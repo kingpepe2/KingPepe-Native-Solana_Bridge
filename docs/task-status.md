@@ -1,4 +1,4 @@
-# KingPepe Native ↔ Solana Bridge — Task Status
+# KingPepe Native <-> Solana Bridge — Task Status
 
 ## Phase 01 — Safe Foundation
 
@@ -9,9 +9,10 @@
   - `d9767256d5335815bcca16e62841782d05fd5e51` — `docs: record latest stage-01 commit and ci run`
   - `fe648a074983853acef0541b2616486d4d0b06e4` — `docs: correct phase 01 status with current head and ci run`
   - `d5bee6eab42f4347c21d0cbce53a4b49528288e2` — `docs: include final phase 01 sha and ci run`
+  - `3d055d3b081d293b98b4012ce11b0e83af472097` — `docs: sync phase 01 status to final head`
 - Push result: `success` (`main` -> `origin/main`)
 - CI status: `success`
-- Latest CI run: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34019560072`
+- Latest CI run: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34019612364`
 
 - Implemented:
   - Added `.gitignore` for secret/publication boundaries and build artifacts.
@@ -30,7 +31,7 @@
     and `windows-latest` with both guardrail jobs passing.
 
 - Push:
-  - `d5bee6eab42f4347c21d0cbce53a4b49528288e2` pushed to `main`.
+  - `3d055d3b081d293b98b4012ce11b0e83af472097` pushed to `main`.
 
 - Open blockers:
   - No functional bridge code exists yet.
