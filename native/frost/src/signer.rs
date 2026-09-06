@@ -128,7 +128,8 @@ impl Signer {
         if share.message_hash != build_message(request) {
             return Err(SignerError::DigestMismatch);
         }
-        let signature = Signature::from_bytes(&share.signature);
+        let signature = Signature::from_slice(&share.signature)
+            .map_err(|_| SignerError::BadSignature)?;
         let public_key = self.public_key();
         public_key
             .verify(&share.message_hash, &signature)
@@ -149,7 +150,8 @@ impl SignedShare {
         if self.message_hash != build_message(request) {
             return Err(SignerError::DigestMismatch);
         }
-        let signature = Signature::from_bytes(&self.signature);
+        let signature = Signature::from_slice(&self.signature)
+            .map_err(|_| SignerError::BadSignature)?;
         public_key
             .verify(&self.message_hash, &signature)
             .map_err(|_| SignerError::BadSignature)?;
