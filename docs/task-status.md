@@ -139,14 +139,18 @@
 
 - Tests/validation performed:
   - Local guardrail scan: passed.
-  - Local Rust build/test for `native/frost`: NOT_RUN (toolchain not installed: `cargo` unavailable in this environment).
-  - Signed/invalid-share behavior covered by integration tests in `native/frost/tests/signing_runtime_tests.rs` (pending execution in CI/local toolchain).
+  - Local Rust build/test for `native/frost`: failed in environment toolchain until dependency/features were corrected; final dependency configuration and API compatibility were validated in WSL and tests now pass:
+    - `cargo check --manifest-path native/frost/Cargo.toml` ✅
+    - `cargo test --manifest-path native/frost/Cargo.toml` ✅
+    - 7/7 tests passed (`native/frost/tests/signing_runtime_tests.rs`).
 
-- Commit:
-  - `627fc69` — `feat(phase-04): implement native frost runtime coordinator and signatures`
+- Commits:
+  - `f80469f` — `feat(phase-04): implement native frost runtime coordinator and signatures`
+  - `7333f4b` — `fix(phase-04): handle ed25519 signature parsing as fallible decode`
+  - `de8c41f` — `fix(phase-04): stabilize frost crate dependencies and fix compile issues`
 
 - Push:
-  - Pending for this phase commit.
+  - Pending for latest phase commit.
 - CI:
   - Pending (to be reported after push).
 
