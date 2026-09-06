@@ -21,8 +21,8 @@
 
 ## Current phase status
 
-- Current implementation phase: `PHASE 04 — Software FROST A+B`
-- Objective: implement service/process topology and state machine for dual-operator signing coordination.
+- Current implementation phase: `PHASE 04 ― Software FROST A+B`
+- Objective: implement native same-host dual-signer primitives and coordinator state machine.
 
 ## Authoritative status files
 
@@ -31,15 +31,18 @@
 - `BRIDGE-READINESS.json` (to be created in a later phase)
 - `.github/workflows/ci.yml`
 
-## Phase 03 safe commands
+## Phase 04 safe commands
 
 - Run guardrail checks:
   - `python .github/scripts/guardrails.py`
-- Review staged changes before commit:
+- Run staged diff review:
   - `git diff --cached`
 - Inspect repository remotes and branch:
   - `git remote -v`
   - `git branch --show-current`
+- Validate FROST crate build/tests locally (if toolchain available):
+  - `cargo check --manifest-path native/frost/Cargo.toml`
+  - `cargo test --manifest-path native/frost/Cargo.toml`
 - Validate Solana workspace:
   - `cargo check --workspace --all-targets` (run in `solana/`)
 - Verify commit and push:

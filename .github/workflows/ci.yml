@@ -28,6 +28,10 @@ jobs:
         run: |
           cd solana
           cargo check --workspace --all-targets
+      - name: Validate native FROST runtime
+        run: cargo check --manifest-path native/frost/Cargo.toml
+      - name: Run native FROST tests
+        run: cargo test --manifest-path native/frost/Cargo.toml
 
   foundation-windows-check:
     name: Foundation Windows Check
@@ -48,3 +52,7 @@ jobs:
         run: |
           cd solana
           cargo check --workspace --all-targets
+      - name: Validate native FROST runtime
+        run: cargo check --manifest-path native/frost/Cargo.toml
+      - name: Run native FROST tests
+        run: cargo test --manifest-path native/frost/Cargo.toml
