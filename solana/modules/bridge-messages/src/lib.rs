@@ -99,6 +99,7 @@ impl BridgeOperationState {
             (S::REJECTED_INVALID, _) | (S::HARD_STOP, _) | (S::COMPLETED, _) => {
                 Err(BridgeStateTransitionError::InvalidTransition)
             }
+            _ => Err(BridgeStateTransitionError::InvalidTransition),
         }
     }
 }
@@ -334,31 +335,70 @@ impl LedgerState {
     }
 
     pub fn record_validated_deposit(&mut self, amount: u64, fee: u64) -> Result<(), LedgerError> {
-        self.apply_add(&mut self.backing_reserve, amount.into())?;
-        self.apply_add(&mut self.pending_mint_liability, amount.into())?;
-        self.apply_add(&mut self.collected_fees, fee.into())?;
-        self.apply_add(&mut self.emitted_gross, amount.into())?;
+        self.backing_reserve = self
+            .backing_reserve
+            .checked_add(amount as u128)
+            .ok_or(LedgerError::Arithmetic)?;
+        self.pending_mint_liability = self
+            .pending_mint_liability
+            .checked_add(amount as u128)
+            .ok_or(LedgerError::Arithmetic)?;
+        self.collected_fees = self
+            .collected_fees
+            .checked_add(fee as u128)
+            .ok_or(LedgerError::Arithmetic)?;
+        self.emitted_gross = self
+            .emitted_gross
+            .checked_add(amount as u128)
+            .ok_or(LedgerError::Arithmetic)?;
         self.assert_invariants()
     }
 
     pub fn record_mint(&mut self, amount: u64, fee: u64) -> Result<(), LedgerError> {
-        self.apply_sub_limit(&mut self.pending_mint_liability, amount)?;
-        self.apply_add(&mut self.collected_fees, fee.into())?;
-        self.apply_add(&mut self.projected_surplus, (amount.saturating_sub(fee)).into())?;
+        self.pending_mint_liability = self
+            .pending_mint_liability
+            .checked_sub(amount as u128)
+            .ok_or(LedgerError::InsufficientFunds)?;
+        self.collected_fees = self
+            .collected_fees
+            .checked_add(fee as u128)
+            .ok_or(LedgerError::Arithmetic)?;
+        self.projected_surplus = self
+            .projected_surplus
+            .checked_add((amount.saturating_sub(fee)) as u128)
+            .ok_or(LedgerError::Arithmetic)?;
         self.assert_invariants()
     }
 
     pub fn record_burn_request(&mut self, amount: u64, fee: u64) -> Result<(), LedgerError> {
-        self.apply_add(&mut self.pending_withdrawal_liability, amount.into())?;
-        self.apply_add(&mut self.emitted_gross, amount.into())?;
-        self.apply_sub_limit(&mut self.collected_fees, fee)?;
-        self.apply_add(&mut self.projected_surplus, 0)?;
+        self.pending_withdrawal_liability = self
+            .pending_withdrawal_liability
+            .checked_add(amount as u128)
+            .ok_or(LedgerError::Arithmetic)?;
+        self.emitted_gross = self
+            .emitted_gross
+            .checked_add(amount as u128)
+            .ok_or(LedgerError::Arithmetic)?;
+        self.collected_fees = self
+            .collected_fees
+            .checked_sub(fee as u128)
+            .ok_or(LedgerError::InsufficientFunds)?;
+        self.projected_surplus = self
+            .projected_surplus
+            .checked_add(0)
+            .ok_or(LedgerError::Arithmetic)?;
         self.assert_invariants()
     }
 
     pub fn record_payout_settlement(&mut self, amount: u64) -> Result<(), LedgerError> {
-        self.apply_sub_limit(&mut self.pending_withdrawal_liability, amount)?;
-        self.apply_sub_limit(&mut self.backing_reserve, amount)?;
+        self.pending_withdrawal_liability = self
+            .pending_withdrawal_liability
+            .checked_sub(amount as u128)
+            .ok_or(LedgerError::InsufficientFunds)?;
+        self.backing_reserve = self
+            .backing_reserve
+            .checked_sub(amount as u128)
+            .ok_or(LedgerError::InsufficientFunds)?;
         self.assert_invariants()
     }
 
@@ -376,25 +416,6 @@ impl LedgerState {
         Ok(())
     }
 
-    fn apply_add<T>(&self, field: &mut T, amount: u128) -> Result<(), LedgerError>
-    where
-        T: Copy + Into<u128> + TryFrom<u128>,
-    {
-        let base: u128 = (*field).into();
-        let updated = base.checked_add(amount).ok_or(LedgerError::Arithmetic)?;
-        *field = T::try_from(updated).ok().ok_or(LedgerError::Arithmetic)?;
-        Ok(())
-    }
-
-    fn apply_sub_limit<T>(&self, field: &mut T, amount: u64) -> Result<(), LedgerError>
-    where
-        T: Copy + Into<u128> + TryFrom<u128>,
-    {
-        let current: u128 = (*field).into();
-        let updated = current.checked_sub(amount as u128).ok_or(LedgerError::InsufficientFunds)?;
-        *field = T::try_from(updated).ok().ok_or(LedgerError::Arithmetic)?;
-        Ok(())
-    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
