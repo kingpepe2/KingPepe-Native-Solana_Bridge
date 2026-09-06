@@ -21,8 +21,8 @@
 
 ## Current phase status
 
-- Current implementation phase: `PHASE 01 — Safe Foundation`
-- Objective: establish repository baseline, secrets policy, minimal authoritative documentation, and CI guardrails.
+- Current implementation phase: `PHASE 02 - Recovery, Comparison, and Clean Structure`
+- Objective: establish the Solana workspace/layout baseline, compare with NTT, pin baseline dependencies, and prepare compliance artifacts.
 
 ## Authoritative status files
 
@@ -31,7 +31,7 @@
 - `BRIDGE-READINESS.json` (to be created in a later phase)
 - `.github/workflows/ci.yml`
 
-## Phase 01 safe commands
+## Phase 02 safe commands
 
 - Run guardrail checks:
   - `python .github/scripts/guardrails.py`
@@ -40,6 +40,8 @@
 - Inspect repository remotes and branch:
   - `git remote -v`
   - `git branch --show-current`
+- Validate Solana workspace:
+  - `cargo check --workspace --all-targets` (run in `solana/`)
 - Verify commit and push:
   - `git status`
   - `git log --oneline -n 3`
