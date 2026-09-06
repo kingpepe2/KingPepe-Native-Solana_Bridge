@@ -3,6 +3,7 @@ use ed25519_dalek::{Signature, SigningKey, VerifyingKey};
 use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use thiserror::Error;
 
 pub const ROLE_A: u8 = 0;
 pub const ROLE_B: u8 = 1;
@@ -44,7 +45,7 @@ pub struct SignedShare {
     pub epoch: u64,
     pub nonce: [u8; 32],
     pub message_hash: [u8; 32],
-    pub signature: [u8; 64],
+    pub signature: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
@@ -108,7 +109,7 @@ impl Signer {
             epoch: request.epoch,
             nonce: request.nonce,
             message_hash: message,
-            signature: signature.to_bytes(),
+            signature: signature.to_bytes().to_vec(),
         })
     }
 
@@ -128,7 +129,12 @@ impl Signer {
         if share.message_hash != build_message(request) {
             return Err(SignerError::DigestMismatch);
         }
-        let signature = Signature::from_slice(&share.signature)
+        let signature_bytes: [u8; 64] = share
+            .signature
+            .as_slice()
+            .try_into()
+            .map_err(|_| SignerError::BadSignature)?;
+        let signature = Signature::from_slice(&signature_bytes)
             .map_err(|_| SignerError::BadSignature)?;
         let public_key = self.public_key();
         public_key
@@ -150,7 +156,12 @@ impl SignedShare {
         if self.message_hash != build_message(request) {
             return Err(SignerError::DigestMismatch);
         }
-        let signature = Signature::from_slice(&self.signature)
+        let signature_bytes: [u8; 64] = self
+            .signature
+            .as_slice()
+            .try_into()
+            .map_err(|_| SignerError::BadSignature)?;
+        let signature = Signature::from_slice(&signature_bytes)
             .map_err(|_| SignerError::BadSignature)?;
         public_key
             .verify(&self.message_hash, &signature)

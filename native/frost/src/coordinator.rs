@@ -46,7 +46,7 @@ impl SigningSession {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct SigningCoordinator {
     required_participants: BTreeSet<SignerRole>,
     policy: SigningPolicy,
@@ -138,10 +138,11 @@ impl SigningCoordinator {
         }
 
         session.seen.insert(share.signer_role);
-        session.shares.insert(share.signer_role, share);
+        let role = share.signer_role;
+        session.shares.insert(role, share);
 
         self.nonce_store
-            .record_signature(&session.record.nonce, share.signer_role)
+            .record_signature(&session.record.nonce, role)
             .map_err(|store_err| match store_err {
                 NonceStoreError::InvalidTransition { .. } => CoordinatorError::InvalidTransition,
                 NonceStoreError::CompletedCannotRollback => CoordinatorError::HardStop,

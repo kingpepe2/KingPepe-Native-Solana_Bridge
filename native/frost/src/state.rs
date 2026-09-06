@@ -43,6 +43,7 @@ impl NonceEntry {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct NonceStore {
     entries: BTreeMap<NonceId, NonceEntry>,
     used_request_ids: HashSet<[u8; 32]>,
