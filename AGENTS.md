@@ -21,8 +21,8 @@
 
 ## Current phase status
 
-- Current implementation phase: `PHASE 02 - Recovery, Comparison, and Clean Structure`
-- Objective: establish the Solana workspace/layout baseline, compare with NTT, pin baseline dependencies, and prepare compliance artifacts.
+- Current implementation phase: `PHASE 03 — Protocol and Accounting Model`
+- Objective: define canonical messages, identities, operation state transitions, and accounting primitives.
 
 ## Authoritative status files
 
@@ -31,7 +31,7 @@
 - `BRIDGE-READINESS.json` (to be created in a later phase)
 - `.github/workflows/ci.yml`
 
-## Phase 02 safe commands
+## Phase 03 safe commands
 
 - Run guardrail checks:
   - `python .github/scripts/guardrails.py`
