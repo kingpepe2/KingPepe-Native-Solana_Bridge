@@ -72,7 +72,7 @@
     - `da5a73814140bd87eb1dce0035bfe5fa3565ff2e`
     - `080c1ba720af9048b2ae91a64cdd43c86025daf7`
 - CI:
-  - `success` (`https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34020246077`)
+  - `success` (`https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34020293831`)
 - Open blockers:
   - No Rust toolchain available in this shell for local build checks.
   - No concrete native parsers, FROST signing code, or production services implemented yet.
