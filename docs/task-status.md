@@ -79,3 +79,33 @@
   - Toolchain pinning remains to be finalized against execution environments (Linux/Windows and CI).
 - Next steps:
   - Start Phase 03 implementation and accounting primitives.
+
+## Phase 03 — Protocol and Accounting Model
+
+- Status: `IN_PROGRESS`
+- Implemented in this phase:
+  - Implemented canonical bridge message model in `solana/modules/bridge-messages/src/lib.rs`.
+  - Added versioned message encoding/decoding with strict length checks and field validation.
+  - Added explicit bridge direction/action enums.
+  - Added operation state machine and allowed transitions:
+    - `WAITING_FOR_FINALITY`
+    - `WAITING_FOR_DEPENDENCY`
+    - `QUEUED_BY_LIMIT`
+    - `VERIFIED_READY`
+    - `REJECTED_INVALID`
+    - `HARD_STOP`
+    - `COMPLETED`
+  - Added deployment/identity binding and accounting snapshot primitives.
+  - Added checked reserve/liability accounting with invariant checks for backing coverage.
+  - Updated bridge-messages tests to cover canonical roundtrip, invalid direction/version checks, and accounting checks.
+- Tests/validation:
+  - Local guardrail scan passed.
+  - Local `cargo check` could not run because Rust toolchain is not available in this runtime (NOT_RUN).
+  - CI verification pending for this phase commit.
+- Push:
+  - Not yet pushed.
+- Open blockers:
+  - Full Solana runtime/toolchain setup is required locally to run `cargo check` before merge.
+  - Economic state semantics still need to be integrated with Solana/native workflow in later phases.
+- Next steps:
+  - Finalize and publish Phase 03 after CI pass.
