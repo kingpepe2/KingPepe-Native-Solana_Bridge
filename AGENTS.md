@@ -21,8 +21,8 @@
 
 ## Current phase status
 
-- Current implementation phase: `PHASE 04 ― Software FROST A+B`
-- Objective: implement native same-host dual-signer primitives and coordinator state machine.
+- Current implementation phase: `PHASE 05 ― Solana Programs`
+- Objective: implement Solana bridge and transceiver programs, including replay protection, authority boundaries, and program checks.
 
 ## Authoritative status files
 
@@ -31,7 +31,7 @@
 - `BRIDGE-READINESS.json` (to be created in a later phase)
 - `.github/workflows/ci.yml`
 
-## Phase 04 safe commands
+## Phase 05 safe commands
 
 - Run guardrail checks:
   - `python .github/scripts/guardrails.py`
@@ -40,11 +40,15 @@
 - Inspect repository remotes and branch:
   - `git remote -v`
   - `git branch --show-current`
-- Validate FROST crate build/tests locally (if toolchain available):
-  - `cargo check --manifest-path native/frost/Cargo.toml`
-  - `cargo test --manifest-path native/frost/Cargo.toml`
 - Validate Solana workspace:
   - `cargo check --workspace --all-targets` (run in `solana/`)
+  - `cargo test` (as program-specific harnesss expand per implementation)
+- Validate native runtime crates:
+  - `cargo check --manifest-path native/frost/Cargo.toml`
+  - `cargo test --manifest-path native/frost/Cargo.toml`
+- Validate stage transitions and program-level checks:
+  - `cargo build --manifest-path solana/programs/kingpepe-bridge/Cargo.toml`
+  - `cargo build --manifest-path solana/programs/kingpepe-transceiver/Cargo.toml`
 - Verify commit and push:
   - `git status`
   - `git log --oneline -n 3`

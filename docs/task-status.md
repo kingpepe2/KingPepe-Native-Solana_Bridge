@@ -116,7 +116,7 @@
 
 ## Phase 04 — Software FROST A+B
 
-- Status: `IN_PROGRESS`
+- Status: `COMPLETED`
 - Implemented in this phase:
   - Added native `frost_runtime` crate under `native/frost` with:
     - deterministic signer role model (`A`, `B`),
@@ -150,14 +150,12 @@
   - `de8c41f` — `fix(phase-04): stabilize frost crate dependencies and fix compile issues`
 
 - Push:
-  - Pending for latest phase commit.
+  - `a96db13` pushed to `main`.
 - CI:
-  - Pending (to be reported after push).
+  - `success` (`https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34021101551`)
 
 - Open blockers:
-  - Rust toolchain unavailable in current session.
-  - FROST implementation remains a deterministic ed25519-based signing/runtime stage and does not yet integrate into full payment flow (reserved for later phases).
+  - FROST implementation is a deterministic ed25519-based runtime and does not yet integrate into full payment flow (reserved for later phases).
 
 - Next steps:
-  - Push this phase and capture CI result.
-  - Continue with Phase 05 (`Solana Programs`).
+  - Transition to Phase 05 (`Solana Programs`) with Phase 04 marked complete.
