@@ -82,7 +82,7 @@
 
 ## Phase 03 — Protocol and Accounting Model
 
-- Status: `IN_PROGRESS`
+- Status: `COMPLETED`
 - Implemented in this phase:
   - Implemented canonical bridge message model in `solana/modules/bridge-messages/src/lib.rs`.
   - Added versioned message encoding/decoding with strict length checks and field validation.
@@ -101,11 +101,15 @@
 - Tests/validation:
   - Local guardrail scan passed.
   - Local `cargo check` could not run because Rust toolchain is not available in this runtime (NOT_RUN).
-  - CI verification pending for this phase commit.
+  - `Validate Solana workspace` step in CI passed on committed phase-03 head.
 - Push:
-  - Not yet pushed.
+  - Completed and pushed as:
+    - `673ad48a6e42fd908c847b4c7058d6c57184abfc`
+    - `5ce08e7755d383998c9c903de0fe82a4e5298c77`
+- CI:
+  - `success` (`https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34020507243`)
 - Open blockers:
   - Full Solana runtime/toolchain setup is required locally to run `cargo check` before merge.
   - Economic state semantics still need to be integrated with Solana/native workflow in later phases.
 - Next steps:
-  - Finalize and publish Phase 03 after CI pass.
+  - Start Phase 04 (`Software FROST A+B`).

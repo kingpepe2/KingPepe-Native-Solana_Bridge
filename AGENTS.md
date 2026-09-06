@@ -21,8 +21,8 @@
 
 ## Current phase status
 
-- Current implementation phase: `PHASE 03 — Protocol and Accounting Model`
-- Objective: define canonical messages, identities, operation state transitions, and accounting primitives.
+- Current implementation phase: `PHASE 04 — Software FROST A+B`
+- Objective: implement service/process topology and state machine for dual-operator signing coordination.
 
 ## Authoritative status files
 
