@@ -1,0 +1,12 @@
+[package]
+name = "kingpepe-transceiver"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "kingpepe_transceiver"
+path = "src/lib.rs"
+
+[dependencies]
+thiserror = "1.0"
+

@@ -1,0 +1,38 @@
+{
+  "primaryReference": {
+    "project": "wormhole-foundation/native-token-transfers",
+    "selectedCommit": "250d810d42b005526e4fb7e3aea75d2d2ab8fdbb",
+    "selectedReason": "Committed structure and module layout aligned to current requirements; explicit comparison was performed before implementing project-specific Native custody logic.",
+    "selectedOn": "2026-09-06",
+    "license": "Apache-2.0"
+  },
+  "reuse": [
+    {
+      "area": "Source architecture for Solana component layout",
+      "status": "comparison-only",
+      "decision": "Reference only; no code imported yet in this stage."
+    },
+    {
+      "area": "Message format and module naming patterns",
+      "status": "comparison-only",
+      "decision": "Patterns recorded for later canonical encoding design."
+    }
+  ],
+  "excluded": [
+    {
+      "area": "TON/other-chain modules",
+      "status": "excluded",
+      "reason": "Project target excludes TON, Sui, XRPL, EVM chain implementations."
+    },
+    {
+      "area": "Upstream examples and runtime scripts",
+      "status": "excluded",
+      "reason": "Requires selective extraction only where compatible and not yet planned."
+    }
+  ],
+  "licenseNotes": [
+    "Track Apache-2.0 upstream headers when importing concrete files in later phases.",
+    "Do not import generated/derived binaries or deployment assets without matching provenance."
+  ]
+}
+

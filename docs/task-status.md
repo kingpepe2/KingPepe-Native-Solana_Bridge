@@ -41,3 +41,34 @@
 
 - Next phase:
   - Phase 02 (`Recovery, Comparison, and Clean Structure`) once Stage 01 is committed and CI green.
+
+## Phase 02 — Recovery, Comparison, and Clean Structure
+
+- Status: `IN_PROGRESS`
+- Implemented:
+  - Added Solana workspace scaffold:
+    - `solana/Cargo.toml`
+    - `solana/rust-toolchain.toml`
+    - `solana/Anchor.toml`
+    - `solana/programs/kingpepe-bridge` package + tests
+    - `solana/programs/kingpepe-transceiver` package + tests
+    - `solana/modules/bridge-messages` package + tests
+  - Added structured comparison and compliance artifacts:
+    - `docs/architecture/ntt-comparison.md`
+    - `UPSTREAM-REFERENCES.json`
+    - `THIRD_PARTY_NOTICES.md`
+  - Added initial domain scaffolds under:
+    - `native/`
+    - `services/`
+- Tests/validation:
+  - Local guardrail scan passed.
+  - Local `cargo check` could not run because Rust toolchain is not installed in this
+    runtime. CI job includes `cargo check --workspace --all-targets` validation.
+- Push:
+  - Not yet pushed at this phase milestone.
+- Open blockers:
+  - No Rust toolchain available in this shell for local build checks.
+  - No concrete native parsers, FROST signing code, or production services implemented yet.
+  - Toolchain pinning remains to be finalized against execution environments (Linux/Windows and CI).
+- Next steps:
+  - Complete phase 02 commit with pinned dependency manifest and record final CI evidence.
