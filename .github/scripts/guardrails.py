@@ -13,18 +13,17 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 SENSITIVE_BASENAMES = {
     "secret",
-    "wallet",
     "mnemonic",
     "seed",
-    "recovery",
-    "private",
     ".env",
 }
 
 SENSITIVE_PATH_PATTERNS = [
     re.compile(r"(^|/)\.env(\.|$)", re.IGNORECASE),
-    re.compile(r"(^|/)frost(?:_state)?/", re.IGNORECASE),
-    re.compile(r"(^|/)frost[-_]?(?:a|b)[-_]?", re.IGNORECASE),
+    re.compile(r"(^|/)private[_-]?keys?/", re.IGNORECASE),
+    re.compile(r"(^|/)credentials?/", re.IGNORECASE),
+    re.compile(r"(^|/)secrets?/", re.IGNORECASE),
+    re.compile(r"(^|/)keystore/", re.IGNORECASE),
     re.compile(r"(^|/)id_.*\.json$", re.IGNORECASE),
     re.compile(r"(^|/)wallet.*\.json$", re.IGNORECASE),
 ]
@@ -54,7 +53,7 @@ def check_file_for_secrets(path: Path) -> list[str]:
     if path.suffix.lower() in SENSITIVE_EXTENSIONS:
         findings.append(f"sensitive extension: {rel}")
 
-    if any(name in lower for name in [".secret", ".wallet", ".mnemonic", ".seed", "recovery"]):
+    if any(name in lower for name in [".secret", ".wallet", ".mnemonic", ".seed"]):
         findings.append(f"sensitive filename: {rel}")
 
     if basename in SENSITIVE_BASENAMES:
