@@ -1,0 +1,40 @@
+name: bridge-foundation
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  foundation-guardrails:
+    name: Foundation Guardrails
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run local guardrails
+        run: python .github/scripts/guardrails.py
+
+  foundation-windows-check:
+    name: Foundation Windows Check
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run guardrails
+        run: python .github/scripts/guardrails.py
