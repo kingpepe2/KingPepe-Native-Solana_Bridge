@@ -8,9 +8,10 @@
   - `a11fc36b1e0f40ce9bae57a7e46ebb2598d0b337` — `docs: finalize phase 01 status after push and ci`
   - `d9767256d5335815bcca16e62841782d05fd5e51` — `docs: record latest stage-01 commit and ci run`
   - `fe648a074983853acef0541b2616486d4d0b06e4` — `docs: correct phase 01 status with current head and ci run`
+  - `d5bee6eab42f4347c21d0cbce53a4b49528288e2` — `docs: include final phase 01 sha and ci run`
 - Push result: `success` (`main` -> `origin/main`)
 - CI status: `success`
-- Latest CI run: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34019531196`
+- Latest CI run: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34019560072`
 
 - Implemented:
   - Added `.gitignore` for secret/publication boundaries and build artifacts.
@@ -29,7 +30,7 @@
     and `windows-latest` with both guardrail jobs passing.
 
 - Push:
-  - `fe648a074983853acef0541b2616486d4d0b06e4` pushed to `main`.
+  - `d5bee6eab42f4347c21d0cbce53a4b49528288e2` pushed to `main`.
 
 - Open blockers:
   - No functional bridge code exists yet.
