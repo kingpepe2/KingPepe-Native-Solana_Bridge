@@ -113,3 +113,47 @@
   - Economic state semantics still need to be integrated with Solana/native workflow in later phases.
 - Next steps:
   - Start Phase 04 (`Software FROST A+B`).
+
+## Phase 04 — Software FROST A+B
+
+- Status: `IN_PROGRESS`
+- Implemented in this phase:
+  - Added native `frost_runtime` crate under `native/frost` with:
+    - deterministic signer role model (`A`, `B`),
+    - signing request and signed share encoding,
+    - in-memory nonce/session store with transition checks and rollback guard,
+    - coordinator state machine requiring both participants,
+    - domain/policy validation for deployment epoch and chain bindings,
+    - recovery instruction/rule types.
+  - Added coordinator/tests integration to validate:
+    - both signatures required before finalize,
+    - duplicate role share rejection,
+    - domain mismatch rejection,
+    - nonce reuse protection,
+    - policy limit enforcement,
+    - restart rollback guard on completed operations.
+  - Updated CI (`.github/workflows/ci.yml`) to run:
+    - `cargo check --manifest-path native/frost/Cargo.toml`
+    - `cargo test --manifest-path native/frost/Cargo.toml`
+    on both Ubuntu and Windows jobs.
+
+- Tests/validation performed:
+  - Local guardrail scan: passed.
+  - Local Rust build/test for `native/frost`: NOT_RUN (toolchain not installed: `cargo` unavailable in this environment).
+  - Signed/invalid-share behavior covered by integration tests in `native/frost/tests/signing_runtime_tests.rs` (pending execution in CI/local toolchain).
+
+- Commit:
+  - `627fc69` — `feat(phase-04): implement native frost runtime coordinator and signatures`
+
+- Push:
+  - Pending for this phase commit.
+- CI:
+  - Pending (to be reported after push).
+
+- Open blockers:
+  - Rust toolchain unavailable in current session.
+  - FROST implementation remains a deterministic ed25519-based signing/runtime stage and does not yet integrate into full payment flow (reserved for later phases).
+
+- Next steps:
+  - Push this phase and capture CI result.
+  - Continue with Phase 05 (`Solana Programs`).
