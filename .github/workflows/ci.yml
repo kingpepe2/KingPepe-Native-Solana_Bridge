@@ -22,6 +22,12 @@ jobs:
           python-version: "3.11"
       - name: Run local guardrails
         run: python .github/scripts/guardrails.py
+      - name: Pin rust toolchain
+        run: rustup toolchain install --profile minimal nightly-2023-10-29
+      - name: Validate Solana workspace
+        run: |
+          cd solana
+          cargo check --workspace --all-targets
 
   foundation-windows-check:
     name: Foundation Windows Check
@@ -38,3 +44,7 @@ jobs:
           python-version: "3.11"
       - name: Run guardrails
         run: python .github/scripts/guardrails.py
+      - name: Validate Solana workspace
+        run: |
+          cd solana
+          cargo check --workspace --all-targets

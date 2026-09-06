@@ -1,0 +1,12 @@
+[package]
+name = "kingpepe-bridge"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "kingpepe_bridge"
+path = "src/lib.rs"
+
+[dependencies]
+thiserror = "1.0"
+

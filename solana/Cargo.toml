@@ -1,0 +1,8 @@
+[workspace]
+members = [
+  "programs/kingpepe-bridge",
+  "programs/kingpepe-transceiver",
+  "modules/bridge-messages",
+]
+resolver = "2"
+
