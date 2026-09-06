@@ -60,18 +60,16 @@
   - Added initial domain scaffolds under:
     - `native/`
     - `services/`
--  - Added reference module dependency fix for `bridge-messages` tests and tightened guardrail false-positive handling.
+  - Added reference module dependency fix for `bridge-messages` tests and tightened guardrail false-positive handling.
 - Tests/validation:
   - Local guardrail scan passed.
   - Local `cargo check` could not run because Rust toolchain is not installed in this runtime (NOT RUN).
   - `Validate Solana workspace` step in CI passed on the committed phase-02 head.
 - Push:
   - Completed and pushed as:
-    - `c8a9839afdfa7c8d8580e4c60d943d41e50f0aaf`
-    - `21226e65980921e6fdbc43494703d9885a7fec5d`
-    - `48e8b0396f23f655024267d1203219c45667a0b8`
+    - `9944eee3174d56ceee29bb768b06253d1d61947`
 - CI:
-  - `success` (`https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34019937489`)
+  - `success` (`https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34020000530`)
 - Open blockers:
   - No Rust toolchain available in this shell for local build checks.
   - No concrete native parsers, FROST signing code, or production services implemented yet.
