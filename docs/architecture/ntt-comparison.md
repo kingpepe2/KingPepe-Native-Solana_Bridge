@@ -1,50 +1,41 @@
 # Native Token Transfers (NTT) Comparison
 
-## Scope and selected commit
+## Reference
 
-- Reference repo: `wormhole-foundation/native-token-transfers`
+- Project: `wormhole-foundation/native-token-transfers`
 - Reference commit: `250d810d42b005526e4fb7e3aea75d2d2ab8fdbb`
-- Decision: **compare-only in this stage**; no upstream runtime/source import yet.
+- License: Apache-2.0
+- Date checked: `2026-09-07`
 
-## Directory comparison
+## Why this reference is used
 
-### Matched structure we plan to keep
+- Message and replay structure patterns.
+- Program boundary separation between bridge manager and witness verification.
+- Typed account and integration organization for Solana workspaces.
 
-- `solana/`:
-  - `programs/*` – target keeps a dedicated program workspace layout.
-  - `modules/*` – message module concept retained for shared message schema.
-  - `fuzz/`, `tests/`, `ts/` – required by later phases.
-- `README` conventions and build tooling expectations.
+## What is reused in this phase
 
-### Intentionally excluded for this project
+- Design only, no source file imported yet.
+- Planned reuse patterns:
+  - Solana workspace layout families.
+  - Canonical replay protection and claim tracking model.
+  - Test and fuzz organization approach.
 
-- `xrpl/`, `evm/`, `sui/`, `cli/` (chain-specific alternatives not part of this bridge).
-- TON-oriented or chain-specific deployment references from other chains.
-- Upstream examples not aligned with KingPepe operational model.
+## What is excluded in this project
 
-## Trust model and assumptions difference
+- TON-specific governance, config, and lite-client adapters.
+- Chain-specific modules not in scope (EVM/SUI/XRPL patterns).
+- Legacy examples or scripts that assume external multi-host Guardian trust assumptions.
+- Direct import of any `proof` or `telemetry` code until protocol-specific compatibility is proven.
 
-- NTT is a multi-chain reference with chain-agnostic relay components.
-- KingPepe design requires:
-  - same-host 2-of-2 software FROST with explicit A/B separation,
-  - explicit reservation/liability accounting between Native and Solana,
-  - automatic transfer authorization policies.
-- Therefore, direct code reuse requires explicit policy and cryptographic binding redesign.
+## Required local differences
 
-## Use decision by component family
+- KingPepe Native signature requirements must be handled by project-specific crypto path.
+- Same-host dual FROST participants (A+B) are approved by owner governance for this project.
+- Automatic transfer authorization remains local and policy-driven after user wallet signatures.
+- Canonical reserve/liability model is bound to Native-backed operations and reconciliation.
 
-1. **Program layout and module boundaries**
-   - Decision: Modified reuse pattern; no direct copy yet.
-   - Rationale: required custom trust boundaries and state model.
-2. **Replay protection / message encoding**
-   - Decision: Reference logic expected, but concrete encoding and domain binding is still project-specific.
-3. **ATTESTATION and witness path**
-   - Decision: Reference-only; no direct runtime code copied in this phase.
-4. **Fuzz and test templates**
-   - Decision: Reuse test strategy shape in later phases, pending project-specific vectors.
+## Compliance notes
 
-## Tooling and license tracking
-
-- Upstream commit carries Apache-2.0 license.
-- Concrete imports will continue to reference source SHA and keep Apache headers in files we adopt.
-
+- If any upstream file is imported later, license headers and NOTICE lines must be preserved.
+- Source hashes for imported commits must match tracked in `UPSTREAM-REFERENCES.json`.

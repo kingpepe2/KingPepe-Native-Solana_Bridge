@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "KingPepe Native-Solana Bridge Local Environment Schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "environment",
+    "nativeNetwork",
+    "solanaCluster"
+  ],
+  "properties": {
+    "environment": {
+      "type": "string",
+      "enum": ["localnet", "devnet", "mainnet"]
+    },
+    "nativeNetwork": {
+      "type": "string",
+      "minLength": 1
+    },
+    "solanaCluster": {
+      "type": "string",
+      "minLength": 1
+    },
+    "frost": {
+      "type": "object",
+      "properties": {
+        "participantAStateRoot": { "type": "string" },
+        "participantBStateRoot": { "type": "string" },
+        "policyEpoch": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["participantAStateRoot", "participantBStateRoot", "policyEpoch"],
+      "additionalProperties": false
+    },
+    "attestation": {
+      "type": "object",
+      "properties": {
+        "attesterAKeyRef": { "type": "string" },
+        "attesterBKeyRef": { "type": "string" }
+      },
+      "required": ["attesterAKeyRef", "attesterBKeyRef"],
+      "additionalProperties": false
+    },
+    "program": {
+      "type": "object",
+      "properties": {
+        "bridgeProgramId": { "type": "string" },
+        "transceiverProgramId": { "type": "string" },
+        "mint": { "type": "string" },
+        "tokenProgram": { "type": "string" }
+      },
+      "required": ["bridgeProgramId", "transceiverProgramId", "mint", "tokenProgram"],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,38 +1,46 @@
 {
+  "generatedAt": "2026-09-07T00:00:00Z",
   "primaryReference": {
     "project": "wormhole-foundation/native-token-transfers",
+    "referenceType": "technical-comparison",
     "selectedCommit": "250d810d42b005526e4fb7e3aea75d2d2ab8fdbb",
-    "selectedReason": "Committed structure and module layout aligned to current requirements; explicit comparison was performed before implementing project-specific Native custody logic.",
-    "selectedOn": "2026-09-06",
-    "license": "Apache-2.0"
+    "license": "Apache-2.0",
+    "rationale": "Reference for Solana manager/transceiver layout, replay structure, and message organization.",
+    "verificationDate": "2026-09-07"
+  },
+  "comparison": {
+    "solanaProgramStructure": "matched-pattern",
+    "fuzzAndTestOrganization": "intended-adopt",
+    "attestationModel": "reference-only",
+    "chainSpecificModules": "excluded"
   },
   "reuse": [
     {
-      "area": "Source architecture for Solana component layout",
-      "status": "comparison-only",
-      "decision": "Reference only; no code imported yet in this stage."
+      "area": "program workspace boundaries",
+      "status": "comparison-only"
     },
     {
-      "area": "Message format and module naming patterns",
-      "status": "comparison-only",
-      "decision": "Patterns recorded for later canonical encoding design."
+      "area": "replay protection patterns",
+      "status": "comparison-only"
+    },
+    {
+      "area": "canonical-message module layout",
+      "status": "planned",
+      "notes": "Implemented in KingPepe-specific code in later phases"
     }
   ],
   "excluded": [
     {
-      "area": "TON/other-chain modules",
-      "status": "excluded",
-      "reason": "Project target excludes TON, Sui, XRPL, EVM chain implementations."
+      "area": "TON-related runtime",
+      "reason": "Out of project scope"
     },
     {
-      "area": "Upstream examples and runtime scripts",
-      "status": "excluded",
-      "reason": "Requires selective extraction only where compatible and not yet planned."
+      "area": "legacy governance and multi-party Guardian assumptions",
+      "reason": "Different trust and approval model"
+    },
+    {
+      "area": "direct source imports",
+      "reason": "Phase 02 is structure and comparison only"
     }
-  ],
-  "licenseNotes": [
-    "Track Apache-2.0 upstream headers when importing concrete files in later phases.",
-    "Do not import generated/derived binaries or deployment assets without matching provenance."
   ]
 }
-

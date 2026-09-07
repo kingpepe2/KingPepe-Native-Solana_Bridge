@@ -24,8 +24,8 @@
 
 ## Current phase status
 
-- Current implementation phase: `PHASE 01 - Safe Foundation`
-- Objective: baseline private-source compliance, provenance, and secure guardrails before any additional functional changes.
+- Current implementation phase: `PHASE 02 - Structure and Toolchain`
+- Objective: establish clean source layout, pinned build/tool dependencies, and explicit upstream comparison records before deeper protocol work.
 - Required authority: `KINGPEPE_TEAM_GOVERNANCE`
 
 ## Authoritative status files
@@ -44,3 +44,20 @@
 - `git remote -v`
 - `git branch --show-current`
 - `Get-Content -Raw PROVENANCE.json` (local provenance verification)
+
+## Phase 02 safe commands
+
+- `python .github/scripts/guardrails.py`
+- `git add -A` only after review
+- `git status`
+- `git diff --name-only`
+
+## Phase 02 phase notes
+
+- Added initial non-empty structure directories and configuration schema templates under:
+  - `solana/ts`, `solana/tests`, `solana/fuzz`, `solana/scripts`
+  - `native/proof`, `native/reserve`, `native/recovery`
+  - `config`, `deployment`, `db-backup`, `shared`, `cli`, `app`, `scripts`, `monitoring`, `tests`
+- Pinned toolchain and dependency versions in manifest files.
+- Kept all sensitive runtime data and live credentials outside repository scope.
+- Updated source comparison records: `UPSTREAM-REFERENCES.json`, `docs/architecture/ntt-comparison.md`.

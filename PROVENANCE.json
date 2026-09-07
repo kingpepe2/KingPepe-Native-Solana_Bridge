@@ -36,14 +36,29 @@
       "notes": "Operational and governance instructions for this repository."
     },
     {
+      "path": "BRIDGE-READINESS.json",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Readiness-gate state machine artifact."
+    },
+    {
       "path": "LICENSE",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
       "notes": "Repository proprietary rights statement."
     },
     {
+      "path": "PROVENANCE.json",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Added by phase-02 structure pass; classification derived from file role."
+    },
+    {
       "path": "README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
       "notes": "Project-facing introduction and activation status."
+    },
+    {
+      "path": "SECURITY.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Security boundary and operational controls."
     },
     {
       "path": "THIRD_PARTY_NOTICES.md",
@@ -54,6 +69,56 @@
       "path": "UPSTREAM-REFERENCES.json",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
       "notes": "Reference matrix against the upstream NTT repository."
+    },
+    {
+      "path": "app/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
+      "path": "cli/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
+      "path": "config/examples/localnet.example.json",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
+      "path": "config/schemas/bridge-local.schema.json",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
+      "path": "db-backup/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
+      "path": "deployment/devnet/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
+      "path": "deployment/localnet/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
+      "path": "deployment/mainnet/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
+      "path": "deployment/manifests/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
+      "path": "deployment/windows/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
     },
     {
       "path": "docs/architecture/ntt-comparison.md",
@@ -69,6 +134,21 @@
       "path": "docs/task-status.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
       "notes": "Historical phase status document."
+    },
+    {
+      "path": "monitoring/grafana/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
+      "path": "monitoring/metrics/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
+      "path": "monitoring/prometheus/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
     },
     {
       "path": "native/README.md",
@@ -106,11 +186,6 @@
       "notes": "Signer role notes."
     },
     {
-      "path": "native/frost/state/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "State-management structure notes."
-    },
-    {
       "path": "native/frost/src/coordinator.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Coordinator state machine and orchestration logic."
@@ -141,6 +216,11 @@
       "notes": "State models and persistence abstractions."
     },
     {
+      "path": "native/frost/state/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "State-management structure notes."
+    },
+    {
       "path": "native/frost/tests/signing_runtime_tests.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Runtime and integration tests for coordinator/signer behavior."
@@ -149,6 +229,31 @@
       "path": "native/node/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
       "notes": "Native node adapter notes."
+    },
+    {
+      "path": "native/proof/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
+      "path": "native/recovery/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
+      "path": "native/reserve/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
+      "path": "scripts/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
     },
     {
       "path": "services/attesters/README.md",
@@ -186,14 +291,24 @@
       "notes": "Supervisor service role notes."
     },
     {
+      "path": "shared/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
       "path": "solana/Anchor.toml",
-           "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
       "notes": "Anchor workspace configuration."
     },
     {
       "path": "solana/Cargo.toml",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
       "notes": "Workspace dependency and crate manifest."
+    },
+    {
+      "path": "solana/fuzz/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
     },
     {
       "path": "solana/modules/bridge-messages/Cargo.toml",
@@ -246,14 +361,49 @@
       "notes": "Rust toolchain pinning for reproducibility."
     },
     {
-      "path": "BRIDGE-READINESS.json",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Readiness-gate state machine artifact."
+      "path": "solana/scripts/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
     },
     {
-      "path": "SECURITY.md",
+      "path": "solana/tests/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Security boundary and operational controls."
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
+      "path": "solana/ts/idl/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
+      "path": "solana/ts/lib/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
+      "path": "solana/ts/scripts/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
+      "path": "solana/ts/sdk/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
+      "path": "tests/adversarial/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
+      "path": "tests/integration/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
+      "path": "tests/recovery/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
     }
   ]
 }
