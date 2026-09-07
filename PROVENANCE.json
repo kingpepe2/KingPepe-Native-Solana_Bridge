@@ -1,0 +1,259 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-09-07T00:00:00Z",
+  "project": "KingPepe Native - Solana Bridge",
+  "purpose": "file-by-file provenance classification for local tracked content",
+  "provenancePolicy": {
+    "originalCodeLicense": "Proprietary (Copyright (c) 2026 KingPepe Team)",
+    "provenanceClassifications": [
+      "ORIGINAL_KINGPEPE_CODE",
+      "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "THIRD_PARTY_CODE",
+      "DERIVED_FROM_THIRD_PARTY",
+      "GENERATED_FILE",
+      "BUILD_OR_CONFIGURATION_METADATA"
+    ]
+  },
+  "trackedFiles": [
+    {
+      "path": ".github/scripts/guardrails.py",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Repository guardrail script developed for local policy enforcement."
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "CI workflow configuration and job sequencing."
+    },
+    {
+      "path": ".gitignore",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Publication-boundary and build artifact ignore rules."
+    },
+    {
+      "path": "AGENTS.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Operational and governance instructions for this repository."
+    },
+    {
+      "path": "LICENSE",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Repository proprietary rights statement."
+    },
+    {
+      "path": "README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Project-facing introduction and activation status."
+    },
+    {
+      "path": "THIRD_PARTY_NOTICES.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Third-party attribution index for external references."
+    },
+    {
+      "path": "UPSTREAM-REFERENCES.json",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Reference matrix against the upstream NTT repository."
+    },
+    {
+      "path": "docs/architecture/ntt-comparison.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Architecture comparison notes created for this project."
+    },
+    {
+      "path": "docs/development-status.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Phase progress and status reporting."
+    },
+    {
+      "path": "docs/task-status.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Historical phase status document."
+    },
+    {
+      "path": "native/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Native integration notes and crate layout."
+    },
+    {
+      "path": "native/frost/Cargo.lock",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Rust dependency lockfile for frost crate."
+    },
+    {
+      "path": "native/frost/Cargo.toml",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Crate dependency and feature declarations."
+    },
+    {
+      "path": "native/frost/coordinator/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Coordinator role notes."
+    },
+    {
+      "path": "native/frost/policy/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Policy role notes."
+    },
+    {
+      "path": "native/frost/recovery/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Recovery role notes."
+    },
+    {
+      "path": "native/frost/signer/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Signer role notes."
+    },
+    {
+      "path": "native/frost/state/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "State-management structure notes."
+    },
+    {
+      "path": "native/frost/src/coordinator.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Coordinator state machine and orchestration logic."
+    },
+    {
+      "path": "native/frost/src/lib.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Native FROST crate API surface and exports."
+    },
+    {
+      "path": "native/frost/src/policy.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Policy enforcement logic and types."
+    },
+    {
+      "path": "native/frost/src/recovery.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Recovery-oriented data types and checks."
+    },
+    {
+      "path": "native/frost/src/signer.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Signer abstractions and request validation."
+    },
+    {
+      "path": "native/frost/src/state.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "State models and persistence abstractions."
+    },
+    {
+      "path": "native/frost/tests/signing_runtime_tests.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Runtime and integration tests for coordinator/signer behavior."
+    },
+    {
+      "path": "native/node/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Native node adapter notes."
+    },
+    {
+      "path": "services/attesters/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Attester service role notes."
+    },
+    {
+      "path": "services/bridge-validator/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Bridge validator service role notes."
+    },
+    {
+      "path": "services/indexer/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Indexer service role notes."
+    },
+    {
+      "path": "services/reconciliation/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Reconciliation service role notes."
+    },
+    {
+      "path": "services/relayer/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Relayer service role notes."
+    },
+    {
+      "path": "services/solana-observer/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Solana observer role notes."
+    },
+    {
+      "path": "services/supervisor/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Supervisor service role notes."
+    },
+    {
+      "path": "solana/Anchor.toml",
+           "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Anchor workspace configuration."
+    },
+    {
+      "path": "solana/Cargo.toml",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Workspace dependency and crate manifest."
+    },
+    {
+      "path": "solana/modules/bridge-messages/Cargo.toml",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Bridge message module manifest."
+    },
+    {
+      "path": "solana/modules/bridge-messages/src/lib.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Canonical message schema and validation logic."
+    },
+    {
+      "path": "solana/modules/bridge-messages/tests/messages_smoke.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Message module tests."
+    },
+    {
+      "path": "solana/programs/kingpepe-bridge/Cargo.toml",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Bridge manager program manifest."
+    },
+    {
+      "path": "solana/programs/kingpepe-bridge/src/lib.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Bridge manager program implementation."
+    },
+    {
+      "path": "solana/programs/kingpepe-bridge/tests/bridge_smoke.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Bridge manager smoke test."
+    },
+    {
+      "path": "solana/programs/kingpepe-transceiver/Cargo.toml",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Transceiver program manifest."
+    },
+    {
+      "path": "solana/programs/kingpepe-transceiver/src/lib.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Transceiver implementation and validations."
+    },
+    {
+      "path": "solana/programs/kingpepe-transceiver/tests/transceiver_smoke.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Transceiver smoke test."
+    },
+    {
+      "path": "solana/rust-toolchain.toml",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Rust toolchain pinning for reproducibility."
+    },
+    {
+      "path": "BRIDGE-READINESS.json",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Readiness-gate state machine artifact."
+    },
+    {
+      "path": "SECURITY.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Security boundary and operational controls."
+    }
+  ]
+}
