@@ -8,5 +8,4 @@ name = "kingpepe_bridge"
 path = "src/lib.rs"
 
 [dependencies]
-thiserror = "1.0"
-
+thiserror = "1.0.69"

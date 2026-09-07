@@ -8,4 +8,4 @@ name = "bridge_messages"
 path = "src/lib.rs"
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0.229", features = ["derive"] }
