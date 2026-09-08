@@ -1,4 +1,6 @@
-use bridge_messages::{CanonicalBridgeMessage, DeploymentIdentity, MessageEpochs, NativeOutpoint, ValidityWindow};
+use bridge_messages::{
+    CanonicalBridgeMessage, DeploymentIdentity, MessageEpochs, NativeOutpoint, ValidityWindow,
+};
 use kingpepe_transceiver::{AttestationObservation, TransceiverConfig, TransceiverProgram};
 
 fn h(byte: u8) -> [u8; 32] {
@@ -26,7 +28,10 @@ fn transceiver_can_record_verification() {
             transceiver_program_id: config.transceiver_program_id,
             mint: config.mint,
         },
-        NativeOutpoint { txid: h(9), vout: 1 },
+        NativeOutpoint {
+            txid: h(9),
+            vout: 1,
+        },
         100,
         h(10),
         MessageEpochs {
