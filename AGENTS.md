@@ -24,8 +24,8 @@
 
 ## Current phase status
 
-- Current implementation phase: `PHASE 04 - Real Native-Compatible FROST 2-of-2`
-- Objective: validate and publish the real secp256k1 Taproot/BIP340-compatible `2-of-2` FROST runtime.
+- Current implementation phase: `PHASE 08 - Automatic Native to Solana local end-to-end`
+- Objective: connect the automated local Native-to-Solana deposit path using validated Native reserve transitions, project attestations, Solana mint receipt consumption, and reconciliation while keeping live activation disabled outside local testing.
 - Required authority: `KINGPEPE_TEAM_GOVERNANCE`
 
 ## Authoritative status files
@@ -79,8 +79,37 @@
 - Do not treat Ed25519 attestation or phase-02 deterministic Rust test shares as FROST.
 - KingPepe Native signing evidence from read-only recovery material identifies the required path as Taproot/BIP340.
 - The Phase 04 runtime uses pinned `@noble/curves` `2.3.0` `schnorr_FROST`.
+- Phase 04 implementation commit: `3494ebf70f9a432bd786ea17ca73a1177d8bf66d`
+- Phase 04 CI: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34281044175` PASS
 - Required local checks:
   - `npm ci --ignore-scripts`
   - `npm run test:frost`
   - `npm audit --audit-level=low`
 - Keep all generated test key material outside the repository.
+
+## Phase 05 phase notes
+
+- Bridge manager must not accept caller-provided proof flags.
+- Transceiver owns attestation verification and receipts but must not hold mint authority.
+- Mint authority must be a bridge PDA; freeze authority remains none.
+- Production activation remains disabled.
+
+## Phase 06 phase notes
+
+- Native proof/reserve/recovery crates validate KingPepe Native headers, PoW,
+  difficulty, chainwork, transactions, Merkle proofs, UTXO observations,
+  reserve sweeps, and temporary-deposit recovery eligibility.
+- Temporary recoverable deposits do not authorize minting.
+- CI verified Phase 06 at `836b8e62e2c87fe8b2d3df48f7fc54466206b646`.
+
+## Phase 07 phase notes
+
+- Attestation uses Ed25519 project attestations, not FROST.
+- Attestation keys remain separate from Native FROST shares and outside the
+  repository.
+- Transceiver instruction parsing binds Solana Ed25519 verifier instructions to
+  the exact canonical message bytes.
+- Solana observer logic must distinguish RPC observation from local validation
+  and must `HARD_STOP` on unauthorized program, binary, upgrade-authority, Mint,
+  or mint-authority changes.
+- CI verified Phase 07 at `d17ba8fe61d20a88d4206f72d68a010a2d146524`.
