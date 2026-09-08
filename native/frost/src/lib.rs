@@ -17,7 +17,9 @@ mod recovery;
 mod signer;
 mod state;
 
-pub use coordinator::{AggregateSignature, CoordinatorError, SigningCoordinator, SigningRecord};
+pub use coordinator::{
+    AggregateSignature, CoordinatorError, SigningCoordinator, SigningRecord, SigningSessionInput,
+};
 pub use policy::{DomainBinding, SigningPolicy, SigningPolicyError};
 pub use recovery::{RecoveryError, RecoveryInstruction, RecoveryRecord};
 pub use signer::{

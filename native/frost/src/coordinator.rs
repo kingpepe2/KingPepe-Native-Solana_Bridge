@@ -19,6 +19,17 @@ pub struct SigningRecord {
     pub fee: u64,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct SigningSessionInput {
+    pub request_id: [u8; 32],
+    pub operation_id: [u8; 32],
+    pub digest: [u8; 32],
+    pub amount: u64,
+    pub fee: u64,
+    pub domains: DomainBinding,
+    pub nonce: NonceId,
+}
+
 #[derive(Debug, Clone)]
 pub struct AggregateSignature {
     pub request_id: [u8; 32],
@@ -79,42 +90,36 @@ impl SigningCoordinator {
 
     pub fn start_session(
         &mut self,
-        request_id: [u8; 32],
-        operation_id: [u8; 32],
-        digest: [u8; 32],
-        amount: u64,
-        fee: u64,
-        domains: &DomainBinding,
-        nonce: NonceId,
+        input: SigningSessionInput,
     ) -> Result<SigningRecord, CoordinatorError> {
         if self.required_participants.len() != 2 {
             return Err(CoordinatorError::PolicyRejected);
         }
 
-        policy_bound_domain_ok(&self.policy, domains, self.epoch)
+        policy_bound_domain_ok(&self.policy, &input.domains, self.epoch)
             .map_err(|_| CoordinatorError::DomainMismatch)?;
-        validate_amount_fits_limits(&self.policy, amount, fee)
+        validate_amount_fits_limits(&self.policy, input.amount, input.fee)
             .map_err(|_| CoordinatorError::PolicyRejected)?;
 
         self.nonce_store
-            .reserve_nonce(nonce, request_id, operation_id, self.epoch)
+            .reserve_nonce(input.nonce, input.request_id, input.operation_id, self.epoch)
             .map_err(|_| CoordinatorError::NonceRejected)?;
 
         let record = SigningRecord {
-            request_id,
-            operation_id,
+            request_id: input.request_id,
+            operation_id: input.operation_id,
             epoch: self.epoch,
-            digest,
-            nonce,
-            amount,
-            fee,
+            digest: input.digest,
+            nonce: input.nonce,
+            amount: input.amount,
+            fee: input.fee,
         };
         let session = SigningSession {
             record: record.clone(),
             seen: BTreeSet::new(),
             shares: BTreeMap::new(),
         };
-        self.sessions.insert(request_id, session);
+        self.sessions.insert(input.request_id, session);
         Ok(record)
     }
 

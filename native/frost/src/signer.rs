@@ -55,19 +55,10 @@ pub struct SignedShare {
     pub signature: Vec<u8>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct SignerState {
     pub last_consumed: u64,
     pub active_sessions: u32,
-}
-
-impl Default for SignerState {
-    fn default() -> Self {
-        Self {
-            last_consumed: 0,
-            active_sessions: 0,
-        }
-    }
 }
 
 impl Signer {
