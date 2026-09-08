@@ -74,9 +74,7 @@ pub enum RecoveryError {
     DustOrNonPositiveRecoveryOutput,
 }
 
-pub fn validate_recovery_plan(
-    input: RecoveryPlanInput<'_>,
-) -> Result<RecoveryPlan, RecoveryError> {
+pub fn validate_recovery_plan(input: RecoveryPlanInput<'_>) -> Result<RecoveryPlan, RecoveryError> {
     if input.params.network != input.deposit.network
         || input.params.genesis_hash() != input.deposit.native_genesis_hash
         || input.eligibility.network != input.deposit.network
@@ -84,8 +82,7 @@ pub fn validate_recovery_plan(
     {
         return Err(RecoveryError::WrongNetworkOrGenesis);
     }
-    if input.recovery_delay_blocks == 0 || input.recovery_delay_blocks > MAX_RECOVERY_DELAY_BLOCKS
-    {
+    if input.recovery_delay_blocks == 0 || input.recovery_delay_blocks > MAX_RECOVERY_DELAY_BLOCKS {
         return Err(RecoveryError::InvalidRecoveryDelay);
     }
     if input.eligibility.outpoint != input.deposit.outpoint
@@ -157,7 +154,10 @@ mod tests {
             maximum_native_network_fee_atomic: 1_000,
         })
         .unwrap();
-        assert_eq!(plan.status, RecoveryStatus::UnsignedUnbroadcastNotAuthorized);
+        assert_eq!(
+            plan.status,
+            RecoveryStatus::UnsignedUnbroadcastNotAuthorized
+        );
         assert!(!plan.signing_authorized);
         assert!(!plan.broadcast_authorized);
         assert_eq!(plan.maturity_tip_height, 111);
