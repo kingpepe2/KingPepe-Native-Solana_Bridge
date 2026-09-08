@@ -155,17 +155,24 @@ impl ReserveLedger {
     }
 
     pub fn settle_reserve_sweep(&mut self, record: ReserveSweepRecord) -> Result<(), ReserveError> {
-        if !self.temporary_deposits.contains_key(&record.temporary_outpoint) {
+        if !self
+            .temporary_deposits
+            .contains_key(&record.temporary_outpoint)
+        {
             return Err(ReserveError::UnknownTemporaryDeposit);
         }
-        if self.consumed_temporary_outpoints.contains(&record.temporary_outpoint) {
+        if self
+            .consumed_temporary_outpoints
+            .contains(&record.temporary_outpoint)
+        {
             return Err(ReserveError::DuplicateTemporaryOutpointConsumption);
         }
         if self.reserve_allocations.contains_key(&record.allocation_id) {
             return Err(ReserveError::DuplicateReserveAllocation);
         }
         self.temporary_deposits.remove(&record.temporary_outpoint);
-        self.consumed_temporary_outpoints.insert(record.temporary_outpoint);
+        self.consumed_temporary_outpoints
+            .insert(record.temporary_outpoint);
         self.canonical_reserve_atomic = self
             .canonical_reserve_atomic
             .checked_add(record.reserve_amount_atomic as u128)
@@ -178,7 +185,8 @@ impl ReserveLedger {
             .spent_native_fees_atomic
             .checked_add(record.native_network_fee_atomic as u128)
             .ok_or(ReserveError::ReserveOverflow)?;
-        self.reserve_allocations.insert(record.allocation_id, record);
+        self.reserve_allocations
+            .insert(record.allocation_id, record);
         Ok(())
     }
 
@@ -248,7 +256,9 @@ mod tests {
         let mut ledger = ReserveLedger::default();
         ledger.record_temporary_deposit(temporary.clone()).unwrap();
         assert_eq!(
-            ledger.authorize_mint_from_temporary(temporary.outpoint).unwrap_err(),
+            ledger
+                .authorize_mint_from_temporary(temporary.outpoint)
+                .unwrap_err(),
             ReserveError::TemporaryDepositCannotMint
         );
         assert_eq!(ledger.authorized_unminted_credits_atomic(), 0);
@@ -290,7 +300,14 @@ mod tests {
     #[test]
     fn reserve_sweep_rejects_wrong_input_output_amount_and_merkle_root() {
         let temporary = deposit();
-        let wrong_input = sweep_transaction(OutPoint { txid: [9; 32], vout: 0 }, 4_900, &[0x51, 0x20, 8]);
+        let wrong_input = sweep_transaction(
+            OutPoint {
+                txid: [9; 32],
+                vout: 0,
+            },
+            4_900,
+            &[0x51, 0x20, 8],
+        );
         let root = [7; 32];
         let block = header(20, root, 20);
         let tip = header(25, root, 30);
@@ -338,7 +355,10 @@ mod tests {
         ValidatedTemporaryDeposit {
             network: NativeNetwork::Regtest,
             native_genesis_hash: NativeChainParams::regtest().genesis_hash(),
-            outpoint: OutPoint { txid: [1; 32], vout: 0 },
+            outpoint: OutPoint {
+                txid: [1; 32],
+                vout: 0,
+            },
             amount_atomic: 5_000,
             script_pubkey: vec![0x51, 0x20, 7],
             recipient_commitment_script: Some(vec![0x6a, 0x14, 9]),
@@ -348,7 +368,11 @@ mod tests {
         }
     }
 
-    fn sweep_transaction(outpoint: OutPoint, amount: u64, script_pubkey: &[u8]) -> ParsedTransaction {
+    fn sweep_transaction(
+        outpoint: OutPoint,
+        amount: u64,
+        script_pubkey: &[u8],
+    ) -> ParsedTransaction {
         let mut raw = Vec::new();
         raw.extend(2_i32.to_le_bytes());
         raw.push(1);

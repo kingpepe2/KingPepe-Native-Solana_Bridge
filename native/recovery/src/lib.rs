@@ -74,7 +74,9 @@ pub enum RecoveryError {
     DustOrNonPositiveRecoveryOutput,
 }
 
-pub fn validate_recovery_plan(input: RecoveryPlanInput<'_>) -> Result<RecoveryPlan, RecoveryError> {
+pub fn validate_recovery_plan(
+    input: RecoveryPlanInput<'_>,
+) -> Result<RecoveryPlan, RecoveryError> {
     if input.params.network != input.deposit.network
         || input.params.genesis_hash() != input.deposit.native_genesis_hash
         || input.eligibility.network != input.deposit.network
@@ -82,7 +84,8 @@ pub fn validate_recovery_plan(input: RecoveryPlanInput<'_>) -> Result<RecoveryPl
     {
         return Err(RecoveryError::WrongNetworkOrGenesis);
     }
-    if input.recovery_delay_blocks == 0 || input.recovery_delay_blocks > MAX_RECOVERY_DELAY_BLOCKS {
+    if input.recovery_delay_blocks == 0 || input.recovery_delay_blocks > MAX_RECOVERY_DELAY_BLOCKS
+    {
         return Err(RecoveryError::InvalidRecoveryDelay);
     }
     if input.eligibility.outpoint != input.deposit.outpoint
@@ -94,7 +97,9 @@ pub fn validate_recovery_plan(input: RecoveryPlanInput<'_>) -> Result<RecoveryPl
     if !input.eligibility.native_outpoint_unspent {
         return Err(RecoveryError::OutpointNotUnspent);
     }
-    if input.eligibility.kpepe_minted_for_deposit || input.eligibility.canonical_reserve_sweep_confirmed {
+    if input.eligibility.kpepe_minted_for_deposit
+        || input.eligibility.canonical_reserve_sweep_confirmed
+    {
         return Err(RecoveryError::RecoveryConflictsWithBridgeSettlement);
     }
     if input.eligibility.recovery_spend_observed {
@@ -268,7 +273,10 @@ mod tests {
         ValidatedTemporaryDeposit {
             network: params.network,
             native_genesis_hash: params.genesis_hash(),
-            outpoint: OutPoint { txid: [1; 32], vout: 0 },
+            outpoint: OutPoint {
+                txid: [1; 32],
+                vout: 0,
+            },
             amount_atomic: 5_000,
             script_pubkey: vec![0x51, 0x20, 7],
             recipient_commitment_script: Some(vec![0x6a, 0x14, 9]),
