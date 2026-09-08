@@ -24,8 +24,8 @@
 
 ## Current phase status
 
-- Current implementation phase: `PHASE 04 - Real Native-Compatible FROST 2-of-2`
-- Objective: validate and publish the real secp256k1 Taproot/BIP340-compatible `2-of-2` FROST runtime.
+- Current implementation phase: `PHASE 05 - Solana Bridge Manager and Transceiver`
+- Objective: implement Solana program boundaries for bridge manager, transceiver, receipts, replay protection, mint/PDA policy, and withdrawal recording while keeping live activation disabled.
 - Required authority: `KINGPEPE_TEAM_GOVERNANCE`
 
 ## Authoritative status files
@@ -79,8 +79,17 @@
 - Do not treat Ed25519 attestation or phase-02 deterministic Rust test shares as FROST.
 - KingPepe Native signing evidence from read-only recovery material identifies the required path as Taproot/BIP340.
 - The Phase 04 runtime uses pinned `@noble/curves` `2.3.0` `schnorr_FROST`.
+- Phase 04 implementation commit: `3494ebf70f9a432bd786ea17ca73a1177d8bf66d`
+- Phase 04 CI: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34281044175` PASS
 - Required local checks:
   - `npm ci --ignore-scripts`
   - `npm run test:frost`
   - `npm audit --audit-level=low`
 - Keep all generated test key material outside the repository.
+
+## Phase 05 phase notes
+
+- Bridge manager must not accept caller-provided proof flags.
+- Transceiver owns attestation verification and receipts but must not hold mint authority.
+- Mint authority must be a bridge PDA; freeze authority remains none.
+- Production activation remains disabled.

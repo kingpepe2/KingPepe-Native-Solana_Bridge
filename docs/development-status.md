@@ -2,7 +2,7 @@
 
 ## Current phase
 
-- `PHASE 04` - Real Native-compatible FROST 2-of-2
+- `PHASE 05` - Solana Bridge Manager and Transceiver
 - Branch: `main`
 - Repository: private by policy
 - `productionReady = false`
@@ -36,8 +36,8 @@
 
 ## Current blockers
 
-- Phase 04 CI verification is pending for the current local implementation.
-- Full Native transaction construction, Native node acceptance, Solana programs, local end-to-end flows, Devnet, production configuration, external review, and activation remain later phases.
+- Solana Bridge Manager and Transceiver implementation is the current phase.
+- Full Native transaction construction, Native node acceptance, local end-to-end flows, Devnet, production configuration, external review, and activation remain later phases.
 
 ## Latest local validation
 
@@ -65,7 +65,7 @@
 
 ## Next phase
 
-- Push Phase 04, verify CI for the exact source SHA, and then proceed to Phase 05 Solana Bridge Manager and Transceiver implementation if CI passes.
+- Implement Phase 05 Solana Bridge Manager and Transceiver, then push and verify CI for the exact source SHA.
 
 ## Phase 04 local implementation
 
@@ -84,3 +84,6 @@
   - Wrong sighash, epoch, deployment, recipient, amount, fee, change script, and change amount are rejected before signing.
   - Signing retry is idempotent and does not allocate a second economic signature.
   - Runtime state inside the repository is rejected.
+- Commit: `3494ebf70f9a432bd786ea17ca73a1177d8bf66d`
+- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34281044175`
+- CI status: PASS
