@@ -24,8 +24,8 @@
 
 ## Current phase status
 
-- Current implementation phase: `PHASE 02 - Structure and Toolchain`
-- Objective: establish clean source layout, pinned build/tool dependencies, and explicit upstream comparison records before deeper protocol work.
+- Current implementation phase: `PHASE 03 - Canonical Protocol Messages and Accounting`
+- Objective: implement canonical binary protocol messages, golden vectors, identities, state machines, and exact reserve/liability accounting primitives.
 - Required authority: `KINGPEPE_TEAM_GOVERNANCE`
 
 ## Authoritative status files
@@ -67,3 +67,9 @@
 - Kept all sensitive runtime data and live credentials outside repository scope.
 - Updated source comparison records: `UPSTREAM-REFERENCES.json`, `docs/architecture/ntt-comparison.md`.
 - The current native signing runtime is not final Native-compatible FROST. Real FROST remains a Phase 04 requirement.
+
+## Phase 03 phase notes
+
+- Keep message authorization binary and canonical; do not use JSON as an economic authorization encoding.
+- Use exact integer accounting only.
+- Keep production readiness false and Mainnet activation disabled.
