@@ -5,7 +5,7 @@ use thiserror::Error;
 use crate::policy::{
     policy_bound_domain_ok, validate_amount_fits_limits, DomainBinding, SigningPolicy,
 };
-use crate::signer::{build_message, ParticipantPublicKey, SignerRole, SignedShare, SigningRequest};
+use crate::signer::{build_message, ParticipantPublicKey, SignedShare, SignerRole, SigningRequest};
 use crate::state::{NonceId, NonceStore, NonceStoreError};
 
 #[derive(Debug, Clone)]
