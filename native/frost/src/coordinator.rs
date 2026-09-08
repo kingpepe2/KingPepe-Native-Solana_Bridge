@@ -102,7 +102,12 @@ impl SigningCoordinator {
             .map_err(|_| CoordinatorError::PolicyRejected)?;
 
         self.nonce_store
-            .reserve_nonce(input.nonce, input.request_id, input.operation_id, self.epoch)
+            .reserve_nonce(
+                input.nonce,
+                input.request_id,
+                input.operation_id,
+                self.epoch,
+            )
             .map_err(|_| CoordinatorError::NonceRejected)?;
 
         let record = SigningRecord {
