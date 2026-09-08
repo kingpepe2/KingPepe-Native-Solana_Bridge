@@ -2,7 +2,7 @@
 
 ## Current phase
 
-- `PHASE 03` - Canonical protocol messages and accounting model
+- `PHASE 04` - Real Native-compatible FROST 2-of-2
 - Branch: `main`
 - Repository: private by policy
 - `productionReady = false`
@@ -36,7 +36,7 @@
 
 ## Current blockers
 
-- Phase 03 GitHub Actions verification is pending for the implementation commit.
+- Native signature requirements must be determined from available KingPepe Native source/reference material before selecting the final FROST implementation.
 - Real Native-compatible FROST remains a Phase 04 requirement.
 - Native proof validation, Solana programs, local end-to-end flows, Devnet, production configuration, external review, and activation remain later phases.
 
@@ -57,7 +57,10 @@
 - Added lifecycle states for automatic transfer processing without per-transfer KingPepe Team approval.
 - Added exact integer ledger primitives for reserve, minted supply, unminted credits, burned unpaid withdrawals, reserved UTXOs, broadcast payouts, finalized payouts, fees, change, and unsettled operation counts.
 - Added shared JSON golden vectors plus Rust and Node verification.
+- Commit: `1b95cf0`
+- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34278735928`
+- CI status: PASS
 
 ## Next phase
 
-- Push Phase 03 implementation, verify CI for the exact SHA, then start Phase 04 real Native-compatible FROST.
+- Inspect KingPepe Native signing requirements and implement or integrate real `2-of-2` Native-compatible FROST without committing secrets or runtime state.
