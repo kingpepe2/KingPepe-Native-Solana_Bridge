@@ -22,7 +22,9 @@
     "phase04CiVerified": true,
     "solanaProgramBoundaryImplemented": true,
     "phase05LocalValidationPassed": true,
-    "phase05CiVerified": true
+    "phase05CiVerified": true,
+    "nativeProofReserveRecoveryImplemented": true,
+    "phase06LocalValidationPassed": true
   },
   "readinessGates": {
     "SOURCE_COMPLETE": "IMPLEMENTED_NOT_FULLY_TESTED",
@@ -31,7 +33,7 @@
     "FROST_NATIVE_SIGNATURE_PASS": "IMPLEMENTED_AND_TESTED_LOCALLY_PHASE04",
     "NONCE_SAFETY_PASS": "IMPLEMENTED_AND_TESTED_LOCALLY_PHASE04_NOT_PRODUCTION_ROLLBACK",
     "SOLANA_PROGRAM_AUDIT_PASS": "NOT_CONFIGURED",
-    "NATIVE_VALIDATION_PASS": "NOT_CONFIGURED",
+    "NATIVE_VALIDATION_PASS": "IMPLEMENTED_AND_TESTED_LOCALLY_PHASE06_NOT_E2E",
     "RECONCILIATION_PASS": "NOT_CONFIGURED",
     "BACKUP_RESTORE_PASS": "NOT_CONFIGURED",
     "SECRET_SCAN_PASS": "IMPLEMENTED_AND_TESTED_LOCALLY",

@@ -8,6 +8,15 @@
     "rationale": "Reference for Solana manager/transceiver layout, replay structure, and message organization.",
     "verificationDate": "2026-09-07"
   },
+  "nativeSourceReference": {
+    "project": "kingpepe2/king-pepe-source-code",
+    "referenceType": "consensus-parameter-and-format-reference",
+    "selectedCommit": "3f2621820ffefae59cbe48b350f5f8f6ec8a6da5",
+    "selectedTree": "33d550b0c2bec33ede7e6d73cd44afbbe18dea8b",
+    "verificationSource": "read-only recovery material in config/networks/kingpepe-mainnet.json and config/networks/kingpepe-regtest.json",
+    "phase06Use": "KingPepe Native genesis, decimals, PoW, difficulty, chainwork, activation, address, transaction, and header format facts",
+    "status": "reference-facts-only-no-git-history-import"
+  },
   "comparison": {
     "solanaProgramStructure": "matched-pattern",
     "fuzzAndTestOrganization": "intended-adopt",
