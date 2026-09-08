@@ -30,6 +30,8 @@
     "solanaObservationImplemented": true,
     "phase07LocalValidationPassed": true,
     "phase07CiVerified": true,
+    "automaticDepositPipelineImplemented": true,
+    "phase08SourceBoundaryTestsPassed": true,
     "phase08LocalE2eBlocked": true
   },
   "readinessGates": {

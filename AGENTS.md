@@ -116,7 +116,11 @@
 
 ## Phase 08 phase notes
 
-- Phase 08 is currently blocked on local E2E infrastructure.
+- Phase 08 has a source-level automatic Native-to-Solana deposit pipeline
+  boundary in `services/bridge-validator/automatic-deposit-pipeline.mjs`.
+- The pipeline uses existing real FROST A+B signing, project attestation,
+  canonical messages, adapter boundaries, replay checks, and exact BigInt
+  accounting. It has no per-transfer KingPepe Team approval state.
 - Required local executables were not available in the checked environment:
   `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
 - Current Solana crates are tested Rust boundary models, not deployable
@@ -124,3 +128,5 @@
 - Do not mark Native-to-Solana local E2E as passed until a disposable
   KingPepe regtest node and Solana local validator execute the full automated
   deposit flow without per-transfer KingPepe Team approval.
+- Current local source-boundary check:
+  - `npm run test:bridge-validator`
