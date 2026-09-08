@@ -36,7 +36,10 @@ impl TransceiverConfig {
             return Err(TransceiverError::InvalidConfig);
         }
         if self.authorized_attesters[0] == self.authorized_attesters[1]
-            || self.authorized_attesters.iter().any(|key| *key == [0u8; 32])
+            || self
+                .authorized_attesters
+                .iter()
+                .any(|key| *key == [0u8; 32])
         {
             return Err(TransceiverError::InvalidAttesterSet);
         }
@@ -101,7 +104,9 @@ impl TransceiverProgram {
         if !self.config.active {
             return Err(TransceiverError::Inactive);
         }
-        message.validate().map_err(|_| TransceiverError::InvalidMessage)?;
+        message
+            .validate()
+            .map_err(|_| TransceiverError::InvalidMessage)?;
         if message.deployment.transceiver_program_id != self.config.transceiver_program_id
             || message.deployment.manager_program_id != self.config.manager_program_id
             || message.deployment.mint != self.config.mint
@@ -140,7 +145,10 @@ impl TransceiverProgram {
         Ok(digest)
     }
 
-    pub fn consume_receipt(&mut self, digest: &Hash32) -> Result<VerifiedMessageReceipt, TransceiverError> {
+    pub fn consume_receipt(
+        &mut self,
+        digest: &Hash32,
+    ) -> Result<VerifiedMessageReceipt, TransceiverError> {
         let receipt = self
             .receipts
             .get_mut(digest)
@@ -160,11 +168,14 @@ impl TransceiverProgram {
         if observations.len() != 2 {
             return Err(TransceiverError::ThresholdNotMet);
         }
-        let authorized: BTreeSet<PubkeyBytes> = self.config.authorized_attesters.iter().copied().collect();
+        let authorized: BTreeSet<PubkeyBytes> =
+            self.config.authorized_attesters.iter().copied().collect();
         let mut seen = BTreeSet::new();
         let mut sorted = Vec::new();
         for observation in observations {
-            if observation.message_digest != digest || observation.key_epoch != self.config.key_epoch {
+            if observation.message_digest != digest
+                || observation.key_epoch != self.config.key_epoch
+            {
                 return Err(TransceiverError::AttestationDomainMismatch);
             }
             if !authorized.contains(&observation.attester) {
@@ -240,7 +251,10 @@ mod tests {
                 transceiver_program_id: config.transceiver_program_id,
                 mint: config.mint,
             },
-            NativeOutpoint { txid: h(8), vout: 1 },
+            NativeOutpoint {
+                txid: h(8),
+                vout: 1,
+            },
             1_000,
             h(9),
             MessageEpochs {
@@ -313,7 +327,9 @@ mod tests {
         let msg = message(&config);
         let digest = msg.message_digest().unwrap();
         let mut program = TransceiverProgram::initialize(config.clone()).unwrap();
-        let recorded = program.verify_message(&msg, &observations(&config, digest)).unwrap();
+        let recorded = program
+            .verify_message(&msg, &observations(&config, digest))
+            .unwrap();
         assert_eq!(recorded, digest);
         assert_eq!(program.verified_messages(), 1);
         let consumed = program.consume_receipt(&digest).unwrap();

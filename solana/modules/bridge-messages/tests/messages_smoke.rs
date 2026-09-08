@@ -1,7 +1,7 @@
 use bridge_messages::{
     BridgeAction, BridgeDirection, BridgeOperationState, BridgeStateEvent, CanonicalBridgeMessage,
-    DeploymentIdentity, LedgerError, LedgerState, MessageDecodeError, MessageEncodeError, MessageEpochs,
-    NativeOutpoint, ValidityWindow, MESSAGE_LENGTH, MESSAGE_VERSION,
+    DeploymentIdentity, LedgerError, LedgerState, MessageDecodeError, MessageEncodeError,
+    MessageEpochs, NativeOutpoint, ValidityWindow, MESSAGE_LENGTH, MESSAGE_VERSION,
 };
 use serde::Deserialize;
 
@@ -322,7 +322,9 @@ fn ledger_keeps_burned_withdrawal_as_liability_until_payout() {
     assert_eq!(ledger.burned_unpaid_withdrawals, 1_000);
     assert_eq!(ledger.coverage_required().unwrap(), 10_000);
 
-    ledger.reserve_withdrawal_utxos(1_000).expect("reserve utxo");
+    ledger
+        .reserve_withdrawal_utxos(1_000)
+        .expect("reserve utxo");
     ledger.record_payout_broadcast(1_000).expect("broadcast");
     ledger.record_payout_settlement(1_000).expect("settle");
 

@@ -170,20 +170,28 @@ impl BridgeProgram {
         let config = self.require_ready_for_deposits()?;
         validate_accounts(config, accounts)?;
         validate_message_domain(config, message)?;
-        if message.direction != BridgeDirection::NativeToSolana || message.action != BridgeAction::DepositClaim {
+        if message.direction != BridgeDirection::NativeToSolana
+            || message.action != BridgeAction::DepositClaim
+        {
             return Err(BridgeError::WrongMessageKind);
         }
         if self.deposit_claims.contains_key(&message.operation_id) {
             return Err(BridgeError::Replay);
         }
-        let digest = message.message_digest().map_err(|_| BridgeError::InvalidMessage)?;
-        let receipt = transceiver.receipt(&digest).ok_or(BridgeError::MissingReceipt)?;
+        let digest = message
+            .message_digest()
+            .map_err(|_| BridgeError::InvalidMessage)?;
+        let receipt = transceiver
+            .receipt(&digest)
+            .ok_or(BridgeError::MissingReceipt)?;
         validate_receipt(config, receipt, message, digest)?;
         if self.consumed_receipts.contains(&digest) {
             return Err(BridgeError::Replay);
         }
 
-        transceiver.consume_receipt(&digest).map_err(BridgeError::Transceiver)?;
+        transceiver
+            .consume_receipt(&digest)
+            .map_err(BridgeError::Transceiver)?;
         let record = DepositClaimRecord {
             operation_id: message.operation_id,
             message_digest: digest,
@@ -194,7 +202,8 @@ impl BridgeProgram {
             .minted_supply
             .checked_add(message.amount_atomic as u128)
             .ok_or(BridgeError::ArithmeticOverflow)?;
-        self.deposit_claims.insert(message.operation_id, record.clone());
+        self.deposit_claims
+            .insert(message.operation_id, record.clone());
         self.consumed_receipts.insert(digest);
         Ok(record)
     }
@@ -208,7 +217,9 @@ impl BridgeProgram {
         let config = self.require_ready_for_withdrawals()?;
         validate_accounts(config, accounts)?;
         validate_message_domain(config, message)?;
-        if message.direction != BridgeDirection::SolanaToNative || message.action != BridgeAction::WithdrawalRequest {
+        if message.direction != BridgeDirection::SolanaToNative
+            || message.action != BridgeAction::WithdrawalRequest
+        {
             return Err(BridgeError::WrongMessageKind);
         }
         if self.withdrawal_records.contains_key(&message.withdrawal_id) {
@@ -216,7 +227,9 @@ impl BridgeProgram {
         }
         validate_burn(config, message, burn)?;
 
-        let digest = message.message_digest().map_err(|_| BridgeError::InvalidMessage)?;
+        let digest = message
+            .message_digest()
+            .map_err(|_| BridgeError::InvalidMessage)?;
         let record = WithdrawalRecord {
             withdrawal_id: message.withdrawal_id,
             operation_id: message.operation_id,
@@ -235,7 +248,11 @@ impl BridgeProgram {
         Ok(record)
     }
 
-    pub fn rotate_epochs_for_test(&mut self, policy_epoch: u32, key_epoch: u32) -> Result<(), BridgeError> {
+    pub fn rotate_epochs_for_test(
+        &mut self,
+        policy_epoch: u32,
+        key_epoch: u32,
+    ) -> Result<(), BridgeError> {
         let config = self.config.as_mut().ok_or(BridgeError::Uninitialized)?;
         if policy_epoch == 0 || key_epoch == 0 {
             return Err(BridgeError::InvalidConfig);
@@ -268,7 +285,10 @@ impl BridgeProgram {
     }
 }
 
-pub fn derive_mint_authority_pda(manager_program_id: &PubkeyBytes, mint: &PubkeyBytes) -> PubkeyBytes {
+pub fn derive_mint_authority_pda(
+    manager_program_id: &PubkeyBytes,
+    mint: &PubkeyBytes,
+) -> PubkeyBytes {
     let mut digest = Sha256::new();
     digest.update(b"KINGPEPE_BRIDGE_MINT_AUTHORITY_PDA_V1");
     digest.update(manager_program_id);
@@ -285,7 +305,8 @@ fn validate_config(config: &BridgeConfig) -> Result<(), BridgeError> {
     {
         return Err(BridgeError::InvalidConfig);
     }
-    if matches!(config.environment, BridgeEnvironment::Mainnet) && config.mainnet_activation_enabled {
+    if matches!(config.environment, BridgeEnvironment::Mainnet) && config.mainnet_activation_enabled
+    {
         return Err(BridgeError::MainnetActivationDisabled);
     }
     let mint = &config.mint_binding;
@@ -301,7 +322,8 @@ fn validate_config(config: &BridgeConfig) -> Result<(), BridgeError> {
     if mint.decimals != mint.native_decimals {
         return Err(BridgeError::DecimalsMismatch);
     }
-    if mint.mint_authority_pda != derive_mint_authority_pda(&config.manager_program_id, &mint.mint) {
+    if mint.mint_authority_pda != derive_mint_authority_pda(&config.manager_program_id, &mint.mint)
+    {
         return Err(BridgeError::MintAuthorityMismatch);
     }
     Ok(())
@@ -339,8 +361,13 @@ fn validate_accounts(config: &BridgeConfig, accounts: &AccountContext) -> Result
     Ok(())
 }
 
-fn validate_message_domain(config: &BridgeConfig, message: &CanonicalBridgeMessage) -> Result<(), BridgeError> {
-    message.validate().map_err(|_| BridgeError::InvalidMessage)?;
+fn validate_message_domain(
+    config: &BridgeConfig,
+    message: &CanonicalBridgeMessage,
+) -> Result<(), BridgeError> {
+    message
+        .validate()
+        .map_err(|_| BridgeError::InvalidMessage)?;
     if message.deployment.manager_program_id != config.manager_program_id
         || message.deployment.transceiver_program_id != config.transceiver_program_id
         || message.deployment.mint != config.mint_binding.mint
@@ -376,7 +403,11 @@ fn validate_receipt(
     Ok(())
 }
 
-fn validate_burn(config: &BridgeConfig, message: &CanonicalBridgeMessage, burn: &BurnChecked) -> Result<(), BridgeError> {
+fn validate_burn(
+    config: &BridgeConfig,
+    message: &CanonicalBridgeMessage,
+    burn: &BurnChecked,
+) -> Result<(), BridgeError> {
     let mint = &config.mint_binding;
     if burn.token_program_id != mint.token_program_id
         || burn.mint != mint.mint
@@ -503,7 +534,10 @@ mod tests {
     fn deposit_message(config: &BridgeConfig) -> CanonicalBridgeMessage {
         CanonicalBridgeMessage::new_deposit_claim(
             deployment(config),
-            NativeOutpoint { txid: h(9), vout: 1 },
+            NativeOutpoint {
+                txid: h(9),
+                vout: 1,
+            },
             5_000,
             h(10),
             MessageEpochs {
@@ -582,17 +616,26 @@ mod tests {
         let mut program = BridgeProgram::new();
         let mut config = base_config();
         config.mint_binding.initial_supply = 1;
-        assert_eq!(program.initialize(config), Err(BridgeError::InitialSupplyMustBeZero));
+        assert_eq!(
+            program.initialize(config),
+            Err(BridgeError::InitialSupplyMustBeZero)
+        );
 
         let mut program = BridgeProgram::new();
         let mut config = base_config();
         config.mint_binding.freeze_authority = Some(h(99));
-        assert_eq!(program.initialize(config), Err(BridgeError::FreezeAuthorityMustBeNone));
+        assert_eq!(
+            program.initialize(config),
+            Err(BridgeError::FreezeAuthorityMustBeNone)
+        );
 
         let mut program = BridgeProgram::new();
         let mut config = base_config();
         config.mint_binding.mint_authority_pda = h(98);
-        assert_eq!(program.initialize(config), Err(BridgeError::MintAuthorityMismatch));
+        assert_eq!(
+            program.initialize(config),
+            Err(BridgeError::MintAuthorityMismatch)
+        );
     }
 
     #[test]
@@ -600,7 +643,10 @@ mod tests {
         let mut program = BridgeProgram::new();
         let config = base_config();
         program.initialize(config.clone()).unwrap();
-        assert_eq!(program.initialize(config), Err(BridgeError::AlreadyInitialized));
+        assert_eq!(
+            program.initialize(config),
+            Err(BridgeError::AlreadyInitialized)
+        );
 
         let mut mainnet_config = base_config();
         mainnet_config.environment = BridgeEnvironment::Mainnet;
@@ -615,7 +661,9 @@ mod tests {
         disabled_mainnet.environment = BridgeEnvironment::Mainnet;
         disabled_mainnet.mainnet_activation_enabled = false;
         let mut mainnet_program = BridgeProgram::new();
-        mainnet_program.initialize(disabled_mainnet.clone()).unwrap();
+        mainnet_program
+            .initialize(disabled_mainnet.clone())
+            .unwrap();
         assert_eq!(mainnet_program.state(), &ProgramState::Phase0Disabled);
         let mut transceiver = transceiver(&disabled_mainnet);
         let message = deposit_message(&disabled_mainnet);
@@ -672,11 +720,17 @@ mod tests {
         bridge.initialize(config.clone()).unwrap();
         let mut bad_accounts = accounts(&config);
         bad_accounts.mint = h(88);
-        assert_eq!(validate_accounts(&config, &bad_accounts), Err(BridgeError::AccountMismatch));
+        assert_eq!(
+            validate_accounts(&config, &bad_accounts),
+            Err(BridgeError::AccountMismatch)
+        );
 
         let mut alias = accounts(&config);
         alias.writable_accounts.push(config.manager_program_id);
-        assert_eq!(validate_accounts(&config, &alias), Err(BridgeError::AccountAliasing));
+        assert_eq!(
+            validate_accounts(&config, &alias),
+            Err(BridgeError::AccountAliasing)
+        );
     }
 
     #[test]

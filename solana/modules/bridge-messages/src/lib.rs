@@ -297,7 +297,11 @@ impl CanonicalBridgeMessage {
         write_fixed(&mut out, &mut cursor, &self.withdrawal_id);
         write_fixed(&mut out, &mut cursor, &self.amount_atomic.to_le_bytes());
         write_fixed(&mut out, &mut cursor, &self.fee_atomic.to_le_bytes());
-        write_fixed(&mut out, &mut cursor, &(self.destination.len() as u16).to_le_bytes());
+        write_fixed(
+            &mut out,
+            &mut cursor,
+            &(self.destination.len() as u16).to_le_bytes(),
+        );
 
         let destination_start = cursor;
         let destination_end = destination_start + self.destination.len();
@@ -376,7 +380,10 @@ impl CanonicalBridgeMessage {
         }
         let destination_padded = cursor.read_array::<MAX_DESTINATION_LENGTH>()?;
         let destination = destination_padded[..destination_len].to_vec();
-        if destination_padded[destination_len..].iter().any(|byte| *byte != 0) {
+        if destination_padded[destination_len..]
+            .iter()
+            .any(|byte| *byte != 0)
+        {
             return Err(MessageDecodeError::NonZeroDestinationPadding);
         }
         let policy_epoch = cursor.read_u32_le()?;
@@ -571,7 +578,11 @@ impl LedgerSnapshot {
         Ok(())
     }
 
-    pub fn record_validated_deposit(&mut self, gross_amount: u64, bridge_fee: u64) -> Result<(), LedgerError> {
+    pub fn record_validated_deposit(
+        &mut self,
+        gross_amount: u64,
+        bridge_fee: u64,
+    ) -> Result<(), LedgerError> {
         if bridge_fee > gross_amount {
             return Err(LedgerError::FeeExceedsAmount);
         }
@@ -601,7 +612,11 @@ impl LedgerSnapshot {
         self.assert_invariants()
     }
 
-    pub fn record_burn_request(&mut self, gross_amount: u64, fee_amount: u64) -> Result<(), LedgerError> {
+    pub fn record_burn_request(
+        &mut self,
+        gross_amount: u64,
+        fee_amount: u64,
+    ) -> Result<(), LedgerError> {
         if fee_amount > gross_amount {
             return Err(LedgerError::FeeExceedsAmount);
         }
@@ -713,7 +728,8 @@ fn checked_add(left: u128, right: u128) -> Result<u128, LedgerError> {
 }
 
 fn checked_sub(left: u128, right: u128) -> Result<u128, LedgerError> {
-    left.checked_sub(right).ok_or(LedgerError::InsufficientFunds)
+    left.checked_sub(right)
+        .ok_or(LedgerError::InsufficientFunds)
 }
 
 fn checked_sum(values: &[u128]) -> Result<u128, LedgerError> {
@@ -830,7 +846,10 @@ mod tests {
 
     #[test]
     fn deployment_identity_length_is_exact() {
-        assert_eq!(sample_deployment().to_bytes().len(), DEPLOYMENT_IDENTITY_LENGTH);
+        assert_eq!(
+            sample_deployment().to_bytes().len(),
+            DEPLOYMENT_IDENTITY_LENGTH
+        );
     }
 
     #[test]
@@ -855,15 +874,8 @@ mod tests {
     #[test]
     fn rejects_alternate_destination_padding() {
         let mut encoded = sample_deposit_message().encode().expect("encode");
-        let padding_index = 12
-            + DEPLOYMENT_IDENTITY_LENGTH
-            + 32
-            + NATIVE_OUTPOINT_LENGTH
-            + 32
-            + 8
-            + 8
-            + 2
-            + 32;
+        let padding_index =
+            12 + DEPLOYMENT_IDENTITY_LENGTH + 32 + NATIVE_OUTPOINT_LENGTH + 32 + 8 + 8 + 2 + 32;
         encoded[padding_index] = 1;
         assert!(matches!(
             CanonicalBridgeMessage::decode(&encoded),
@@ -874,7 +886,11 @@ mod tests {
     #[test]
     fn canonical_vector_prefix_is_stable() {
         let encoded = sample_deposit_message().encode().expect("encode");
-        let prefix: String = encoded.iter().take(12).map(|b| format!("{b:02x}")).collect();
+        let prefix: String = encoded
+            .iter()
+            .take(12)
+            .map(|b| format!("{b:02x}"))
+            .collect();
         assert_eq!(prefix, "4b5045504252473101000000");
     }
 
@@ -914,7 +930,9 @@ mod tests {
         state = state
             .transition(BridgeStateEvent::DependencySatisfied)
             .expect("step");
-        state = state.transition(BridgeStateEvent::BeginSigning).expect("step");
+        state = state
+            .transition(BridgeStateEvent::BeginSigning)
+            .expect("step");
         state = state
             .transition(BridgeStateEvent::BroadcastSubmitted)
             .expect("step");
@@ -946,7 +964,9 @@ mod tests {
         ledger.record_validated_deposit(10_000, 0).expect("deposit");
         ledger.record_mint(10_000, 0).expect("mint");
         ledger.record_burn_request(1_000, 0).expect("burn request");
-        ledger.reserve_withdrawal_utxos(1_000).expect("reserve utxo");
+        ledger
+            .reserve_withdrawal_utxos(1_000)
+            .expect("reserve utxo");
         ledger.record_payout_broadcast(1_000).expect("broadcast");
         ledger.record_payout_settlement(1_000).expect("finalized");
         assert_eq!(ledger.canonical_reserve, 9_000);
