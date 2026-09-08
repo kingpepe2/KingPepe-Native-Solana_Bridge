@@ -428,7 +428,22 @@
     {
       "path": "services/bridge-validator/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Bridge validator service role notes."
+      "notes": "Bridge validator service role notes and Phase 08 source-boundary implementation status."
+    },
+    {
+      "path": "services/bridge-validator/automatic-deposit-pipeline.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 automatic Native-to-Solana deposit orchestration boundary using existing FROST, attestation, adapter, and exact-accounting checks."
+    },
+    {
+      "path": "services/bridge-validator/index.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Bridge validator service export surface."
+    },
+    {
+      "path": "services/bridge-validator/tests/automatic-deposit-pipeline.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 deposit pipeline tests using temporary in-memory keys and temp-directory FROST state outside the repository."
     },
     {
       "path": "services/indexer/README.md",

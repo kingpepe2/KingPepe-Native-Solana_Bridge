@@ -68,6 +68,7 @@
 - Phase 07 CI: PASS for `d17ba8fe61d20a88d4206f72d68a010a2d146524`
 - Phase 08 `Get-Command kingpeped kingpepe-cli solana-test-validator anchor`: NOT_FOUND on Windows
 - Phase 08 `command -v kingpeped kingpepe-cli solana-test-validator solana anchor`: NOT_FOUND under WSL
+- Phase 08 `npm run test:bridge-validator`: PASS, 6 automatic deposit pipeline tests
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
 
 ## Phase 03 local implementation
@@ -84,7 +85,33 @@
 
 ## Next phase
 
-- Provide or install pinned disposable local E2E infrastructure, then implement and run Phase 08 automatic Native-to-Solana local flow.
+- Continue Phase 08 by replacing remaining adapter seams with deployable local
+  Solana program execution and disposable KingPepe regtest node integration
+  once the missing local E2E infrastructure is available.
+
+## Phase 08 source-boundary implementation
+
+- Added `services/bridge-validator/automatic-deposit-pipeline.mjs`.
+- Added `services/bridge-validator/tests/automatic-deposit-pipeline.test.mjs`.
+- Added `services/bridge-validator/index.mjs`.
+- Updated CI to run `npm run test:bridge-validator` on Linux and Windows.
+- Implemented service-side automatic Native-to-Solana orchestration that:
+  - validates configured Native evidence before signing;
+  - performs automatic FROST A+B reserve-sweep signing through the existing
+    Native-compatible FROST runtime;
+  - waits for finalized canonical reserve-sweep evidence before attestation;
+  - requires two distinct project attesters over the identical canonical
+    deposit message;
+  - submits exactly one deposit claim through a Solana bridge adapter;
+  - records exact BigInt reserve, mint-credit, minted-supply, fee, and
+    unsettled-operation accounting;
+  - prevents completed replay from minting or broadcasting twice;
+  - rejects invalid trust, altered reserve evidence, and FROST quorum loss;
+  - contains no per-transfer KingPepe Team approval state.
+- Implementation commit: `PENDING`
+- CI URL: `PENDING`
+- CI status: `PENDING`
+- Real daemon-backed Native-to-Solana E2E: `BLOCKED / NOT_RUN`
 
 ## Phase 04 local implementation
 
