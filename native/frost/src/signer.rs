@@ -123,7 +123,11 @@ impl Signer {
         })
     }
 
-    pub fn verify_local(&self, request: &SigningRequest, share: &SignedShare) -> Result<bool, SignerError> {
+    pub fn verify_local(
+        &self,
+        request: &SigningRequest,
+        share: &SignedShare,
+    ) -> Result<bool, SignerError> {
         if share.signer_role != self.role {
             return Err(SignerError::WrongRole);
         }
@@ -150,7 +154,10 @@ impl SignedShare {
         public_key: &ParticipantPublicKey,
         request: &SigningRequest,
     ) -> Result<bool, SignerError> {
-        if self.request_id != request.request_id || self.nonce != request.nonce || self.epoch != request.epoch {
+        if self.request_id != request.request_id
+            || self.nonce != request.nonce
+            || self.epoch != request.epoch
+        {
             return Err(SignerError::RequestIdMismatch);
         }
         if self.message_hash != build_message(request) {
@@ -186,7 +193,10 @@ fn build_test_signature(
     digest.finalize().into()
 }
 
-fn validate_test_signature(public_key: &ParticipantPublicKey, share: &SignedShare) -> Result<(), SignerError> {
+fn validate_test_signature(
+    public_key: &ParticipantPublicKey,
+    share: &SignedShare,
+) -> Result<(), SignerError> {
     let expected = build_test_signature(public_key, share.signer_role, &share.message_hash);
     if share.signature.as_slice() != expected {
         return Err(SignerError::BadSignature);

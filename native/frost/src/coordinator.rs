@@ -2,7 +2,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use thiserror::Error;
 
-use crate::policy::{policy_bound_domain_ok, validate_amount_fits_limits, DomainBinding, SigningPolicy};
+use crate::policy::{
+    policy_bound_domain_ok, validate_amount_fits_limits, DomainBinding, SigningPolicy,
+};
 use crate::signer::{build_message, ParticipantPublicKey, SignerRole, SignedShare, SigningRequest};
 use crate::state::{NonceId, NonceStore, NonceStoreError};
 
@@ -57,8 +59,13 @@ pub struct SigningCoordinator {
 }
 
 impl SigningCoordinator {
-    pub fn new(policy: SigningPolicy, epoch: u64, participant_keys: BTreeMap<SignerRole, ParticipantPublicKey>) -> Self {
-        let required_participants: BTreeSet<SignerRole> = [SignerRole::A, SignerRole::B].into_iter().collect();
+    pub fn new(
+        policy: SigningPolicy,
+        epoch: u64,
+        participant_keys: BTreeMap<SignerRole, ParticipantPublicKey>,
+    ) -> Self {
+        let required_participants: BTreeSet<SignerRole> =
+            [SignerRole::A, SignerRole::B].into_iter().collect();
         Self {
             required_participants,
             policy,
@@ -84,8 +91,10 @@ impl SigningCoordinator {
             return Err(CoordinatorError::PolicyRejected);
         }
 
-        policy_bound_domain_ok(&self.policy, domains, self.epoch).map_err(|_| CoordinatorError::DomainMismatch)?;
-        validate_amount_fits_limits(&self.policy, amount, fee).map_err(|_| CoordinatorError::PolicyRejected)?;
+        policy_bound_domain_ok(&self.policy, domains, self.epoch)
+            .map_err(|_| CoordinatorError::DomainMismatch)?;
+        validate_amount_fits_limits(&self.policy, amount, fee)
+            .map_err(|_| CoordinatorError::PolicyRejected)?;
 
         self.nonce_store
             .reserve_nonce(nonce, request_id, operation_id, self.epoch)
@@ -109,7 +118,11 @@ impl SigningCoordinator {
         Ok(record)
     }
 
-    pub fn consume_signature(&mut self, request_id: [u8; 32], share: SignedShare) -> Result<(), CoordinatorError> {
+    pub fn consume_signature(
+        &mut self,
+        request_id: [u8; 32],
+        share: SignedShare,
+    ) -> Result<(), CoordinatorError> {
         let session = self
             .sessions
             .get_mut(&request_id)

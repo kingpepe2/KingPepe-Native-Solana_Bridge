@@ -1,6 +1,9 @@
 use std::collections::BTreeMap;
 
-use frost_runtime::{AggregateSignature, DomainBinding, ParticipantPublicKey, Signer, SignerRole, SignerState, SigningPolicy, SigningRequest};
+use frost_runtime::{
+    AggregateSignature, DomainBinding, ParticipantPublicKey, Signer, SignerRole, SignerState,
+    SigningPolicy, SigningRequest,
+};
 use frost_runtime::{SigningCoordinator, SigningRecord};
 
 fn policy() -> (SigningPolicy, DomainBinding) {
@@ -143,7 +146,15 @@ fn coordinator_rejects_nonce_reuse() {
     let (_, _, keys) = signers_and_keys();
     let mut coordinator = SigningCoordinator::new(policy, 7, keys);
     coordinator
-        .start_session([11u8; 32], [12u8; 32], [13u8; 32], 100, 10, &binding, [33u8; 32])
+        .start_session(
+            [11u8; 32],
+            [12u8; 32],
+            [13u8; 32],
+            100,
+            10,
+            &binding,
+            [33u8; 32],
+        )
         .expect("first session");
     let second = coordinator.start_session(
         [14u8; 32],

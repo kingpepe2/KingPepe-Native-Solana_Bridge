@@ -27,7 +27,8 @@ pub fn policy_bound_domain_ok(
         return Err(SigningPolicyError::EpochMismatch);
     }
 
-    if policy.expected_domains.native_chain_id == 0 || policy.expected_domains.solana_chain_id == 0 {
+    if policy.expected_domains.native_chain_id == 0 || policy.expected_domains.solana_chain_id == 0
+    {
         return Err(SigningPolicyError::DomainMismatch);
     }
 
@@ -44,7 +45,11 @@ pub fn policy_bound_domain_ok(
     Ok(())
 }
 
-pub fn validate_amount_fits_limits(policy: &SigningPolicy, amount: u64, fee: u64) -> Result<(), SigningPolicyError> {
+pub fn validate_amount_fits_limits(
+    policy: &SigningPolicy,
+    amount: u64,
+    fee: u64,
+) -> Result<(), SigningPolicyError> {
     if amount == 0 {
         return Err(SigningPolicyError::ZeroAmount);
     }
