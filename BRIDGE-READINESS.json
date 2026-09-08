@@ -19,7 +19,9 @@
     "phase03CiVerified": true,
     "nativeCompatibleFrostImplemented": true,
     "phase04LocalValidationPassed": true,
-    "phase04CiVerified": true
+    "phase04CiVerified": true,
+    "solanaProgramBoundaryImplemented": true,
+    "phase05LocalValidationPassed": true
   },
   "readinessGates": {
     "SOURCE_COMPLETE": "IMPLEMENTED_NOT_FULLY_TESTED",

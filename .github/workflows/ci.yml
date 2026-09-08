@@ -28,6 +28,20 @@ jobs:
         run: npm audit --audit-level=low
       - name: Pin rust toolchain
         run: rustup toolchain install --profile minimal nightly-2023-10-29
+      - name: Install Rust quality components
+        run: rustup component add rustfmt clippy --toolchain nightly-2023-10-29
+      - name: Validate Solana Rust formatting
+        run: |
+          cd solana
+          cargo fmt --check --all
+      - name: Validate native Rust formatting
+        run: cargo fmt --check --manifest-path native/frost/Cargo.toml
+      - name: Run Solana clippy
+        run: |
+          cd solana
+          cargo clippy --locked --workspace --all-targets -- -D warnings
+      - name: Run native clippy
+        run: cargo clippy --locked --manifest-path native/frost/Cargo.toml --all-targets -- -D warnings
       - name: Validate Solana workspace
         run: |
           cd solana

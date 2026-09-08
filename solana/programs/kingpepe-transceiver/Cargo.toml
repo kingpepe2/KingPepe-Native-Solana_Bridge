@@ -8,4 +8,5 @@ name = "kingpepe_transceiver"
 path = "src/lib.rs"
 
 [dependencies]
+bridge-messages = { path = "../../modules/bridge-messages" }
 thiserror = "1.0.69"
