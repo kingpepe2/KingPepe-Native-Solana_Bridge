@@ -36,7 +36,7 @@
 
 ## Current blockers
 
-- Phase 06 Native proof/reserve/recovery has not been implemented yet.
+- Phase 06 CI verification is pending for the current local implementation.
 - Full Native transaction construction, Native node acceptance, local end-to-end flows, Devnet, production configuration, external review, and activation remain later phases.
 
 ## Latest local validation
@@ -54,6 +54,9 @@
 - Phase 05 `cd solana && cargo test --locked --workspace`: PASS under WSL, 35 Rust tests
 - Phase 05 local `cargo fmt` / `cargo clippy`: NOT_RUN; local WSL Cargo 1.75 lacks the subcommands
 - Phase 05 CI: PASS for `7e8212b1ca80ccbcdafbad1c72422bb0eafaa300`
+- Phase 06 `cargo test --locked --manifest-path native/proof/Cargo.toml`: PASS under WSL, 8 Rust tests
+- Phase 06 `cargo test --locked --manifest-path native/reserve/Cargo.toml`: PASS under WSL, 3 Rust tests
+- Phase 06 `cargo test --locked --manifest-path native/recovery/Cargo.toml`: PASS under WSL, 3 Rust tests
 
 ## Phase 03 local implementation
 
@@ -69,7 +72,7 @@
 
 ## Next phase
 
-- Start Phase 06 Native proof/reserve/recovery implementation.
+- Push Phase 06, verify CI for the exact source SHA, and then proceed to Phase 07 attestation and Solana observation if CI passes.
 
 ## Phase 04 local implementation
 
@@ -114,3 +117,11 @@
   - `7e8212b1ca80ccbcdafbad1c72422bb0eafaa300`
 - CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34285305630`
 - CI status: `PASS`
+
+## Phase 06 local implementation
+
+- Added `kingpepe_native_proof` with reviewed KingPepe Native mainnet/regtest parameters, 8-decimal atomic units, SHA256d header parsing, compact targets, PoW, difficulty, chainwork, Merkle proofs, transaction parsing, UTXO observation checks, and temporary-deposit validation.
+- Added `kingpepe_native_reserve` with canonical reserve sweep validation, exact fee/allocation accounting, temporary-deposit non-mintability, and single-use allocation consumption.
+- Added `kingpepe_native_recovery` with CSV maturity, wrong-network, spent-output, mint/sweep conflict, duplicate recovery, fee, and dust checks.
+- Added CI gates for native proof/reserve/recovery formatting, clippy, locked check, and tests.
+- CI status: `PENDING`

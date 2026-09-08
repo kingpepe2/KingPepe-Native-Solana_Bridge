@@ -115,3 +115,25 @@
   - Ed25519 instruction parsing, Native validation, local validator flows, and deployment manifests remain later phases.
 - next:
   - Start Phase 06 Native proof/reserve/recovery implementation.
+
+## Phase 06 local implementation summary
+
+- PHASE: `06`
+- commit: `PENDING`
+- push result: `PENDING`
+- CI URL: `PENDING`
+- CI status: `PENDING`
+- tests:
+  - `cargo test --locked --manifest-path native/proof/Cargo.toml` (pass under WSL, 8 Rust tests)
+  - `cargo test --locked --manifest-path native/reserve/Cargo.toml` (pass under WSL, 3 Rust tests)
+  - `cargo test --locked --manifest-path native/recovery/Cargo.toml` (pass under WSL, 3 Rust tests)
+- changed:
+  - Implemented Native header, PoW, difficulty, chainwork, transaction, Merkle, UTXO, and deposit validation primitives.
+  - Implemented reserve sweep transition checks and once-only mint-credit accounting.
+  - Implemented temporary-deposit recovery eligibility checks.
+  - Added CI coverage for the new Phase 06 crates.
+- blockers:
+  - Phase 06 CI verification is pending for the outgoing commit.
+  - Live KingPepe regtest node integration, full transaction broadcasting, Solana observation, local E2E, Devnet, production configuration, and external review remain later phases.
+- next:
+  - Push Phase 06, verify CI, then start Phase 07 attestation and Solana observation.

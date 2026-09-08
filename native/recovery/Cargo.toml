@@ -1,0 +1,10 @@
+[package]
+name = "kingpepe_native_recovery"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+kingpepe_native_proof = { path = "../proof" }
+serde = { version = "1.0.229", features = ["derive"] }
+thiserror = "1.0.69"

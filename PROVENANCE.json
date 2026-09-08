@@ -146,6 +146,11 @@
       "notes": "Phase 05 Solana bridge manager and transceiver boundary documentation."
     },
     {
+      "path": "docs/architecture/native-validation.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Phase 06 Native proof, reserve, recovery, and trust-boundary documentation."
+    },
+    {
       "path": "docs/security/software-frost.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
       "notes": "Software FROST implementation, Native signing evidence, and same-host risk notes."
@@ -283,22 +288,107 @@
     {
       "path": "native/node/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Native node adapter notes."
+      "notes": "Native node observation boundary notes for Phase 06."
+    },
+    {
+      "path": "native/proof/Cargo.lock",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Generated Rust lockfile for the Phase 06 Native proof crate."
+    },
+    {
+      "path": "native/proof/Cargo.toml",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Crate dependency and package metadata for Native proof validation."
     },
     {
       "path": "native/proof/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+      "notes": "Native proof crate documentation updated in Phase 06."
+    },
+    {
+      "path": "native/proof/src/bytes.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Hex, byte-order, and SHA256d helpers for Native proof validation."
+    },
+    {
+      "path": "native/proof/src/chain.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "KingPepe Native mainnet/regtest parameters, header-chain finality, activation, and chainwork validation."
+    },
+    {
+      "path": "native/proof/src/deposit.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Temporary deposit evidence validation against transaction, Merkle, finality, and UTXO observations."
+    },
+    {
+      "path": "native/proof/src/difficulty.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "KingPepe Native difficulty retargeting and compact target checks based on reviewed source facts."
+    },
+    {
+      "path": "native/proof/src/header.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Native block-header parsing, compact target encoding, PoW, and block-proof arithmetic."
+    },
+    {
+      "path": "native/proof/src/lib.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Native proof crate API surface and typed errors."
+    },
+    {
+      "path": "native/proof/src/merkle.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Native transaction Merkle branch reconstruction and verification."
+    },
+    {
+      "path": "native/proof/src/node.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Native source and UTXO observation trust-boundary validation."
+    },
+    {
+      "path": "native/proof/src/transaction.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Bounded KingPepe Native transaction parser and txid/wtxid calculation."
+    },
+    {
+      "path": "native/recovery/Cargo.lock",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Generated Rust lockfile for the Phase 06 Native recovery crate."
+    },
+    {
+      "path": "native/recovery/Cargo.toml",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Crate dependency and package metadata for Native recovery validation."
     },
     {
       "path": "native/recovery/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+      "notes": "Native recovery crate documentation updated in Phase 06."
+    },
+    {
+      "path": "native/recovery/src/lib.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Temporary-deposit recovery eligibility checks without signing or broadcasting."
+    },
+    {
+      "path": "native/reserve/Cargo.lock",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Generated Rust lockfile for the Phase 06 Native reserve crate."
+    },
+    {
+      "path": "native/reserve/Cargo.toml",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Crate dependency and package metadata for Native reserve validation."
     },
     {
       "path": "native/reserve/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+      "notes": "Native reserve crate documentation updated in Phase 06."
+    },
+    {
+      "path": "native/reserve/src/lib.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Canonical reserve sweep, allocation, and mint-credit transition checks."
     },
     {
       "path": "rust-toolchain.toml",
