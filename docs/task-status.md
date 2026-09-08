@@ -89,3 +89,29 @@
   - Full Native node transaction acceptance remains a later local end-to-end phase.
 - next:
   - Start Phase 05 Solana Bridge Manager and Transceiver implementation.
+
+## Phase 05 local implementation summary
+
+- PHASE: `05`
+- commit: `PENDING`
+- push result: `PENDING`
+- CI URL: `PENDING`
+- CI status: `PENDING`
+- tests:
+  - `cd solana && cargo check --locked --workspace --all-targets` (pass under WSL)
+  - `cd solana && cargo test --locked --workspace` (pass under WSL, 35 Rust tests)
+  - `npm test` (pass, 2 protocol vectors and 5 FROST Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - `cargo test --locked --manifest-path native/frost/Cargo.toml` (pass under WSL, 7 Rust tests)
+  - local `cargo fmt` / `cargo clippy` (NOT_RUN; local WSL Cargo 1.75 lacks the subcommands)
+- changed:
+  - Implemented bridge manager initialization, mint binding, PDA authority checks, freeze-authority rejection, account validation, receipt consumption, replay protection, and withdrawal recording.
+  - Implemented transceiver domain checks, two-attester threshold checks, verified-message receipts, and receipt consumption protection.
+  - Kept Mainnet activation disabled and documented that SBF/Anchor deployment binding remains later work.
+  - Added Linux CI Rust formatting and clippy gates for the Solana and native Rust workspaces.
+- blockers:
+  - Phase 05 CI verification is pending for the outgoing commit.
+  - Ed25519 instruction parsing, Native validation, local validator flows, and deployment manifests remain later phases.
+- next:
+  - Push Phase 05, verify CI, then start Phase 06 Native proof/reserve/recovery implementation.

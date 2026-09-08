@@ -36,7 +36,7 @@
 
 ## Current blockers
 
-- Solana Bridge Manager and Transceiver implementation is the current phase.
+- Phase 05 CI verification is pending for the current local implementation.
 - Full Native transaction construction, Native node acceptance, local end-to-end flows, Devnet, production configuration, external review, and activation remain later phases.
 
 ## Latest local validation
@@ -50,6 +50,10 @@
 - `npm ci --ignore-scripts`: PASS
 - `npm test`: PASS, 2 protocol vectors and 5 FROST Node tests
 - `npm audit --audit-level=low`: PASS, 0 vulnerabilities
+- Phase 05 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL
+- Phase 05 `cd solana && cargo test --locked --workspace`: PASS under WSL, 35 Rust tests
+- Phase 05 local `cargo fmt` / `cargo clippy`: NOT_RUN; local WSL Cargo 1.75 lacks the subcommands
+- Phase 05 CI now includes Linux Rust formatting and clippy gates
 
 ## Phase 03 local implementation
 
@@ -65,7 +69,7 @@
 
 ## Next phase
 
-- Implement Phase 05 Solana Bridge Manager and Transceiver, then push and verify CI for the exact source SHA.
+- Push Phase 05, verify CI for the exact source SHA, and then proceed to Phase 06 Native proof/reserve/recovery implementation if CI passes.
 
 ## Phase 04 local implementation
 
@@ -87,3 +91,15 @@
 - Commit: `3494ebf70f9a432bd786ea17ca73a1177d8bf66d`
 - CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34281044175`
 - CI status: PASS
+
+## Phase 05 local implementation
+
+- Replaced Solana program placeholders with bridge manager and transceiver boundary logic.
+- Added configured transceiver receipts with exact message-domain binding.
+- Required two distinct authorized attestation identities at the transceiver boundary.
+- Added bridge initialization protections, zero initial supply enforcement, PDA mint-authority derivation, freeze-authority rejection, mint/native decimal matching, wrong-account rejection, and account-aliasing rejection.
+- Added deposit receipt consumption and replay protection.
+- Added atomic withdrawal record creation tied to a matching BurnChecked model.
+- Added Mainnet-disabled behavior.
+- Added tests for initialization, wrong accounts, missing receipts, replay, direct burns without bridge records, epoch rotation preserving markers, attester threshold/duplicate rejection, receipt consumption, and wrong transceiver domains.
+- CI status: `PENDING`
