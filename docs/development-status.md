@@ -2,7 +2,7 @@
 
 ## Current phase
 
-- `PHASE 05` - Solana Bridge Manager and Transceiver
+- `PHASE 06` - Native proof, reserve, and recovery
 - Branch: `main`
 - Repository: private by policy
 - `productionReady = false`
@@ -36,7 +36,7 @@
 
 ## Current blockers
 
-- Phase 05 CI verification is pending for the current local implementation.
+- Phase 06 Native proof/reserve/recovery has not been implemented yet.
 - Full Native transaction construction, Native node acceptance, local end-to-end flows, Devnet, production configuration, external review, and activation remain later phases.
 
 ## Latest local validation
@@ -53,7 +53,7 @@
 - Phase 05 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL
 - Phase 05 `cd solana && cargo test --locked --workspace`: PASS under WSL, 35 Rust tests
 - Phase 05 local `cargo fmt` / `cargo clippy`: NOT_RUN; local WSL Cargo 1.75 lacks the subcommands
-- Phase 05 CI now includes Linux Rust formatting and clippy gates
+- Phase 05 CI: PASS for `7e8212b1ca80ccbcdafbad1c72422bb0eafaa300`
 
 ## Phase 03 local implementation
 
@@ -69,7 +69,7 @@
 
 ## Next phase
 
-- Push Phase 05, verify CI for the exact source SHA, and then proceed to Phase 06 Native proof/reserve/recovery implementation if CI passes.
+- Start Phase 06 Native proof/reserve/recovery implementation.
 
 ## Phase 04 local implementation
 
@@ -102,4 +102,15 @@
 - Added atomic withdrawal record creation tied to a matching BurnChecked model.
 - Added Mainnet-disabled behavior.
 - Added tests for initialization, wrong accounts, missing receipts, replay, direct burns without bridge records, epoch rotation preserving markers, attester threshold/duplicate rejection, receipt consumption, and wrong transceiver domains.
-- CI status: `PENDING`
+- Implementation commit sequence:
+  - `7ddacbc72694aaac7da3900dff34cccbde703536`
+  - `a78156c60beb3c76eaf81d9af4314d640ce3e220`
+  - `58310b908590a77342db599b7845da4be9cebe32`
+  - `164e096e58b4b453d857aec367e1a83dbaef1c97`
+  - `6216b9aa9bca6b91d17dc7c91f38222c09a5e049`
+  - `f860c47d68a682545112ab7f152e681703d6ab6d`
+  - `d914d9148c4cbe7ef845955f19feb9c753823ea6`
+  - `dd9c64df3289b48ae0d9250d0e1ae2ba3b0b5b1f`
+  - `7e8212b1ca80ccbcdafbad1c72422bb0eafaa300`
+- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34285305630`
+- CI status: `PASS`
