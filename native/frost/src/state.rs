@@ -77,8 +77,15 @@ impl NonceStore {
         Ok(entry)
     }
 
-    pub fn record_signature(&mut self, nonce: &NonceId, role: SignerRole) -> Result<(), NonceStoreError> {
-        let entry = self.entries.get_mut(nonce).ok_or(NonceStoreError::NonceMissing)?;
+    pub fn record_signature(
+        &mut self,
+        nonce: &NonceId,
+        role: SignerRole,
+    ) -> Result<(), NonceStoreError> {
+        let entry = self
+            .entries
+            .get_mut(nonce)
+            .ok_or(NonceStoreError::NonceMissing)?;
 
         let next_state = match (entry.state, role) {
             (NonceState::Allocated, SignerRole::A) => NonceState::SignedByA,

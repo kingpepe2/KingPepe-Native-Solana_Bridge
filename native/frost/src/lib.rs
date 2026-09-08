@@ -20,5 +20,7 @@ mod state;
 pub use coordinator::{AggregateSignature, CoordinatorError, SigningCoordinator, SigningRecord};
 pub use policy::{DomainBinding, SigningPolicy, SigningPolicyError};
 pub use recovery::{RecoveryInstruction, RecoveryError, RecoveryRecord};
-pub use signer::{ParticipantPublicKey, SignedShare, Signer, SignerRole, SignerState, SigningRequest};
+pub use signer::{
+    ParticipantPublicKey, SignedShare, Signer, SignerRole, SignerState, SigningRequest,
+};
 pub use state::{NonceId, NonceState, NonceStore};
