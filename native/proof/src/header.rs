@@ -69,7 +69,9 @@ pub fn encode_compact(target: &BigUint, negative: bool) -> Result<u32, NativePro
     let bytes = target.to_bytes_be();
     let mut size = bytes.len() as u32;
     let mut compact = if size <= 3 {
-        let value = target.to_u32().ok_or(NativeProofError::InvalidCompactTarget)?;
+        let value = target
+            .to_u32()
+            .ok_or(NativeProofError::InvalidCompactTarget)?;
         value << (8 * (3 - size))
     } else {
         ((bytes[0] as u32) << 16) | ((bytes[1] as u32) << 8) | bytes[2] as u32
@@ -159,7 +161,9 @@ pub fn serialize_header(
 
 pub fn verify_proof_of_work(header: &ParsedHeader, pow_limit: &BigUint) -> bool {
     match target_from_bits(header.bits, pow_limit) {
-        Ok(target) => cmp_32_be(&header.hash, &target_to_32_be(&target)) != std::cmp::Ordering::Greater,
+        Ok(target) => {
+            cmp_32_be(&header.hash, &target_to_32_be(&target)) != std::cmp::Ordering::Greater
+        }
         Err(_) => false,
     }
 }

@@ -76,11 +76,24 @@ mod tests {
         let txids: Vec<[u8; 32]> = (1..=5).map(|value| [value; 32]).collect();
         for index in 0..txids.len() {
             let (root, branch) = build_merkle_branch(&txids, index).unwrap();
-            assert_eq!(reconstruct_merkle_root(txids[index], &branch, index as u32).unwrap(), root);
-            assert!(verify_merkle_proof(txids[index], &branch, index as u32, root));
+            assert_eq!(
+                reconstruct_merkle_root(txids[index], &branch, index as u32).unwrap(),
+                root
+            );
+            assert!(verify_merkle_proof(
+                txids[index],
+                &branch,
+                index as u32,
+                root
+            ));
             let mut altered = branch;
             altered[0] = [0xff; 32];
-            assert!(!verify_merkle_proof(txids[index], &altered, index as u32, root));
+            assert!(!verify_merkle_proof(
+                txids[index],
+                &altered,
+                index as u32,
+                root
+            ));
         }
         assert_eq!(
             reconstruct_merkle_root(txids[0], &[], 1).unwrap_err(),
