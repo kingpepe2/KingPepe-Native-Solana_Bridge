@@ -126,6 +126,11 @@
       "notes": "Architecture comparison notes created for this project."
     },
     {
+      "path": "docs/architecture/protocol-messages.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Canonical protocol message and accounting model documentation."
+    },
+    {
       "path": "docs/development-status.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
       "notes": "Phase progress and status reporting."
@@ -331,6 +336,11 @@
       "notes": "Message module tests."
     },
     {
+      "path": "solana/modules/bridge-messages/vectors/canonical-v1.json",
+      "classification": "GENERATED_FILE",
+      "notes": "Public deterministic test vectors for canonical protocol encoding; not operational key material."
+    },
+    {
       "path": "solana/programs/kingpepe-bridge/Cargo.toml",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
       "notes": "Bridge manager program manifest."
@@ -386,9 +396,19 @@
       "notes": "Added by phase-02 structure pass; classification assigned by path/type."
     },
     {
+      "path": "solana/ts/lib/protocol.ts",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "TypeScript canonical protocol encoder and digest helpers."
+    },
+    {
       "path": "solana/ts/scripts/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
       "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
+      "path": "solana/ts/scripts/verify-vectors.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Node-based vector verifier used by CI without production secrets."
     },
     {
       "path": "solana/ts/sdk/README.md",
