@@ -222,7 +222,9 @@ pub enum TransceiverError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bridge_messages::{DeploymentIdentity, MessageEpochs, NativeOutpoint, ValidityWindow};
+    use bridge_messages::{
+        DeploymentIdentity, DepositClaimFields, MessageEpochs, NativeOutpoint, ValidityWindow,
+    };
 
     fn h(byte: u8) -> [u8; 32] {
         [byte; 32]
@@ -241,8 +243,8 @@ mod tests {
     }
 
     fn message(config: &TransceiverConfig) -> CanonicalBridgeMessage {
-        CanonicalBridgeMessage::new_deposit_claim(
-            DeploymentIdentity {
+        CanonicalBridgeMessage::new_deposit_claim(DepositClaimFields {
+            deployment: DeploymentIdentity {
                 protocol_id: 1,
                 native_network: 2,
                 native_genesis: h(7),
@@ -251,23 +253,23 @@ mod tests {
                 transceiver_program_id: config.transceiver_program_id,
                 mint: config.mint,
             },
-            NativeOutpoint {
+            deposit_outpoint: NativeOutpoint {
                 txid: h(8),
                 vout: 1,
             },
-            1_000,
-            h(9),
-            MessageEpochs {
+            amount_atomic: 1_000,
+            solana_recipient: h(9),
+            epochs: MessageEpochs {
                 policy_epoch: 1,
                 key_epoch: config.key_epoch,
             },
-            h(10),
-            ValidityWindow {
+            nonce: h(10),
+            validity: ValidityWindow {
                 valid_from: 1,
                 valid_until: 2,
             },
-            h(11),
-        )
+            evidence_digest: h(11),
+        })
         .unwrap()
     }
 

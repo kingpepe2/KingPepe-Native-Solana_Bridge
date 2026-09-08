@@ -1,7 +1,8 @@
 use bridge_messages::{
     BridgeAction, BridgeDirection, BridgeOperationState, BridgeStateEvent, CanonicalBridgeMessage,
-    DeploymentIdentity, LedgerError, LedgerState, MessageDecodeError, MessageEncodeError,
-    MessageEpochs, NativeOutpoint, ValidityWindow, MESSAGE_LENGTH, MESSAGE_VERSION,
+    DeploymentIdentity, DepositClaimFields, LedgerError, LedgerState, MessageDecodeError,
+    MessageEncodeError, MessageEpochs, NativeOutpoint, ValidityWindow, WithdrawalRequestFields,
+    MESSAGE_LENGTH, MESSAGE_VERSION,
 };
 use serde::Deserialize;
 
@@ -66,46 +67,46 @@ fn deployment() -> DeploymentIdentity {
 }
 
 fn deposit_message() -> CanonicalBridgeMessage {
-    CanonicalBridgeMessage::new_deposit_claim(
-        deployment(),
-        NativeOutpoint {
+    CanonicalBridgeMessage::new_deposit_claim(DepositClaimFields {
+        deployment: deployment(),
+        deposit_outpoint: NativeOutpoint {
             txid: [7u8; 32],
             vout: 2,
         },
-        12_345,
-        [8u8; 32],
-        MessageEpochs {
+        amount_atomic: 12_345,
+        solana_recipient: [8u8; 32],
+        epochs: MessageEpochs {
             policy_epoch: 1,
             key_epoch: 2,
         },
-        [0x42u8; 32],
-        ValidityWindow {
+        nonce: [0x42u8; 32],
+        validity: ValidityWindow {
             valid_from: 1_700_000_000,
             valid_until: 1_700_001_200,
         },
-        [9u8; 32],
-    )
+        evidence_digest: [9u8; 32],
+    })
     .expect("deposit message")
 }
 
 fn withdrawal_message() -> CanonicalBridgeMessage {
-    CanonicalBridgeMessage::new_withdrawal_request(
-        deployment(),
-        [0xAAu8; 32],
-        1_000,
-        12,
-        vec![0x51, 0x20, 0x99],
-        MessageEpochs {
+    CanonicalBridgeMessage::new_withdrawal_request(WithdrawalRequestFields {
+        deployment: deployment(),
+        withdrawal_id: [0xAAu8; 32],
+        gross_amount_atomic: 1_000,
+        fee_atomic: 12,
+        native_destination: vec![0x51, 0x20, 0x99],
+        epochs: MessageEpochs {
             policy_epoch: 1,
             key_epoch: 2,
         },
-        [0x43u8; 32],
-        ValidityWindow {
+        nonce: [0x43u8; 32],
+        validity: ValidityWindow {
             valid_from: 1_700_000_000,
             valid_until: 1_700_001_200,
         },
-        [0xBBu8; 32],
-    )
+        evidence_digest: [0xBBu8; 32],
+    })
     .expect("withdrawal message")
 }
 
@@ -135,44 +136,48 @@ fn vector_deployment(input: &VectorDeployment) -> DeploymentIdentity {
 
 fn vector_message(input: &VectorCase) -> CanonicalBridgeMessage {
     match (input.action.as_str(), input.direction.as_str()) {
-        ("DepositClaim", "NativeToSolana") => CanonicalBridgeMessage::new_deposit_claim(
-            vector_deployment(&input.deployment),
-            NativeOutpoint {
-                txid: hash32(&input.deposit_outpoint.txid),
-                vout: input.deposit_outpoint.vout,
-            },
-            input.amount_atomic.parse().expect("amount"),
-            hash32(&input.destination),
-            MessageEpochs {
-                policy_epoch: input.policy_epoch,
-                key_epoch: input.key_epoch,
-            },
-            hash32(&input.nonce),
-            ValidityWindow {
-                valid_from: input.valid_from.parse().expect("valid_from"),
-                valid_until: input.valid_until.parse().expect("valid_until"),
-            },
-            hash32(&input.evidence_digest),
-        )
-        .expect("deposit vector message"),
-        ("WithdrawalRequest", "SolanaToNative") => CanonicalBridgeMessage::new_withdrawal_request(
-            vector_deployment(&input.deployment),
-            hash32(&input.withdrawal_id),
-            input.amount_atomic.parse().expect("amount"),
-            input.fee_atomic.parse().expect("fee"),
-            hex_to_bytes(&input.destination),
-            MessageEpochs {
-                policy_epoch: input.policy_epoch,
-                key_epoch: input.key_epoch,
-            },
-            hash32(&input.nonce),
-            ValidityWindow {
-                valid_from: input.valid_from.parse().expect("valid_from"),
-                valid_until: input.valid_until.parse().expect("valid_until"),
-            },
-            hash32(&input.evidence_digest),
-        )
-        .expect("withdrawal vector message"),
+        ("DepositClaim", "NativeToSolana") => {
+            CanonicalBridgeMessage::new_deposit_claim(DepositClaimFields {
+                deployment: vector_deployment(&input.deployment),
+                deposit_outpoint: NativeOutpoint {
+                    txid: hash32(&input.deposit_outpoint.txid),
+                    vout: input.deposit_outpoint.vout,
+                },
+                amount_atomic: input.amount_atomic.parse().expect("amount"),
+                solana_recipient: hash32(&input.destination),
+                epochs: MessageEpochs {
+                    policy_epoch: input.policy_epoch,
+                    key_epoch: input.key_epoch,
+                },
+                nonce: hash32(&input.nonce),
+                validity: ValidityWindow {
+                    valid_from: input.valid_from.parse().expect("valid_from"),
+                    valid_until: input.valid_until.parse().expect("valid_until"),
+                },
+                evidence_digest: hash32(&input.evidence_digest),
+            })
+            .expect("deposit vector message")
+        }
+        ("WithdrawalRequest", "SolanaToNative") => {
+            CanonicalBridgeMessage::new_withdrawal_request(WithdrawalRequestFields {
+                deployment: vector_deployment(&input.deployment),
+                withdrawal_id: hash32(&input.withdrawal_id),
+                gross_amount_atomic: input.amount_atomic.parse().expect("amount"),
+                fee_atomic: input.fee_atomic.parse().expect("fee"),
+                native_destination: hex_to_bytes(&input.destination),
+                epochs: MessageEpochs {
+                    policy_epoch: input.policy_epoch,
+                    key_epoch: input.key_epoch,
+                },
+                nonce: hash32(&input.nonce),
+                validity: ValidityWindow {
+                    valid_from: input.valid_from.parse().expect("valid_from"),
+                    valid_until: input.valid_until.parse().expect("valid_until"),
+                },
+                evidence_digest: hash32(&input.evidence_digest),
+            })
+            .expect("withdrawal vector message")
+        }
         _ => panic!("unsupported vector case {}", input.name),
     }
 }

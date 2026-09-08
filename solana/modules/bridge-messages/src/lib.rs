@@ -212,34 +212,50 @@ pub struct CanonicalBridgeMessage {
     pub evidence_digest: Hash32,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct DepositClaimFields {
+    pub deployment: DeploymentIdentity,
+    pub deposit_outpoint: NativeOutpoint,
+    pub amount_atomic: u64,
+    pub solana_recipient: PubkeyBytes,
+    pub epochs: MessageEpochs,
+    pub nonce: Hash32,
+    pub validity: ValidityWindow,
+    pub evidence_digest: Hash32,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct WithdrawalRequestFields {
+    pub deployment: DeploymentIdentity,
+    pub withdrawal_id: Hash32,
+    pub gross_amount_atomic: u64,
+    pub fee_atomic: u64,
+    pub native_destination: Vec<u8>,
+    pub epochs: MessageEpochs,
+    pub nonce: Hash32,
+    pub validity: ValidityWindow,
+    pub evidence_digest: Hash32,
+}
+
 impl CanonicalBridgeMessage {
-    pub fn new_deposit_claim(
-        deployment: DeploymentIdentity,
-        deposit_outpoint: NativeOutpoint,
-        amount_atomic: u64,
-        solana_recipient: PubkeyBytes,
-        epochs: MessageEpochs,
-        nonce: Hash32,
-        validity: ValidityWindow,
-        evidence_digest: Hash32,
-    ) -> Result<Self, MessageEncodeError> {
+    pub fn new_deposit_claim(fields: DepositClaimFields) -> Result<Self, MessageEncodeError> {
         let mut message = Self {
             version: MESSAGE_VERSION,
             direction: BridgeDirection::NativeToSolana,
             action: BridgeAction::DepositClaim,
-            deployment,
+            deployment: fields.deployment,
             operation_id: [0u8; 32],
-            deposit_outpoint,
+            deposit_outpoint: fields.deposit_outpoint,
             withdrawal_id: [0u8; 32],
-            amount_atomic,
+            amount_atomic: fields.amount_atomic,
             fee_atomic: 0,
-            destination: solana_recipient.to_vec(),
-            policy_epoch: epochs.policy_epoch,
-            key_epoch: epochs.key_epoch,
-            nonce,
-            valid_from: validity.valid_from,
-            valid_until: validity.valid_until,
-            evidence_digest,
+            destination: fields.solana_recipient.to_vec(),
+            policy_epoch: fields.epochs.policy_epoch,
+            key_epoch: fields.epochs.key_epoch,
+            nonce: fields.nonce,
+            valid_from: fields.validity.valid_from,
+            valid_until: fields.validity.valid_until,
+            evidence_digest: fields.evidence_digest,
         };
         message.operation_id = message.derive_operation_id()?;
         message.validate()?;
@@ -247,33 +263,25 @@ impl CanonicalBridgeMessage {
     }
 
     pub fn new_withdrawal_request(
-        deployment: DeploymentIdentity,
-        withdrawal_id: Hash32,
-        gross_amount_atomic: u64,
-        fee_atomic: u64,
-        native_destination: Vec<u8>,
-        epochs: MessageEpochs,
-        nonce: Hash32,
-        validity: ValidityWindow,
-        evidence_digest: Hash32,
+        fields: WithdrawalRequestFields,
     ) -> Result<Self, MessageEncodeError> {
         let mut message = Self {
             version: MESSAGE_VERSION,
             direction: BridgeDirection::SolanaToNative,
             action: BridgeAction::WithdrawalRequest,
-            deployment,
+            deployment: fields.deployment,
             operation_id: [0u8; 32],
             deposit_outpoint: NativeOutpoint::ZERO,
-            withdrawal_id,
-            amount_atomic: gross_amount_atomic,
-            fee_atomic,
-            destination: native_destination,
-            policy_epoch: epochs.policy_epoch,
-            key_epoch: epochs.key_epoch,
-            nonce,
-            valid_from: validity.valid_from,
-            valid_until: validity.valid_until,
-            evidence_digest,
+            withdrawal_id: fields.withdrawal_id,
+            amount_atomic: fields.gross_amount_atomic,
+            fee_atomic: fields.fee_atomic,
+            destination: fields.native_destination,
+            policy_epoch: fields.epochs.policy_epoch,
+            key_epoch: fields.epochs.key_epoch,
+            nonce: fields.nonce,
+            valid_from: fields.validity.valid_from,
+            valid_until: fields.validity.valid_until,
+            evidence_digest: fields.evidence_digest,
         };
         message.operation_id = message.derive_operation_id()?;
         message.validate()?;
@@ -822,25 +830,25 @@ mod tests {
     }
 
     pub fn sample_deposit_message() -> CanonicalBridgeMessage {
-        CanonicalBridgeMessage::new_deposit_claim(
-            sample_deployment(),
-            NativeOutpoint {
+        CanonicalBridgeMessage::new_deposit_claim(DepositClaimFields {
+            deployment: sample_deployment(),
+            deposit_outpoint: NativeOutpoint {
                 txid: [7u8; 32],
                 vout: 2,
             },
-            12_345,
-            [8u8; 32],
-            MessageEpochs {
+            amount_atomic: 12_345,
+            solana_recipient: [8u8; 32],
+            epochs: MessageEpochs {
                 policy_epoch: 1,
                 key_epoch: 2,
             },
-            [0x42u8; 32],
-            ValidityWindow {
+            nonce: [0x42u8; 32],
+            validity: ValidityWindow {
                 valid_from: 1_700_000_000,
                 valid_until: 1_700_001_200,
             },
-            [9u8; 32],
-        )
+            evidence_digest: [9u8; 32],
+        })
         .expect("sample deposit message")
     }
 

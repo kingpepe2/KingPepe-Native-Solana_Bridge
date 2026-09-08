@@ -473,7 +473,10 @@ pub enum BridgeError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bridge_messages::{DeploymentIdentity, MessageEpochs, NativeOutpoint, ValidityWindow};
+    use bridge_messages::{
+        DeploymentIdentity, DepositClaimFields, MessageEpochs, NativeOutpoint, ValidityWindow,
+        WithdrawalRequestFields,
+    };
     use kingpepe_transceiver::{AttestationObservation, TransceiverConfig};
 
     fn h(byte: u8) -> [u8; 32] {
@@ -532,46 +535,46 @@ mod tests {
     }
 
     fn deposit_message(config: &BridgeConfig) -> CanonicalBridgeMessage {
-        CanonicalBridgeMessage::new_deposit_claim(
-            deployment(config),
-            NativeOutpoint {
+        CanonicalBridgeMessage::new_deposit_claim(DepositClaimFields {
+            deployment: deployment(config),
+            deposit_outpoint: NativeOutpoint {
                 txid: h(9),
                 vout: 1,
             },
-            5_000,
-            h(10),
-            MessageEpochs {
+            amount_atomic: 5_000,
+            solana_recipient: h(10),
+            epochs: MessageEpochs {
                 policy_epoch: config.policy_epoch,
                 key_epoch: config.key_epoch,
             },
-            h(11),
-            ValidityWindow {
+            nonce: h(11),
+            validity: ValidityWindow {
                 valid_from: 1,
                 valid_until: 2,
             },
-            h(12),
-        )
+            evidence_digest: h(12),
+        })
         .unwrap()
     }
 
     fn withdrawal_message(config: &BridgeConfig) -> CanonicalBridgeMessage {
-        CanonicalBridgeMessage::new_withdrawal_request(
-            deployment(config),
-            h(13),
-            4_000,
-            25,
-            vec![0x51, 0x20, 0xAB],
-            MessageEpochs {
+        CanonicalBridgeMessage::new_withdrawal_request(WithdrawalRequestFields {
+            deployment: deployment(config),
+            withdrawal_id: h(13),
+            gross_amount_atomic: 4_000,
+            fee_atomic: 25,
+            native_destination: vec![0x51, 0x20, 0xAB],
+            epochs: MessageEpochs {
                 policy_epoch: config.policy_epoch,
                 key_epoch: config.key_epoch,
             },
-            h(14),
-            ValidityWindow {
+            nonce: h(14),
+            validity: ValidityWindow {
                 valid_from: 1,
                 valid_until: 2,
             },
-            h(15),
-        )
+            evidence_digest: h(15),
+        })
         .unwrap()
     }
 
