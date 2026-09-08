@@ -1,10 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use ed25519_dalek::VerifyingKey;
 use thiserror::Error;
 
 use crate::policy::{policy_bound_domain_ok, validate_amount_fits_limits, DomainBinding, SigningPolicy};
-use crate::signer::{build_message, SignerRole, SignedShare, SigningRequest};
+use crate::signer::{build_message, ParticipantPublicKey, SignerRole, SignedShare, SigningRequest};
 use crate::state::{NonceId, NonceStore, NonceStoreError};
 
 #[derive(Debug, Clone)]
@@ -54,11 +53,11 @@ pub struct SigningCoordinator {
     nonce_store: NonceStore,
     sessions: BTreeMap<[u8; 32], SigningSession>,
     completed: BTreeMap<[u8; 32], AggregateSignature>,
-    participant_keys: BTreeMap<SignerRole, VerifyingKey>,
+    participant_keys: BTreeMap<SignerRole, ParticipantPublicKey>,
 }
 
 impl SigningCoordinator {
-    pub fn new(policy: SigningPolicy, epoch: u64, participant_keys: BTreeMap<SignerRole, VerifyingKey>) -> Self {
+    pub fn new(policy: SigningPolicy, epoch: u64, participant_keys: BTreeMap<SignerRole, ParticipantPublicKey>) -> Self {
         let required_participants: BTreeSet<SignerRole> = [SignerRole::A, SignerRole::B].into_iter().collect();
         Self {
             required_participants,

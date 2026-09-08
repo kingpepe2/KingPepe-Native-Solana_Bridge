@@ -3,13 +3,14 @@
   "project": "KingPepe Native - Solana Bridge",
   "productionReady": false,
   "mainnetActivation": "DISABLED",
-  "lastUpdated": "2026-09-07",
+  "lastUpdated": "2026-09-09",
   "sourceState": {
     "provenanceComplete": true,
     "secretBoundaryDefined": true,
     "privateRepositoryValidated": true,
     "ciConfigured": true,
     "toolchainPinned": true,
+    "lockfilesPinned": true,
     "structureBaselineInPlace": true
   },
   "readinessGates": {
@@ -25,7 +26,7 @@
     "SECRET_SCAN_PASS": "IMPLEMENTED_AND_TESTED_LOCALLY",
     "DEPENDENCY_AUDIT_PASS": "NOT_CONFIGURED",
     "LICENSE_PROVENANCE_PASS": "IMPLEMENTED_AND_TESTED_LOCALLY",
-    "REPRODUCIBLE_BUILD_PASS": "BLOCKED_TOOLCHAIN_UNAVAILABLE",
+    "REPRODUCIBLE_BUILD_PASS": "NOT_RUN_FULL_REPRODUCIBLE_BUILD",
     "PRODUCTION_CONFIGURATION_VALIDATED": "NOT_CONFIGURED",
     "PROGRAM_IDENTITIES_VERIFIED": "NOT_CONFIGURED",
     "MINT_AUTHORITY_VERIFIED": "NOT_CONFIGURED",

@@ -48,7 +48,10 @@
 ## Phase 02 safe commands
 
 - `python .github/scripts/guardrails.py`
-- `git add -A` only after review
+- `cd solana && cargo check --locked --workspace --all-targets`
+- `cargo check --locked --manifest-path native/frost/Cargo.toml`
+- `cargo test --locked --manifest-path native/frost/Cargo.toml`
+- Stage intended files explicitly after review.
 - `git status`
 - `git diff --name-only`
 
@@ -59,5 +62,8 @@
   - `native/proof`, `native/reserve`, `native/recovery`
   - `config`, `deployment`, `db-backup`, `shared`, `cli`, `app`, `scripts`, `monitoring`, `tests`
 - Pinned toolchain and dependency versions in manifest files.
+- Added locked dependency files for the current Solana and native Rust workspaces.
+- Removed the phase-02 Ed25519 placeholder dependency from the native runtime to keep CI compatible with the pinned toolchain.
 - Kept all sensitive runtime data and live credentials outside repository scope.
 - Updated source comparison records: `UPSTREAM-REFERENCES.json`, `docs/architecture/ntt-comparison.md`.
+- The current native signing runtime is not final Native-compatible FROST. Real FROST remains a Phase 04 requirement.

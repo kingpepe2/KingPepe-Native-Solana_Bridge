@@ -26,13 +26,23 @@
   - `UPSTREAM-REFERENCES.json`
   - `PROVENANCE.json` (coverage updated to include all tracked files)
 - Updated CI action pins in `.github/workflows/ci.yml`
+- Added `solana/Cargo.lock` and tightened CI Rust commands to `--locked`.
+- Removed the phase-02 Ed25519 signing placeholder dependency from `native/frost`; the current deterministic test-share model is build scaffolding only and is not final Native-compatible FROST.
 - Confirmed secret scan remains clean via `python .github/scripts/guardrails.py`.
 - Confirmed repository remains private.
 
 ## Current blockers
 
-- Runtime crate behavior and protocol logic remain placeholder in this phase.
-- No local `cargo` toolchain is available in this execution environment, so compile/test execution is blocked until a Rust runtime is installed.
+- Runtime crate behavior and protocol logic remain incomplete in this phase.
+- Real Native-compatible FROST remains a Phase 04 requirement.
+- Local Windows PowerShell does not expose `cargo`; WSL Cargo is available and was used for locked Rust validation.
+
+## Latest local validation
+
+- `python .github/scripts/guardrails.py`: PASS
+- `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL
+- `cargo check --locked --manifest-path native/frost/Cargo.toml`: PASS under WSL
+- `cargo test --locked --manifest-path native/frost/Cargo.toml`: PASS under WSL, 7 tests
 
 ## Next phase
 
