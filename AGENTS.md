@@ -24,8 +24,8 @@
 
 ## Current phase status
 
-- Current implementation phase: `PHASE 03 - Canonical Protocol Messages and Accounting`
-- Objective: implement canonical binary protocol messages, golden vectors, identities, state machines, and exact reserve/liability accounting primitives.
+- Current implementation phase: `PHASE 04 - Real Native-Compatible FROST 2-of-2`
+- Objective: determine Native signature requirements and implement or integrate real threshold signing compatible with KingPepe Native transactions.
 - Required authority: `KINGPEPE_TEAM_GOVERNANCE`
 
 ## Authoritative status files
@@ -73,3 +73,9 @@
 - Keep message authorization binary and canonical; do not use JSON as an economic authorization encoding.
 - Use exact integer accounting only.
 - Keep production readiness false and Mainnet activation disabled.
+
+## Phase 04 phase notes
+
+- Do not treat Ed25519 attestation or phase-02 deterministic test shares as FROST.
+- Determine KingPepe Native transaction signature requirements from source before selecting the FROST ciphersuite.
+- Keep all generated test key material outside the repository.
