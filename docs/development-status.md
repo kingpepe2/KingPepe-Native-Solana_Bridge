@@ -36,7 +36,8 @@
 
 ## Current blockers
 
-- Phase 08 automatic Native to Solana local end-to-end flow has not been implemented yet.
+- Phase 08 is blocked because the local environment does not provide `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, or `anchor`.
+- Current Solana crates are tested Rust boundary models, not deployable SBF/Anchor programs for local-validator execution.
 - Full Native transaction construction, Native node acceptance, local end-to-end flows, Devnet, production configuration, external review, and activation remain later phases.
 
 ## Latest local validation
@@ -65,6 +66,9 @@
 - Phase 07 `python .github/scripts/guardrails.py`: PASS
 - Phase 07 local `cargo fmt` / `cargo clippy`: NOT_RUN; local WSL has Cargo but not `rustup`, `rustfmt`, or `clippy`
 - Phase 07 CI: PASS for `d17ba8fe61d20a88d4206f72d68a010a2d146524`
+- Phase 08 `Get-Command kingpeped kingpepe-cli solana-test-validator anchor`: NOT_FOUND on Windows
+- Phase 08 `command -v kingpeped kingpepe-cli solana-test-validator solana anchor`: NOT_FOUND under WSL
+- Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
 
 ## Phase 03 local implementation
 
@@ -80,7 +84,7 @@
 
 ## Next phase
 
-- Start Phase 08 automatic Native to Solana local end-to-end implementation.
+- Provide or install pinned disposable local E2E infrastructure, then implement and run Phase 08 automatic Native-to-Solana local flow.
 
 ## Phase 04 local implementation
 

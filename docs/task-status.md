@@ -162,3 +162,21 @@
   - Local end-to-end bridge automation, Devnet, production configuration, external review, and activation remain later phases.
 - next:
   - Start Phase 08 automatic Native to Solana local end-to-end.
+
+## Phase 08 blocker summary
+
+- PHASE: `08`
+- commit: `PENDING`
+- push result: `PENDING`
+- CI URL: `PENDING`
+- CI status: `PENDING`
+- tests:
+  - `Get-Command kingpeped kingpepe-cli solana-test-validator anchor` (NOT_FOUND on Windows)
+  - `command -v kingpeped kingpepe-cli solana-test-validator solana anchor` (NOT_FOUND under WSL)
+  - Native-to-Solana local E2E (BLOCKED / NOT_RUN)
+- blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`
+  - The environment does not currently provide the KingPepe regtest daemon/CLI or Solana local validator/Anchor tooling needed for the required real local E2E gate.
+  - Current Solana crates are tested Rust boundary models and are not yet deployable SBF/Anchor local-validator programs.
+- next:
+  - Provide pinned disposable local KingPepe regtest and Solana local-validator tooling, then continue Phase 08 without claiming an E2E pass until the full automated deposit flow actually runs.

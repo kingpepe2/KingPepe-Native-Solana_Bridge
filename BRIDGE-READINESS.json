@@ -29,11 +29,12 @@
     "projectAttestationImplemented": true,
     "solanaObservationImplemented": true,
     "phase07LocalValidationPassed": true,
-    "phase07CiVerified": true
+    "phase07CiVerified": true,
+    "phase08LocalE2eBlocked": true
   },
   "readinessGates": {
     "SOURCE_COMPLETE": "IMPLEMENTED_NOT_FULLY_TESTED",
-    "LOCAL_E2E_PASS": "NOT_CONFIGURED",
+    "LOCAL_E2E_PASS": "BLOCKED_LOCAL_INFRASTRUCTURE_MISSING",
     "DEVNET_VALIDATION_PASS": "NOT_CONFIGURED",
     "FROST_NATIVE_SIGNATURE_PASS": "IMPLEMENTED_AND_TESTED_LOCALLY_PHASE04",
     "NONCE_SAFETY_PASS": "IMPLEMENTED_AND_TESTED_LOCALLY_PHASE04_NOT_PRODUCTION_ROLLBACK",

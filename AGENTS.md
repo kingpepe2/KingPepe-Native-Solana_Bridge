@@ -113,3 +113,14 @@
   and must `HARD_STOP` on unauthorized program, binary, upgrade-authority, Mint,
   or mint-authority changes.
 - CI verified Phase 07 at `d17ba8fe61d20a88d4206f72d68a010a2d146524`.
+
+## Phase 08 phase notes
+
+- Phase 08 is currently blocked on local E2E infrastructure.
+- Required local executables were not available in the checked environment:
+  `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
+- Current Solana crates are tested Rust boundary models, not deployable
+  SBF/Anchor programs for a local validator.
+- Do not mark Native-to-Solana local E2E as passed until a disposable
+  KingPepe regtest node and Solana local validator execute the full automated
+  deposit flow without per-transfer KingPepe Team approval.
