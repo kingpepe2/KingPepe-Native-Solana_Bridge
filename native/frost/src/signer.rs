@@ -79,10 +79,7 @@ impl Signer {
         let mut rng = OsRng;
         let mut seed = [0u8; 32];
         rng.fill_bytes(&mut seed);
-        Self {
-            role,
-            seed,
-        }
+        Self { role, seed }
     }
 
     pub fn public_key(&self) -> ParticipantPublicKey {

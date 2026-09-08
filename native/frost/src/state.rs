@@ -107,7 +107,10 @@ impl NonceStore {
     }
 
     pub fn rollback_on_restart(&mut self, nonce: &NonceId) -> Result<(), NonceStoreError> {
-        let entry = self.entries.get_mut(nonce).ok_or(NonceStoreError::NonceMissing)?;
+        let entry = self
+            .entries
+            .get_mut(nonce)
+            .ok_or(NonceStoreError::NonceMissing)?;
         if matches!(entry.state, NonceState::Completed) {
             return Err(NonceStoreError::CompletedCannotRollback);
         }

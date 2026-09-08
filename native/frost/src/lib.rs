@@ -19,7 +19,7 @@ mod state;
 
 pub use coordinator::{AggregateSignature, CoordinatorError, SigningCoordinator, SigningRecord};
 pub use policy::{DomainBinding, SigningPolicy, SigningPolicyError};
-pub use recovery::{RecoveryInstruction, RecoveryError, RecoveryRecord};
+pub use recovery::{RecoveryError, RecoveryInstruction, RecoveryRecord};
 pub use signer::{
     ParticipantPublicKey, SignedShare, Signer, SignerRole, SignerState, SigningRequest,
 };
