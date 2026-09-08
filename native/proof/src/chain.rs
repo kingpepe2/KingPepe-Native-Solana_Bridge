@@ -1,7 +1,9 @@
 use num_bigint::BigUint;
 
 use crate::bytes::{parse_hex_fixed, to_hex};
-use crate::difficulty::{expected_next_work_required, validate_compact_target, DifficultyNode, PowParameters};
+use crate::difficulty::{
+    expected_next_work_required, validate_compact_target, DifficultyNode, PowParameters,
+};
 use crate::header::{
     block_proof, parse_header, serialize_header, uint256_max, verify_proof_of_work, ParsedHeader,
 };
@@ -64,7 +66,8 @@ impl NativeChainParams {
             network: NativeNetwork::Mainnet,
             chain_name: "main",
             genesis_hash_hex: "00000a00a75c7ed12c71b9a8b73c01576009d62a0a606c0a1ef37b043c520fb2",
-            genesis_merkle_root_hex: "45319425eda8b91d62440dd4372699f35509076c592e1f8ea707780335e60e89",
+            genesis_merkle_root_hex:
+                "45319425eda8b91d62440dd4372699f35509076c592e1f8ea707780335e60e89",
             genesis_time: 1_749_678_364,
             genesis_nonce: 835_537,
             genesis_bits: 0x1e0f_fff0,
@@ -94,7 +97,8 @@ impl NativeChainParams {
             network: NativeNetwork::Regtest,
             chain_name: "regtest",
             genesis_hash_hex: "352a1a62f7880d325da6d3fe2e62272cd0ce735a7ba003eae4fb59d2a175a8b9",
-            genesis_merkle_root_hex: "45319425eda8b91d62440dd4372699f35509076c592e1f8ea707780335e60e89",
+            genesis_merkle_root_hex:
+                "45319425eda8b91d62440dd4372699f35509076c592e1f8ea707780335e60e89",
             genesis_time: 1_749_678_369,
             genesis_nonce: 5,
             genesis_bits: 0x207f_ffff,
@@ -201,7 +205,11 @@ impl HeaderChain {
         }
         let next_height = last.height + 1;
         assert_contextual_header_version(parsed.version, next_height, self.params)?;
-        let expected = expected_next_work_required(&self.difficulty_nodes(), parsed.time, &self.params.pow_parameters())?;
+        let expected = expected_next_work_required(
+            &self.difficulty_nodes(),
+            parsed.time,
+            &self.params.pow_parameters(),
+        )?;
         if parsed.bits != expected {
             return Err(NativeProofError::BadDifficulty);
         }
@@ -209,7 +217,8 @@ impl HeaderChain {
         if !verify_proof_of_work(&parsed, &self.params.pow_limit()) {
             return Err(NativeProofError::InvalidProofOfWork);
         }
-        let chainwork = last.chainwork.clone() + block_proof(parsed.bits, &self.params.pow_limit())?;
+        let chainwork =
+            last.chainwork.clone() + block_proof(parsed.bits, &self.params.pow_limit())?;
         if chainwork > uint256_max() {
             return Err(NativeProofError::ChainworkOverflow);
         }
@@ -284,7 +293,9 @@ mod tests {
 
     use super::*;
     use crate::bytes::{parse_hex, parse_hex_fixed};
-    use crate::difficulty::{calculate_next_work_required, expected_next_work_required, DifficultyNode};
+    use crate::difficulty::{
+        calculate_next_work_required, expected_next_work_required, DifficultyNode,
+    };
     use crate::header::{decode_compact, encode_compact, target_from_bits};
 
     #[test]
@@ -306,7 +317,13 @@ mod tests {
         assert!(decode_compact(0x1d80_ffff).negative);
         assert!(decode_compact(0x2300_0001).overflow);
         assert!(!decode_compact(0).valid);
-        for bits in [0x0101_0000, 0x1d00_ffff, 0x1e0f_fff0, 0x1f00_ffff, 0x207f_ffff] {
+        for bits in [
+            0x0101_0000,
+            0x1d00_ffff,
+            0x1e0f_fff0,
+            0x1f00_ffff,
+            0x207f_ffff,
+        ] {
             let target = decode_compact(bits).target;
             assert_eq!(encode_compact(&target, false).unwrap(), bits);
         }
@@ -317,10 +334,16 @@ mod tests {
         let params = NativeChainParams::mainnet().pow_parameters();
         let bits = 0x1e0f_fff0;
         let nodes = linked_timeline(120, 1_700_000_000, 60, bits);
-        assert_eq!(expected_next_work_required(&nodes[..119], nodes[118].time + 60, &params).unwrap(), bits);
+        assert_eq!(
+            expected_next_work_required(&nodes[..119], nodes[118].time + 60, &params).unwrap(),
+            bits
+        );
         let next = expected_next_work_required(&nodes, nodes[119].time + 60, &params).unwrap();
         let old_target = target_from_bits(bits, &params.pow_limit).unwrap();
-        assert_eq!(next, encode_compact(&((old_target * 7_140_u32) / 7_200_u32), false).unwrap());
+        assert_eq!(
+            next,
+            encode_compact(&((old_target * 7_140_u32) / 7_200_u32), false).unwrap()
+        );
     }
 
     #[test]
@@ -380,13 +403,19 @@ mod tests {
         raw.extend([0_u8; 4]);
 
         let transaction = crate::transaction::parse_transaction(&raw).unwrap();
-        assert_eq!(transaction.txid, NativeChainParams::mainnet().genesis_merkle_root());
+        assert_eq!(
+            transaction.txid,
+            NativeChainParams::mainnet().genesis_merkle_root()
+        );
         assert_eq!(transaction.wtxid, transaction.txid);
         assert_eq!(transaction.outputs[0].value_atomic, 300_000_000);
         assert_eq!(transaction.inputs[0].previous_txid, [0_u8; 32]);
         assert_eq!(
-            parse_hex_fixed::<32>("45319425eda8b91d62440dd4372699f35509076c592e1f8ea707780335e60e89", "root")
-                .unwrap(),
+            parse_hex_fixed::<32>(
+                "45319425eda8b91d62440dd4372699f35509076c592e1f8ea707780335e60e89",
+                "root"
+            )
+            .unwrap(),
             transaction.txid
         );
     }

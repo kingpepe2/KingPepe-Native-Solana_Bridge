@@ -69,17 +69,23 @@ impl<'a> Reader<'a> {
 
     fn u32(&mut self, label: &str) -> Result<u32, NativeProofError> {
         let bytes = self.read(4, label)?;
-        Ok(u32::from_le_bytes(bytes.try_into().expect("slice length checked")))
+        Ok(u32::from_le_bytes(
+            bytes.try_into().expect("slice length checked"),
+        ))
     }
 
     fn i32(&mut self, label: &str) -> Result<i32, NativeProofError> {
         let bytes = self.read(4, label)?;
-        Ok(i32::from_le_bytes(bytes.try_into().expect("slice length checked")))
+        Ok(i32::from_le_bytes(
+            bytes.try_into().expect("slice length checked"),
+        ))
     }
 
     fn u64(&mut self, label: &str) -> Result<u64, NativeProofError> {
         let bytes = self.read(8, label)?;
-        Ok(u64::from_le_bytes(bytes.try_into().expect("slice length checked")))
+        Ok(u64::from_le_bytes(
+            bytes.try_into().expect("slice length checked"),
+        ))
     }
 }
 
@@ -103,10 +109,14 @@ pub fn encode_varint(value: u64) -> Vec<u8> {
 
 pub fn parse_transaction(raw: &[u8]) -> Result<ParsedTransaction, NativeProofError> {
     if raw.len() > MAX_NATIVE_TRANSACTION_BYTES {
-        return Err(NativeProofError::ResourceLimit("raw transaction".to_owned()));
+        return Err(NativeProofError::ResourceLimit(
+            "raw transaction".to_owned(),
+        ));
     }
     if raw.len() < 10 {
-        return Err(NativeProofError::InvalidLength("raw transaction".to_owned()));
+        return Err(NativeProofError::InvalidLength(
+            "raw transaction".to_owned(),
+        ));
     }
 
     let mut reader = Reader::new(raw);
@@ -127,13 +137,19 @@ pub fn parse_transaction(raw: &[u8]) -> Result<ParsedTransaction, NativeProofErr
         read_varint(&mut reader)?
     };
     if input_count > MAX_NATIVE_TRANSACTION_INPUTS {
-        return Err(NativeProofError::ResourceLimit("transaction inputs".to_owned()));
+        return Err(NativeProofError::ResourceLimit(
+            "transaction inputs".to_owned(),
+        ));
     }
     let mut inputs = Vec::with_capacity(input_count as usize);
     for _ in 0..input_count {
         let previous_txid = reverse_slice_32(reader.read(32, "previous transaction id")?)?;
         let previous_vout = reader.u32("previous output index")?;
-        let script_length = bounded_usize(read_varint(&mut reader)?, MAX_NATIVE_TRANSACTION_BYTES as u64, "scriptSig")?;
+        let script_length = bounded_usize(
+            read_varint(&mut reader)?,
+            MAX_NATIVE_TRANSACTION_BYTES as u64,
+            "scriptSig",
+        )?;
         let script_sig = reader.read(script_length, "scriptSig")?.to_vec();
         let sequence = reader.u32("input sequence")?;
         inputs.push(TransactionInput {
@@ -147,7 +163,9 @@ pub fn parse_transaction(raw: &[u8]) -> Result<ParsedTransaction, NativeProofErr
 
     let output_count = read_varint(&mut reader)?;
     if output_count > MAX_NATIVE_TRANSACTION_OUTPUTS {
-        return Err(NativeProofError::ResourceLimit("transaction outputs".to_owned()));
+        return Err(NativeProofError::ResourceLimit(
+            "transaction outputs".to_owned(),
+        ));
     }
     let mut outputs = Vec::with_capacity(output_count as usize);
     for _ in 0..output_count {
@@ -155,7 +173,11 @@ pub fn parse_transaction(raw: &[u8]) -> Result<ParsedTransaction, NativeProofErr
         if value_atomic > 0x7fff_ffff_ffff_ffff {
             return Err(NativeProofError::ResourceLimit("output value".to_owned()));
         }
-        let script_length = bounded_usize(read_varint(&mut reader)?, MAX_NATIVE_TRANSACTION_BYTES as u64, "scriptPubKey")?;
+        let script_length = bounded_usize(
+            read_varint(&mut reader)?,
+            MAX_NATIVE_TRANSACTION_BYTES as u64,
+            "scriptPubKey",
+        )?;
         outputs.push(TransactionOutput {
             value_atomic,
             script_pubkey: reader.read(script_length, "scriptPubKey")?.to_vec(),
@@ -174,7 +196,11 @@ pub fn parse_transaction(raw: &[u8]) -> Result<ParsedTransaction, NativeProofErr
             }
             let mut witness = Vec::with_capacity(count as usize);
             for _ in 0..count {
-                let length = bounded_usize(read_varint(&mut reader)?, MAX_NATIVE_TRANSACTION_BYTES as u64, "witness item")?;
+                let length = bounded_usize(
+                    read_varint(&mut reader)?,
+                    MAX_NATIVE_TRANSACTION_BYTES as u64,
+                    "witness item",
+                )?;
                 witness.push(reader.read(length, "witness item")?.to_vec());
             }
             input.witness = witness;
@@ -293,9 +319,7 @@ mod tests {
             parse_transaction(&[1, 0, 0, 0, 0xfd, 1, 0, 0, 0, 0, 0]).unwrap_err(),
             NativeProofError::NonCanonicalCompactSize
         );
-        let trailing = [
-            1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        ];
+        let trailing = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
         assert_eq!(
             parse_transaction(&trailing).unwrap_err(),
             NativeProofError::TrailingTransactionData

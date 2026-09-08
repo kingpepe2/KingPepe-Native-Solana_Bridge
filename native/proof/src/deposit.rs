@@ -43,11 +43,9 @@ pub fn validate_temporary_deposit(
         return Err(NativeProofError::OutputMismatch);
     }
     if let Some(commitment_script) = input.expected_recipient_commitment_script {
-        let contains_commitment = input
-            .transaction
-            .outputs
-            .iter()
-            .any(|candidate| candidate.value_atomic == 0 && candidate.script_pubkey == commitment_script);
+        let contains_commitment = input.transaction.outputs.iter().any(|candidate| {
+            candidate.value_atomic == 0 && candidate.script_pubkey == commitment_script
+        });
         if !contains_commitment {
             return Err(NativeProofError::MissingDepositCommitment);
         }
@@ -87,7 +85,9 @@ pub fn validate_temporary_deposit(
         outpoint,
         amount_atomic: input.expected_amount_atomic,
         script_pubkey: input.expected_script_pubkey.to_vec(),
-        recipient_commitment_script: input.expected_recipient_commitment_script.map(ToOwned::to_owned),
+        recipient_commitment_script: input
+            .expected_recipient_commitment_script
+            .map(ToOwned::to_owned),
         block_hash: input.containing_block.hash,
         block_height: input.containing_block.height,
         evidence_digest: sha256d(&digest_input),
@@ -122,7 +122,10 @@ mod tests {
             ..block.clone()
         };
         let utxo = UtxoObservation {
-            outpoint: OutPoint { txid: tx.txid, vout: 0 },
+            outpoint: OutPoint {
+                txid: tx.txid,
+                vout: 0,
+            },
             value_atomic: 5_000,
             script_pubkey: vec![0x51, 0x20, 7],
             best_block_hash: tip.hash,
@@ -167,7 +170,10 @@ mod tests {
         tip: &'a HeaderMeta,
     ) -> DepositValidationInput<'a> {
         let utxo = Box::leak(Box::new(UtxoObservation {
-            outpoint: OutPoint { txid: tx.txid, vout: 0 },
+            outpoint: OutPoint {
+                txid: tx.txid,
+                vout: 0,
+            },
             value_atomic: 5_000,
             script_pubkey: vec![0x51, 0x20, 7],
             best_block_hash: tip.hash,
