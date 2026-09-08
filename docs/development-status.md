@@ -2,13 +2,13 @@
 
 ## Current phase
 
-- `PHASE 02` - Clean Solana/Native structure and pinned toolchain
+- `PHASE 03` - Canonical protocol messages and accounting model
 - Branch: `main`
 - Repository: private by policy
 - `productionReady = false`
 - `mainnetActivation = DISABLED`
 
-## What changed in this phase
+## Phase 02 result
 
 - Added root and workspace toolchain pins:
   - `rust-toolchain.toml`
@@ -30,12 +30,15 @@
 - Removed the phase-02 Ed25519 signing placeholder dependency from `native/frost`; the current deterministic test-share model is build scaffolding only and is not final Native-compatible FROST.
 - Confirmed secret scan remains clean via `python .github/scripts/guardrails.py`.
 - Confirmed repository remains private.
+- Corrective commit: `218cff1dacea2a2f6ba0564fc49593c85b3f4f9f`
+- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34276946620`
+- CI status: PASS
 
 ## Current blockers
 
-- Runtime crate behavior and protocol logic remain incomplete in this phase.
+- Canonical message encoding and accounting model are not complete yet.
 - Real Native-compatible FROST remains a Phase 04 requirement.
-- Local Windows PowerShell does not expose `cargo`; WSL Cargo is available and was used for locked Rust validation.
+- Native proof validation, Solana programs, local end-to-end flows, Devnet, production configuration, external review, and activation remain later phases.
 
 ## Latest local validation
 
@@ -46,4 +49,4 @@
 
 ## Next phase
 
-- `PHASE 03` - Canonical protocol messages and accounting model.
+- Implement canonical messages, golden vectors, operation identities, state machines, and reserve/liability accounting primitives.
