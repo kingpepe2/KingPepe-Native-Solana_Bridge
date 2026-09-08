@@ -20,7 +20,7 @@
   "comparison": {
     "solanaProgramStructure": "matched-pattern",
     "fuzzAndTestOrganization": "intended-adopt",
-    "attestationModel": "reference-only",
+    "attestationModel": "KingPepe-specific PROJECT_ATTESTED_2_OF_2; NTT reviewed for transceiver/message boundary patterns only",
     "chainSpecificModules": "excluded"
   },
   "cryptoDependencies": [
@@ -28,7 +28,7 @@
       "project": "@noble/curves",
       "version": "2.3.0",
       "license": "MIT",
-      "use": "Native secp256k1 Taproot/BIP340-compatible FROST implementation",
+      "use": "Native secp256k1 Taproot/BIP340-compatible FROST implementation and Ed25519 project attestations",
       "status": "direct-runtime-dependency"
     },
     {

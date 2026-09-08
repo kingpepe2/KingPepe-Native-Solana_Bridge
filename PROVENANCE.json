@@ -53,7 +53,7 @@
     {
       "path": "package.json",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Root Node package metadata and Phase 04 test scripts."
+      "notes": "Root Node package metadata and Phase 04/07 test scripts."
     },
     {
       "path": "PROVENANCE.json",
@@ -149,6 +149,11 @@
       "path": "docs/architecture/native-validation.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
       "notes": "Phase 06 Native proof, reserve, recovery, and trust-boundary documentation."
+    },
+    {
+      "path": "docs/architecture/attestation-and-observation.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Phase 07 project attestation and Solana observation trust-boundary documentation."
     },
     {
       "path": "docs/security/software-frost.md",
@@ -403,7 +408,22 @@
     {
       "path": "services/attesters/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Attester service role notes."
+      "notes": "Attester service role and Phase 07 implementation notes."
+    },
+    {
+      "path": "services/attesters/attestation-service.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 07 Ed25519 project attestation service with canonical-message and Native evidence policy checks."
+    },
+    {
+      "path": "services/attesters/index.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 07 attester service export surface."
+    },
+    {
+      "path": "services/attesters/tests/attestation-service.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 07 attestation tests using ephemeral in-memory test keys only."
     },
     {
       "path": "services/bridge-validator/README.md",
@@ -428,7 +448,22 @@
     {
       "path": "services/solana-observer/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Solana observer role notes."
+      "notes": "Solana observer role and Phase 07 implementation notes."
+    },
+    {
+      "path": "services/solana-observer/index.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 07 Solana observer service export surface."
+    },
+    {
+      "path": "services/solana-observer/solana-withdrawal-observer.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 07 finalized Solana withdrawal observation and program/authority hard-stop checks."
+    },
+    {
+      "path": "services/solana-observer/tests/solana-withdrawal-observer.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 07 Solana observer tests for finalized withdrawals, direct burns, and unauthorized identity changes."
     },
     {
       "path": "services/supervisor/README.md",
@@ -438,7 +473,12 @@
     {
       "path": "shared/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+      "notes": "Shared utility documentation updated for Phase 07 canonical-message helpers."
+    },
+    {
+      "path": "shared/protocol/canonical-message.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Executable service-side canonical message encoder/decoder and digest helpers."
     },
     {
       "path": "solana/Anchor.toml",
@@ -503,7 +543,7 @@
     {
       "path": "solana/programs/kingpepe-transceiver/src/lib.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Transceiver implementation and validations."
+      "notes": "Transceiver implementation, receipt validation, and Phase 07 Ed25519 instruction binding."
     },
     {
       "path": "solana/programs/kingpepe-transceiver/tests/transceiver_smoke.rs",

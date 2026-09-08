@@ -9,9 +9,13 @@ program-boundary logic:
   - Validates canonical message domain against configured manager, mint,
     deployment, and key epoch.
   - Requires exactly two distinct authorized attestation identities.
+  - Parses Solana Ed25519 verifier instruction data and binds the verified
+    instruction message bytes to the canonical bridge message.
   - Creates verified-message receipts.
   - Rejects duplicate attesters, inactive transceiver state, wrong domains, and
     already consumed receipts.
+  - Rejects wrong Ed25519 program IDs, offset substitution, message
+    substitution, and duplicate public keys.
 
 - `kingpepe-bridge`
   - Enforces protected initialization and rejects reinitialization.
@@ -31,8 +35,9 @@ program-boundary logic:
 
 This phase is not a production SBF/Anchor deployment:
 
-- Ed25519 instruction parsing and attestation services are Phase 07.
-- Native proof/reserve validation is Phase 06.
+- Attestation services and Solana observer models are implemented in Phase 07,
+  but are not yet connected to local end-to-end flows.
+- Native proof/reserve validation is implemented in Phase 06.
 - Local validator end-to-end flows are Phase 08 and Phase 09.
 - Production program IDs, Mint, ProgramData, and authority manifests are not
   configured.

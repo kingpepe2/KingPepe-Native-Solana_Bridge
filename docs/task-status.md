@@ -137,3 +137,28 @@
   - Live KingPepe regtest node integration, full transaction broadcasting, Solana observation, local E2E, Devnet, production configuration, and external review remain later phases.
 - next:
   - Start Phase 07 attestation and Solana observation.
+
+## Phase 07 local implementation summary
+
+- PHASE: `07`
+- commit: `PENDING`
+- push result: `PENDING`
+- CI URL: `PENDING`
+- CI status: `PENDING`
+- tests:
+  - `cd solana && cargo check --locked --workspace --all-targets` (pass under WSL)
+  - `cd solana && cargo test --locked --workspace` (pass under WSL, 38 Rust tests)
+  - `npm test` (pass, 2 protocol vectors, 5 FROST Node tests, 5 attester tests, 7 Solana observer tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - local `cargo fmt` / `cargo clippy` (NOT_RUN; local WSL has Cargo but not `rustup`, `rustfmt`, or `clippy`)
+- changed:
+  - Implemented Ed25519 project attestation service logic with A+B threshold checks.
+  - Implemented transceiver Ed25519 verifier instruction parsing and canonical message binding.
+  - Implemented Solana finalized withdrawal observation and program/authority hard-stop checks.
+  - Added Linux and Windows CI steps for Phase 07 service tests.
+- blockers:
+  - Phase 07 CI verification is pending for the outgoing commit.
+  - Local end-to-end bridge automation, Devnet, production configuration, external review, and activation remain later phases.
+- next:
+  - Push Phase 07, verify CI, then start Phase 08 automatic Native to Solana local end-to-end.

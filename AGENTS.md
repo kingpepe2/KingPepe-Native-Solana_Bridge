@@ -24,8 +24,8 @@
 
 ## Current phase status
 
-- Current implementation phase: `PHASE 05 - Solana Bridge Manager and Transceiver`
-- Objective: implement Solana program boundaries for bridge manager, transceiver, receipts, replay protection, mint/PDA policy, and withdrawal recording while keeping live activation disabled.
+- Current implementation phase: `PHASE 07 - Attestation and Solana observation`
+- Objective: implement project attestation services, Solana Ed25519 instruction binding, finalized withdrawal observation, and unauthorized program/authority hard-stop detection while keeping live activation disabled.
 - Required authority: `KINGPEPE_TEAM_GOVERNANCE`
 
 ## Authoritative status files
@@ -93,3 +93,22 @@
 - Transceiver owns attestation verification and receipts but must not hold mint authority.
 - Mint authority must be a bridge PDA; freeze authority remains none.
 - Production activation remains disabled.
+
+## Phase 06 phase notes
+
+- Native proof/reserve/recovery crates validate KingPepe Native headers, PoW,
+  difficulty, chainwork, transactions, Merkle proofs, UTXO observations,
+  reserve sweeps, and temporary-deposit recovery eligibility.
+- Temporary recoverable deposits do not authorize minting.
+- CI verified Phase 06 at `836b8e62e2c87fe8b2d3df48f7fc54466206b646`.
+
+## Phase 07 phase notes
+
+- Attestation uses Ed25519 project attestations, not FROST.
+- Attestation keys remain separate from Native FROST shares and outside the
+  repository.
+- Transceiver instruction parsing binds Solana Ed25519 verifier instructions to
+  the exact canonical message bytes.
+- Solana observer logic must distinguish RPC observation from local validation
+  and must `HARD_STOP` on unauthorized program, binary, upgrade-authority, Mint,
+  or mint-authority changes.

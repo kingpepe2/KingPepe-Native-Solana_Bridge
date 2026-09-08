@@ -7,10 +7,20 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use bridge_messages::{BridgeAction, BridgeDirection, CanonicalBridgeMessage, Hash32, PubkeyBytes};
+use bridge_messages::{
+    BridgeAction, BridgeDirection, CanonicalBridgeMessage, Hash32, PubkeyBytes, MESSAGE_LENGTH,
+};
 use thiserror::Error;
 
 pub const PROGRAM_NAME: &str = "kingpepe_transceiver";
+pub const ED25519_PROGRAM_ID: PubkeyBytes = [
+    0x03, 0x7d, 0x46, 0xd6, 0x7c, 0x93, 0xfb, 0xbe, 0x12, 0xf9, 0x42, 0x8f, 0x83, 0x8d, 0x40,
+    0xff, 0x05, 0x70, 0x74, 0x49, 0x27, 0xf4, 0x8a, 0x64, 0xfc, 0xca, 0x70, 0x44, 0x80, 0x00,
+    0x00, 0x00,
+];
+pub const ED25519_SIGNATURE_LENGTH: usize = 64;
+pub const ED25519_PUBLIC_KEY_LENGTH: usize = 32;
+pub const ED25519_INSTRUCTION_HEADER_LENGTH: usize = 16;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransceiverConfig {
@@ -53,6 +63,13 @@ pub struct AttestationObservation {
     pub message_digest: Hash32,
     pub key_epoch: u32,
     pub instruction_index: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SolanaInstructionView {
+    pub program_id: PubkeyBytes,
+    pub instruction_index: u16,
+    pub data: Vec<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -145,6 +162,26 @@ impl TransceiverProgram {
         Ok(digest)
     }
 
+    pub fn verify_message_from_ed25519_instructions(
+        &mut self,
+        message: &CanonicalBridgeMessage,
+        instructions: &[SolanaInstructionView],
+    ) -> Result<Hash32, TransceiverError> {
+        let encoded = message
+            .encode()
+            .map_err(|_| TransceiverError::InvalidMessage)?;
+        let digest = message
+            .message_digest()
+            .map_err(|_| TransceiverError::InvalidMessage)?;
+        let observations = instructions
+            .iter()
+            .map(|instruction| {
+                parse_ed25519_instruction(instruction, &encoded, digest, message.key_epoch)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        self.verify_message(message, &observations)
+    }
+
     pub fn consume_receipt(
         &mut self,
         digest: &Hash32,
@@ -191,6 +228,100 @@ impl TransceiverProgram {
     }
 }
 
+fn parse_ed25519_instruction(
+    instruction: &SolanaInstructionView,
+    expected_message: &[u8],
+    expected_digest: Hash32,
+    key_epoch: u32,
+) -> Result<AttestationObservation, TransceiverError> {
+    if instruction.program_id != ED25519_PROGRAM_ID {
+        return Err(TransceiverError::InvalidEd25519Program);
+    }
+    let data = &instruction.data;
+    if data.len() < ED25519_INSTRUCTION_HEADER_LENGTH
+        || data[0] != 1
+        || data[1] != 0
+        || expected_message.len() != MESSAGE_LENGTH
+    {
+        return Err(TransceiverError::InvalidEd25519Instruction);
+    }
+
+    let signature_offset = read_u16_le(data, 2)? as usize;
+    let signature_instruction_index = read_u16_le(data, 4)?;
+    let public_key_offset = read_u16_le(data, 6)? as usize;
+    let public_key_instruction_index = read_u16_le(data, 8)?;
+    let message_data_offset = read_u16_le(data, 10)? as usize;
+    let message_data_size = read_u16_le(data, 12)? as usize;
+    let message_instruction_index = read_u16_le(data, 14)?;
+
+    if signature_instruction_index != instruction.instruction_index
+        || public_key_instruction_index != instruction.instruction_index
+        || message_instruction_index != instruction.instruction_index
+    {
+        return Err(TransceiverError::InvalidEd25519InstructionOffsets);
+    }
+    if message_data_size != expected_message.len() {
+        return Err(TransceiverError::Ed25519MessageMismatch);
+    }
+
+    let signature_end = signature_offset
+        .checked_add(ED25519_SIGNATURE_LENGTH)
+        .ok_or(TransceiverError::InvalidEd25519InstructionOffsets)?;
+    let public_key_end = public_key_offset
+        .checked_add(ED25519_PUBLIC_KEY_LENGTH)
+        .ok_or(TransceiverError::InvalidEd25519InstructionOffsets)?;
+    let message_end = message_data_offset
+        .checked_add(message_data_size)
+        .ok_or(TransceiverError::InvalidEd25519InstructionOffsets)?;
+
+    if signature_end > data.len() || public_key_end > data.len() || message_end > data.len() {
+        return Err(TransceiverError::InvalidEd25519InstructionOffsets);
+    }
+    if ranges_overlap(signature_offset, signature_end, public_key_offset, public_key_end)
+        || ranges_overlap(
+            signature_offset,
+            signature_end,
+            message_data_offset,
+            message_end,
+        )
+        || ranges_overlap(
+            public_key_offset,
+            public_key_end,
+            message_data_offset,
+            message_end,
+        )
+    {
+        return Err(TransceiverError::InvalidEd25519InstructionOffsets);
+    }
+    if message_end != data.len() {
+        return Err(TransceiverError::InvalidEd25519Instruction);
+    }
+    if &data[message_data_offset..message_end] != expected_message {
+        return Err(TransceiverError::Ed25519MessageMismatch);
+    }
+
+    let attester = data[public_key_offset..public_key_end]
+        .try_into()
+        .expect("public key length checked");
+    Ok(AttestationObservation {
+        attester,
+        message_digest: expected_digest,
+        key_epoch,
+        instruction_index: instruction.instruction_index,
+    })
+}
+
+fn read_u16_le(data: &[u8], offset: usize) -> Result<u16, TransceiverError> {
+    let bytes = data
+        .get(offset..offset + 2)
+        .ok_or(TransceiverError::InvalidEd25519InstructionOffsets)?;
+    Ok(u16::from_le_bytes(bytes.try_into().expect("slice length checked")))
+}
+
+fn ranges_overlap(a_start: usize, a_end: usize, b_start: usize, b_end: usize) -> bool {
+    a_start < b_end && b_start < a_end
+}
+
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum TransceiverError {
     #[error("transceiver configuration is invalid")]
@@ -211,6 +342,14 @@ pub enum TransceiverError {
     DuplicateAttester,
     #[error("unauthorized attester")]
     UnauthorizedAttester,
+    #[error("instruction is not the Solana Ed25519 verifier")]
+    InvalidEd25519Program,
+    #[error("Ed25519 verifier instruction layout is invalid")]
+    InvalidEd25519Instruction,
+    #[error("Ed25519 verifier instruction offsets are invalid")]
+    InvalidEd25519InstructionOffsets,
+    #[error("Ed25519 verifier message does not match canonical bridge message")]
+    Ed25519MessageMismatch,
     #[error("receipt conflict")]
     ReceiptConflict,
     #[error("receipt is unknown")]
@@ -287,6 +426,35 @@ mod tests {
             .collect()
     }
 
+    fn ed25519_instruction(
+        attester: PubkeyBytes,
+        message: &CanonicalBridgeMessage,
+        instruction_index: u16,
+    ) -> SolanaInstructionView {
+        let encoded = message.encode().unwrap();
+        let signature_offset = ED25519_INSTRUCTION_HEADER_LENGTH as u16;
+        let public_key_offset = signature_offset + ED25519_SIGNATURE_LENGTH as u16;
+        let message_offset = public_key_offset + ED25519_PUBLIC_KEY_LENGTH as u16;
+        let mut data = Vec::with_capacity(message_offset as usize + encoded.len());
+        data.push(1);
+        data.push(0);
+        data.extend(signature_offset.to_le_bytes());
+        data.extend(instruction_index.to_le_bytes());
+        data.extend(public_key_offset.to_le_bytes());
+        data.extend(instruction_index.to_le_bytes());
+        data.extend(message_offset.to_le_bytes());
+        data.extend((encoded.len() as u16).to_le_bytes());
+        data.extend(instruction_index.to_le_bytes());
+        data.extend([instruction_index as u8; ED25519_SIGNATURE_LENGTH]);
+        data.extend(attester);
+        data.extend(encoded);
+        SolanaInstructionView {
+            program_id: ED25519_PROGRAM_ID,
+            instruction_index,
+            data,
+        }
+    }
+
     #[test]
     fn transceiver_default_has_no_verifications() {
         let program = TransceiverProgram::initialize(config()).unwrap();
@@ -339,6 +507,85 @@ mod tests {
         assert_eq!(
             program.consume_receipt(&digest),
             Err(TransceiverError::ReceiptAlreadyConsumed)
+        );
+    }
+
+    #[test]
+    fn transceiver_accepts_exact_ed25519_instruction_attestations() {
+        let config = config();
+        let msg = message(&config);
+        let mut program = TransceiverProgram::initialize(config.clone()).unwrap();
+        let digest = program
+            .verify_message_from_ed25519_instructions(
+                &msg,
+                &[
+                    ed25519_instruction(config.authorized_attesters[0], &msg, 0),
+                    ed25519_instruction(config.authorized_attesters[1], &msg, 1),
+                ],
+            )
+            .unwrap();
+        let receipt = program.receipt(&digest).unwrap();
+        assert_eq!(receipt.operation_id, msg.operation_id);
+        assert_eq!(receipt.attesters[0], config.authorized_attesters[0]);
+        assert_eq!(receipt.attesters[1], config.authorized_attesters[1]);
+    }
+
+    #[test]
+    fn transceiver_rejects_ed25519_message_or_offset_substitution() {
+        let config = config();
+        let msg = message(&config);
+        let mut wrong_message = ed25519_instruction(config.authorized_attesters[0], &msg, 0);
+        let last = wrong_message.data.len() - 1;
+        wrong_message.data[last] ^= 1;
+        assert_eq!(
+            parse_ed25519_instruction(
+                &wrong_message,
+                &msg.encode().unwrap(),
+                msg.message_digest().unwrap(),
+                msg.key_epoch,
+            ),
+            Err(TransceiverError::Ed25519MessageMismatch)
+        );
+
+        let mut wrong_index = ed25519_instruction(config.authorized_attesters[0], &msg, 0);
+        wrong_index.data[4..6].copy_from_slice(&1u16.to_le_bytes());
+        assert_eq!(
+            parse_ed25519_instruction(
+                &wrong_index,
+                &msg.encode().unwrap(),
+                msg.message_digest().unwrap(),
+                msg.key_epoch,
+            ),
+            Err(TransceiverError::InvalidEd25519InstructionOffsets)
+        );
+    }
+
+    #[test]
+    fn transceiver_rejects_wrong_ed25519_program_and_duplicate_attesters() {
+        let config = config();
+        let msg = message(&config);
+        let mut wrong_program = ed25519_instruction(config.authorized_attesters[0], &msg, 0);
+        wrong_program.program_id = h(99);
+        assert_eq!(
+            parse_ed25519_instruction(
+                &wrong_program,
+                &msg.encode().unwrap(),
+                msg.message_digest().unwrap(),
+                msg.key_epoch,
+            ),
+            Err(TransceiverError::InvalidEd25519Program)
+        );
+
+        let mut program = TransceiverProgram::initialize(config.clone()).unwrap();
+        assert_eq!(
+            program.verify_message_from_ed25519_instructions(
+                &msg,
+                &[
+                    ed25519_instruction(config.authorized_attesters[0], &msg, 0),
+                    ed25519_instruction(config.authorized_attesters[0], &msg, 1),
+                ],
+            ),
+            Err(TransceiverError::DuplicateAttester)
         );
     }
 

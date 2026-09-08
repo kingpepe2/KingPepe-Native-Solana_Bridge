@@ -36,7 +36,7 @@
 
 ## Current blockers
 
-- Phase 07 attestation and Solana observation have not been implemented yet.
+- Phase 07 CI verification is pending for the current local implementation.
 - Full Native transaction construction, Native node acceptance, local end-to-end flows, Devnet, production configuration, external review, and activation remain later phases.
 
 ## Latest local validation
@@ -58,6 +58,12 @@
 - Phase 06 `cargo test --locked --manifest-path native/reserve/Cargo.toml`: PASS under WSL, 3 Rust tests
 - Phase 06 `cargo test --locked --manifest-path native/recovery/Cargo.toml`: PASS under WSL, 3 Rust tests
 - Phase 06 CI: PASS for `836b8e62e2c87fe8b2d3df48f7fc54466206b646`
+- Phase 07 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL
+- Phase 07 `cd solana && cargo test --locked --workspace`: PASS under WSL, 38 Rust tests
+- Phase 07 `npm test`: PASS, 2 protocol vectors, 5 FROST Node tests, 5 attester tests, and 7 Solana observer tests
+- Phase 07 `npm audit --audit-level=low`: PASS, 0 vulnerabilities
+- Phase 07 `python .github/scripts/guardrails.py`: PASS
+- Phase 07 local `cargo fmt` / `cargo clippy`: NOT_RUN; local WSL has Cargo but not `rustup`, `rustfmt`, or `clippy`
 
 ## Phase 03 local implementation
 
@@ -73,7 +79,7 @@
 
 ## Next phase
 
-- Start Phase 07 attestation and Solana observation implementation.
+- Push Phase 07, verify CI for the exact source SHA, and then proceed to Phase 08 automatic Native to Solana local end-to-end if CI passes.
 
 ## Phase 04 local implementation
 
@@ -132,3 +138,24 @@
   - `836b8e62e2c87fe8b2d3df48f7fc54466206b646`
 - CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34287906641`
 - CI status: `PASS`
+
+## Phase 07 local implementation
+
+- Added executable shared canonical-message helpers for service-side decoding,
+  operation ID validation, digesting, and exact integer field handling.
+- Added Ed25519 project attestation service logic for `ATTESTER_A` and
+  `ATTESTER_B`.
+- Attesters sign the canonical binary bridge message bytes only after Native
+  evidence, finality, reserve transition, mint-credit, domain, amount,
+  recipient, policy epoch, key epoch, and evidence-digest checks pass.
+- Added two-of-two attestation combination checks that reject one signer,
+  duplicate signers, unauthorized public keys, and altered canonical bytes.
+- Extended the transceiver model with exact Solana Ed25519 verifier program ID
+  checks, bounded instruction offsets, canonical message-byte binding, and
+  duplicate-attester rejection.
+- Added Solana withdrawal observation logic for finalized withdrawal records,
+  burn consistency, Mint/Token Program/PDA authority checks, program binary and
+  upgrade-authority identity checks, and `HARD_STOP` on unauthorized changes.
+- Added CI steps for attester and Solana observer Node tests on Linux and
+  Windows.
+- CI status: `PENDING`
