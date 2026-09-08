@@ -22,6 +22,10 @@ jobs:
           python-version: "3.11"
       - name: Run local guardrails
         run: python .github/scripts/guardrails.py
+      - name: Install locked Node dependencies
+        run: npm ci --ignore-scripts
+      - name: Audit Node dependencies
+        run: npm audit --audit-level=low
       - name: Pin rust toolchain
         run: rustup toolchain install --profile minimal nightly-2023-10-29
       - name: Validate Solana workspace
@@ -34,6 +38,8 @@ jobs:
           cargo test --locked --workspace
       - name: Verify TypeScript protocol vectors
         run: node solana/ts/scripts/verify-vectors.mjs
+      - name: Run Native FROST Node tests
+        run: npm run test:frost
       - name: Validate native FROST runtime
         run: cargo check --locked --manifest-path native/frost/Cargo.toml
       - name: Run native FROST tests
@@ -54,6 +60,10 @@ jobs:
           python-version: "3.11"
       - name: Run guardrails
         run: python .github/scripts/guardrails.py
+      - name: Install locked Node dependencies
+        run: npm ci --ignore-scripts
+      - name: Audit Node dependencies
+        run: npm audit --audit-level=low
       - name: Validate Solana workspace
         run: |
           cd solana
@@ -64,6 +74,8 @@ jobs:
           cargo test --locked --workspace
       - name: Verify TypeScript protocol vectors
         run: node solana/ts/scripts/verify-vectors.mjs
+      - name: Run Native FROST Node tests
+        run: npm run test:frost
       - name: Validate native FROST runtime
         run: cargo check --locked --manifest-path native/frost/Cargo.toml
       - name: Run native FROST tests

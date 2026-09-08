@@ -2,14 +2,14 @@
 //!
 //! This crate intentionally implements a staged and testable subset:
 //!  - deterministic identity and epoch binding
-//!  - nonce/session ownership and replay guards
+//!  - nonce/session isolation and replay guards
 //!  - per-signer request policy checks
 //!  - coordinated dual-signature collection (one signature per participant)
 //!  - explicit failure modes and restart-safe bookkeeping hooks
 //!
-//! Phase 02 does not implement final Native-compatible FROST. The final
-//! threshold signer is a Phase 04 requirement and must not be replaced by this
-//! deterministic test-share model.
+//! This Rust crate remains supporting policy/state scaffold. The Phase 04
+//! Native-compatible FROST signing runtime lives in the adjacent Node modules
+//! and must not be replaced by this deterministic test-share model.
 
 mod coordinator;
 mod policy;

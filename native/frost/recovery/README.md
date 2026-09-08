@@ -1,3 +1,4 @@
-# FROST recovery (scaffold)
+# FROST recovery
 
-Recovery tooling and policy notes for stale/fenced signer states will be placed here.
+FROST recovery remains a later phase. Phase 04 covers nonce tombstones and
+fail-closed session replay behavior only.

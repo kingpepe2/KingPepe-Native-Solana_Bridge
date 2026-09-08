@@ -60,3 +60,32 @@
   - Real Native-compatible FROST remains Phase 04 work.
 - next:
   - Start Phase 04 by determining KingPepe Native signature requirements from available source/reference material.
+
+## Phase 04 local implementation summary
+
+- PHASE: `04`
+- commit: `PENDING`
+- push result: `PENDING`
+- CI URL: `PENDING`
+- CI status: `PENDING`
+- tests:
+  - `npm ci --ignore-scripts` (pass)
+  - `npm test` (pass, 2 protocol vectors and 5 FROST Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - `cd solana && cargo check --locked --workspace --all-targets` (pass under WSL)
+  - `cd solana && cargo test --locked --workspace` (pass under WSL, 24 Rust tests)
+  - `cargo check --locked --manifest-path native/frost/Cargo.toml` (pass under WSL)
+  - `cargo test --locked --manifest-path native/frost/Cargo.toml` (pass under WSL, 7 Rust tests)
+- changed:
+  - Added secp256k1 Taproot/BIP340-compatible software FROST using pinned `@noble/curves` `2.3.0`.
+  - Added exact A+B two-party DKG and aggregate-signature verification.
+  - Added per-signer policy checks bound to validated operation snapshots.
+  - Added file-backed signer state that rejects source-tree runtime state roots.
+  - Added nonce reservation and tombstone checks.
+  - Updated CI to run locked Node install, audit, and FROST tests.
+- blockers:
+  - Phase 04 CI verification is pending for the outgoing commit.
+  - Full Native node transaction acceptance remains a later local end-to-end phase.
+- next:
+  - Push Phase 04, verify CI, then start Phase 05 Solana Bridge Manager and Transceiver implementation.

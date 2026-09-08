@@ -1,0 +1,19 @@
+{
+  "name": "@kingpepe/native-solana-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Proprietary KingPepe Native to Solana bridge source and tests.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "test": "npm run test:protocol && npm run test:frost",
+    "test:frost": "node --test native/frost/tests/frost_runtime_node.test.mjs",
+    "test:protocol": "node solana/ts/scripts/verify-vectors.mjs"
+  },
+  "dependencies": {
+    "@noble/curves": "2.3.0"
+  }
+}

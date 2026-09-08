@@ -1,4 +1,8 @@
-# FROST coordinator (scaffold)
+# FROST coordinator
 
-Coordinator runtime will orchestrate nonce allocation, policy checks, and cross-service
-signing requests once implemented.
+`native-frost-coordinator.mjs` orchestrates two-party DKG and automatic signing
+for `KINGPEPE_FROST_A` + `KINGPEPE_FROST_B`.
+
+The coordinator does not hold a private FROST share. It verifies both signature
+shares and the final BIP340 aggregate signature before returning a signed
+result.

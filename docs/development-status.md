@@ -36,9 +36,8 @@
 
 ## Current blockers
 
-- Native signature requirements must be determined from available KingPepe Native source/reference material before selecting the final FROST implementation.
-- Real Native-compatible FROST remains a Phase 04 requirement.
-- Native proof validation, Solana programs, local end-to-end flows, Devnet, production configuration, external review, and activation remain later phases.
+- Phase 04 CI verification is pending for the current local implementation.
+- Full Native transaction construction, Native node acceptance, Solana programs, local end-to-end flows, Devnet, production configuration, external review, and activation remain later phases.
 
 ## Latest local validation
 
@@ -48,6 +47,9 @@
 - `node solana/ts/scripts/verify-vectors.mjs`: PASS, 2 vectors
 - `cargo check --locked --manifest-path native/frost/Cargo.toml`: PASS under WSL
 - `cargo test --locked --manifest-path native/frost/Cargo.toml`: PASS under WSL, 7 tests
+- `npm ci --ignore-scripts`: PASS
+- `npm test`: PASS, 2 protocol vectors and 5 FROST Node tests
+- `npm audit --audit-level=low`: PASS, 0 vulnerabilities
 
 ## Phase 03 local implementation
 
@@ -63,4 +65,22 @@
 
 ## Next phase
 
-- Inspect KingPepe Native signing requirements and implement or integrate real `2-of-2` Native-compatible FROST without committing secrets or runtime state.
+- Push Phase 04, verify CI for the exact source SHA, and then proceed to Phase 05 Solana Bridge Manager and Transceiver implementation if CI passes.
+
+## Phase 04 local implementation
+
+- Determined from read-only recovery material that the Native signing path is Bitcoin-style Taproot/BIP340 with P2TR custody scripts and 8-decimal atomic Native units.
+- Added a pinned Node runtime dependency on `@noble/curves` `2.3.0`.
+- Implemented secp256k1 Taproot/BIP340-compatible software FROST for exactly `KINGPEPE_FROST_A` + `KINGPEPE_FROST_B`.
+- Implemented two-party DKG without a coordinator private share.
+- Implemented per-signer authorization checks bound to a validated operation snapshot.
+- Implemented file-backed signer state with source-tree boundary rejection.
+- Implemented durable nonce reservation before commitments and nonce tombstones before signature shares.
+- Added Node tests proving:
+  - A+B produce one aggregate signature verified by independent BIP340 verification.
+  - A alone cannot complete signing.
+  - B absence does not trigger a weaker threshold.
+  - The coordinator alone cannot be constructed as a signer substitute.
+  - Wrong sighash, epoch, deployment, recipient, amount, fee, change script, and change amount are rejected before signing.
+  - Signing retry is idempotent and does not allocate a second economic signature.
+  - Runtime state inside the repository is rejected.

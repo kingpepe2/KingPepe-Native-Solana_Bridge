@@ -46,6 +46,16 @@
       "notes": "Repository proprietary rights statement."
     },
     {
+      "path": "package-lock.json",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Generated npm lockfile pinning Node runtime dependencies."
+    },
+    {
+      "path": "package.json",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Root Node package metadata and Phase 04 test scripts."
+    },
+    {
       "path": "PROVENANCE.json",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
       "notes": "Added by phase-02 structure pass; classification derived from file role."
@@ -131,6 +141,11 @@
       "notes": "Canonical protocol message and accounting model documentation."
     },
     {
+      "path": "docs/security/software-frost.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Software FROST implementation, Native signing evidence, and same-host risk notes."
+    },
+    {
       "path": "docs/development-status.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
       "notes": "Phase progress and status reporting."
@@ -176,9 +191,24 @@
       "notes": "Coordinator role notes."
     },
     {
+      "path": "native/frost/coordinator/native-frost-coordinator.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 04 two-party FROST DKG and signing coordinator without a private share."
+    },
+    {
+      "path": "native/frost/index.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 04 Node FROST runtime export surface."
+    },
+    {
       "path": "native/frost/policy/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
       "notes": "Policy role notes."
+    },
+    {
+      "path": "native/frost/policy/native-signing-policy.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 04 Native signing policy and validated-operation snapshot binding."
     },
     {
       "path": "native/frost/recovery/README.md",
@@ -189,6 +219,11 @@
       "path": "native/frost/signer/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
       "notes": "Signer role notes."
+    },
+    {
+      "path": "native/frost/signer/native-frost-signer.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 04 FROST participant implementation with DKG, policy checks, nonce reservation, and tombstones."
     },
     {
       "path": "native/frost/src/coordinator.rs",
@@ -224,6 +259,16 @@
       "path": "native/frost/state/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
       "notes": "State-management structure notes."
+    },
+    {
+      "path": "native/frost/state/file-state-store.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 04 file-backed signer state boundary that rejects source-tree runtime state."
+    },
+    {
+      "path": "native/frost/tests/frost_runtime_node.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 04 Node tests for real A+B FROST signatures and nonce safety; generated keys are temporary and outside the repository."
     },
     {
       "path": "native/frost/tests/signing_runtime_tests.rs",

@@ -23,6 +23,8 @@ Production constraints:
 ## Build and validation references
 
 - `python .github/scripts/guardrails.py`
+- `npm ci --ignore-scripts`
+- `npm run test:frost`
 - `cargo test --manifest-path native/frost/Cargo.toml` (where operational environment includes matching toolchain)
 
 Copyright (c) 2026 KingPepe Team.

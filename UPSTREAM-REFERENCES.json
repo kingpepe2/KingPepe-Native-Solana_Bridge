@@ -14,6 +14,22 @@
     "attestationModel": "reference-only",
     "chainSpecificModules": "excluded"
   },
+  "cryptoDependencies": [
+    {
+      "project": "@noble/curves",
+      "version": "2.3.0",
+      "license": "MIT",
+      "use": "Native secp256k1 Taproot/BIP340-compatible FROST implementation",
+      "status": "direct-runtime-dependency"
+    },
+    {
+      "project": "@noble/hashes",
+      "version": "2.3.0",
+      "license": "MIT",
+      "use": "Transitive dependency of @noble/curves",
+      "status": "transitive-runtime-dependency"
+    }
+  ],
   "reuse": [
     {
       "area": "program workspace boundaries",
