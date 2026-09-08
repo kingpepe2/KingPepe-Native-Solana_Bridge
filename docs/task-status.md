@@ -35,3 +35,28 @@
   - Real Native-compatible FROST remains Phase 04 work and is not claimed by Phase 02.
 - next:
   - Start Phase 03 with canonical messages and exact accounting primitives.
+
+## Phase 03 implementation summary
+
+- PHASE: `03`
+- commit: pending
+- push result: pending
+- CI URL: pending
+- CI status: pending
+- tests:
+  - `python .github/scripts/guardrails.py` (pass)
+  - `cd solana && cargo check --locked --workspace --all-targets` (pass under WSL)
+  - `cd solana && cargo test --locked --workspace` (pass under WSL, 23 tests)
+  - `node solana/ts/scripts/verify-vectors.mjs` (pass, 2 vectors)
+  - `cargo check --locked --manifest-path native/frost/Cargo.toml` (pass under WSL)
+  - `cargo test --locked --manifest-path native/frost/Cargo.toml` (pass under WSL, 7 tests)
+- changed:
+  - Implemented canonical binary message encoding, operation ID derivation, fixed deployment identity layout, and strict decode validation.
+  - Implemented automatic lifecycle states without per-transfer approval.
+  - Implemented exact reserve/liability accounting primitives.
+  - Added Rust and Node golden-vector verification.
+- blockers:
+  - GitHub Actions must pass for the Phase 03 implementation commit before Phase 04 starts.
+  - Real Native-compatible FROST remains Phase 04 work.
+- next:
+  - Push Phase 03 implementation and verify CI.

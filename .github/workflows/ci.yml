@@ -28,6 +28,12 @@ jobs:
         run: |
           cd solana
           cargo check --locked --workspace --all-targets
+      - name: Run Solana workspace tests
+        run: |
+          cd solana
+          cargo test --locked --workspace
+      - name: Verify TypeScript protocol vectors
+        run: node solana/ts/scripts/verify-vectors.mjs
       - name: Validate native FROST runtime
         run: cargo check --locked --manifest-path native/frost/Cargo.toml
       - name: Run native FROST tests
@@ -52,6 +58,12 @@ jobs:
         run: |
           cd solana
           cargo check --locked --workspace --all-targets
+      - name: Run Solana workspace tests
+        run: |
+          cd solana
+          cargo test --locked --workspace
+      - name: Verify TypeScript protocol vectors
+        run: node solana/ts/scripts/verify-vectors.mjs
       - name: Validate native FROST runtime
         run: cargo check --locked --manifest-path native/frost/Cargo.toml
       - name: Run native FROST tests

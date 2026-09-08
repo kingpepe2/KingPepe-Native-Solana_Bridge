@@ -36,7 +36,7 @@
 
 ## Current blockers
 
-- Canonical message encoding and accounting model are not complete yet.
+- Phase 03 GitHub Actions verification is pending for the implementation commit.
 - Real Native-compatible FROST remains a Phase 04 requirement.
 - Native proof validation, Solana programs, local end-to-end flows, Devnet, production configuration, external review, and activation remain later phases.
 
@@ -44,9 +44,20 @@
 
 - `python .github/scripts/guardrails.py`: PASS
 - `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL
+- `cd solana && cargo test --locked --workspace`: PASS under WSL, 23 tests
+- `node solana/ts/scripts/verify-vectors.mjs`: PASS, 2 vectors
 - `cargo check --locked --manifest-path native/frost/Cargo.toml`: PASS under WSL
 - `cargo test --locked --manifest-path native/frost/Cargo.toml`: PASS under WSL, 7 tests
 
+## Phase 03 local implementation
+
+- Replaced the phase-02 message scaffold with a fixed-length 514-byte canonical binary protocol message.
+- Added operation ID derivation and message digest generation with SHA-256.
+- Added deposit and withdrawal constructors, domain-bound deployment identity, native outpoint handling, validity windows, policy/key epochs, and bounded destination encoding.
+- Added lifecycle states for automatic transfer processing without per-transfer KingPepe Team approval.
+- Added exact integer ledger primitives for reserve, minted supply, unminted credits, burned unpaid withdrawals, reserved UTXOs, broadcast payouts, finalized payouts, fees, change, and unsettled operation counts.
+- Added shared JSON golden vectors plus Rust and Node verification.
+
 ## Next phase
 
-- Implement canonical messages, golden vectors, operation identities, state machines, and reserve/liability accounting primitives.
+- Push Phase 03 implementation, verify CI for the exact SHA, then start Phase 04 real Native-compatible FROST.

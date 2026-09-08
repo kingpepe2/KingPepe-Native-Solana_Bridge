@@ -12,7 +12,10 @@
     "phase02CiVerified": true,
     "toolchainPinned": true,
     "lockfilesPinned": true,
-    "structureBaselineInPlace": true
+    "structureBaselineInPlace": true,
+    "canonicalProtocolMessagesImplemented": true,
+    "accountingPrimitivesImplemented": true,
+    "phase03LocalValidationPassed": true
   },
   "readinessGates": {
     "SOURCE_COMPLETE": "IMPLEMENTED_NOT_FULLY_TESTED",

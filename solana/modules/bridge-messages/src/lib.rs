@@ -1,15 +1,22 @@
-//! Canonical bridge message definitions, deterministic encoding, state transitions,
-//! and accounting primitives used by the first implementation phases.
+//! Canonical bridge message definitions, deterministic binary encoding,
+//! operation identity derivation, lifecycle states, and exact accounting
+//! primitives for the KingPepe Native - Solana bridge.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
+pub const PROTOCOL_MAGIC: [u8; 8] = *b"KPEPBRG1";
 pub const MESSAGE_VERSION: u8 = 1;
-pub const MESSAGE_LENGTH: usize = 284;
+pub const DEPLOYMENT_IDENTITY_LENGTH: usize = 168;
+pub const NATIVE_OUTPOINT_LENGTH: usize = 36;
+pub const MAX_DESTINATION_LENGTH: usize = 128;
+pub const MESSAGE_LENGTH: usize = 514;
 
 pub type Hash32 = [u8; 32];
 pub type PubkeyBytes = [u8; 32];
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[repr(u8)]
 pub enum BridgeDirection {
     NativeToSolana = 0,
     SolanaToNative = 1,
@@ -34,9 +41,10 @@ impl From<BridgeDirection> for u8 {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[repr(u8)]
 pub enum BridgeAction {
     DepositClaim = 0,
-    BurnRequest = 1,
+    WithdrawalRequest = 1,
 }
 
 impl TryFrom<u8> for BridgeAction {
@@ -45,7 +53,7 @@ impl TryFrom<u8> for BridgeAction {
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             0 => Ok(Self::DepositClaim),
-            1 => Ok(Self::BurnRequest),
+            1 => Ok(Self::WithdrawalRequest),
             _ => Err(MessageDecodeError::InvalidAction(value)),
         }
     }
@@ -58,47 +66,62 @@ impl From<BridgeAction> for u8 {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[allow(clippy::upper_case_acronyms)]
+#[repr(u8)]
 pub enum BridgeOperationState {
-    WAITING_FOR_FINALITY = 0,
-    WAITING_FOR_DEPENDENCY = 1,
-    QUEUED_BY_LIMIT = 2,
-    VERIFIED_READY = 3,
-    REJECTED_INVALID = 4,
-    HARD_STOP = 5,
-    COMPLETED = 6,
+    Observed = 0,
+    WaitingForFinality = 1,
+    WaitingForDependency = 2,
+    QueuedByLimit = 3,
+    VerifiedReady = 4,
+    Signing = 5,
+    Broadcast = 6,
+    WaitingSettlement = 7,
+    Completed = 8,
+    Rejected = 9,
+    HardStop = 10,
 }
 
 impl BridgeOperationState {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Observed => "OBSERVED",
+            Self::WaitingForFinality => "WAITING_FOR_FINALITY",
+            Self::WaitingForDependency => "WAITING_FOR_DEPENDENCY",
+            Self::QueuedByLimit => "QUEUED_BY_LIMIT",
+            Self::VerifiedReady => "VERIFIED_READY",
+            Self::Signing => "SIGNING",
+            Self::Broadcast => "BROADCAST",
+            Self::WaitingSettlement => "WAITING_SETTLEMENT",
+            Self::Completed => "COMPLETED",
+            Self::Rejected => "REJECTED",
+            Self::HardStop => "HARD_STOP",
+        }
+    }
+
     pub fn is_terminal(&self) -> bool {
-        matches!(self, Self::REJECTED_INVALID | Self::HARD_STOP | Self::COMPLETED)
+        matches!(self, Self::Completed | Self::Rejected | Self::HardStop)
     }
 
     pub fn transition(self, event: BridgeStateEvent) -> Result<Self, BridgeStateTransitionError> {
         use BridgeOperationState as S;
         use BridgeStateEvent as E;
 
+        if self.is_terminal() {
+            return Err(BridgeStateTransitionError::TerminalState);
+        }
+
         match (self, event) {
-            (S::WAITING_FOR_FINALITY, E::ObservedFinality) => Ok(S::WAITING_FOR_DEPENDENCY),
-            (S::WAITING_FOR_FINALITY, E::Reject) => Ok(S::REJECTED_INVALID),
-            (S::WAITING_FOR_FINALITY, E::EnterHardStop) => Ok(S::HARD_STOP),
-
-            (S::WAITING_FOR_DEPENDENCY, E::DependencySatisfied) => Ok(S::VERIFIED_READY),
-            (S::WAITING_FOR_DEPENDENCY, E::QueueByLimit) => Ok(S::QUEUED_BY_LIMIT),
-            (S::WAITING_FOR_DEPENDENCY, E::Reject) => Ok(S::REJECTED_INVALID),
-            (S::WAITING_FOR_DEPENDENCY, E::EnterHardStop) => Ok(S::HARD_STOP),
-
-            (S::QUEUED_BY_LIMIT, E::DependencySatisfied) => Ok(S::VERIFIED_READY),
-            (S::QUEUED_BY_LIMIT, E::Reject) => Ok(S::REJECTED_INVALID),
-            (S::QUEUED_BY_LIMIT, E::EnterHardStop) => Ok(S::HARD_STOP),
-
-            (S::VERIFIED_READY, E::Complete) => Ok(S::COMPLETED),
-            (S::VERIFIED_READY, E::Reject) => Ok(S::REJECTED_INVALID),
-            (S::VERIFIED_READY, E::EnterHardStop) => Ok(S::HARD_STOP),
-
-            (S::REJECTED_INVALID, _) | (S::HARD_STOP, _) | (S::COMPLETED, _) => {
-                Err(BridgeStateTransitionError::InvalidTransition)
-            }
+            (_, E::Reject) => Ok(S::Rejected),
+            (_, E::EnterHardStop) => Ok(S::HardStop),
+            (S::Observed, E::ObservationAccepted) => Ok(S::WaitingForFinality),
+            (S::WaitingForFinality, E::FinalityReached) => Ok(S::WaitingForDependency),
+            (S::WaitingForDependency, E::QueueByLimit) => Ok(S::QueuedByLimit),
+            (S::WaitingForDependency, E::DependencySatisfied) => Ok(S::VerifiedReady),
+            (S::QueuedByLimit, E::DependencySatisfied) => Ok(S::VerifiedReady),
+            (S::VerifiedReady, E::BeginSigning) => Ok(S::Signing),
+            (S::Signing, E::BroadcastSubmitted) => Ok(S::Broadcast),
+            (S::Broadcast, E::BroadcastObserved) => Ok(S::WaitingSettlement),
+            (S::WaitingSettlement, E::SettlementFinalized) => Ok(S::Completed),
             _ => Err(BridgeStateTransitionError::InvalidTransition),
         }
     }
@@ -106,36 +129,66 @@ impl BridgeOperationState {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum BridgeStateEvent {
-    ObservedFinality,
+    ObservationAccepted,
+    FinalityReached,
     DependencySatisfied,
     QueueByLimit,
+    BeginSigning,
+    BroadcastSubmitted,
+    BroadcastObserved,
+    SettlementFinalized,
     Reject,
     EnterHardStop,
-    Complete,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DeploymentIdentity {
     pub protocol_id: u32,
-    pub native_chain_id: u32,
+    pub native_network: u32,
     pub native_genesis: Hash32,
-    pub solana_cluster: Hash32,
+    pub solana_deployment: Hash32,
     pub manager_program_id: PubkeyBytes,
     pub transceiver_program_id: PubkeyBytes,
     pub mint: PubkeyBytes,
 }
 
 impl DeploymentIdentity {
-    pub fn to_bytes(&self) -> [u8; 160] {
-        let mut out = [0u8; 160];
-        out[0..4].copy_from_slice(&self.protocol_id.to_le_bytes());
-        out[4..8].copy_from_slice(&self.native_chain_id.to_le_bytes());
-        out[8..40].copy_from_slice(&self.native_genesis);
-        out[40..72].copy_from_slice(&self.solana_cluster);
-        out[72..104].copy_from_slice(&self.manager_program_id);
-        out[104..136].copy_from_slice(&self.transceiver_program_id);
-        out[136..168].copy_from_slice(&self.mint);
+    pub fn to_bytes(&self) -> [u8; DEPLOYMENT_IDENTITY_LENGTH] {
+        let mut out = [0u8; DEPLOYMENT_IDENTITY_LENGTH];
+        let mut cursor = 0usize;
+        write_fixed(&mut out, &mut cursor, &self.protocol_id.to_le_bytes());
+        write_fixed(&mut out, &mut cursor, &self.native_network.to_le_bytes());
+        write_fixed(&mut out, &mut cursor, &self.native_genesis);
+        write_fixed(&mut out, &mut cursor, &self.solana_deployment);
+        write_fixed(&mut out, &mut cursor, &self.manager_program_id);
+        write_fixed(&mut out, &mut cursor, &self.transceiver_program_id);
+        write_fixed(&mut out, &mut cursor, &self.mint);
+        debug_assert_eq!(cursor, DEPLOYMENT_IDENTITY_LENGTH);
         out
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct NativeOutpoint {
+    pub txid: Hash32,
+    pub vout: u32,
+}
+
+impl NativeOutpoint {
+    pub const ZERO: Self = Self {
+        txid: [0u8; 32],
+        vout: 0,
+    };
+
+    pub fn to_bytes(&self) -> [u8; NATIVE_OUTPOINT_LENGTH] {
+        let mut out = [0u8; NATIVE_OUTPOINT_LENGTH];
+        out[0..32].copy_from_slice(&self.txid);
+        out[32..36].copy_from_slice(&self.vout.to_le_bytes());
+        out
+    }
+
+    pub fn is_zero(&self) -> bool {
+        *self == Self::ZERO
     }
 }
 
@@ -144,69 +197,125 @@ pub struct CanonicalBridgeMessage {
     pub version: u8,
     pub direction: BridgeDirection,
     pub action: BridgeAction,
-    pub protocol_version: u8,
     pub deployment: DeploymentIdentity,
     pub operation_id: Hash32,
-    pub native_reference: Hash32,
-    pub recipient: Hash32,
-    pub amount: u64,
-    pub fee: u64,
+    pub deposit_outpoint: NativeOutpoint,
+    pub withdrawal_id: Hash32,
+    pub amount_atomic: u64,
+    pub fee_atomic: u64,
+    pub destination: Vec<u8>,
     pub policy_epoch: u32,
-    pub nonce: u64,
-    pub evidence_valid_until: u64,
-    pub validity_window: u32,
+    pub key_epoch: u32,
+    pub nonce: Hash32,
+    pub valid_from: u64,
+    pub valid_until: u64,
     pub evidence_digest: Hash32,
 }
 
 impl CanonicalBridgeMessage {
+    pub fn new_deposit_claim(
+        deployment: DeploymentIdentity,
+        deposit_outpoint: NativeOutpoint,
+        amount_atomic: u64,
+        solana_recipient: PubkeyBytes,
+        epochs: MessageEpochs,
+        nonce: Hash32,
+        validity: ValidityWindow,
+        evidence_digest: Hash32,
+    ) -> Result<Self, MessageEncodeError> {
+        let mut message = Self {
+            version: MESSAGE_VERSION,
+            direction: BridgeDirection::NativeToSolana,
+            action: BridgeAction::DepositClaim,
+            deployment,
+            operation_id: [0u8; 32],
+            deposit_outpoint,
+            withdrawal_id: [0u8; 32],
+            amount_atomic,
+            fee_atomic: 0,
+            destination: solana_recipient.to_vec(),
+            policy_epoch: epochs.policy_epoch,
+            key_epoch: epochs.key_epoch,
+            nonce,
+            valid_from: validity.valid_from,
+            valid_until: validity.valid_until,
+            evidence_digest,
+        };
+        message.operation_id = message.derive_operation_id()?;
+        message.validate()?;
+        Ok(message)
+    }
+
+    pub fn new_withdrawal_request(
+        deployment: DeploymentIdentity,
+        withdrawal_id: Hash32,
+        gross_amount_atomic: u64,
+        fee_atomic: u64,
+        native_destination: Vec<u8>,
+        epochs: MessageEpochs,
+        nonce: Hash32,
+        validity: ValidityWindow,
+        evidence_digest: Hash32,
+    ) -> Result<Self, MessageEncodeError> {
+        let mut message = Self {
+            version: MESSAGE_VERSION,
+            direction: BridgeDirection::SolanaToNative,
+            action: BridgeAction::WithdrawalRequest,
+            deployment,
+            operation_id: [0u8; 32],
+            deposit_outpoint: NativeOutpoint::ZERO,
+            withdrawal_id,
+            amount_atomic: gross_amount_atomic,
+            fee_atomic,
+            destination: native_destination,
+            policy_epoch: epochs.policy_epoch,
+            key_epoch: epochs.key_epoch,
+            nonce,
+            valid_from: validity.valid_from,
+            valid_until: validity.valid_until,
+            evidence_digest,
+        };
+        message.operation_id = message.derive_operation_id()?;
+        message.validate()?;
+        Ok(message)
+    }
+
     pub fn encode(&self) -> Result<Vec<u8>, MessageEncodeError> {
-        if self.version != MESSAGE_VERSION {
-            return Err(MessageEncodeError::UnsupportedVersion {
-                expected: MESSAGE_VERSION,
-                found: self.version,
-            });
-        }
+        self.validate()?;
 
         let mut out = vec![0u8; MESSAGE_LENGTH];
         let mut cursor = 0usize;
 
-        out[cursor] = self.version;
-        cursor += 1;
-        out[cursor] = self.direction as u8;
-        cursor += 1;
-        out[cursor] = self.action as u8;
-        cursor += 1;
-        out[cursor] = self.protocol_version;
-        cursor += 1;
+        write_fixed(&mut out, &mut cursor, &PROTOCOL_MAGIC);
+        write_fixed(&mut out, &mut cursor, &[self.version]);
+        write_fixed(&mut out, &mut cursor, &[self.action as u8]);
+        write_fixed(&mut out, &mut cursor, &[self.direction as u8]);
+        write_fixed(&mut out, &mut cursor, &[0u8]);
+        write_fixed(&mut out, &mut cursor, &self.deployment.to_bytes());
+        write_fixed(&mut out, &mut cursor, &self.operation_id);
+        write_fixed(&mut out, &mut cursor, &self.deposit_outpoint.to_bytes());
+        write_fixed(&mut out, &mut cursor, &self.withdrawal_id);
+        write_fixed(&mut out, &mut cursor, &self.amount_atomic.to_le_bytes());
+        write_fixed(&mut out, &mut cursor, &self.fee_atomic.to_le_bytes());
+        write_fixed(&mut out, &mut cursor, &(self.destination.len() as u16).to_le_bytes());
 
-        let deployment_bytes = self.deployment.to_bytes();
-        out[cursor..cursor + deployment_bytes.len()].copy_from_slice(&deployment_bytes);
-        cursor += deployment_bytes.len();
+        let destination_start = cursor;
+        let destination_end = destination_start + self.destination.len();
+        out[destination_start..destination_end].copy_from_slice(&self.destination);
+        cursor += MAX_DESTINATION_LENGTH;
 
-        out[cursor..cursor + 32].copy_from_slice(&self.operation_id);
-        cursor += 32;
-        out[cursor..cursor + 32].copy_from_slice(&self.native_reference);
-        cursor += 32;
-        out[cursor..cursor + 32].copy_from_slice(&self.recipient);
-        cursor += 32;
-
-        out[cursor..cursor + 8].copy_from_slice(&self.amount.to_le_bytes());
-        cursor += 8;
-        out[cursor..cursor + 8].copy_from_slice(&self.fee.to_le_bytes());
-        cursor += 8;
-        out[cursor..cursor + 4].copy_from_slice(&self.policy_epoch.to_le_bytes());
-        cursor += 4;
-        out[cursor..cursor + 8].copy_from_slice(&self.nonce.to_le_bytes());
-        cursor += 8;
-        out[cursor..cursor + 8].copy_from_slice(&self.evidence_valid_until.to_le_bytes());
-        cursor += 8;
-        out[cursor..cursor + 4].copy_from_slice(&self.validity_window.to_le_bytes());
-        cursor += 4;
-        out[cursor..cursor + 32].copy_from_slice(&self.evidence_digest);
-        cursor += 32;
+        write_fixed(&mut out, &mut cursor, &self.policy_epoch.to_le_bytes());
+        write_fixed(&mut out, &mut cursor, &self.key_epoch.to_le_bytes());
+        write_fixed(&mut out, &mut cursor, &self.nonce);
+        write_fixed(&mut out, &mut cursor, &self.valid_from.to_le_bytes());
+        write_fixed(&mut out, &mut cursor, &self.valid_until.to_le_bytes());
+        write_fixed(&mut out, &mut cursor, &self.evidence_digest);
 
         if cursor != MESSAGE_LENGTH {
-            return Err(MessageEncodeError::InvalidLength { expected: MESSAGE_LENGTH, found: cursor });
+            return Err(MessageEncodeError::InvalidLength {
+                expected: MESSAGE_LENGTH,
+                found: cursor,
+            });
         }
 
         Ok(out)
@@ -220,9 +329,13 @@ impl CanonicalBridgeMessage {
             });
         }
 
-        let mut cursor = 0usize;
-        let version = bytes[cursor];
-        cursor += 1;
+        let mut cursor = DecodeCursor::new(bytes);
+        let magic = cursor.read_array::<8>()?;
+        if magic != PROTOCOL_MAGIC {
+            return Err(MessageDecodeError::InvalidMagic);
+        }
+
+        let version = cursor.read_u8()?;
         if version != MESSAGE_VERSION {
             return Err(MessageDecodeError::UnsupportedVersion {
                 expected: MESSAGE_VERSION,
@@ -230,206 +343,353 @@ impl CanonicalBridgeMessage {
             });
         }
 
-        let direction = BridgeDirection::try_from(bytes[cursor])?;
-        cursor += 1;
-        let action = BridgeAction::try_from(bytes[cursor])?;
-        cursor += 1;
-        let protocol_version = bytes[cursor];
-        cursor += 1;
+        let action = BridgeAction::try_from(cursor.read_u8()?)?;
+        let direction = BridgeDirection::try_from(cursor.read_u8()?)?;
+        let reserved = cursor.read_u8()?;
+        if reserved != 0 {
+            return Err(MessageDecodeError::NonZeroReservedByte);
+        }
 
-        let deployment = {
-            let protocol_id = u32::from_le_bytes(bytes[cursor..cursor + 4].try_into().unwrap());
-            cursor += 4;
-            let native_chain_id = u32::from_le_bytes(bytes[cursor..cursor + 4].try_into().unwrap());
-            cursor += 4;
-            let native_genesis = bytes[cursor..cursor + 32].try_into().unwrap();
-            cursor += 32;
-            let solana_cluster = bytes[cursor..cursor + 32].try_into().unwrap();
-            cursor += 32;
-            let manager_program_id = bytes[cursor..cursor + 32].try_into().unwrap();
-            cursor += 32;
-            let transceiver_program_id = bytes[cursor..cursor + 32].try_into().unwrap();
-            cursor += 32;
-            let mint = bytes[cursor..cursor + 32].try_into().unwrap();
-            cursor += 32;
-
-            DeploymentIdentity {
-                protocol_id,
-                native_chain_id,
-                native_genesis,
-                solana_cluster,
-                manager_program_id,
-                transceiver_program_id,
-                mint,
-            }
+        let deployment = DeploymentIdentity {
+            protocol_id: cursor.read_u32_le()?,
+            native_network: cursor.read_u32_le()?,
+            native_genesis: cursor.read_array::<32>()?,
+            solana_deployment: cursor.read_array::<32>()?,
+            manager_program_id: cursor.read_array::<32>()?,
+            transceiver_program_id: cursor.read_array::<32>()?,
+            mint: cursor.read_array::<32>()?,
         };
+        let operation_id = cursor.read_array::<32>()?;
+        let deposit_outpoint = NativeOutpoint {
+            txid: cursor.read_array::<32>()?,
+            vout: cursor.read_u32_le()?,
+        };
+        let withdrawal_id = cursor.read_array::<32>()?;
+        let amount_atomic = cursor.read_u64_le()?;
+        let fee_atomic = cursor.read_u64_le()?;
+        let destination_len = cursor.read_u16_le()? as usize;
+        if destination_len > MAX_DESTINATION_LENGTH {
+            return Err(MessageDecodeError::DestinationTooLong {
+                max: MAX_DESTINATION_LENGTH,
+                found: destination_len,
+            });
+        }
+        let destination_padded = cursor.read_array::<MAX_DESTINATION_LENGTH>()?;
+        let destination = destination_padded[..destination_len].to_vec();
+        if destination_padded[destination_len..].iter().any(|byte| *byte != 0) {
+            return Err(MessageDecodeError::NonZeroDestinationPadding);
+        }
+        let policy_epoch = cursor.read_u32_le()?;
+        let key_epoch = cursor.read_u32_le()?;
+        let nonce = cursor.read_array::<32>()?;
+        let valid_from = cursor.read_u64_le()?;
+        let valid_until = cursor.read_u64_le()?;
+        let evidence_digest = cursor.read_array::<32>()?;
 
-        let operation_id = bytes[cursor..cursor + 32].try_into().unwrap();
-        cursor += 32;
-        let native_reference = bytes[cursor..cursor + 32].try_into().unwrap();
-        cursor += 32;
-        let recipient = bytes[cursor..cursor + 32].try_into().unwrap();
-        cursor += 32;
-        let amount = u64::from_le_bytes(bytes[cursor..cursor + 8].try_into().unwrap());
-        cursor += 8;
-        let fee = u64::from_le_bytes(bytes[cursor..cursor + 8].try_into().unwrap());
-        cursor += 8;
-        let policy_epoch = u32::from_le_bytes(bytes[cursor..cursor + 4].try_into().unwrap());
-        cursor += 4;
-        let nonce = u64::from_le_bytes(bytes[cursor..cursor + 8].try_into().unwrap());
-        cursor += 8;
-        let evidence_valid_until = u64::from_le_bytes(bytes[cursor..cursor + 8].try_into().unwrap());
-        cursor += 8;
-        let validity_window = u32::from_le_bytes(bytes[cursor..cursor + 4].try_into().unwrap());
-        cursor += 4;
-        let evidence_digest = bytes[cursor..cursor + 32].try_into().unwrap();
-        cursor += 32;
-
-        if cursor != MESSAGE_LENGTH {
+        if cursor.position() != MESSAGE_LENGTH {
             return Err(MessageDecodeError::InvalidLength {
                 expected: MESSAGE_LENGTH,
-                found: cursor,
+                found: cursor.position(),
             });
         }
 
-        Ok(Self {
+        let message = Self {
             version,
             direction,
             action,
-            protocol_version,
             deployment,
             operation_id,
-            native_reference,
-            recipient,
-            amount,
-            fee,
+            deposit_outpoint,
+            withdrawal_id,
+            amount_atomic,
+            fee_atomic,
+            destination,
             policy_epoch,
+            key_epoch,
             nonce,
-            evidence_valid_until,
-            validity_window,
+            valid_from,
+            valid_until,
             evidence_digest,
-        })
+        };
+        message.validate().map_err(MessageDecodeError::Validation)?;
+        Ok(message)
     }
+
+    pub fn derive_operation_id(&self) -> Result<Hash32, MessageEncodeError> {
+        validate_destination(&self.destination)?;
+        let mut digest = Sha256::new();
+        digest.update(PROTOCOL_MAGIC);
+        digest.update([MESSAGE_VERSION]);
+        digest.update([self.action as u8]);
+        digest.update([self.direction as u8]);
+        digest.update(self.deployment.to_bytes());
+        digest.update(self.deposit_outpoint.to_bytes());
+        digest.update(self.withdrawal_id);
+        digest.update(self.amount_atomic.to_le_bytes());
+        digest.update(self.fee_atomic.to_le_bytes());
+        digest.update((self.destination.len() as u16).to_le_bytes());
+        digest.update(&self.destination);
+        digest.update(self.policy_epoch.to_le_bytes());
+        digest.update(self.key_epoch.to_le_bytes());
+        digest.update(self.nonce);
+        digest.update(self.valid_from.to_le_bytes());
+        digest.update(self.valid_until.to_le_bytes());
+        digest.update(self.evidence_digest);
+        Ok(digest.finalize().into())
+    }
+
+    pub fn message_digest(&self) -> Result<Hash32, MessageEncodeError> {
+        let encoded = self.encode()?;
+        Ok(Sha256::digest(encoded).into())
+    }
+
+    pub fn validate(&self) -> Result<(), MessageEncodeError> {
+        if self.version != MESSAGE_VERSION {
+            return Err(MessageEncodeError::UnsupportedVersion {
+                expected: MESSAGE_VERSION,
+                found: self.version,
+            });
+        }
+        if self.amount_atomic == 0 {
+            return Err(MessageEncodeError::AmountZero);
+        }
+        if self.fee_atomic > self.amount_atomic {
+            return Err(MessageEncodeError::FeeExceedsAmount);
+        }
+        if self.policy_epoch == 0 || self.key_epoch == 0 {
+            return Err(MessageEncodeError::EpochZero);
+        }
+        if self.valid_until <= self.valid_from {
+            return Err(MessageEncodeError::InvalidValidityWindow);
+        }
+        if is_zero_hash(&self.nonce) {
+            return Err(MessageEncodeError::NonceZero);
+        }
+        if is_zero_hash(&self.evidence_digest) {
+            return Err(MessageEncodeError::EvidenceDigestZero);
+        }
+        validate_destination(&self.destination)?;
+
+        match (self.action, self.direction) {
+            (BridgeAction::DepositClaim, BridgeDirection::NativeToSolana) => {
+                if self.deposit_outpoint.is_zero() {
+                    return Err(MessageEncodeError::MissingDepositOutpoint);
+                }
+                if !is_zero_hash(&self.withdrawal_id) {
+                    return Err(MessageEncodeError::UnexpectedWithdrawalId);
+                }
+            }
+            (BridgeAction::WithdrawalRequest, BridgeDirection::SolanaToNative) => {
+                if !self.deposit_outpoint.is_zero() {
+                    return Err(MessageEncodeError::UnexpectedDepositOutpoint);
+                }
+                if is_zero_hash(&self.withdrawal_id) {
+                    return Err(MessageEncodeError::MissingWithdrawalId);
+                }
+            }
+            _ => return Err(MessageEncodeError::ActionDirectionMismatch),
+        }
+
+        let derived = self.derive_operation_id()?;
+        if self.operation_id != derived {
+            return Err(MessageEncodeError::OperationIdMismatch);
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct MessageEpochs {
+    pub policy_epoch: u32,
+    pub key_epoch: u32,
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ValidityWindow {
+    pub valid_from: u64,
+    pub valid_until: u64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct LedgerState {
-    pub backing_reserve: u128,
-    pub pending_mint_liability: u128,
-    pub pending_withdrawal_liability: u128,
-    pub collected_fees: u128,
-    pub emitted_gross: u128,
-    pub projected_surplus: u128,
+pub struct LedgerSnapshot {
+    pub canonical_reserve: u128,
+    pub minted_supply: u128,
+    pub authorized_unminted_credits: u128,
+    pub burned_unpaid_withdrawals: u128,
+    pub reserved_utxo_liabilities: u128,
+    pub broadcast_payout_liabilities: u128,
+    pub finalized_payouts: u128,
+    pub fees_accrued: u128,
+    pub change_reserved: u128,
+    pub unsettled_operations: u64,
 }
 
-impl LedgerState {
+impl Default for LedgerSnapshot {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl LedgerSnapshot {
     pub fn new() -> Self {
         Self {
-            backing_reserve: 0,
-            pending_mint_liability: 0,
-            pending_withdrawal_liability: 0,
-            collected_fees: 0,
-            emitted_gross: 0,
-            projected_surplus: 0,
+            canonical_reserve: 0,
+            minted_supply: 0,
+            authorized_unminted_credits: 0,
+            burned_unpaid_withdrawals: 0,
+            reserved_utxo_liabilities: 0,
+            broadcast_payout_liabilities: 0,
+            finalized_payouts: 0,
+            fees_accrued: 0,
+            change_reserved: 0,
+            unsettled_operations: 0,
         }
     }
 
-    pub fn record_validated_deposit(&mut self, amount: u64, fee: u64) -> Result<(), LedgerError> {
-        self.backing_reserve = self
-            .backing_reserve
-            .checked_add(amount as u128)
-            .ok_or(LedgerError::Arithmetic)?;
-        self.pending_mint_liability = self
-            .pending_mint_liability
-            .checked_add(amount as u128)
-            .ok_or(LedgerError::Arithmetic)?;
-        self.collected_fees = self
-            .collected_fees
-            .checked_add(fee as u128)
-            .ok_or(LedgerError::Arithmetic)?;
-        self.emitted_gross = self
-            .emitted_gross
-            .checked_add(amount as u128)
-            .ok_or(LedgerError::Arithmetic)?;
-        self.assert_invariants()
+    pub fn coverage_required(&self) -> Result<u128, LedgerError> {
+        checked_sum(&[
+            self.minted_supply,
+            self.authorized_unminted_credits,
+            self.burned_unpaid_withdrawals,
+            self.reserved_utxo_liabilities,
+            self.broadcast_payout_liabilities,
+            self.change_reserved,
+        ])
     }
 
-    pub fn record_mint(&mut self, amount: u64, fee: u64) -> Result<(), LedgerError> {
-        self.pending_mint_liability = self
-            .pending_mint_liability
-            .checked_sub(amount as u128)
-            .ok_or(LedgerError::InsufficientFunds)?;
-        self.collected_fees = self
-            .collected_fees
-            .checked_add(fee as u128)
-            .ok_or(LedgerError::Arithmetic)?;
-        self.projected_surplus = self
-            .projected_surplus
-            .checked_add((amount.saturating_sub(fee)) as u128)
-            .ok_or(LedgerError::Arithmetic)?;
-        self.assert_invariants()
+    pub fn surplus(&self) -> Result<u128, LedgerError> {
+        self.canonical_reserve
+            .checked_sub(self.coverage_required()?)
+            .ok_or(LedgerError::InsufficientBacking)
     }
 
-    pub fn record_burn_request(&mut self, amount: u64, fee: u64) -> Result<(), LedgerError> {
-        self.pending_withdrawal_liability = self
-            .pending_withdrawal_liability
-            .checked_add(amount as u128)
-            .ok_or(LedgerError::Arithmetic)?;
-        self.emitted_gross = self
-            .emitted_gross
-            .checked_add(amount as u128)
-            .ok_or(LedgerError::Arithmetic)?;
-        self.collected_fees = self
-            .collected_fees
-            .checked_sub(fee as u128)
-            .ok_or(LedgerError::InsufficientFunds)?;
-        self.projected_surplus = self
-            .projected_surplus
-            .checked_add(0)
-            .ok_or(LedgerError::Arithmetic)?;
-        self.assert_invariants()
-    }
-
-    pub fn record_payout_settlement(&mut self, amount: u64) -> Result<(), LedgerError> {
-        self.pending_withdrawal_liability = self
-            .pending_withdrawal_liability
-            .checked_sub(amount as u128)
-            .ok_or(LedgerError::InsufficientFunds)?;
-        self.backing_reserve = self
-            .backing_reserve
-            .checked_sub(amount as u128)
-            .ok_or(LedgerError::InsufficientFunds)?;
-        self.assert_invariants()
-    }
-
-    fn assert_invariants(&self) -> Result<(), LedgerError> {
-        let out = self
-            .pending_mint_liability
-            .checked_add(self.pending_withdrawal_liability)
-            .ok_or(LedgerError::Arithmetic)?;
-        if self.backing_reserve < out {
+    pub fn assert_invariants(&self) -> Result<(), LedgerError> {
+        if self.canonical_reserve < self.coverage_required()? {
             return Err(LedgerError::InsufficientBacking);
-        }
-        if self.collected_fees > (self.emitted_gross + self.projected_surplus) {
-            return Err(LedgerError::InvalidFeeAccounting);
         }
         Ok(())
     }
 
+    pub fn record_validated_deposit(&mut self, gross_amount: u64, bridge_fee: u64) -> Result<(), LedgerError> {
+        if bridge_fee > gross_amount {
+            return Err(LedgerError::FeeExceedsAmount);
+        }
+        let net_amount = gross_amount - bridge_fee;
+        self.canonical_reserve = checked_add(self.canonical_reserve, gross_amount as u128)?;
+        self.authorized_unminted_credits =
+            checked_add(self.authorized_unminted_credits, net_amount as u128)?;
+        self.fees_accrued = checked_add(self.fees_accrued, bridge_fee as u128)?;
+        self.unsettled_operations = self
+            .unsettled_operations
+            .checked_add(1)
+            .ok_or(LedgerError::Arithmetic)?;
+        self.assert_invariants()
+    }
+
+    pub fn record_mint(&mut self, amount: u64, bridge_fee: u64) -> Result<(), LedgerError> {
+        if bridge_fee != 0 {
+            return Err(LedgerError::UnexpectedFeeAtMint);
+        }
+        self.authorized_unminted_credits =
+            checked_sub(self.authorized_unminted_credits, amount as u128)?;
+        self.minted_supply = checked_add(self.minted_supply, amount as u128)?;
+        self.unsettled_operations = self
+            .unsettled_operations
+            .checked_sub(1)
+            .ok_or(LedgerError::InvalidOperationCount)?;
+        self.assert_invariants()
+    }
+
+    pub fn record_burn_request(&mut self, gross_amount: u64, fee_amount: u64) -> Result<(), LedgerError> {
+        if fee_amount > gross_amount {
+            return Err(LedgerError::FeeExceedsAmount);
+        }
+        let net_payout = gross_amount - fee_amount;
+        self.minted_supply = checked_sub(self.minted_supply, gross_amount as u128)?;
+        self.burned_unpaid_withdrawals =
+            checked_add(self.burned_unpaid_withdrawals, net_payout as u128)?;
+        self.fees_accrued = checked_add(self.fees_accrued, fee_amount as u128)?;
+        self.unsettled_operations = self
+            .unsettled_operations
+            .checked_add(1)
+            .ok_or(LedgerError::Arithmetic)?;
+        self.assert_invariants()
+    }
+
+    pub fn reserve_withdrawal_utxos(&mut self, net_amount: u64) -> Result<(), LedgerError> {
+        self.burned_unpaid_withdrawals =
+            checked_sub(self.burned_unpaid_withdrawals, net_amount as u128)?;
+        self.reserved_utxo_liabilities =
+            checked_add(self.reserved_utxo_liabilities, net_amount as u128)?;
+        self.assert_invariants()
+    }
+
+    pub fn record_payout_broadcast(&mut self, net_amount: u64) -> Result<(), LedgerError> {
+        self.reserved_utxo_liabilities =
+            checked_sub(self.reserved_utxo_liabilities, net_amount as u128)?;
+        self.broadcast_payout_liabilities =
+            checked_add(self.broadcast_payout_liabilities, net_amount as u128)?;
+        self.assert_invariants()
+    }
+
+    pub fn record_payout_settlement(&mut self, net_amount: u64) -> Result<(), LedgerError> {
+        let net_amount = net_amount as u128;
+        if self.broadcast_payout_liabilities >= net_amount {
+            self.broadcast_payout_liabilities =
+                checked_sub(self.broadcast_payout_liabilities, net_amount)?;
+        } else {
+            self.burned_unpaid_withdrawals =
+                checked_sub(self.burned_unpaid_withdrawals, net_amount)?;
+        }
+        self.canonical_reserve = checked_sub(self.canonical_reserve, net_amount)?;
+        self.finalized_payouts = checked_add(self.finalized_payouts, net_amount)?;
+        self.unsettled_operations = self
+            .unsettled_operations
+            .checked_sub(1)
+            .ok_or(LedgerError::InvalidOperationCount)?;
+        self.assert_invariants()
+    }
+
+    pub fn record_reserve_donation(&mut self, amount: u64) -> Result<(), LedgerError> {
+        self.canonical_reserve = checked_add(self.canonical_reserve, amount as u128)?;
+        self.assert_invariants()
+    }
 }
+
+pub type LedgerState = LedgerSnapshot;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum MessageEncodeError {
     UnsupportedVersion { expected: u8, found: u8 },
     InvalidLength { expected: usize, found: usize },
+    DestinationEmpty,
+    DestinationTooLong { max: usize, found: usize },
+    AmountZero,
+    FeeExceedsAmount,
+    EpochZero,
+    InvalidValidityWindow,
+    NonceZero,
+    EvidenceDigestZero,
+    MissingDepositOutpoint,
+    UnexpectedDepositOutpoint,
+    MissingWithdrawalId,
+    UnexpectedWithdrawalId,
+    ActionDirectionMismatch,
+    OperationIdMismatch,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum MessageDecodeError {
     UnsupportedVersion { expected: u8, found: u8 },
     InvalidLength { expected: usize, found: usize },
+    InvalidMagic,
     InvalidDirection(u8),
     InvalidAction(u8),
+    NonZeroReservedByte,
+    NonZeroDestinationPadding,
+    DestinationTooLong { max: usize, found: usize },
+    Validation(MessageEncodeError),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -437,49 +697,145 @@ pub enum LedgerError {
     Arithmetic,
     InsufficientFunds,
     InsufficientBacking,
-    InvalidFeeAccounting,
+    FeeExceedsAmount,
+    UnexpectedFeeAtMint,
+    InvalidOperationCount,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum BridgeStateTransitionError {
     InvalidTransition,
+    TerminalState,
+}
+
+fn checked_add(left: u128, right: u128) -> Result<u128, LedgerError> {
+    left.checked_add(right).ok_or(LedgerError::Arithmetic)
+}
+
+fn checked_sub(left: u128, right: u128) -> Result<u128, LedgerError> {
+    left.checked_sub(right).ok_or(LedgerError::InsufficientFunds)
+}
+
+fn checked_sum(values: &[u128]) -> Result<u128, LedgerError> {
+    values
+        .iter()
+        .try_fold(0u128, |acc, value| checked_add(acc, *value))
+}
+
+fn validate_destination(destination: &[u8]) -> Result<(), MessageEncodeError> {
+    if destination.is_empty() {
+        return Err(MessageEncodeError::DestinationEmpty);
+    }
+    if destination.len() > MAX_DESTINATION_LENGTH {
+        return Err(MessageEncodeError::DestinationTooLong {
+            max: MAX_DESTINATION_LENGTH,
+            found: destination.len(),
+        });
+    }
+    Ok(())
+}
+
+fn is_zero_hash(hash: &Hash32) -> bool {
+    hash.iter().all(|byte| *byte == 0)
+}
+
+fn write_fixed(out: &mut [u8], cursor: &mut usize, bytes: &[u8]) {
+    let end = *cursor + bytes.len();
+    out[*cursor..end].copy_from_slice(bytes);
+    *cursor = end;
+}
+
+struct DecodeCursor<'a> {
+    bytes: &'a [u8],
+    cursor: usize,
+}
+
+impl<'a> DecodeCursor<'a> {
+    fn new(bytes: &'a [u8]) -> Self {
+        Self { bytes, cursor: 0 }
+    }
+
+    fn position(&self) -> usize {
+        self.cursor
+    }
+
+    fn read_u8(&mut self) -> Result<u8, MessageDecodeError> {
+        Ok(self.read_array::<1>()?[0])
+    }
+
+    fn read_u16_le(&mut self) -> Result<u16, MessageDecodeError> {
+        Ok(u16::from_le_bytes(self.read_array::<2>()?))
+    }
+
+    fn read_u32_le(&mut self) -> Result<u32, MessageDecodeError> {
+        Ok(u32::from_le_bytes(self.read_array::<4>()?))
+    }
+
+    fn read_u64_le(&mut self) -> Result<u64, MessageDecodeError> {
+        Ok(u64::from_le_bytes(self.read_array::<8>()?))
+    }
+
+    fn read_array<const N: usize>(&mut self) -> Result<[u8; N], MessageDecodeError> {
+        let end = self.cursor + N;
+        let bytes = self
+            .bytes
+            .get(self.cursor..end)
+            .ok_or(MessageDecodeError::InvalidLength {
+                expected: MESSAGE_LENGTH,
+                found: end,
+            })?;
+        self.cursor = end;
+        Ok(bytes.try_into().expect("slice length checked"))
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn sample_message() -> CanonicalBridgeMessage {
-        CanonicalBridgeMessage {
-            version: MESSAGE_VERSION,
-            direction: BridgeDirection::NativeToSolana,
-            action: BridgeAction::DepositClaim,
-            protocol_version: 1,
-            deployment: DeploymentIdentity {
-                protocol_id: 1,
-                native_chain_id: 8_000_111,
-                native_genesis: [1u8; 32],
-                solana_cluster: [2u8; 32],
-                manager_program_id: [3u8; 32],
-                transceiver_program_id: [4u8; 32],
-                mint: [5u8; 32],
-            },
-            operation_id: [6u8; 32],
-            native_reference: [7u8; 32],
-            recipient: [8u8; 32],
-            amount: 12_345,
-            fee: 3,
-            policy_epoch: 1,
-            nonce: 42,
-            evidence_valid_until: 1_700_000_000,
-            validity_window: 1200,
-            evidence_digest: [9u8; 32],
+    pub fn sample_deployment() -> DeploymentIdentity {
+        DeploymentIdentity {
+            protocol_id: 1,
+            native_network: 8_000_111,
+            native_genesis: [1u8; 32],
+            solana_deployment: [2u8; 32],
+            manager_program_id: [3u8; 32],
+            transceiver_program_id: [4u8; 32],
+            mint: [5u8; 32],
         }
+    }
+
+    pub fn sample_deposit_message() -> CanonicalBridgeMessage {
+        CanonicalBridgeMessage::new_deposit_claim(
+            sample_deployment(),
+            NativeOutpoint {
+                txid: [7u8; 32],
+                vout: 2,
+            },
+            12_345,
+            [8u8; 32],
+            MessageEpochs {
+                policy_epoch: 1,
+                key_epoch: 2,
+            },
+            [0x42u8; 32],
+            ValidityWindow {
+                valid_from: 1_700_000_000,
+                valid_until: 1_700_001_200,
+            },
+            [9u8; 32],
+        )
+        .expect("sample deposit message")
+    }
+
+    #[test]
+    fn deployment_identity_length_is_exact() {
+        assert_eq!(sample_deployment().to_bytes().len(), DEPLOYMENT_IDENTITY_LENGTH);
     }
 
     #[test]
     fn encoding_is_deterministic() {
-        let message = sample_message();
+        let message = sample_deposit_message();
         let encoded = message.encode().expect("encode");
         assert_eq!(encoded.len(), MESSAGE_LENGTH);
         let decoded = CanonicalBridgeMessage::decode(&encoded).expect("decode");
@@ -487,8 +843,8 @@ mod tests {
     }
 
     #[test]
-    fn decoding_rejects_wrong_length() {
-        let mut payload = sample_message().encode().expect("encode");
+    fn decoding_rejects_wrong_length_and_trailing_data() {
+        let mut payload = sample_deposit_message().encode().expect("encode");
         payload.push(0);
         assert!(matches!(
             CanonicalBridgeMessage::decode(&payload),
@@ -497,46 +853,120 @@ mod tests {
     }
 
     #[test]
-    fn canonical_vector_is_stable() {
-        let encoded = sample_message().encode().expect("encode");
-        let expected = "01000001"; // first 4 bytes sanity: version+direction+action+protocol_version
-        let prefix: String = encoded.iter().take(4).map(|b| format!("{b:02x}")).collect();
-        assert_eq!(prefix, expected);
+    fn rejects_alternate_destination_padding() {
+        let mut encoded = sample_deposit_message().encode().expect("encode");
+        let padding_index = 12
+            + DEPLOYMENT_IDENTITY_LENGTH
+            + 32
+            + NATIVE_OUTPOINT_LENGTH
+            + 32
+            + 8
+            + 8
+            + 2
+            + 32;
+        encoded[padding_index] = 1;
+        assert!(matches!(
+            CanonicalBridgeMessage::decode(&encoded),
+            Err(MessageDecodeError::NonZeroDestinationPadding)
+        ));
+    }
+
+    #[test]
+    fn canonical_vector_prefix_is_stable() {
+        let encoded = sample_deposit_message().encode().expect("encode");
+        let prefix: String = encoded.iter().take(12).map(|b| format!("{b:02x}")).collect();
+        assert_eq!(prefix, "4b5045504252473101000000");
+    }
+
+    #[test]
+    fn rejects_mutated_operation_id() {
+        let mut message = sample_deposit_message();
+        message.operation_id[0] ^= 0xFF;
+        assert!(matches!(
+            message.encode(),
+            Err(MessageEncodeError::OperationIdMismatch)
+        ));
+    }
+
+    #[test]
+    fn rejects_action_direction_mismatch() {
+        let mut message = sample_deposit_message();
+        message.direction = BridgeDirection::SolanaToNative;
+        message.operation_id = message.derive_operation_id().expect("derive");
+        assert!(matches!(
+            message.encode(),
+            Err(MessageEncodeError::ActionDirectionMismatch)
+        ));
     }
 
     #[test]
     fn state_machine_transitions() {
-        let mut state = BridgeOperationState::WAITING_FOR_FINALITY;
-        state = state.transition(BridgeStateEvent::ObservedFinality).expect("step");
-        state = state.transition(BridgeStateEvent::QueueByLimit).expect("step");
-        state = state.transition(BridgeStateEvent::DependencySatisfied).expect("step");
-        state = state.transition(BridgeStateEvent::Complete).expect("step");
-        assert!(state.is_terminal());
-        assert_eq!(state, BridgeOperationState::COMPLETED);
-        assert!(BridgeOperationState::COMPLETED.transition(BridgeStateEvent::Reject).is_err());
+        let mut state = BridgeOperationState::Observed;
+        state = state
+            .transition(BridgeStateEvent::ObservationAccepted)
+            .expect("step");
+        state = state
+            .transition(BridgeStateEvent::FinalityReached)
+            .expect("step");
+        state = state
+            .transition(BridgeStateEvent::QueueByLimit)
+            .expect("step");
+        state = state
+            .transition(BridgeStateEvent::DependencySatisfied)
+            .expect("step");
+        state = state.transition(BridgeStateEvent::BeginSigning).expect("step");
+        state = state
+            .transition(BridgeStateEvent::BroadcastSubmitted)
+            .expect("step");
+        state = state
+            .transition(BridgeStateEvent::BroadcastObserved)
+            .expect("step");
+        state = state
+            .transition(BridgeStateEvent::SettlementFinalized)
+            .expect("step");
+        assert_eq!(state.as_str(), "COMPLETED");
+        assert!(state.transition(BridgeStateEvent::Reject).is_err());
     }
 
     #[test]
-    fn ledger_arithmetic_and_invariants() {
+    fn ledger_transitions_keep_withdrawal_liability_after_burn() {
         let mut ledger = LedgerState::new();
-        ledger
-            .record_validated_deposit(10_000, 10)
-            .expect("deposit credited");
-        ledger
-            .record_burn_request(1_000, 2)
-            .expect("withdrawal requested");
+        ledger.record_validated_deposit(10_000, 0).expect("deposit");
+        ledger.record_mint(10_000, 0).expect("mint");
+        ledger.record_burn_request(1_000, 5).expect("burn request");
+        assert_eq!(ledger.minted_supply, 9_000);
+        assert_eq!(ledger.burned_unpaid_withdrawals, 995);
+        assert_eq!(ledger.coverage_required().unwrap(), 9_995);
+        assert_eq!(ledger.surplus().unwrap(), 5);
+    }
+
+    #[test]
+    fn ledger_moves_withdrawal_liability_until_finalized_payout() {
+        let mut ledger = LedgerState::new();
+        ledger.record_validated_deposit(10_000, 0).expect("deposit");
+        ledger.record_mint(10_000, 0).expect("mint");
+        ledger.record_burn_request(1_000, 0).expect("burn request");
+        ledger.reserve_withdrawal_utxos(1_000).expect("reserve utxo");
+        ledger.record_payout_broadcast(1_000).expect("broadcast");
+        ledger.record_payout_settlement(1_000).expect("finalized");
+        assert_eq!(ledger.canonical_reserve, 9_000);
+        assert_eq!(ledger.minted_supply, 9_000);
+        assert_eq!(ledger.broadcast_payout_liabilities, 0);
+        assert_eq!(ledger.finalized_payouts, 1_000);
+        assert_eq!(ledger.unsettled_operations, 0);
+    }
+
+    #[test]
+    fn ledger_rejects_unbacked_mint_and_overflow() {
+        let mut ledger = LedgerState::new();
         assert!(matches!(
-            ledger.record_payout_settlement(20_000),
+            ledger.record_mint(1, 0),
             Err(LedgerError::InsufficientFunds)
         ));
-        ledger.record_payout_settlement(1_000).expect("payout");
-        assert_eq!(ledger.pending_mint_liability, 10_000);
-    }
-
-    #[test]
-    fn rejects_unsupported_message_version() {
-        let mut msg = sample_message();
-        msg.version = 9;
-        assert!(msg.encode().is_err());
+        ledger.canonical_reserve = u128::MAX;
+        assert!(matches!(
+            ledger.record_validated_deposit(1, 0),
+            Err(LedgerError::Arithmetic)
+        ));
     }
 }
