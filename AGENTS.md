@@ -130,3 +130,7 @@
   deposit flow without per-transfer KingPepe Team approval.
 - Current local source-boundary check:
   - `npm run test:bridge-validator`
+- Phase 08 source-boundary implementation commit:
+  `09e42e6856312a0c617eb9c14a0312012263722a`
+- Phase 08 source-boundary CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34292181114` PASS
