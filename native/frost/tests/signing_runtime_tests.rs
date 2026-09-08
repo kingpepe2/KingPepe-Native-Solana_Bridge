@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use frost_runtime::{
     AggregateSignature, DomainBinding, ParticipantPublicKey, Signer, SignerRole, SignerState,
-    SigningPolicy, SigningRequest,
+    SigningPolicy, SigningRequest, SigningSessionInput,
 };
 use frost_runtime::{SigningCoordinator, SigningRecord};
 
@@ -63,9 +63,15 @@ fn coordinator_requires_both_participants_for_finalize() {
     let (signer_a, signer_b, keys) = signers_and_keys();
     let mut coordinator = SigningCoordinator::new(policy, 7, keys);
     let record = coordinator
-        .start_session(
-            [1u8; 32], [2u8; 32], [3u8; 32], 1000, 42, &binding, [9u8; 32],
-        )
+        .start_session(SigningSessionInput {
+            request_id: [1u8; 32],
+            operation_id: [2u8; 32],
+            digest: [3u8; 32],
+            amount: 1000,
+            fee: 42,
+            domains: binding,
+            nonce: [9u8; 32],
+        })
         .expect("start_session");
     let request = request_from(&record);
     let a = signer_a
@@ -94,9 +100,15 @@ fn coordinator_rejects_duplicate_role_share() {
     let (signer_a, _, keys) = signers_and_keys();
     let mut coordinator = SigningCoordinator::new(policy, 7, keys);
     let record = coordinator
-        .start_session(
-            [7u8; 32], [8u8; 32], [9u8; 32], 2000, 10, &binding, [5u8; 32],
-        )
+        .start_session(SigningSessionInput {
+            request_id: [7u8; 32],
+            operation_id: [8u8; 32],
+            digest: [9u8; 32],
+            amount: 2000,
+            fee: 10,
+            domains: binding,
+            nonce: [5u8; 32],
+        })
         .expect("start_session");
     let request = request_from(&record);
     let share = signer_a
@@ -121,7 +133,15 @@ fn coordinator_rejects_domain_mismatch() {
     let mut coordinator = SigningCoordinator::new(policy, 7, keys);
     binding.native_chain_id = 999;
     assert!(matches!(
-        coordinator.start_session([1u8; 32], [2u8; 32], [3u8; 32], 1000, 1, &binding, [9u8; 32],),
+        coordinator.start_session(SigningSessionInput {
+            request_id: [1u8; 32],
+            operation_id: [2u8; 32],
+            digest: [3u8; 32],
+            amount: 1000,
+            fee: 1,
+            domains: binding,
+            nonce: [9u8; 32],
+        }),
         Err(frost_runtime::CoordinatorError::DomainMismatch)
     ));
 }
@@ -132,13 +152,25 @@ fn coordinator_rejects_nonce_reuse() {
     let (_, _, keys) = signers_and_keys();
     let mut coordinator = SigningCoordinator::new(policy, 7, keys);
     coordinator
-        .start_session(
-            [11u8; 32], [12u8; 32], [13u8; 32], 100, 10, &binding, [33u8; 32],
-        )
+        .start_session(SigningSessionInput {
+            request_id: [11u8; 32],
+            operation_id: [12u8; 32],
+            digest: [13u8; 32],
+            amount: 100,
+            fee: 10,
+            domains: binding,
+            nonce: [33u8; 32],
+        })
         .expect("first session");
-    let second = coordinator.start_session(
-        [14u8; 32], [15u8; 32], [16u8; 32], 100, 10, &binding, [33u8; 32],
-    );
+    let second = coordinator.start_session(SigningSessionInput {
+        request_id: [14u8; 32],
+        operation_id: [15u8; 32],
+        digest: [16u8; 32],
+        amount: 100,
+        fee: 10,
+        domains: binding,
+        nonce: [33u8; 32],
+    });
     assert!(matches!(
         second,
         Err(frost_runtime::CoordinatorError::NonceRejected)
@@ -151,9 +183,15 @@ fn coordinator_rejects_amount_above_policy() {
     let (_, _, keys) = signers_and_keys();
     policy.max_amount = 99;
     let mut coordinator = SigningCoordinator::new(policy, 7, keys);
-    let bad = coordinator.start_session(
-        [11u8; 32], [12u8; 32], [13u8; 32], 100, 1, &binding, [44u8; 32],
-    );
+    let bad = coordinator.start_session(SigningSessionInput {
+        request_id: [11u8; 32],
+        operation_id: [12u8; 32],
+        digest: [13u8; 32],
+        amount: 100,
+        fee: 1,
+        domains: binding,
+        nonce: [44u8; 32],
+    });
     assert!(matches!(
         bad,
         Err(frost_runtime::CoordinatorError::PolicyRejected)
@@ -166,9 +204,15 @@ fn coordinator_rejects_restart_transition_after_completion_guard() {
     let (signer_a, signer_b, keys) = signers_and_keys();
     let mut coordinator = SigningCoordinator::new(policy, 7, keys);
     let record = coordinator
-        .start_session(
-            [21u8; 32], [22u8; 32], [23u8; 32], 500, 1, &binding, [55u8; 32],
-        )
+        .start_session(SigningSessionInput {
+            request_id: [21u8; 32],
+            operation_id: [22u8; 32],
+            digest: [23u8; 32],
+            amount: 500,
+            fee: 1,
+            domains: binding,
+            nonce: [55u8; 32],
+        })
         .expect("start_session");
     let request = request_from(&record);
     let a = signer_a.sign(&request, &SignerState::default()).unwrap();
