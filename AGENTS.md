@@ -24,8 +24,8 @@
 
 ## Current phase status
 
-- Current implementation phase: `PHASE 07 - Attestation and Solana observation`
-- Objective: implement project attestation services, Solana Ed25519 instruction binding, finalized withdrawal observation, and unauthorized program/authority hard-stop detection while keeping live activation disabled.
+- Current implementation phase: `PHASE 08 - Automatic Native to Solana local end-to-end`
+- Objective: connect the automated local Native-to-Solana deposit path using validated Native reserve transitions, project attestations, Solana mint receipt consumption, and reconciliation while keeping live activation disabled outside local testing.
 - Required authority: `KINGPEPE_TEAM_GOVERNANCE`
 
 ## Authoritative status files
@@ -112,3 +112,4 @@
 - Solana observer logic must distinguish RPC observation from local validation
   and must `HARD_STOP` on unauthorized program, binary, upgrade-authority, Mint,
   or mint-authority changes.
+- CI verified Phase 07 at `d17ba8fe61d20a88d4206f72d68a010a2d146524`.

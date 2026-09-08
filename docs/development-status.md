@@ -2,7 +2,7 @@
 
 ## Current phase
 
-- `PHASE 07` - Attestation and Solana observation
+- `PHASE 08` - Automatic Native to Solana local end-to-end
 - Branch: `main`
 - Repository: private by policy
 - `productionReady = false`
@@ -36,7 +36,7 @@
 
 ## Current blockers
 
-- Phase 07 CI verification is pending for the current local implementation.
+- Phase 08 automatic Native to Solana local end-to-end flow has not been implemented yet.
 - Full Native transaction construction, Native node acceptance, local end-to-end flows, Devnet, production configuration, external review, and activation remain later phases.
 
 ## Latest local validation
@@ -64,6 +64,7 @@
 - Phase 07 `npm audit --audit-level=low`: PASS, 0 vulnerabilities
 - Phase 07 `python .github/scripts/guardrails.py`: PASS
 - Phase 07 local `cargo fmt` / `cargo clippy`: NOT_RUN; local WSL has Cargo but not `rustup`, `rustfmt`, or `clippy`
+- Phase 07 CI: PASS for `d17ba8fe61d20a88d4206f72d68a010a2d146524`
 
 ## Phase 03 local implementation
 
@@ -79,7 +80,7 @@
 
 ## Next phase
 
-- Push Phase 07, verify CI for the exact source SHA, and then proceed to Phase 08 automatic Native to Solana local end-to-end if CI passes.
+- Start Phase 08 automatic Native to Solana local end-to-end implementation.
 
 ## Phase 04 local implementation
 
@@ -158,4 +159,8 @@
   upgrade-authority identity checks, and `HARD_STOP` on unauthorized changes.
 - Added CI steps for attester and Solana observer Node tests on Linux and
   Windows.
-- CI status: `PENDING`
+- Implementation commit sequence:
+  - `baf8ee07b4d7baba1e04b1855a0210a46c9ec57a`
+  - `d17ba8fe61d20a88d4206f72d68a010a2d146524`
+- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34290281015`
+- CI status: `PASS`
