@@ -5,6 +5,7 @@ use bridge_messages::{
     MESSAGE_LENGTH, MESSAGE_VERSION,
 };
 use serde::Deserialize;
+use std::fmt::Write as _;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -122,6 +123,14 @@ fn hash32(hex: &str) -> [u8; 32] {
     hex_to_bytes(hex).try_into().expect("32-byte hex")
 }
 
+fn hex_lower(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        write!(&mut out, "{byte:02x}").expect("write to string");
+    }
+    out
+}
+
 fn vector_deployment(input: &VectorDeployment) -> DeploymentIdentity {
     DeploymentIdentity {
         protocol_id: input.protocol_id,
@@ -203,18 +212,10 @@ fn shared_golden_vectors_match_rust_encoding() {
     for case in file.vectors {
         let message = vector_message(&case);
         let encoded = message.encode().expect("encode vector");
-        let encoded_hex: String = encoded.iter().map(|byte| format!("{byte:02x}")).collect();
-        let digest_hex: String = message
-            .message_digest()
-            .expect("message digest")
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect();
-        let operation_id_hex: String = message
-            .operation_id
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect();
+        let message_digest = message.message_digest().expect("message digest");
+        let encoded_hex = hex_lower(&encoded);
+        let digest_hex = hex_lower(&message_digest);
+        let operation_id_hex = hex_lower(&message.operation_id);
 
         assert_eq!(operation_id_hex, case.operation_id, "{}", case.name);
         assert_eq!(digest_hex, case.message_digest, "{}", case.name);

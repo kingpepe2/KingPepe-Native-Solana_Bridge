@@ -816,6 +816,7 @@ impl<'a> DecodeCursor<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fmt::Write as _;
 
     pub fn sample_deployment() -> DeploymentIdentity {
         DeploymentIdentity {
@@ -850,6 +851,14 @@ mod tests {
             evidence_digest: [9u8; 32],
         })
         .expect("sample deposit message")
+    }
+
+    fn hex_lower(bytes: &[u8]) -> String {
+        let mut out = String::with_capacity(bytes.len() * 2);
+        for byte in bytes {
+            write!(&mut out, "{byte:02x}").expect("write to string");
+        }
+        out
     }
 
     #[test]
@@ -894,11 +903,7 @@ mod tests {
     #[test]
     fn canonical_vector_prefix_is_stable() {
         let encoded = sample_deposit_message().encode().expect("encode");
-        let prefix: String = encoded
-            .iter()
-            .take(12)
-            .map(|b| format!("{b:02x}"))
-            .collect();
+        let prefix = hex_lower(&encoded[..12]);
         assert_eq!(prefix, "4b5045504252473101000000");
     }
 
