@@ -24,7 +24,8 @@
     "phase05LocalValidationPassed": true,
     "phase05CiVerified": true,
     "nativeProofReserveRecoveryImplemented": true,
-    "phase06LocalValidationPassed": true
+    "phase06LocalValidationPassed": true,
+    "phase06CiVerified": true
   },
   "readinessGates": {
     "SOURCE_COMPLETE": "IMPLEMENTED_NOT_FULLY_TESTED",

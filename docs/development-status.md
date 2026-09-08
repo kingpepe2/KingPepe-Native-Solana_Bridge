@@ -2,7 +2,7 @@
 
 ## Current phase
 
-- `PHASE 06` - Native proof, reserve, and recovery
+- `PHASE 07` - Attestation and Solana observation
 - Branch: `main`
 - Repository: private by policy
 - `productionReady = false`
@@ -36,7 +36,7 @@
 
 ## Current blockers
 
-- Phase 06 CI verification is pending for the current local implementation.
+- Phase 07 attestation and Solana observation have not been implemented yet.
 - Full Native transaction construction, Native node acceptance, local end-to-end flows, Devnet, production configuration, external review, and activation remain later phases.
 
 ## Latest local validation
@@ -57,6 +57,7 @@
 - Phase 06 `cargo test --locked --manifest-path native/proof/Cargo.toml`: PASS under WSL, 8 Rust tests
 - Phase 06 `cargo test --locked --manifest-path native/reserve/Cargo.toml`: PASS under WSL, 3 Rust tests
 - Phase 06 `cargo test --locked --manifest-path native/recovery/Cargo.toml`: PASS under WSL, 3 Rust tests
+- Phase 06 CI: PASS for `836b8e62e2c87fe8b2d3df48f7fc54466206b646`
 
 ## Phase 03 local implementation
 
@@ -72,7 +73,7 @@
 
 ## Next phase
 
-- Push Phase 06, verify CI for the exact source SHA, and then proceed to Phase 07 attestation and Solana observation if CI passes.
+- Start Phase 07 attestation and Solana observation implementation.
 
 ## Phase 04 local implementation
 
@@ -124,4 +125,10 @@
 - Added `kingpepe_native_reserve` with canonical reserve sweep validation, exact fee/allocation accounting, temporary-deposit non-mintability, and single-use allocation consumption.
 - Added `kingpepe_native_recovery` with CSV maturity, wrong-network, spent-output, mint/sweep conflict, duplicate recovery, fee, and dust checks.
 - Added CI gates for native proof/reserve/recovery formatting, clippy, locked check, and tests.
-- CI status: `PENDING`
+- Implementation commit sequence:
+  - `37876fa26d9dfd447095d5a9dee95b3faa471725`
+  - `4547b6df190ea4dc4334135d9383560c3c272572`
+  - `6ef112651f40cf13f81dffe3eee44290f67bada3`
+  - `836b8e62e2c87fe8b2d3df48f7fc54466206b646`
+- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34287906641`
+- CI status: `PASS`

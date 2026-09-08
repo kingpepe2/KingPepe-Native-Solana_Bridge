@@ -119,10 +119,10 @@
 ## Phase 06 local implementation summary
 
 - PHASE: `06`
-- commit: `PENDING`
-- push result: `PENDING`
-- CI URL: `PENDING`
-- CI status: `PENDING`
+- commit: `836b8e62e2c87fe8b2d3df48f7fc54466206b646`
+- push result: pushed to private `origin/main`
+- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34287906641`
+- CI status: `PASS`
 - tests:
   - `cargo test --locked --manifest-path native/proof/Cargo.toml` (pass under WSL, 8 Rust tests)
   - `cargo test --locked --manifest-path native/reserve/Cargo.toml` (pass under WSL, 3 Rust tests)
@@ -133,7 +133,7 @@
   - Implemented temporary-deposit recovery eligibility checks.
   - Added CI coverage for the new Phase 06 crates.
 - blockers:
-  - Phase 06 CI verification is pending for the outgoing commit.
+  - No Phase 06 implementation or CI blockers remain.
   - Live KingPepe regtest node integration, full transaction broadcasting, Solana observation, local E2E, Devnet, production configuration, and external review remain later phases.
 - next:
-  - Push Phase 06, verify CI, then start Phase 07 attestation and Solana observation.
+  - Start Phase 07 attestation and Solana observation.
