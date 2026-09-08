@@ -14,9 +14,8 @@ use thiserror::Error;
 
 pub const PROGRAM_NAME: &str = "kingpepe_transceiver";
 pub const ED25519_PROGRAM_ID: PubkeyBytes = [
-    0x03, 0x7d, 0x46, 0xd6, 0x7c, 0x93, 0xfb, 0xbe, 0x12, 0xf9, 0x42, 0x8f, 0x83, 0x8d, 0x40,
-    0xff, 0x05, 0x70, 0x74, 0x49, 0x27, 0xf4, 0x8a, 0x64, 0xfc, 0xca, 0x70, 0x44, 0x80, 0x00,
-    0x00, 0x00,
+    0x03, 0x7d, 0x46, 0xd6, 0x7c, 0x93, 0xfb, 0xbe, 0x12, 0xf9, 0x42, 0x8f, 0x83, 0x8d, 0x40, 0xff,
+    0x05, 0x70, 0x74, 0x49, 0x27, 0xf4, 0x8a, 0x64, 0xfc, 0xca, 0x70, 0x44, 0x80, 0x00, 0x00, 0x00,
 ];
 pub const ED25519_SIGNATURE_LENGTH: usize = 64;
 pub const ED25519_PUBLIC_KEY_LENGTH: usize = 32;
@@ -277,20 +276,22 @@ fn parse_ed25519_instruction(
     if signature_end > data.len() || public_key_end > data.len() || message_end > data.len() {
         return Err(TransceiverError::InvalidEd25519InstructionOffsets);
     }
-    if ranges_overlap(signature_offset, signature_end, public_key_offset, public_key_end)
-        || ranges_overlap(
-            signature_offset,
-            signature_end,
-            message_data_offset,
-            message_end,
-        )
-        || ranges_overlap(
-            public_key_offset,
-            public_key_end,
-            message_data_offset,
-            message_end,
-        )
-    {
+    if ranges_overlap(
+        signature_offset,
+        signature_end,
+        public_key_offset,
+        public_key_end,
+    ) || ranges_overlap(
+        signature_offset,
+        signature_end,
+        message_data_offset,
+        message_end,
+    ) || ranges_overlap(
+        public_key_offset,
+        public_key_end,
+        message_data_offset,
+        message_end,
+    ) {
         return Err(TransceiverError::InvalidEd25519InstructionOffsets);
     }
     if message_end != data.len() {
@@ -315,7 +316,9 @@ fn read_u16_le(data: &[u8], offset: usize) -> Result<u16, TransceiverError> {
     let bytes = data
         .get(offset..offset + 2)
         .ok_or(TransceiverError::InvalidEd25519InstructionOffsets)?;
-    Ok(u16::from_le_bytes(bytes.try_into().expect("slice length checked")))
+    Ok(u16::from_le_bytes(
+        bytes.try_into().expect("slice length checked"),
+    ))
 }
 
 fn ranges_overlap(a_start: usize, a_end: usize, b_start: usize, b_end: usize) -> bool {
