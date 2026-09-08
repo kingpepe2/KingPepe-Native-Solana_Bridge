@@ -78,7 +78,7 @@ fn coordinator_requires_both_participants_for_finalize() {
         .sign(&request, &SignerState::default())
         .expect("sign a");
     coordinator.consume_signature(record.request_id, a).unwrap();
-    assert!(matches!(coordinator.finalize(record.request_id), Err(_)));
+    assert!(coordinator.finalize(record.request_id).is_err());
 
     let b_request = request_from(&record);
     let b = signer_b
