@@ -9,9 +9,11 @@
     "node": ">=20.19.0"
   },
   "scripts": {
-    "test": "npm run test:protocol && npm run test:frost",
+    "test": "npm run test:protocol && npm run test:frost && npm run test:attesters && npm run test:solana-observer",
+    "test:attesters": "node --test services/attesters/tests/*.test.mjs",
     "test:frost": "node --test native/frost/tests/frost_runtime_node.test.mjs",
-    "test:protocol": "node solana/ts/scripts/verify-vectors.mjs"
+    "test:protocol": "node solana/ts/scripts/verify-vectors.mjs",
+    "test:solana-observer": "node --test services/solana-observer/tests/*.test.mjs"
   },
   "dependencies": {
     "@noble/curves": "2.3.0"

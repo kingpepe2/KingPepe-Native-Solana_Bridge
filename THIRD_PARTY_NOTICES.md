@@ -10,7 +10,7 @@ This repository tracks selected upstream references for architectural guidance.
 - `@noble/curves` `2.3.0`
   - License: MIT
   - Copyright: Copyright (c) 2022 Paul Miller
-  - Use: pinned runtime dependency for secp256k1 Taproot/BIP340-compatible FROST tests and implementation
+  - Use: pinned runtime dependency for secp256k1 Taproot/BIP340-compatible FROST implementation and Ed25519 project attestation tests/services
 
 - `@noble/hashes` `2.3.0`
   - License: MIT
