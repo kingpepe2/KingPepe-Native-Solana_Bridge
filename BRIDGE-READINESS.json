@@ -16,14 +16,16 @@
     "canonicalProtocolMessagesImplemented": true,
     "accountingPrimitivesImplemented": true,
     "phase03LocalValidationPassed": true,
-    "phase03CiVerified": true
+    "phase03CiVerified": true,
+    "nativeCompatibleFrostImplemented": true,
+    "phase04LocalValidationPassed": true
   },
   "readinessGates": {
     "SOURCE_COMPLETE": "IMPLEMENTED_NOT_FULLY_TESTED",
     "LOCAL_E2E_PASS": "NOT_CONFIGURED",
     "DEVNET_VALIDATION_PASS": "NOT_CONFIGURED",
-    "FROST_NATIVE_SIGNATURE_PASS": "NOT_CONFIGURED",
-    "NONCE_SAFETY_PASS": "NOT_CONFIGURED",
+    "FROST_NATIVE_SIGNATURE_PASS": "IMPLEMENTED_AND_TESTED_LOCALLY_PHASE04",
+    "NONCE_SAFETY_PASS": "IMPLEMENTED_AND_TESTED_LOCALLY_PHASE04_NOT_PRODUCTION_ROLLBACK",
     "SOLANA_PROGRAM_AUDIT_PASS": "NOT_CONFIGURED",
     "NATIVE_VALIDATION_PASS": "NOT_CONFIGURED",
     "RECONCILIATION_PASS": "NOT_CONFIGURED",

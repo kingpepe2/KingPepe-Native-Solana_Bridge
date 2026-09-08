@@ -2,7 +2,7 @@
 
 Purpose:
 
-- Prepare offline-safe recovery helpers for temporary deposit ownership proof flows.
+- Prepare offline-safe recovery helpers for temporary deposit control proof flows.
 - Keep recovery state modeling distinct from live runtime state.
 
 Planned responsibilities:

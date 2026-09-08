@@ -25,7 +25,7 @@
 ## Current phase status
 
 - Current implementation phase: `PHASE 04 - Real Native-Compatible FROST 2-of-2`
-- Objective: determine Native signature requirements and implement or integrate real threshold signing compatible with KingPepe Native transactions.
+- Objective: validate and publish the real secp256k1 Taproot/BIP340-compatible `2-of-2` FROST runtime.
 - Required authority: `KINGPEPE_TEAM_GOVERNANCE`
 
 ## Authoritative status files
@@ -66,7 +66,7 @@
 - Removed the phase-02 Ed25519 placeholder dependency from the native runtime to keep CI compatible with the pinned toolchain.
 - Kept all sensitive runtime data and live credentials outside repository scope.
 - Updated source comparison records: `UPSTREAM-REFERENCES.json`, `docs/architecture/ntt-comparison.md`.
-- The current native signing runtime is not final Native-compatible FROST. Real FROST remains a Phase 04 requirement.
+- The Rust crate remains supporting policy/state scaffold. Phase 04 Native signatures are implemented in the Node FROST runtime.
 
 ## Phase 03 phase notes
 
@@ -76,6 +76,11 @@
 
 ## Phase 04 phase notes
 
-- Do not treat Ed25519 attestation or phase-02 deterministic test shares as FROST.
-- Determine KingPepe Native transaction signature requirements from source before selecting the FROST ciphersuite.
+- Do not treat Ed25519 attestation or phase-02 deterministic Rust test shares as FROST.
+- KingPepe Native signing evidence from read-only recovery material identifies the required path as Taproot/BIP340.
+- The Phase 04 runtime uses pinned `@noble/curves` `2.3.0` `schnorr_FROST`.
+- Required local checks:
+  - `npm ci --ignore-scripts`
+  - `npm run test:frost`
+  - `npm audit --audit-level=low`
 - Keep all generated test key material outside the repository.

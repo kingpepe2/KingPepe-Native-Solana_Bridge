@@ -31,7 +31,7 @@
 ## Required local differences
 
 - KingPepe Native signature requirements must be handled by project-specific crypto path.
-- Same-host dual FROST participants (A+B) are approved by owner governance for this project.
+- Same-host dual FROST participants (A+B) are approved by KingPepe Team governance for this project.
 - Automatic transfer authorization remains local and policy-driven after user wallet signatures.
 - Canonical reserve/liability model is bound to Native-backed operations and reconciliation.
 
