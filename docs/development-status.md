@@ -69,6 +69,7 @@
 - Phase 08 `Get-Command kingpeped kingpepe-cli solana-test-validator anchor`: NOT_FOUND on Windows
 - Phase 08 `command -v kingpeped kingpepe-cli solana-test-validator solana anchor`: NOT_FOUND under WSL
 - Phase 08 `npm run test:bridge-validator`: PASS, 6 automatic deposit pipeline tests
+- Phase 08 source-boundary CI: PASS for `09e42e6856312a0c617eb9c14a0312012263722a`
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
 
 ## Phase 03 local implementation
@@ -108,9 +109,9 @@
   - prevents completed replay from minting or broadcasting twice;
   - rejects invalid trust, altered reserve evidence, and FROST quorum loss;
   - contains no per-transfer KingPepe Team approval state.
-- Implementation commit: `PENDING`
-- CI URL: `PENDING`
-- CI status: `PENDING`
+- Implementation commit: `09e42e6856312a0c617eb9c14a0312012263722a`
+- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34292181114`
+- CI status: `PASS`
 - Real daemon-backed Native-to-Solana E2E: `BLOCKED / NOT_RUN`
 
 ## Phase 04 local implementation
