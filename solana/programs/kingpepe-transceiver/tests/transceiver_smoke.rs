@@ -1,5 +1,6 @@
 use bridge_messages::{
-    CanonicalBridgeMessage, DeploymentIdentity, MessageEpochs, NativeOutpoint, ValidityWindow,
+    CanonicalBridgeMessage, DeploymentIdentity, DepositClaimFields, MessageEpochs, NativeOutpoint,
+    ValidityWindow,
 };
 use kingpepe_transceiver::{AttestationObservation, TransceiverConfig, TransceiverProgram};
 
@@ -18,8 +19,8 @@ fn transceiver_can_record_verification() {
         active: true,
         key_epoch: 7,
     };
-    let message = CanonicalBridgeMessage::new_deposit_claim(
-        DeploymentIdentity {
+    let message = CanonicalBridgeMessage::new_deposit_claim(DepositClaimFields {
+        deployment: DeploymentIdentity {
             protocol_id: 1,
             native_network: 2,
             native_genesis: h(8),
@@ -28,23 +29,23 @@ fn transceiver_can_record_verification() {
             transceiver_program_id: config.transceiver_program_id,
             mint: config.mint,
         },
-        NativeOutpoint {
+        deposit_outpoint: NativeOutpoint {
             txid: h(9),
             vout: 1,
         },
-        100,
-        h(10),
-        MessageEpochs {
+        amount_atomic: 100,
+        solana_recipient: h(10),
+        epochs: MessageEpochs {
             policy_epoch: 1,
             key_epoch: config.key_epoch,
         },
-        h(11),
-        ValidityWindow {
+        nonce: h(11),
+        validity: ValidityWindow {
             valid_from: 1,
             valid_until: 2,
         },
-        h(12),
-    )
+        evidence_digest: h(12),
+    })
     .unwrap();
     let digest = message.message_digest().unwrap();
     let observations = vec![
