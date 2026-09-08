@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 
-use ed25519_dalek::VerifyingKey;
-use frost_runtime::{AggregateSignature, DomainBinding, Signer, SignerRole, SignerState, SigningPolicy, SigningRequest};
+use frost_runtime::{AggregateSignature, DomainBinding, ParticipantPublicKey, Signer, SignerRole, SignerState, SigningPolicy, SigningRequest};
 use frost_runtime::{SigningCoordinator, SigningRecord};
 
 fn policy() -> (SigningPolicy, DomainBinding) {
@@ -27,7 +26,7 @@ fn policy() -> (SigningPolicy, DomainBinding) {
 fn signers_and_keys() -> (
     Signer,
     Signer,
-    BTreeMap<SignerRole, VerifyingKey>,
+    BTreeMap<SignerRole, ParticipantPublicKey>,
 ) {
     let signer_a = Signer::from_seed(SignerRole::A, [0xA5u8; 32]);
     let signer_b = Signer::from_seed(SignerRole::B, [0xB5u8; 32]);

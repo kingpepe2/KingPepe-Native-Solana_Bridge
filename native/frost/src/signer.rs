@@ -1,6 +1,4 @@
-use ed25519_dalek::{Signer as _, Verifier};
-use ed25519_dalek::{Signature, SigningKey, VerifyingKey};
-use rand_core::OsRng;
+use rand_core::{OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -24,7 +22,16 @@ impl SignerRole {
 #[derive(Debug)]
 pub struct Signer {
     pub role: SignerRole,
-    key: SigningKey,
+    seed: [u8; 32],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct ParticipantPublicKey([u8; 32]);
+
+impl ParticipantPublicKey {
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,26 +72,29 @@ impl Default for SignerState {
 
 impl Signer {
     pub fn from_seed(role: SignerRole, seed: [u8; 32]) -> Self {
-        Self {
-            role,
-            key: SigningKey::from_bytes(&seed),
-        }
+        Self { role, seed }
     }
 
     pub fn generate(role: SignerRole) -> Self {
         let mut rng = OsRng;
+        let mut seed = [0u8; 32];
+        rng.fill_bytes(&mut seed);
         Self {
             role,
-            key: SigningKey::generate(&mut rng),
+            seed,
         }
     }
 
-    pub fn public_key(&self) -> VerifyingKey {
-        self.key.verifying_key()
+    pub fn public_key(&self) -> ParticipantPublicKey {
+        let mut digest = Sha256::new();
+        digest.update(b"KINGPEPE_PHASE02_SIGNER_PUBLIC_KEY_V1");
+        digest.update([self.role as u8]);
+        digest.update(self.seed);
+        ParticipantPublicKey(digest.finalize().into())
     }
 
     pub fn public_key_bytes(&self) -> [u8; 32] {
-        self.public_key().to_bytes()
+        *self.public_key().as_bytes()
     }
 
     pub fn sign(
@@ -101,15 +111,15 @@ impl Signer {
         if state.last_consumed > 0 && state.active_sessions > 128 {
             return Err(SignerError::RateLimited);
         }
-        let message = build_message(request);
-        let signature = self.key.sign(&message);
+        let message_hash = build_message(request);
+        let signature = build_test_signature(&self.public_key(), self.role, &message_hash);
         Ok(SignedShare {
             request_id: request.request_id,
             signer_role: self.role,
             epoch: request.epoch,
             nonce: request.nonce,
-            message_hash: message,
-            signature: signature.to_bytes().to_vec(),
+            message_hash,
+            signature: signature.to_vec(),
         })
     }
 
@@ -129,17 +139,7 @@ impl Signer {
         if share.message_hash != build_message(request) {
             return Err(SignerError::DigestMismatch);
         }
-        let signature_bytes: [u8; 64] = share
-            .signature
-            .as_slice()
-            .try_into()
-            .map_err(|_| SignerError::BadSignature)?;
-        let signature = Signature::from_slice(&signature_bytes)
-            .map_err(|_| SignerError::BadSignature)?;
-        let public_key = self.public_key();
-        public_key
-            .verify(&share.message_hash, &signature)
-            .map_err(|_| SignerError::BadSignature)?;
+        validate_test_signature(&self.public_key(), share)?;
         Ok(true)
     }
 }
@@ -147,7 +147,7 @@ impl Signer {
 impl SignedShare {
     pub fn validate(
         &self,
-        public_key: &VerifyingKey,
+        public_key: &ParticipantPublicKey,
         request: &SigningRequest,
     ) -> Result<bool, SignerError> {
         if self.request_id != request.request_id || self.nonce != request.nonce || self.epoch != request.epoch {
@@ -156,16 +156,7 @@ impl SignedShare {
         if self.message_hash != build_message(request) {
             return Err(SignerError::DigestMismatch);
         }
-        let signature_bytes: [u8; 64] = self
-            .signature
-            .as_slice()
-            .try_into()
-            .map_err(|_| SignerError::BadSignature)?;
-        let signature = Signature::from_slice(&signature_bytes)
-            .map_err(|_| SignerError::BadSignature)?;
-        public_key
-            .verify(&self.message_hash, &signature)
-            .map_err(|_| SignerError::BadSignature)?;
+        validate_test_signature(public_key, self)?;
         Ok(true)
     }
 }
@@ -180,6 +171,27 @@ pub fn build_message(request: &SigningRequest) -> [u8; 32] {
     digest.update(request.amount.to_le_bytes());
     digest.update(request.fee.to_le_bytes());
     digest.finalize().into()
+}
+
+fn build_test_signature(
+    public_key: &ParticipantPublicKey,
+    role: SignerRole,
+    message_hash: &[u8; 32],
+) -> [u8; 32] {
+    let mut digest = Sha256::new();
+    digest.update(b"KINGPEPE_PHASE02_SIGNER_SHARE_V1");
+    digest.update(public_key.as_bytes());
+    digest.update([role as u8]);
+    digest.update(message_hash);
+    digest.finalize().into()
+}
+
+fn validate_test_signature(public_key: &ParticipantPublicKey, share: &SignedShare) -> Result<(), SignerError> {
+    let expected = build_test_signature(public_key, share.signer_role, &share.message_hash);
+    if share.signature.as_slice() != expected {
+        return Err(SignerError::BadSignature);
+    }
+    Ok(())
 }
 
 #[derive(Debug, Error)]

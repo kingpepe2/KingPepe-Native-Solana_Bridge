@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "generatedAt": "2026-09-07T00:00:00Z",
+  "generatedAt": "2026-09-09T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
   "purpose": "file-by-file provenance classification for local tracked content",
   "provenancePolicy": {
@@ -304,6 +304,11 @@
       "path": "solana/Cargo.toml",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
       "notes": "Workspace dependency and crate manifest."
+    },
+    {
+      "path": "solana/Cargo.lock",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Rust dependency lockfile for Solana workspace."
     },
     {
       "path": "solana/fuzz/README.md",
