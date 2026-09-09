@@ -258,10 +258,10 @@
 ## Phase 08 mint-authority real Solana PDA correction
 
 - PHASE: `08`
-- source commit: pending publication
-- push result: pending
-- CI URL: pending
-- CI status: pending
+- source commit: `94da519e7a50ea6692c445cfd307beb0fa491347`
+- push result: pushed to private `origin/main`
+- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34299827083`
+- CI status: PASS
 - tests:
   - `cd solana && cargo check --locked --workspace --all-targets` (pass under WSL)
   - `cd solana && cargo test --locked --workspace --all-targets` (pass under WSL, 45 Rust tests)
@@ -281,4 +281,4 @@
   - `SOLANA_PROGRAM_EXECUTION_NOT_READY`
   - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
 - next:
-  - Publish and verify this PDA correction, then continue Phase 08 account execution and SPL Token CPI. Do not proceed to Phase 09 until the Native-to-Solana local E2E gate actually passes.
+  - Continue Phase 08 account execution and SPL Token CPI. Do not proceed to Phase 09 until the Native-to-Solana local E2E gate actually passes.

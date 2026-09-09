@@ -75,7 +75,7 @@
 - Phase 08 local E2E readiness gate CI: PASS for `6f22309770f3a2f85c96093bcf8af10b47065f31`
 - Phase 08 fail-closed Solana entrypoint shell CI: PASS for `7eafd8a38d346dcb018005a7357a0012a84b0e0c`
 - Phase 08 validate-only Solana ABI CI: PASS for `201c5bdc2a2fb65601331b58115e0a7543179e12`
-- Phase 08 mint-authority real Solana PDA correction: local tests PASS; CI pending publication
+- Phase 08 mint-authority real Solana PDA correction CI: PASS for `94da519e7a50ea6692c445cfd307beb0fa491347`
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 45 Rust tests after real Solana PDA correction
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
@@ -163,9 +163,9 @@
   `solana/Cargo.lock`.
 - Added a regression test that reconstructs the PDA with
   `Pubkey::create_program_address` and the returned bump.
-- Source commit: pending publication
-- CI URL: pending
-- CI status: pending
+- Source commit: `94da519e7a50ea6692c445cfd307beb0fa491347`
+- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34299827083`
+- CI status: `PASS`
 - Real daemon-backed Native-to-Solana E2E: `BLOCKED / NOT_RUN`
 
 ## Phase 08 fail-closed Solana entrypoint shell update
