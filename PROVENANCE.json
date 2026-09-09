@@ -406,6 +406,16 @@
       "notes": "Added by phase-02 structure pass; classification assigned by path/type."
     },
     {
+      "path": "scripts/local-e2e-readiness.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 local E2E readiness gate that checks required disposable localnet executables, Solana deployability markers, and Anchor localnet placeholders without reading secrets."
+    },
+    {
+      "path": "scripts/tests/local-e2e-readiness.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 readiness-gate tests using temporary fake toolchain and manifest fixtures only."
+    },
+    {
       "path": "services/attesters/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
       "notes": "Attester service role and Phase 07 implementation notes."

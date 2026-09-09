@@ -33,6 +33,8 @@
     "automaticDepositPipelineImplemented": true,
     "phase08SourceBoundaryTestsPassed": true,
     "phase08SourceBoundaryCiVerified": true,
+    "localE2eReadinessGateImplemented": true,
+    "localE2eReadinessGateTestsPassed": true,
     "phase08LocalE2eBlocked": true
   },
   "readinessGates": {

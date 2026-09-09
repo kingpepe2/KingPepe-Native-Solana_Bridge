@@ -174,6 +174,8 @@
   - `Get-Command kingpeped kingpepe-cli solana-test-validator anchor` (NOT_FOUND on Windows)
   - `command -v kingpeped kingpepe-cli solana-test-validator solana anchor` (NOT_FOUND under WSL)
   - `npm run test:bridge-validator` (pass, 6 automatic deposit pipeline tests)
+  - `npm run test:local-e2e-readiness` (pass, 3 readiness-gate tests)
+  - `npm run doctor:local-e2e` (reports `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`)
   - Native-to-Solana local E2E (BLOCKED / NOT_RUN)
 - changed:
   - Implemented the service-side automatic Native-to-Solana deposit pipeline.
@@ -182,7 +184,10 @@
     canonical reserve evidence before attestation, requires two distinct project
     attestations, submits a single Solana mint claim through an adapter, updates
     exact BigInt accounting, and rejects replay/invalid evidence/quorum loss.
-  - Updated CI to include the new bridge-validator tests on Linux and Windows.
+  - Implemented a local E2E readiness gate so boundary models or missing localnet
+    executables cannot be reported as a real local E2E pass.
+  - Updated CI to include the new bridge-validator and local E2E readiness tests
+    on Linux and Windows.
 - blocker:
   - `LOCAL_E2E_INFRASTRUCTURE_MISSING`
   - The environment does not currently provide the KingPepe regtest daemon/CLI or Solana local validator/Anchor tooling needed for the required real local E2E gate.
