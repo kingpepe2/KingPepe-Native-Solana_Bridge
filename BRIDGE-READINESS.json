@@ -41,6 +41,7 @@
     "phase08SolanaEntrypointShellsCiVerified": true,
     "phase08SolanaEconomicAbiValidateOnlyImplemented": true,
     "phase08SolanaEconomicAbiValidateOnlyLocalTestsPassed": true,
+    "phase08SolanaEconomicAbiValidateOnlyCiVerified": true,
     "solanaEconomicInstructionAbiReady": false,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true
