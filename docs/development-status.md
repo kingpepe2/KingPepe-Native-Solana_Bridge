@@ -68,7 +68,7 @@
 - Phase 07 CI: PASS for `d17ba8fe61d20a88d4206f72d68a010a2d146524`
 - Phase 08 `Get-Command kingpeped kingpepe-cli solana solana-test-validator anchor`: NOT_FOUND on Windows
 - Phase 08 `command -v kingpeped kingpepe-cli solana-test-validator solana anchor`: NOT_FOUND under WSL
-- Phase 08 `npm run test:bridge-validator`: PASS, 35 bridge-validator tests (automatic deposit pipeline, file-backed deposit journal, async adapter path, Native reserve-sweep adapters, Solana deposit claim submitter, Solana transaction-plan builder, and localnet Solana deposit-claim bridge adapter)
+- Phase 08 `npm run test:bridge-validator`: PASS, 39 bridge-validator tests (automatic deposit pipeline, file-backed deposit journal, async adapter path, Native reserve-sweep adapters, adapter-journal restart retry, Solana deposit claim submitter, Solana transaction-plan builder, and localnet Solana deposit-claim bridge adapter)
 - Phase 08 `npm run test:native-node`: PASS, 7 Native REGTEST RPC adapter tests
 - Phase 08 `npm run test:solana-observer`: PASS, 14 Solana observer tests including the localnet deposit-claim observer
 - Phase 08 `npm run test:local-e2e-readiness`: PASS, 13 readiness/orchestration tests
@@ -92,7 +92,7 @@
 - Phase 08 Solana deposit-claim observer: PASS for `df49793f0595bb501e83405b79d21215283a1d0a`
 - Phase 08 Solana deposit-claim transaction plan: PASS for `42a5cdb3bcc60e0be7fb5d2395503f148b6d632f`
 - Phase 08 localnet Solana deposit-claim bridge adapter: PASS for `0a4c39a146d150b5291935fb2ce800100accc898`
-- Phase 08 current `npm test`: PASS, 2 protocol vectors plus 79 Node tests
+- Phase 08 current `npm test`: PASS, 2 protocol vectors plus 83 Node tests
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 52 Rust tests after account-execution update
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
@@ -581,6 +581,21 @@
     missing `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`,
     and `anchor`)
 - Real daemon-backed Native-to-Solana E2E: `BLOCKED / NOT_RUN`
+
+## Phase 08 adapter-journal restart retry coverage
+
+- Source changes are pending commit/CI.
+- Added source-level integration coverage for a restart after Native sweep
+  broadcast but before reserve finality.
+- The test uses file-backed deposit, Native reserve-sweep, and Solana claim
+  journals together outside the repository checkout.
+- First pass broadcasts the local Native sweep and stops at reserve finality.
+- Restart pass reuses persisted journals, avoids a second Native broadcast,
+  waits for finalized reserve evidence, submits one Solana claim, and mints
+  once.
+- Local test status:
+  - `npm run test:bridge-validator` (pass, 39 bridge-validator tests)
+  - real daemon-backed Native-to-Solana E2E remains `BLOCKED / NOT_RUN`.
 
 ## Phase 08 mint-authority real Solana PDA correction
 

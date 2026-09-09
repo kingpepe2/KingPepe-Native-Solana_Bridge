@@ -21,11 +21,15 @@ import {
   prepareLocalnetSolanaDepositClaimRequest,
 } from "../localnet-solana-deposit-claim-bridge.mjs";
 import {
+  FileBackedNativeReserveSweepJournal,
   InMemoryNativeReserveSweepJournal,
   NativeReserveSweepRelayer,
   NativeReserveSweepVerifier,
 } from "../native-reserve-sweep-adapters.mjs";
-import { InMemorySolanaDepositClaimJournal } from "../solana-deposit-claim-submitter.mjs";
+import {
+  FileBackedSolanaDepositClaimJournal,
+  InMemorySolanaDepositClaimJournal,
+} from "../solana-deposit-claim-submitter.mjs";
 import { base58Encode } from "../solana-deposit-claim-transaction-plan.mjs";
 import { SolanaDepositClaimObserver } from "../../solana-observer/solana-deposit-claim-observer.mjs";
 import {
@@ -730,6 +734,151 @@ test("automatic Native to Solana pipeline uses Native reserve sweep adapters and
     assert.doesNotMatch(JSON.stringify(result), /WAITING_FOR_ADMIN_APPROVAL/u);
   } finally {
     runtime.frost.cleanup();
+  }
+});
+
+test("restart after Native sweep broadcast resumes without duplicate broadcast or mint", async () => {
+  const stateRoot = mkdtempSync(path.join(os.tmpdir(), "kingpepe-phase08-restart-after-sweep-"));
+  const depositJournalRoot = path.join(stateRoot, "deposit-journal");
+  const nativeJournalRoot = path.join(stateRoot, "native-sweep-journal");
+  const solanaJournalRoot = path.join(stateRoot, "solana-claim-journal");
+  const config = baseConfig();
+  const operation = operationWithComputedId(config);
+  const depositJournalOptions = {
+    root: depositJournalRoot,
+    repoRoot: REPO_ROOT,
+  };
+  const nativeJournalOptions = {
+    root: nativeJournalRoot,
+    repoRoot: REPO_ROOT,
+  };
+  const solanaJournalOptions = {
+    root: solanaJournalRoot,
+    repoRoot: REPO_ROOT,
+  };
+
+  try {
+    const firstNativeRpc = new FakeIntegratedNativeReserveRpc(operation, {
+      confirmations: 2,
+    });
+    const firstNativeRelayer = new NativeReserveSweepRelayer({
+      config: {
+        environment: "localnet",
+      },
+      rpcClient: firstNativeRpc,
+      journal: new FileBackedNativeReserveSweepJournal(nativeJournalOptions),
+    });
+    const firstReserveVerifier = new NativeReserveSweepVerifier({
+      config: {
+        trust: "LOCALLY_VALIDATED_CHAIN_STATE",
+        expectedSourceNetwork: "regtest",
+        requiredConfirmations: 6,
+        nativeDecimals: 8,
+      },
+      rpcClient: firstNativeRpc,
+    });
+    const firstRuntime = createPipeline({
+      operation,
+      nativeRelayer: firstNativeRelayer,
+      reserveVerifier: firstReserveVerifier,
+      solanaBridge: {
+        submitDepositClaim() {
+          throw new Error("Solana claim must not submit before reserve finality");
+        },
+      },
+      journal: new FileBackedDepositJournal(depositJournalOptions),
+    });
+    try {
+      const firstResult = await firstRuntime.pipeline.processDepositAsync(operation, 1_700_000_600);
+      assert.equal(firstResult.state, DEPOSIT_STATES.WAITING_FOR_FINALITY);
+      assert.equal(firstResult.reason, "RESERVE_SWEEP_FINALITY_NOT_SATISFIED");
+      assert.deepEqual(firstNativeRpc.sendCalls, [operation.reserveSweep.signedNativeTransactionHex]);
+    } finally {
+      firstRuntime.frost.cleanup();
+    }
+
+    const { encodedMessageHex, decodedMessage } = buildDepositClaimMessage(config, operation);
+    const secondNativeRpc = new FakeIntegratedNativeReserveRpc(operation, {
+      confirmations: 8,
+    });
+    const secondNativeRelayer = new NativeReserveSweepRelayer({
+      config: {
+        environment: "localnet",
+      },
+      rpcClient: secondNativeRpc,
+      journal: new FileBackedNativeReserveSweepJournal(nativeJournalOptions),
+    });
+    const secondReserveVerifier = new NativeReserveSweepVerifier({
+      config: {
+        trust: "LOCALLY_VALIDATED_CHAIN_STATE",
+        expectedSourceNetwork: "regtest",
+        requiredConfirmations: 6,
+        nativeDecimals: 8,
+      },
+      rpcClient: secondNativeRpc,
+    });
+    const feePayer = feePayerKeypairForPipelineTest();
+    const feePayerSigner = feePayerSignerForPipelineTest(feePayer);
+    const solanaBridgeConfig = localnetBridgeConfigForPipeline(config, feePayer);
+    const solanaRpc = new FakeIntegratedLocalnetSolanaRpc({
+      claimAccountBase64: depositClaimAccountBase64ForMessage(decodedMessage),
+    });
+    const expectedPrepared = await prepareLocalnetSolanaDepositClaimRequest(
+      solanaBridgeConfig,
+      {
+        operationIdHex: decodedMessage.operationIdHex,
+        encodedMessageHex,
+        messageDigestHex: decodedMessage.messageDigestHex,
+        amountAtomic: decodedMessage.amountAtomic.toString(),
+        solanaRecipientHex: decodedMessage.destinationHex,
+      },
+      {
+        feePayerSigner,
+        blockhashSource: solanaRpc,
+      },
+    );
+    solanaRpc.expectAccounts({
+      depositClaimAccountBase58: expectedPrepared.depositClaimAccountBase58,
+      mintAccountBase58: expectedPrepared.mintAccountBase58,
+    });
+    const claimObserver = new SolanaDepositClaimObserver({
+      config: {
+        environment: "localnet",
+        cluster: "localnet",
+        managerProgramIdHex: config.deployment.managerProgramId,
+        transceiverProgramIdHex: config.deployment.transceiverProgramId,
+        mintHex: config.deployment.mint,
+      },
+      rpcClient: solanaRpc,
+    });
+    const solanaBridge = new LocalnetSolanaDepositClaimBridge({
+      config: solanaBridgeConfig,
+      feePayerSigner,
+      rpcClient: solanaRpc,
+      claimObserver,
+      journal: new FileBackedSolanaDepositClaimJournal(solanaJournalOptions),
+    });
+    const secondRuntime = createPipeline({
+      operation,
+      nativeRelayer: secondNativeRelayer,
+      reserveVerifier: secondReserveVerifier,
+      solanaBridge,
+      journal: new FileBackedDepositJournal(depositJournalOptions),
+    });
+    try {
+      const secondResult = await secondRuntime.pipeline.processDepositAsync(operation, 1_700_000_700);
+      assert.equal(secondResult.state, DEPOSIT_STATES.COMPLETED);
+      assert.equal(secondResult.reason, "ALL_REQUIRED_CHECKS_PASSED");
+      assert.equal(secondResult.mintedAmountAtomic, operation.deposit.amountAtomic);
+      assert.deepEqual(secondNativeRpc.sendCalls, []);
+      assert.equal(solanaRpc.sendCalls.length, 1);
+      assert.equal(secondRuntime.pipeline.ledgerSnapshot().mintedSupply, operation.deposit.amountAtomic);
+      assert.doesNotMatch(JSON.stringify(secondResult), /WAITING_FOR_ADMIN_APPROVAL/u);
+    } finally {
+      secondRuntime.frost.cleanup();
+    }
+  } finally {
+    rmSync(stateRoot, { recursive: true, force: true });
   }
 });
 
