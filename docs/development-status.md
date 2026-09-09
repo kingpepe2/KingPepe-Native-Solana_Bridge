@@ -754,3 +754,21 @@
   - `d17ba8fe61d20a88d4206f72d68a010a2d146524`
 - CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34290281015`
 - CI status: `PASS`
+
+## Phase 08 Native-to-Solana local E2E command runner
+
+- Source status: implemented in working tree pending source commit and CI.
+- Local tests:
+  - `npm run test:local-e2e-readiness`: PASS, 20 readiness/orchestration/bootstrap/runner tests.
+  - `npm run local:e2e:native-to-solana`: expected `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING` in the current environment.
+- What changed:
+  - Added `scripts/local-e2e-native-to-solana.mjs`.
+  - Added package script `local:e2e:native-to-solana`.
+  - The runner composes the reusable bootstrap harness with local REGTEST user-wallet funding, deposit intent creation, deposit transaction observation, and UTXO/finality checks.
+  - Runtime state is constrained to the local E2E run root outside the repository.
+  - The runner has no `WAITING_FOR_ADMIN_APPROVAL` state and keeps Mainnet disabled.
+  - The runner reports `NOT_RUN_FULL_FLOW_NATIVE_RESERVE_SWEEP_PENDING` until reserve-sweep construction, FROST-backed reserve broadcast, Solana mint submission, and reconciliation are exercised against real local daemons.
+- Current blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
+  - Real daemon-backed Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.

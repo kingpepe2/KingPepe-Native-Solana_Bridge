@@ -218,6 +218,13 @@
   keeps the disposable local services active for an injected Native-to-Solana
   flow, stops them afterward, and reports callback failure without claiming a
   local E2E pass.
+- Phase 08 Native-to-Solana local E2E command runner:
+  `scripts/local-e2e-native-to-solana.mjs` composes the bootstrap harness with
+  local REGTEST deposit funding and observation. It keeps runtime state under
+  the local E2E run root outside the source repository, includes no
+  per-transfer KingPepe Team approval state, and reports the full flow as not
+  run until reserve-sweep construction, FROST-backed reserve broadcast, Solana
+  mint submission, and reconciliation are completed against real local daemons.
 - Phase 08 reusable local E2E infrastructure harness commit:
   `f4372d9276946ebe7a8dad1d2903f60821dcaae8`
 - Phase 08 reusable local E2E infrastructure harness CI:
