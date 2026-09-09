@@ -9,7 +9,11 @@ Implemented in Phase 06:
 
 - Temporary deposits are recorded as recoverable and do not authorize minting.
 - Reserve sweeps must spend the exact temporary outpoint.
-- Reserve output script, amount, fee, Merkle inclusion, and finality are checked.
+- Reserve output script, amount, separately funded Native fee evidence, Merkle
+  inclusion, and finality are checked.
+- The credited temporary-deposit amount must become the canonical reserve
+  allocation. Native miner fees are tracked separately and must not silently
+  reduce the user's backing allocation.
 - Canonical reserve allocation IDs are stable and single-use.
 - Mint credits are consumed once by allocation ID.
 

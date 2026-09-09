@@ -30,8 +30,15 @@ pub struct ReserveSweepRecord {
     pub reserve_output_index: u32,
     pub reserve_amount_atomic: u64,
     pub native_network_fee_atomic: u64,
+    pub fee_funding_outpoints: Vec<OutPoint>,
     pub block_hash: [u8; 32],
     pub block_height: u32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FeeFundingInput {
+    pub outpoint: OutPoint,
+    pub amount_atomic: u64,
 }
 
 pub struct ReserveSweepInput<'a> {
@@ -41,6 +48,7 @@ pub struct ReserveSweepInput<'a> {
     pub expected_reserve_script_pubkey: &'a [u8],
     pub reserve_amount_atomic: u64,
     pub native_network_fee_atomic: u64,
+    pub fee_funding_inputs: &'a [FeeFundingInput],
     pub merkle_branch: &'a [[u8; 32]],
     pub merkle_index: u32,
     pub containing_block: &'a HeaderMeta,
@@ -73,8 +81,14 @@ pub enum ReserveError {
     SweepDoesNotSpendTemporaryOutpoint,
     #[error("reserve sweep output does not match the expected reserve allocation")]
     ReserveOutputMismatch,
-    #[error("reserve sweep fee and allocation do not exactly consume the temporary deposit")]
+    #[error("reserve sweep allocation does not equal the credited temporary deposit amount")]
     ReserveAmountMismatch,
+    #[error("nonzero reserve sweep fee requires a separate fee-funding input")]
+    FeeFundingInputMissing,
+    #[error("reserve sweep fee-funding input is missing, duplicated, or aliases the temporary deposit")]
+    FeeFundingInputMismatch,
+    #[error("reserve sweep fee funding does not exactly match the recorded Native fee")]
+    FeeFundingAmountMismatch,
     #[error("reserve backing allocation was already used")]
     DuplicateReserveAllocation,
     #[error("temporary backing outpoint was already consumed")]
@@ -116,13 +130,15 @@ impl ReserveLedger {
         {
             return Err(ReserveError::ReserveOutputMismatch);
         }
-        let total = input
-            .reserve_amount_atomic
-            .checked_add(input.native_network_fee_atomic)
-            .ok_or(ReserveError::ReserveOverflow)?;
-        if total != input.temporary_deposit.amount_atomic {
+        if input.reserve_amount_atomic != input.temporary_deposit.amount_atomic {
             return Err(ReserveError::ReserveAmountMismatch);
         }
+        validate_fee_funding_inputs(
+            input.sweep_transaction,
+            input.temporary_deposit.outpoint,
+            input.native_network_fee_atomic,
+            input.fee_funding_inputs,
+        )?;
         let merkle_root = reconstruct_merkle_root(
             input.sweep_transaction.txid,
             input.merkle_branch,
@@ -149,6 +165,11 @@ impl ReserveLedger {
             reserve_output_index: input.reserve_output_index,
             reserve_amount_atomic: input.reserve_amount_atomic,
             native_network_fee_atomic: input.native_network_fee_atomic,
+            fee_funding_outpoints: input
+                .fee_funding_inputs
+                .iter()
+                .map(|fee_input| fee_input.outpoint)
+                .collect(),
             block_hash: input.containing_block.hash,
             block_height: input.containing_block.height,
         })
@@ -240,6 +261,41 @@ pub fn reserve_allocation_id(
     sha256d(&input)
 }
 
+fn validate_fee_funding_inputs(
+    transaction: &ParsedTransaction,
+    temporary_outpoint: OutPoint,
+    native_network_fee_atomic: u64,
+    fee_funding_inputs: &[FeeFundingInput],
+) -> Result<(), ReserveError> {
+    if native_network_fee_atomic == 0 {
+        if fee_funding_inputs.is_empty() {
+            return Ok(());
+        }
+        return Err(ReserveError::FeeFundingAmountMismatch);
+    }
+    if fee_funding_inputs.is_empty() {
+        return Err(ReserveError::FeeFundingInputMissing);
+    }
+
+    let mut seen = BTreeSet::new();
+    let mut total = 0_u64;
+    for fee_input in fee_funding_inputs {
+        if fee_input.outpoint == temporary_outpoint
+            || !seen.insert(fee_input.outpoint)
+            || !spends_outpoint(transaction, fee_input.outpoint)
+        {
+            return Err(ReserveError::FeeFundingInputMismatch);
+        }
+        total = total
+            .checked_add(fee_input.amount_atomic)
+            .ok_or(ReserveError::ReserveOverflow)?;
+    }
+    if total != native_network_fee_atomic {
+        return Err(ReserveError::FeeFundingAmountMismatch);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use num_bigint::BigUint;
@@ -267,7 +323,12 @@ mod tests {
     #[test]
     fn reserve_sweep_creates_once_only_canonical_allocation_and_mint_credit() {
         let temporary = deposit();
-        let sweep = sweep_transaction(temporary.outpoint, 4_900, &[0x51, 0x20, 8]);
+        let fee_funding = fee_funding();
+        let sweep = sweep_transaction(
+            &[temporary.outpoint, fee_funding.outpoint],
+            5_000,
+            &[0x51, 0x20, 8],
+        );
         let (root, branch) = build_merkle_branch(&[sweep.txid], 0).unwrap();
         let block = header(20, root, 20);
         let tip = header(25, root, 30);
@@ -276,8 +337,9 @@ mod tests {
             sweep_transaction: &sweep,
             reserve_output_index: 0,
             expected_reserve_script_pubkey: &[0x51, 0x20, 8],
-            reserve_amount_atomic: 4_900,
+            reserve_amount_atomic: 5_000,
             native_network_fee_atomic: 100,
+            fee_funding_inputs: &[fee_funding],
             merkle_branch: &branch,
             merkle_index: 0,
             containing_block: &block,
@@ -288,8 +350,8 @@ mod tests {
         let mut ledger = ReserveLedger::default();
         ledger.record_temporary_deposit(temporary).unwrap();
         ledger.settle_reserve_sweep(record.clone()).unwrap();
-        assert_eq!(ledger.canonical_reserve_atomic(), 4_900);
-        assert_eq!(ledger.authorized_unminted_credits_atomic(), 4_900);
+        assert_eq!(ledger.canonical_reserve_atomic(), 5_000);
+        assert_eq!(ledger.authorized_unminted_credits_atomic(), 5_000);
         assert_eq!(ledger.spent_native_fees_atomic(), 100);
         assert_eq!(
             ledger.settle_reserve_sweep(record).unwrap_err(),
@@ -300,11 +362,15 @@ mod tests {
     #[test]
     fn reserve_sweep_rejects_wrong_input_output_amount_and_merkle_root() {
         let temporary = deposit();
+        let fee_funding = fee_funding();
         let wrong_input = sweep_transaction(
-            OutPoint {
-                txid: [9; 32],
-                vout: 0,
-            },
+            &[
+                OutPoint {
+                    txid: [9; 32],
+                    vout: 0,
+                },
+                fee_funding.outpoint,
+            ],
             4_900,
             &[0x51, 0x20, 8],
         );
@@ -319,6 +385,7 @@ mod tests {
                 expected_reserve_script_pubkey: &[0x51, 0x20, 8],
                 reserve_amount_atomic: 4_900,
                 native_network_fee_atomic: 100,
+                fee_funding_inputs: &[fee_funding.clone()],
                 merkle_branch: &[],
                 merkle_index: 0,
                 containing_block: &block,
@@ -329,7 +396,11 @@ mod tests {
             ReserveError::SweepDoesNotSpendTemporaryOutpoint
         );
 
-        let sweep = sweep_transaction(temporary.outpoint, 4_899, &[0x51, 0x20, 8]);
+        let sweep = sweep_transaction(
+            &[temporary.outpoint, fee_funding.outpoint],
+            4_899,
+            &[0x51, 0x20, 8],
+        );
         let (actual_root, branch) = build_merkle_branch(&[sweep.txid], 0).unwrap();
         let actual_block = header(20, actual_root, 20);
         assert_eq!(
@@ -340,6 +411,7 @@ mod tests {
                 expected_reserve_script_pubkey: &[0x51, 0x20, 8],
                 reserve_amount_atomic: 4_899,
                 native_network_fee_atomic: 100,
+                fee_funding_inputs: &[fee_funding],
                 merkle_branch: &branch,
                 merkle_index: 0,
                 containing_block: &actual_block,
@@ -348,6 +420,89 @@ mod tests {
             })
             .unwrap_err(),
             ReserveError::ReserveAmountMismatch
+        );
+    }
+
+    #[test]
+    fn reserve_sweep_requires_exact_separate_fee_funding() {
+        let temporary = deposit();
+        let fee_funding = fee_funding();
+        let sweep = sweep_transaction(
+            &[temporary.outpoint, fee_funding.outpoint],
+            5_000,
+            &[0x51, 0x20, 8],
+        );
+        let (root, branch) = build_merkle_branch(&[sweep.txid], 0).unwrap();
+        let block = header(20, root, 20);
+        let tip = header(25, root, 30);
+        assert_eq!(
+            ReserveLedger::validate_reserve_sweep(ReserveSweepInput {
+                temporary_deposit: &temporary,
+                sweep_transaction: &sweep,
+                reserve_output_index: 0,
+                expected_reserve_script_pubkey: &[0x51, 0x20, 8],
+                reserve_amount_atomic: 5_000,
+                native_network_fee_atomic: 100,
+                fee_funding_inputs: &[],
+                merkle_branch: &branch,
+                merkle_index: 0,
+                containing_block: &block,
+                observed_tip: &tip,
+                minimum_confirmations: 6,
+            })
+            .unwrap_err(),
+            ReserveError::FeeFundingInputMissing
+        );
+
+        let wrong_fee_funding = FeeFundingInput {
+            outpoint: OutPoint {
+                txid: [7; 32],
+                vout: 0,
+            },
+            amount_atomic: 100,
+        };
+        let wrong_fee_funding_inputs = [wrong_fee_funding];
+        assert_eq!(
+            ReserveLedger::validate_reserve_sweep(ReserveSweepInput {
+                temporary_deposit: &temporary,
+                sweep_transaction: &sweep,
+                reserve_output_index: 0,
+                expected_reserve_script_pubkey: &[0x51, 0x20, 8],
+                reserve_amount_atomic: 5_000,
+                native_network_fee_atomic: 100,
+                fee_funding_inputs: &wrong_fee_funding_inputs,
+                merkle_branch: &branch,
+                merkle_index: 0,
+                containing_block: &block,
+                observed_tip: &tip,
+                minimum_confirmations: 6,
+            })
+            .unwrap_err(),
+            ReserveError::FeeFundingInputMismatch
+        );
+
+        let underfunded_fee = FeeFundingInput {
+            amount_atomic: 99,
+            ..fee_funding
+        };
+        let underfunded_fee_inputs = [underfunded_fee];
+        assert_eq!(
+            ReserveLedger::validate_reserve_sweep(ReserveSweepInput {
+                temporary_deposit: &temporary,
+                sweep_transaction: &sweep,
+                reserve_output_index: 0,
+                expected_reserve_script_pubkey: &[0x51, 0x20, 8],
+                reserve_amount_atomic: 5_000,
+                native_network_fee_atomic: 100,
+                fee_funding_inputs: &underfunded_fee_inputs,
+                merkle_branch: &branch,
+                merkle_index: 0,
+                containing_block: &block,
+                observed_tip: &tip,
+                minimum_confirmations: 6,
+            })
+            .unwrap_err(),
+            ReserveError::FeeFundingAmountMismatch
         );
     }
 
@@ -368,20 +523,32 @@ mod tests {
         }
     }
 
+    fn fee_funding() -> FeeFundingInput {
+        FeeFundingInput {
+            outpoint: OutPoint {
+                txid: [6; 32],
+                vout: 1,
+            },
+            amount_atomic: 100,
+        }
+    }
+
     fn sweep_transaction(
-        outpoint: OutPoint,
+        outpoints: &[OutPoint],
         amount: u64,
         script_pubkey: &[u8],
     ) -> ParsedTransaction {
         let mut raw = Vec::new();
         raw.extend(2_i32.to_le_bytes());
-        raw.push(1);
-        let mut previous = outpoint.txid;
-        previous.reverse();
-        raw.extend(previous);
-        raw.extend(outpoint.vout.to_le_bytes());
-        raw.push(0);
-        raw.extend(0xffff_fffe_u32.to_le_bytes());
+        raw.extend(encode_varint(outpoints.len() as u64));
+        for outpoint in outpoints {
+            let mut previous = outpoint.txid;
+            previous.reverse();
+            raw.extend(previous);
+            raw.extend(outpoint.vout.to_le_bytes());
+            raw.push(0);
+            raw.extend(0xffff_fffe_u32.to_le_bytes());
+        }
         raw.push(1);
         raw.extend(amount.to_le_bytes());
         raw.extend(encode_varint(script_pubkey.len() as u64));
