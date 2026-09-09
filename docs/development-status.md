@@ -37,7 +37,7 @@
 ## Current blockers
 
 - Phase 08 is blocked because the local environment does not provide `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, or `anchor`.
-- Current Solana crates have deterministic non-production localnet Program IDs and fail-closed entrypoint shells, but the economic instruction ABI is still disabled.
+- Current Solana crates have deterministic non-production localnet Program IDs and validate-only economic ABI decoding, but Solana economic execution is still disabled.
 - Full Native transaction construction, Native node acceptance, local end-to-end flows, Devnet, production configuration, external review, and activation remain later phases.
 
 ## Latest local validation
@@ -70,12 +70,12 @@
 - Phase 08 `command -v kingpeped kingpepe-cli solana-test-validator solana anchor`: NOT_FOUND under WSL
 - Phase 08 `npm run test:bridge-validator`: PASS, 6 automatic deposit pipeline tests
 - Phase 08 `npm run test:local-e2e-readiness`: PASS, 3 readiness-gate tests
-- Phase 08 `npm run doctor:local-e2e`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING; missing localnet executables and reports `SOLANA_PROGRAM_ABI_NOT_READY` for both Solana programs
+- Phase 08 `npm run doctor:local-e2e`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING; missing localnet executables and reports `SOLANA_PROGRAM_EXECUTION_NOT_READY` for both Solana programs
 - Phase 08 source-boundary CI: PASS for `09e42e6856312a0c617eb9c14a0312012263722a`
 - Phase 08 local E2E readiness gate CI: PASS for `6f22309770f3a2f85c96093bcf8af10b47065f31`
 - Phase 08 fail-closed Solana entrypoint shell CI: PASS for `7eafd8a38d346dcb018005a7357a0012a84b0e0c`
-- Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after entrypoint-shell update
-- Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 42 Rust tests after entrypoint-shell update
+- Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
+- Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 44 Rust tests after validate-only ABI update
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
 
 ## Phase 03 local implementation
@@ -92,8 +92,9 @@
 
 ## Next phase
 
-- Continue Phase 08 by implementing the Solana economic instruction ABI and
-  adding disposable KingPepe regtest plus Solana local-validator tooling.
+- Continue Phase 08 by implementing Solana account execution/SPL CPI for the
+  decoded economic ABI and adding disposable KingPepe regtest plus Solana
+  local-validator tooling.
 
 ## Phase 08 source-boundary implementation
 
@@ -129,6 +130,22 @@
 - Local E2E readiness gate CI URL:
   `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34293107931`
 - Local E2E readiness gate CI status: `PASS`
+- Real daemon-backed Native-to-Solana E2E: `BLOCKED / NOT_RUN`
+
+## Phase 08 validate-only Solana ABI implementation
+
+- Added typed binary instruction decoders for bridge manager instructions:
+  initialization, deposit-claim acceptance, and withdrawal-record creation.
+- Added typed binary instruction decoders for transceiver instructions:
+  initialization and canonical-message verification from Ed25519 instruction
+  indexes.
+- Added strict fixed-length decoding, canonical message decoding, duplicate
+  Ed25519 instruction-index rejection, and trailing-data rejection.
+- Kept on-chain economic execution disabled. The entrypoints decode recognized
+  instructions, then fail closed with execution disabled until account state,
+  SPL Token CPI, and local-validator execution are implemented.
+- Updated the readiness gate to classify the current programs as
+  `ABI_VALIDATE_ONLY` and report `SOLANA_PROGRAM_EXECUTION_NOT_READY`.
 - Real daemon-backed Native-to-Solana E2E: `BLOCKED / NOT_RUN`
 
 ## Phase 08 fail-closed Solana entrypoint shell update

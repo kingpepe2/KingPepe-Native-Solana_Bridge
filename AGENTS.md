@@ -123,9 +123,9 @@
   accounting. It has no per-transfer KingPepe Team approval state.
 - Required local executables were not available in the checked environment:
   `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
-- Current Solana crates now include deterministic non-production localnet
-  Program IDs and fail-closed entrypoint shells. The economic instruction ABI
-  is still disabled, so they are not ready for a real local-validator E2E flow.
+- Current Solana crates include deterministic non-production localnet Program
+  IDs and validate-only economic ABI decoding. Solana economic execution is
+  still disabled, so they are not ready for a real local-validator E2E flow.
 - Do not mark Native-to-Solana local E2E as passed until a disposable
   KingPepe regtest node and Solana local validator execute the full automated
   deposit flow without per-transfer KingPepe Team approval.
@@ -135,7 +135,7 @@
   - `npm run test:local-e2e-readiness`
   - `npm run doctor:local-e2e` reports
     `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING` until the required localnet
-    executables exist and the Solana economic instruction ABI is implemented.
+    executables exist and Solana economic instruction execution is implemented.
 - Phase 08 local E2E readiness gate commit:
   `6f22309770f3a2f85c96093bcf8af10b47065f31`
 - Phase 08 local E2E readiness gate CI:
@@ -148,3 +148,6 @@
   `7eafd8a38d346dcb018005a7357a0012a84b0e0c`
 - Phase 08 fail-closed Solana entrypoint shell CI:
   `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34295554332` PASS
+- Phase 08 validate-only Solana ABI status:
+  instruction decoding and malformed/trailing-data rejection are implemented
+  locally; account execution and SPL CPI remain disabled.

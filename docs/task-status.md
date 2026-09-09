@@ -194,7 +194,7 @@
 - blocker:
   - `LOCAL_E2E_INFRASTRUCTURE_MISSING`
   - The environment does not currently provide the KingPepe regtest daemon/CLI or Solana local validator/Anchor tooling needed for the required real local E2E gate.
-  - Current Solana crates have deterministic non-production localnet Program IDs and fail-closed entrypoint shells, but the economic instruction ABI remains disabled.
+  - Current Solana crates have deterministic non-production localnet Program IDs and validate-only economic ABI decoding, but Solana economic execution remains disabled.
 - next:
   - Provide pinned disposable local KingPepe regtest and Solana local-validator tooling, implement the Solana economic instruction ABI, then continue Phase 08 without claiming an E2E pass until the full automated deposit flow actually runs.
 
@@ -225,4 +225,30 @@
   - `SOLANA_PROGRAM_ABI_NOT_READY`
   - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
 - next:
-  - Continue Phase 08 with real economic Solana instructions and disposable localnet infrastructure. Do not proceed to Phase 09 until the Native-to-Solana local E2E gate actually passes.
+  - Continue Phase 08 with Solana account execution/SPL CPI and disposable localnet infrastructure. Do not proceed to Phase 09 until the Native-to-Solana local E2E gate actually passes.
+
+## Phase 08 validate-only Solana ABI summary
+
+- PHASE: `08`
+- source commit: pending publication
+- push result: pending
+- CI URL: pending
+- CI status: pending
+- tests:
+  - `cd solana && cargo check --locked --workspace --all-targets` (pass under WSL)
+  - `cd solana && cargo test --locked --workspace --all-targets` (pass under WSL, 44 Rust tests)
+  - `npm run test:local-e2e-readiness` (pass, 3 readiness-gate tests)
+  - `npm test` (pass, 2 vectors plus 26 Node tests)
+  - `npm run doctor:local-e2e` (expected BLOCKED, exit 2)
+  - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
+- changed:
+  - Added bridge and transceiver binary instruction decoders.
+  - Rejected malformed length, trailing data, noncanonical messages, and duplicate Ed25519 instruction indexes.
+  - Kept on-chain economic execution disabled and fail-closed.
+  - Updated readiness detection from `ENTRYPOINT_SHELL_ONLY` to `ABI_VALIDATE_ONLY`.
+- blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`
+  - `SOLANA_PROGRAM_EXECUTION_NOT_READY`
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
+- next:
+  - Publish and verify this validate-only ABI increment, then implement account execution and SPL Token CPI.

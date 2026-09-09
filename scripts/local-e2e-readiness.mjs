@@ -31,11 +31,7 @@ export function evaluateLocalE2eReadiness(options = {}) {
     ...missingExecutables.map((command) => `MISSING_EXECUTABLE:${command}`),
     ...solanaPrograms
       .filter((entry) => entry.state !== "READY")
-      .map((entry) =>
-        entry.state === "ENTRYPOINT_SHELL_ONLY"
-          ? `SOLANA_PROGRAM_ABI_NOT_READY:${entry.program}`
-          : `SOLANA_PROGRAM_NOT_DEPLOYABLE:${entry.program}`,
-      ),
+      .map((entry) => solanaProgramBlocker(entry)),
     ...(anchorConfig.state === "READY" ? [] : [`ANCHOR_CONFIG_NOT_READY:${anchorConfig.reason}`]),
   ];
 
@@ -95,17 +91,22 @@ export function inspectSolanaProgram(repoRoot, program) {
     hasSolanaProgramDependency: /^\s*solana-program\s*=/mu.test(manifest),
     hasEntrypoint: /entrypoint!\s*\(|process_instruction\s*\(/u.test(source),
     hasProgramIdDeclaration: /declare_id!\s*\(/u.test(source),
-    economicAbiEnabled: !/PROGRAM_ABI_STATUS\s*:\s*&str\s*=\s*"ENTRYPOINT_FAIL_CLOSED"/u.test(source),
+    hasInstructionDecoder: /decode_[a-z_]*instruction\s*\(|pub\s+enum\s+[A-Za-z]+Instruction/u.test(source),
+    economicExecutionEnabled: /PROGRAM_ABI_STATUS\s*:\s*&str\s*=\s*"ECONOMIC_ABI_ENABLED"/u.test(source),
   });
   const failed = Object.entries(checks)
     .filter(([, passed]) => passed !== true)
     .map(([name]) => name);
-  const deployabilityFailures = failed.filter((entry) => entry !== "economicAbiEnabled");
+  const deployabilityFailures = failed.filter(
+    (entry) => entry !== "hasInstructionDecoder" && entry !== "economicExecutionEnabled",
+  );
   const state =
-    deployabilityFailures.length === 0 && checks.economicAbiEnabled
+    deployabilityFailures.length === 0 && checks.hasInstructionDecoder && checks.economicExecutionEnabled
       ? "READY"
-      : deployabilityFailures.length === 0
-        ? "ENTRYPOINT_SHELL_ONLY"
+      : deployabilityFailures.length === 0 && checks.hasInstructionDecoder
+        ? "ABI_VALIDATE_ONLY"
+        : deployabilityFailures.length === 0
+          ? "ENTRYPOINT_SHELL_ONLY"
         : "BOUNDARY_MODEL_ONLY";
   return Object.freeze({
     program,
@@ -130,6 +131,17 @@ export function inspectAnchorConfig(repoRoot) {
     return Object.freeze({ state: "BLOCKED", reason: "LOCALNET_PROGRAM_IDS_PLACEHOLDER" });
   }
   return Object.freeze({ state: "READY", reason: "LOCALNET_PROGRAM_IDS_CONFIGURED" });
+}
+
+function solanaProgramBlocker(entry) {
+  switch (entry.state) {
+    case "ENTRYPOINT_SHELL_ONLY":
+      return `SOLANA_PROGRAM_ABI_NOT_READY:${entry.program}`;
+    case "ABI_VALIDATE_ONLY":
+      return `SOLANA_PROGRAM_EXECUTION_NOT_READY:${entry.program}`;
+    default:
+      return `SOLANA_PROGRAM_NOT_DEPLOYABLE:${entry.program}`;
+  }
 }
 
 function executableCandidateNames(command, platform, pathExt) {

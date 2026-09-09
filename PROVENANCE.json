@@ -408,12 +408,12 @@
     {
       "path": "scripts/local-e2e-readiness.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 local E2E readiness gate that checks required disposable localnet executables, fail-closed Solana entrypoint shells, economic ABI readiness, and Anchor localnet configuration without reading secrets."
+      "notes": "Phase 08 local E2E readiness gate that checks required disposable localnet executables, Solana ABI validation/execution readiness, and Anchor localnet configuration without reading secrets."
     },
     {
       "path": "scripts/tests/local-e2e-readiness.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 readiness-gate tests using temporary fake toolchain and manifest fixtures only, including fail-closed entrypoint shell classification."
+      "notes": "Phase 08 readiness-gate tests using temporary fake toolchain and manifest fixtures only, including validate-only ABI classification."
     },
     {
       "path": "services/attesters/README.md",
@@ -553,7 +553,7 @@
     {
       "path": "solana/programs/kingpepe-bridge/src/lib.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Bridge manager implementation with Phase 08 fail-closed localnet entrypoint shell; economic instruction ABI remains disabled."
+      "notes": "Bridge manager implementation with Phase 08 validate-only economic instruction ABI decoding; account execution and SPL CPI remain disabled."
     },
     {
       "path": "solana/programs/kingpepe-bridge/tests/bridge_smoke.rs",
@@ -568,7 +568,7 @@
     {
       "path": "solana/programs/kingpepe-transceiver/src/lib.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Transceiver implementation, receipt validation, Phase 07 Ed25519 instruction binding, and Phase 08 fail-closed localnet entrypoint shell."
+      "notes": "Transceiver implementation, receipt validation, Phase 07 Ed25519 instruction binding, and Phase 08 validate-only economic instruction ABI decoding."
     },
     {
       "path": "solana/programs/kingpepe-transceiver/tests/transceiver_smoke.rs",

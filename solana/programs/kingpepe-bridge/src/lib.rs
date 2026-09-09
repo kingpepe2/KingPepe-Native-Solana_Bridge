@@ -25,7 +25,12 @@ solana_program::entrypoint!(process_instruction);
 
 pub const PROGRAM_NAME: &str = "kingpepe_bridge";
 pub const LOCALNET_PROGRAM_ID_BASE58: &str = "EfoRF4BDDspsi53XYL62mCyhCtf3FceV5LpRkRdwYqKM";
-pub const PROGRAM_ABI_STATUS: &str = "ENTRYPOINT_FAIL_CLOSED";
+pub const PROGRAM_ABI_STATUS: &str = "ECONOMIC_ABI_VALIDATE_ONLY";
+pub const BRIDGE_INSTRUCTION_INITIALIZE: u8 = 1;
+pub const BRIDGE_INSTRUCTION_ACCEPT_DEPOSIT_CLAIM: u8 = 2;
+pub const BRIDGE_INSTRUCTION_RECORD_WITHDRAWAL_REQUEST: u8 = 3;
+pub const BRIDGE_CONFIG_INSTRUCTION_LENGTH: usize = 256;
+pub const BURN_CHECKED_INSTRUCTION_LENGTH: usize = 105;
 pub const KPEPE_SYMBOL: &str = "KPEPE";
 pub const KPEPE_NAME: &str = "KingPepe";
 pub const EXPECTED_INITIAL_SUPPLY: u128 = 0;
@@ -40,12 +45,96 @@ pub fn process_instruction(
 }
 
 pub fn process_instruction_boundary(instruction_data: &[u8]) -> Result<(), EntrypointError> {
+    let _instruction = decode_bridge_instruction(instruction_data)?;
+    Err(EntrypointError::InstructionExecutionDisabled)
+}
+
+pub fn decode_bridge_instruction(
+    instruction_data: &[u8],
+) -> Result<BridgeInstruction, EntrypointError> {
     let Some(tag) = instruction_data.first().copied() else {
         return Err(EntrypointError::EmptyInstruction);
     };
     match tag {
-        0 => Err(EntrypointError::InstructionAbiDisabled),
+        BRIDGE_INSTRUCTION_INITIALIZE => {
+            let expected = 1 + BRIDGE_CONFIG_INSTRUCTION_LENGTH;
+            if instruction_data.len() != expected {
+                return Err(EntrypointError::InvalidInstructionLength {
+                    expected,
+                    found: instruction_data.len(),
+                });
+            }
+            Ok(BridgeInstruction::Initialize(decode_bridge_config(
+                &instruction_data[1..],
+            )?))
+        }
+        BRIDGE_INSTRUCTION_ACCEPT_DEPOSIT_CLAIM => {
+            let expected = 1 + bridge_messages::MESSAGE_LENGTH;
+            if instruction_data.len() != expected {
+                return Err(EntrypointError::InvalidInstructionLength {
+                    expected,
+                    found: instruction_data.len(),
+                });
+            }
+            let message = CanonicalBridgeMessage::decode(&instruction_data[1..])
+                .map_err(|_| EntrypointError::InvalidCanonicalMessage)?;
+            Ok(BridgeInstruction::AcceptDepositClaim(message))
+        }
+        BRIDGE_INSTRUCTION_RECORD_WITHDRAWAL_REQUEST => {
+            let expected = 1 + bridge_messages::MESSAGE_LENGTH + BURN_CHECKED_INSTRUCTION_LENGTH;
+            if instruction_data.len() != expected {
+                return Err(EntrypointError::InvalidInstructionLength {
+                    expected,
+                    found: instruction_data.len(),
+                });
+            }
+            let message_end = 1 + bridge_messages::MESSAGE_LENGTH;
+            let message = CanonicalBridgeMessage::decode(&instruction_data[1..message_end])
+                .map_err(|_| EntrypointError::InvalidCanonicalMessage)?;
+            let burn = decode_burn_checked(&instruction_data[message_end..])?;
+            Ok(BridgeInstruction::RecordWithdrawalRequest { message, burn })
+        }
         other => Err(EntrypointError::UnsupportedInstructionTag(other)),
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BridgeInstruction {
+    Initialize(BridgeConfig),
+    AcceptDepositClaim(CanonicalBridgeMessage),
+    RecordWithdrawalRequest {
+        message: CanonicalBridgeMessage,
+        burn: BurnChecked,
+    },
+}
+
+impl BridgeInstruction {
+    pub fn encode(&self) -> Result<Vec<u8>, EntrypointError> {
+        let mut out = Vec::new();
+        match self {
+            BridgeInstruction::Initialize(config) => {
+                out.push(BRIDGE_INSTRUCTION_INITIALIZE);
+                encode_bridge_config(config, &mut out);
+            }
+            BridgeInstruction::AcceptDepositClaim(message) => {
+                out.push(BRIDGE_INSTRUCTION_ACCEPT_DEPOSIT_CLAIM);
+                out.extend(
+                    message
+                        .encode()
+                        .map_err(|_| EntrypointError::InvalidCanonicalMessage)?,
+                );
+            }
+            BridgeInstruction::RecordWithdrawalRequest { message, burn } => {
+                out.push(BRIDGE_INSTRUCTION_RECORD_WITHDRAWAL_REQUEST);
+                out.extend(
+                    message
+                        .encode()
+                        .map_err(|_| EntrypointError::InvalidCanonicalMessage)?,
+                );
+                encode_burn_checked(burn, &mut out);
+            }
+        }
+        Ok(out)
     }
 }
 
@@ -61,6 +150,106 @@ pub enum BridgeEnvironment {
     Localnet,
     Devnet,
     Mainnet,
+}
+
+fn encode_bridge_environment(environment: &BridgeEnvironment) -> u8 {
+    match environment {
+        BridgeEnvironment::Localnet => 0,
+        BridgeEnvironment::Devnet => 1,
+        BridgeEnvironment::Mainnet => 2,
+    }
+}
+
+fn decode_bridge_environment(byte: u8) -> Result<BridgeEnvironment, EntrypointError> {
+    match byte {
+        0 => Ok(BridgeEnvironment::Localnet),
+        1 => Ok(BridgeEnvironment::Devnet),
+        2 => Ok(BridgeEnvironment::Mainnet),
+        _ => Err(EntrypointError::InvalidInstructionEncoding),
+    }
+}
+
+fn encode_bridge_config(config: &BridgeConfig, out: &mut Vec<u8>) {
+    out.push(encode_bridge_environment(&config.environment));
+    out.extend(config.manager_program_id);
+    out.extend(config.transceiver_program_id);
+    out.extend(config.solana_deployment);
+    out.extend(config.mint_binding.mint);
+    out.extend(config.mint_binding.token_program_id);
+    out.extend(config.mint_binding.mint_authority_pda);
+    out.push(config.mint_binding.decimals);
+    out.push(config.mint_binding.native_decimals);
+    match config.mint_binding.freeze_authority {
+        Some(freeze_authority) => {
+            out.push(1);
+            out.extend(freeze_authority);
+        }
+        None => {
+            out.push(0);
+            out.extend([0u8; 32]);
+        }
+    }
+    out.extend(config.mint_binding.initial_supply.to_le_bytes());
+    out.extend(config.policy_epoch.to_le_bytes());
+    out.extend(config.key_epoch.to_le_bytes());
+    out.push(config.deposits_paused as u8);
+    out.push(config.withdrawals_paused as u8);
+    out.push(config.hard_stop as u8);
+    out.push(config.mainnet_activation_enabled as u8);
+}
+
+fn decode_bridge_config(data: &[u8]) -> Result<BridgeConfig, EntrypointError> {
+    let mut cursor = InstructionCursor::new(data);
+    let environment = decode_bridge_environment(cursor.read_u8()?)?;
+    let manager_program_id = cursor.read_array::<32>()?;
+    let transceiver_program_id = cursor.read_array::<32>()?;
+    let solana_deployment = cursor.read_array::<32>()?;
+    let mint = cursor.read_array::<32>()?;
+    let token_program_id = cursor.read_array::<32>()?;
+    let mint_authority_pda = cursor.read_array::<32>()?;
+    let decimals = cursor.read_u8()?;
+    let native_decimals = cursor.read_u8()?;
+    let freeze_authority = match cursor.read_u8()? {
+        0 => {
+            let padded = cursor.read_array::<32>()?;
+            if padded != [0u8; 32] {
+                return Err(EntrypointError::InvalidInstructionEncoding);
+            }
+            None
+        }
+        1 => Some(cursor.read_array::<32>()?),
+        _ => return Err(EntrypointError::InvalidInstructionEncoding),
+    };
+    let initial_supply = cursor.read_u128_le()?;
+    let policy_epoch = cursor.read_u32_le()?;
+    let key_epoch = cursor.read_u32_le()?;
+    let deposits_paused = cursor.read_bool()?;
+    let withdrawals_paused = cursor.read_bool()?;
+    let hard_stop = cursor.read_bool()?;
+    let mainnet_activation_enabled = cursor.read_bool()?;
+    cursor.finish()?;
+
+    Ok(BridgeConfig {
+        environment,
+        manager_program_id,
+        transceiver_program_id,
+        solana_deployment,
+        mint_binding: MintBinding {
+            mint,
+            token_program_id,
+            mint_authority_pda,
+            decimals,
+            native_decimals,
+            freeze_authority,
+            initial_supply,
+        },
+        policy_epoch,
+        key_epoch,
+        deposits_paused,
+        withdrawals_paused,
+        hard_stop,
+        mainnet_activation_enabled,
+    })
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -453,12 +642,98 @@ fn validate_burn(
     Ok(())
 }
 
+fn encode_burn_checked(burn: &BurnChecked, out: &mut Vec<u8>) {
+    out.extend(burn.token_program_id);
+    out.extend(burn.mint);
+    out.extend(burn.authority);
+    out.extend(burn.amount_atomic.to_le_bytes());
+    out.push(burn.decimals);
+}
+
+fn decode_burn_checked(data: &[u8]) -> Result<BurnChecked, EntrypointError> {
+    let mut cursor = InstructionCursor::new(data);
+    let burn = BurnChecked {
+        token_program_id: cursor.read_array::<32>()?,
+        mint: cursor.read_array::<32>()?,
+        authority: cursor.read_array::<32>()?,
+        amount_atomic: cursor.read_u64_le()?,
+        decimals: cursor.read_u8()?,
+    };
+    cursor.finish()?;
+    Ok(burn)
+}
+
+struct InstructionCursor<'a> {
+    data: &'a [u8],
+    offset: usize,
+}
+
+impl<'a> InstructionCursor<'a> {
+    fn new(data: &'a [u8]) -> Self {
+        Self { data, offset: 0 }
+    }
+
+    fn read_array<const N: usize>(&mut self) -> Result<[u8; N], EntrypointError> {
+        let end = self
+            .offset
+            .checked_add(N)
+            .ok_or(EntrypointError::InvalidInstructionEncoding)?;
+        let bytes = self
+            .data
+            .get(self.offset..end)
+            .ok_or(EntrypointError::InvalidInstructionEncoding)?;
+        self.offset = end;
+        Ok(bytes.try_into().expect("slice length checked"))
+    }
+
+    fn read_u8(&mut self) -> Result<u8, EntrypointError> {
+        Ok(self.read_array::<1>()?[0])
+    }
+
+    fn read_bool(&mut self) -> Result<bool, EntrypointError> {
+        match self.read_u8()? {
+            0 => Ok(false),
+            1 => Ok(true),
+            _ => Err(EntrypointError::InvalidInstructionEncoding),
+        }
+    }
+
+    fn read_u32_le(&mut self) -> Result<u32, EntrypointError> {
+        Ok(u32::from_le_bytes(self.read_array::<4>()?))
+    }
+
+    fn read_u64_le(&mut self) -> Result<u64, EntrypointError> {
+        Ok(u64::from_le_bytes(self.read_array::<8>()?))
+    }
+
+    fn read_u128_le(&mut self) -> Result<u128, EntrypointError> {
+        Ok(u128::from_le_bytes(self.read_array::<16>()?))
+    }
+
+    fn finish(&self) -> Result<(), EntrypointError> {
+        if self.offset == self.data.len() {
+            Ok(())
+        } else {
+            Err(EntrypointError::InvalidInstructionLength {
+                expected: self.offset,
+                found: self.data.len(),
+            })
+        }
+    }
+}
+
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum EntrypointError {
     #[error("Solana instruction data is empty")]
     EmptyInstruction,
-    #[error("Solana economic instruction ABI is not enabled yet")]
-    InstructionAbiDisabled,
+    #[error("Solana economic instruction execution is not enabled yet")]
+    InstructionExecutionDisabled,
+    #[error("Solana instruction length mismatch, expected {expected}, found {found}")]
+    InvalidInstructionLength { expected: usize, found: usize },
+    #[error("Solana instruction encoding is invalid")]
+    InvalidInstructionEncoding,
+    #[error("canonical bridge message in Solana instruction is invalid")]
+    InvalidCanonicalMessage,
     #[error("unsupported Solana instruction tag {0}")]
     UnsupportedInstructionTag(u8),
 }
@@ -656,20 +931,68 @@ mod tests {
     }
 
     #[test]
-    fn solana_entrypoint_identity_is_localnet_only_and_fails_closed() {
+    fn solana_entrypoint_identity_is_localnet_only_and_validate_only() {
         assert_eq!(id().to_string(), LOCALNET_PROGRAM_ID_BASE58);
-        assert_eq!(PROGRAM_ABI_STATUS, "ENTRYPOINT_FAIL_CLOSED");
+        assert_eq!(PROGRAM_ABI_STATUS, "ECONOMIC_ABI_VALIDATE_ONLY");
         assert_eq!(
             process_instruction_boundary(&[]),
             Err(EntrypointError::EmptyInstruction)
         );
         assert_eq!(
             process_instruction_boundary(&[0]),
-            Err(EntrypointError::InstructionAbiDisabled)
+            Err(EntrypointError::UnsupportedInstructionTag(0))
         );
         assert_eq!(
             process_instruction_boundary(&[255]),
             Err(EntrypointError::UnsupportedInstructionTag(255))
+        );
+    }
+
+    #[test]
+    fn bridge_instruction_abi_round_trips_and_rejects_trailing_data() {
+        let config = base_config();
+        let initialize = BridgeInstruction::Initialize(config.clone());
+        let initialize_bytes = initialize.encode().unwrap();
+        assert_eq!(initialize_bytes.len(), 1 + BRIDGE_CONFIG_INSTRUCTION_LENGTH);
+        assert_eq!(
+            decode_bridge_instruction(&initialize_bytes).unwrap(),
+            initialize
+        );
+
+        let deposit = BridgeInstruction::AcceptDepositClaim(deposit_message(&config));
+        let deposit_bytes = deposit.encode().unwrap();
+        assert_eq!(decode_bridge_instruction(&deposit_bytes).unwrap(), deposit);
+        assert_eq!(
+            process_instruction_boundary(&deposit_bytes),
+            Err(EntrypointError::InstructionExecutionDisabled)
+        );
+
+        let withdrawal_message = withdrawal_message(&config);
+        let burn = BurnChecked {
+            token_program_id: config.mint_binding.token_program_id,
+            mint: config.mint_binding.mint,
+            authority: h(42),
+            amount_atomic: withdrawal_message.amount_atomic,
+            decimals: config.mint_binding.decimals,
+        };
+        let withdrawal = BridgeInstruction::RecordWithdrawalRequest {
+            message: withdrawal_message,
+            burn,
+        };
+        let withdrawal_bytes = withdrawal.encode().unwrap();
+        assert_eq!(
+            decode_bridge_instruction(&withdrawal_bytes).unwrap(),
+            withdrawal
+        );
+
+        let mut trailing = deposit_bytes;
+        trailing.push(0);
+        assert_eq!(
+            decode_bridge_instruction(&trailing),
+            Err(EntrypointError::InvalidInstructionLength {
+                expected: 1 + bridge_messages::MESSAGE_LENGTH,
+                found: 2 + bridge_messages::MESSAGE_LENGTH,
+            })
         );
     }
 

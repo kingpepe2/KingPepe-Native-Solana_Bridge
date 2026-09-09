@@ -25,7 +25,10 @@ solana_program::entrypoint!(process_instruction);
 
 pub const PROGRAM_NAME: &str = "kingpepe_transceiver";
 pub const LOCALNET_PROGRAM_ID_BASE58: &str = "AkqLGFTy43D9cLjHRTQGpRGb2uWA8nuVyGb2bJYHKCrN";
-pub const PROGRAM_ABI_STATUS: &str = "ENTRYPOINT_FAIL_CLOSED";
+pub const PROGRAM_ABI_STATUS: &str = "ECONOMIC_ABI_VALIDATE_ONLY";
+pub const TRANSCEIVER_INSTRUCTION_INITIALIZE: u8 = 1;
+pub const TRANSCEIVER_INSTRUCTION_VERIFY_MESSAGE_FROM_ED25519: u8 = 2;
+pub const TRANSCEIVER_CONFIG_INSTRUCTION_LENGTH: usize = 197;
 pub const ED25519_PROGRAM_ID: PubkeyBytes = [
     0x03, 0x7d, 0x46, 0xd6, 0x7c, 0x93, 0xfb, 0xbe, 0x12, 0xf9, 0x42, 0x8f, 0x83, 0x8d, 0x40, 0xff,
     0x05, 0x70, 0x74, 0x49, 0x27, 0xf4, 0x8a, 0x64, 0xfc, 0xca, 0x70, 0x44, 0x80, 0x00, 0x00, 0x00,
@@ -43,12 +46,88 @@ pub fn process_instruction(
 }
 
 pub fn process_instruction_boundary(instruction_data: &[u8]) -> Result<(), EntrypointError> {
+    let _instruction = decode_transceiver_instruction(instruction_data)?;
+    Err(EntrypointError::InstructionExecutionDisabled)
+}
+
+pub fn decode_transceiver_instruction(
+    instruction_data: &[u8],
+) -> Result<TransceiverInstruction, EntrypointError> {
     let Some(tag) = instruction_data.first().copied() else {
         return Err(EntrypointError::EmptyInstruction);
     };
     match tag {
-        0 => Err(EntrypointError::InstructionAbiDisabled),
+        TRANSCEIVER_INSTRUCTION_INITIALIZE => {
+            let expected = 1 + TRANSCEIVER_CONFIG_INSTRUCTION_LENGTH;
+            if instruction_data.len() != expected {
+                return Err(EntrypointError::InvalidInstructionLength {
+                    expected,
+                    found: instruction_data.len(),
+                });
+            }
+            Ok(TransceiverInstruction::Initialize(
+                decode_transceiver_config(&instruction_data[1..])?,
+            ))
+        }
+        TRANSCEIVER_INSTRUCTION_VERIFY_MESSAGE_FROM_ED25519 => {
+            let expected = 1 + MESSAGE_LENGTH + 4;
+            if instruction_data.len() != expected {
+                return Err(EntrypointError::InvalidInstructionLength {
+                    expected,
+                    found: instruction_data.len(),
+                });
+            }
+            let message_end = 1 + MESSAGE_LENGTH;
+            let message = CanonicalBridgeMessage::decode(&instruction_data[1..message_end])
+                .map_err(|_| EntrypointError::InvalidCanonicalMessage)?;
+            let mut cursor = InstructionCursor::new(&instruction_data[message_end..]);
+            let first = cursor.read_u16_le()?;
+            let second = cursor.read_u16_le()?;
+            cursor.finish()?;
+            if first == second {
+                return Err(EntrypointError::InvalidInstructionEncoding);
+            }
+            Ok(TransceiverInstruction::VerifyMessageFromEd25519 {
+                message,
+                ed25519_instruction_indexes: [first, second],
+            })
+        }
         other => Err(EntrypointError::UnsupportedInstructionTag(other)),
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TransceiverInstruction {
+    Initialize(TransceiverConfig),
+    VerifyMessageFromEd25519 {
+        message: CanonicalBridgeMessage,
+        ed25519_instruction_indexes: [u16; 2],
+    },
+}
+
+impl TransceiverInstruction {
+    pub fn encode(&self) -> Result<Vec<u8>, EntrypointError> {
+        let mut out = Vec::new();
+        match self {
+            TransceiverInstruction::Initialize(config) => {
+                out.push(TRANSCEIVER_INSTRUCTION_INITIALIZE);
+                encode_transceiver_config(config, &mut out);
+            }
+            TransceiverInstruction::VerifyMessageFromEd25519 {
+                message,
+                ed25519_instruction_indexes,
+            } => {
+                out.push(TRANSCEIVER_INSTRUCTION_VERIFY_MESSAGE_FROM_ED25519);
+                out.extend(
+                    message
+                        .encode()
+                        .map_err(|_| EntrypointError::InvalidCanonicalMessage)?,
+                );
+                out.extend(ed25519_instruction_indexes[0].to_le_bytes());
+                out.extend(ed25519_instruction_indexes[1].to_le_bytes());
+            }
+        }
+        Ok(out)
     }
 }
 
@@ -258,6 +337,39 @@ impl TransceiverProgram {
     }
 }
 
+fn encode_transceiver_config(config: &TransceiverConfig, out: &mut Vec<u8>) {
+    out.extend(config.transceiver_program_id);
+    out.extend(config.manager_program_id);
+    out.extend(config.mint);
+    out.extend(config.solana_deployment);
+    out.extend(config.authorized_attesters[0]);
+    out.extend(config.authorized_attesters[1]);
+    out.push(config.active as u8);
+    out.extend(config.key_epoch.to_le_bytes());
+}
+
+fn decode_transceiver_config(data: &[u8]) -> Result<TransceiverConfig, EntrypointError> {
+    let mut cursor = InstructionCursor::new(data);
+    let transceiver_program_id = cursor.read_array::<32>()?;
+    let manager_program_id = cursor.read_array::<32>()?;
+    let mint = cursor.read_array::<32>()?;
+    let solana_deployment = cursor.read_array::<32>()?;
+    let first_attester = cursor.read_array::<32>()?;
+    let second_attester = cursor.read_array::<32>()?;
+    let active = cursor.read_bool()?;
+    let key_epoch = cursor.read_u32_le()?;
+    cursor.finish()?;
+    Ok(TransceiverConfig {
+        transceiver_program_id,
+        manager_program_id,
+        mint,
+        solana_deployment,
+        authorized_attesters: [first_attester, second_attester],
+        active,
+        key_epoch,
+    })
+}
+
 fn parse_ed25519_instruction(
     instruction: &SolanaInstructionView,
     expected_message: &[u8],
@@ -356,12 +468,73 @@ fn ranges_overlap(a_start: usize, a_end: usize, b_start: usize, b_end: usize) ->
     a_start < b_end && b_start < a_end
 }
 
+struct InstructionCursor<'a> {
+    data: &'a [u8],
+    offset: usize,
+}
+
+impl<'a> InstructionCursor<'a> {
+    fn new(data: &'a [u8]) -> Self {
+        Self { data, offset: 0 }
+    }
+
+    fn read_array<const N: usize>(&mut self) -> Result<[u8; N], EntrypointError> {
+        let end = self
+            .offset
+            .checked_add(N)
+            .ok_or(EntrypointError::InvalidInstructionEncoding)?;
+        let bytes = self
+            .data
+            .get(self.offset..end)
+            .ok_or(EntrypointError::InvalidInstructionEncoding)?;
+        self.offset = end;
+        Ok(bytes.try_into().expect("slice length checked"))
+    }
+
+    fn read_u8(&mut self) -> Result<u8, EntrypointError> {
+        Ok(self.read_array::<1>()?[0])
+    }
+
+    fn read_bool(&mut self) -> Result<bool, EntrypointError> {
+        match self.read_u8()? {
+            0 => Ok(false),
+            1 => Ok(true),
+            _ => Err(EntrypointError::InvalidInstructionEncoding),
+        }
+    }
+
+    fn read_u16_le(&mut self) -> Result<u16, EntrypointError> {
+        Ok(u16::from_le_bytes(self.read_array::<2>()?))
+    }
+
+    fn read_u32_le(&mut self) -> Result<u32, EntrypointError> {
+        Ok(u32::from_le_bytes(self.read_array::<4>()?))
+    }
+
+    fn finish(&self) -> Result<(), EntrypointError> {
+        if self.offset == self.data.len() {
+            Ok(())
+        } else {
+            Err(EntrypointError::InvalidInstructionLength {
+                expected: self.offset,
+                found: self.data.len(),
+            })
+        }
+    }
+}
+
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum EntrypointError {
     #[error("Solana instruction data is empty")]
     EmptyInstruction,
-    #[error("Solana economic instruction ABI is not enabled yet")]
-    InstructionAbiDisabled,
+    #[error("Solana economic instruction execution is not enabled yet")]
+    InstructionExecutionDisabled,
+    #[error("Solana instruction length mismatch, expected {expected}, found {found}")]
+    InvalidInstructionLength { expected: usize, found: usize },
+    #[error("Solana instruction encoding is invalid")]
+    InvalidInstructionEncoding,
+    #[error("canonical bridge message in Solana instruction is invalid")]
+    InvalidCanonicalMessage,
     #[error("unsupported Solana instruction tag {0}")]
     UnsupportedInstructionTag(u8),
 }
@@ -506,20 +679,68 @@ mod tests {
     }
 
     #[test]
-    fn solana_entrypoint_identity_is_localnet_only_and_fails_closed() {
+    fn solana_entrypoint_identity_is_localnet_only_and_validate_only() {
         assert_eq!(id().to_string(), LOCALNET_PROGRAM_ID_BASE58);
-        assert_eq!(PROGRAM_ABI_STATUS, "ENTRYPOINT_FAIL_CLOSED");
+        assert_eq!(PROGRAM_ABI_STATUS, "ECONOMIC_ABI_VALIDATE_ONLY");
         assert_eq!(
             process_instruction_boundary(&[]),
             Err(EntrypointError::EmptyInstruction)
         );
         assert_eq!(
             process_instruction_boundary(&[0]),
-            Err(EntrypointError::InstructionAbiDisabled)
+            Err(EntrypointError::UnsupportedInstructionTag(0))
         );
         assert_eq!(
             process_instruction_boundary(&[255]),
             Err(EntrypointError::UnsupportedInstructionTag(255))
+        );
+    }
+
+    #[test]
+    fn transceiver_instruction_abi_round_trips_and_rejects_duplicate_indexes() {
+        let config = config();
+        let initialize = TransceiverInstruction::Initialize(config.clone());
+        let initialize_bytes = initialize.encode().unwrap();
+        assert_eq!(
+            initialize_bytes.len(),
+            1 + TRANSCEIVER_CONFIG_INSTRUCTION_LENGTH
+        );
+        assert_eq!(
+            decode_transceiver_instruction(&initialize_bytes).unwrap(),
+            initialize
+        );
+
+        let message = message(&config);
+        let verify = TransceiverInstruction::VerifyMessageFromEd25519 {
+            message: message.clone(),
+            ed25519_instruction_indexes: [0, 1],
+        };
+        let verify_bytes = verify.encode().unwrap();
+        assert_eq!(decode_transceiver_instruction(&verify_bytes).unwrap(), verify);
+        assert_eq!(
+            process_instruction_boundary(&verify_bytes),
+            Err(EntrypointError::InstructionExecutionDisabled)
+        );
+
+        let duplicate = TransceiverInstruction::VerifyMessageFromEd25519 {
+            message,
+            ed25519_instruction_indexes: [2, 2],
+        }
+        .encode()
+        .unwrap();
+        assert_eq!(
+            decode_transceiver_instruction(&duplicate),
+            Err(EntrypointError::InvalidInstructionEncoding)
+        );
+
+        let mut trailing = verify_bytes;
+        trailing.push(0);
+        assert_eq!(
+            decode_transceiver_instruction(&trailing),
+            Err(EntrypointError::InvalidInstructionLength {
+                expected: 1 + MESSAGE_LENGTH + 4,
+                found: 2 + MESSAGE_LENGTH + 4,
+            })
         );
     }
 
