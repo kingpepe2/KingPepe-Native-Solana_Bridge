@@ -265,5 +265,15 @@
   `df49793f0595bb501e83405b79d21215283a1d0a`
 - Phase 08 Solana deposit-claim observer CI:
   `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34316743630` PASS.
+- Phase 08 Solana deposit-claim transaction plan:
+  `services/bridge-validator/solana-deposit-claim-transaction-plan.mjs`
+  derives localnet bridge state, deposit claim, mint-authority, and
+  transceiver receipt PDAs, builds exact `AcceptDepositClaim` instruction
+  data, serializes a Solana legacy transaction message, and signs only through
+  an injected local fee-payer signer. It does not load or store key files.
+- Phase 08 Solana deposit-claim transaction plan commit:
+  `42a5cdb3bcc60e0be7fb5d2395503f148b6d632f`
+- Phase 08 Solana deposit-claim transaction plan CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34318547667` PASS.
 - Real local E2E is still blocked by missing `kingpeped`, `kingpepe-cli`,
   `solana`, `solana-test-validator`, and `anchor`.
