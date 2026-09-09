@@ -1049,7 +1049,8 @@
 
 ## Phase 08 local reserve-sweep broadcast and finality validation
 
-- Source status: implemented locally; exact source SHA and CI will be recorded after push.
+- Source status: implemented and CI verified for source commit `81797c2930b74598ed49bc451aef38f1571f01a4`.
+- CI: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34358737395` PASS.
 - What changed:
   - The local Native-to-Solana runner now broadcasts the already FROST-signed, witness-attached reserve sweep with `sendrawtransaction` when local REGTEST infrastructure is available.
   - The runner mines local finality blocks, observes the finalized reserve-sweep transaction, and validates exact txid, input outpoints, reserve output amount, reserve script, and confirmation depth.
