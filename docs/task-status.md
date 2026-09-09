@@ -492,10 +492,19 @@
 ## Phase 08 Native reserve-sweep adapters
 
 - PHASE: `08`
-- source commit: pending until this source increment is committed and pushed
-- CI status: pending
+- source commit: `9af93d22b9af9c1278354a33e35db469311332d9`
+- push result: pushed to private GitHub repository
+- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34313600140`
+- CI status: `PASS`
 - tests:
   - `npm run test:bridge-validator` (pass, 22 bridge-validator tests)
+  - `npm test` (pass, 2 protocol vectors plus 59 Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - `npm run doctor:local-e2e` (expected BLOCKED, exit 2)
+  - `npm run local:e2e:bootstrap` (expected BLOCKED, exit 2)
+  - CI Linux format, clippy, workspace, Node, and native crate tests (PASS)
+  - CI Windows workspace, Node, and native crate tests (PASS)
   - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
 - changed:
   - Added local Native reserve-sweep relayer and verifier adapters.
@@ -512,8 +521,10 @@
   - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`,
     `solana-test-validator`, and `anchor`.
 - next:
-  - Push this source increment and verify CI. Do not proceed to Phase 09 until
-    the Native-to-Solana local E2E gate actually passes.
+  - Continue Phase 08 only if another meaningful source increment can be
+    implemented without falsely reporting a daemon-backed local E2E pass. Do
+    not proceed to Phase 09 until the Native-to-Solana local E2E gate actually
+    passes.
 
 ## Phase 08 Solana account-state codec implementation
 

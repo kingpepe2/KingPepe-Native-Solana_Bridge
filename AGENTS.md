@@ -239,5 +239,14 @@
   `024c0019745bc4671299af135740aa9d29963116`
 - Phase 08 async deposit pipeline entrypoint CI:
   `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34312011059` PASS.
+- Phase 08 Native reserve-sweep adapters:
+  local REGTEST reserve-sweep relayer and verifier adapters persist signed
+  sweep transactions before broadcast, validate FROST A+B transcript
+  consistency, retry idempotently, and verify finalized RPC-observed reserve
+  transition evidence without claiming production consensus validation.
+- Phase 08 Native reserve-sweep adapter commit:
+  `9af93d22b9af9c1278354a33e35db469311332d9`
+- Phase 08 Native reserve-sweep adapter CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34313600140` PASS.
 - Real local E2E is still blocked by missing `kingpeped`, `kingpepe-cli`,
   `solana`, `solana-test-validator`, and `anchor`.
