@@ -42,6 +42,8 @@
     "phase08SolanaEconomicAbiValidateOnlyImplemented": true,
     "phase08SolanaEconomicAbiValidateOnlyLocalTestsPassed": true,
     "phase08SolanaEconomicAbiValidateOnlyCiVerified": true,
+    "phase08SolanaMintAuthorityRealPdaImplemented": true,
+    "phase08SolanaMintAuthorityRealPdaLocalTestsPassed": true,
     "solanaEconomicInstructionAbiReady": false,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true

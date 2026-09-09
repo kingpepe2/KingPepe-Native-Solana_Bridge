@@ -155,3 +155,8 @@
   `201c5bdc2a2fb65601331b58115e0a7543179e12`
 - Phase 08 validate-only Solana ABI CI:
   `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34298518315` PASS.
+- Phase 08 mint-authority PDA correction:
+  the bridge manager now derives the mint authority with Solana
+  `Pubkey::find_program_address` seeds and exposes the bump for future account
+  initialization; source publication/CI verification is pending for this
+  increment.
