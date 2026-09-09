@@ -254,5 +254,16 @@
   source commit `73df9906998f9783c309a0671739d19cfc6b589f`, CI
   `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34315069345`
   PASS.
+- Phase 08 Solana deposit-claim observer:
+  `services/solana-observer/solana-deposit-claim-observer.mjs` provides
+  localnet-only finalized deposit-claim observation through loopback Solana
+  JSON-RPC or an injected test client. It decodes the bridge deposit-claim
+  account, verifies the observed operation ID and message digest against the
+  requested operation, extracts SPL Mint freeze-authority state, and remains
+  blocked outside localnet.
+- Phase 08 Solana deposit-claim observer commit:
+  `df49793f0595bb501e83405b79d21215283a1d0a`
+- Phase 08 Solana deposit-claim observer CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34316743630` PASS.
 - Real local E2E is still blocked by missing `kingpeped`, `kingpepe-cli`,
   `solana`, `solana-test-validator`, and `anchor`.

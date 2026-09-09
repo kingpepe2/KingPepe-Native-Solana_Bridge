@@ -283,6 +283,38 @@
 - next:
   - Continue Phase 08 account execution and SPL Token CPI. Do not proceed to Phase 09 until the Native-to-Solana local E2E gate actually passes.
 
+## Phase 08 Solana deposit-claim observer
+
+- PHASE: `08`
+- source commit: `df49793f0595bb501e83405b79d21215283a1d0a`
+- commit message: `feat(phase-08): add solana deposit claim observer`
+- push result: pushed to private GitHub repository
+- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34316743630`
+- CI status: `PASS`
+- tests:
+  - `npm run test:solana-observer` (pass, 14 tests)
+  - `npm test` (pass, 2 protocol vectors plus 69 Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - `git diff --cached --check` before source commit (pass)
+  - targeted changed-file and outgoing-range secret-pattern scans (pass)
+  - `npm run doctor:local-e2e` (BLOCKED / NOT_RUN; missing localnet executables)
+  - `npm run local:e2e:bootstrap` (BLOCKED / NOT_RUN before command execution; missing localnet executables)
+  - CI Linux format, clippy, workspace, Node, and native crate tests (PASS)
+  - CI Windows workspace, Node, and native crate tests (PASS)
+  - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
+- changed:
+  - Added a localnet-only Solana deposit-claim observer with loopback-only JSON-RPC access.
+  - Decoded finalized bridge deposit-claim account data using the fixed manager account layout.
+  - Decoded SPL Mint freeze-authority state for downstream fail-closed policy checks.
+  - Rejected substituted deposit-claim account records by matching observed operation ID and message digest to the requested operation.
+  - Kept production observation disabled and introduced no production keys, RPCs, Program IDs, Mint identities, or operational state.
+- blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
+- next:
+  - Continue Phase 08 only if another meaningful source increment is possible without falsely reporting daemon-backed local E2E success. Do not proceed to Phase 09 until the Native-to-Solana local E2E gate actually passes.
+
 ## Phase 08 Solana account execution and SPL Token CPI source implementation
 
 - PHASE: `08`

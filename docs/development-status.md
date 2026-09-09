@@ -37,7 +37,7 @@
 ## Current blockers
 
 - Phase 08 is blocked because the local environment does not provide `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, or `anchor`.
-- Current Solana crates have deterministic non-production localnet Program IDs, economic ABI decoding, source-level account execution, and SPL Token CPI construction. Real local-validator execution remains untested because required localnet executables are missing.
+- Current Solana crates have deterministic non-production localnet Program IDs, economic ABI decoding, source-level account execution, SPL Token CPI construction, and a localnet-only deposit-claim observer. Real local-validator execution remains untested because required localnet executables are missing.
 - Full Native transaction construction, Native node acceptance, local end-to-end flows, Devnet, production configuration, external review, and activation remain later phases.
 
 ## Latest local validation
@@ -70,7 +70,8 @@
 - Phase 08 `command -v kingpeped kingpepe-cli solana-test-validator solana anchor`: NOT_FOUND under WSL
 - Phase 08 `npm run test:bridge-validator`: PASS, 25 bridge-validator tests (automatic deposit pipeline, file-backed deposit journal, async adapter path, Native reserve-sweep adapters, and Solana deposit claim submitter)
 - Phase 08 `npm run test:native-node`: PASS, 7 Native REGTEST RPC adapter tests
-- Phase 08 `npm run test:local-e2e-readiness`: PASS, 8 readiness/orchestration tests
+- Phase 08 `npm run test:solana-observer`: PASS, 14 Solana observer tests including the localnet deposit-claim observer
+- Phase 08 `npm run test:local-e2e-readiness`: PASS, 13 readiness/orchestration tests
 - Phase 08 `npm run doctor:local-e2e`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING; missing localnet executables; both Solana programs report `READY` at the source/readiness-gate level after account-execution wiring
 - Phase 08 `npm run local:e2e:plan`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING with redacted local paths and no production configuration
 - Phase 08 `npm run local:e2e:bootstrap`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING before command execution; missing localnet executables
@@ -88,6 +89,8 @@
 - Phase 08 async deposit pipeline entrypoint: PASS for `024c0019745bc4671299af135740aa9d29963116`
 - Phase 08 Native reserve-sweep adapters: PASS for `9af93d22b9af9c1278354a33e35db469311332d9`
 - Phase 08 deposit pipeline file-backed journal: PASS for `73df9906998f9783c309a0671739d19cfc6b589f`
+- Phase 08 Solana deposit-claim observer: PASS for `df49793f0595bb501e83405b79d21215283a1d0a`
+- Phase 08 current `npm test`: PASS, 2 protocol vectors plus 69 Node tests
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 52 Rust tests after account-execution update
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
@@ -106,9 +109,9 @@
 
 ## Next phase
 
-- Continue Phase 08 by adding disposable KingPepe regtest plus Solana
-  local-validator tooling and running the full automated Native-to-Solana
-  local E2E flow.
+- Continue Phase 08 by providing the missing disposable KingPepe regtest and
+  Solana local-validator executables, then run the full automated
+  Native-to-Solana local E2E flow.
 
 ## Phase 08 source-boundary implementation
 
@@ -405,6 +408,38 @@
 - Source commit: `73df9906998f9783c309a0671739d19cfc6b589f`
 - CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34315069345`
 - CI status: `PASS`
+
+## Phase 08 Solana deposit-claim observer
+
+- Added `services/solana-observer/solana-deposit-claim-observer.mjs`.
+- Added `services/solana-observer/tests/solana-deposit-claim-observer.test.mjs`.
+- Exported the observer through `services/solana-observer/index.mjs`.
+- The observer is localnet-only and uses a loopback-only Solana JSON-RPC
+  boundary or an injected test client.
+- It reads a finalized Solana transaction, finalized root slot, bridge
+  deposit-claim account, and SPL Mint account.
+- It decodes the fixed bridge deposit-claim account layout and fails closed if
+  the observed operation ID or message digest does not match the requested
+  operation.
+- It extracts SPL Mint freeze-authority state so downstream checks can
+  hard-stop if freeze authority is present.
+- It does not introduce production RPCs, keys, Program IDs, Mint identities, or
+  operational state.
+- Source commit: `df49793f0595bb501e83405b79d21215283a1d0a`
+- CI URL:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34316743630`
+- CI status: `PASS`
+- Local test status:
+  - `npm run test:solana-observer` (pass, 14 tests)
+  - `npm test` (pass, 2 protocol vectors plus 69 Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - targeted changed-file secret-pattern scan (pass)
+  - `npm run doctor:local-e2e` (BLOCKED / NOT_RUN for real E2E; missing
+    localnet executables)
+  - `npm run local:e2e:bootstrap` (BLOCKED / NOT_RUN before command execution;
+    missing localnet executables)
+  - real Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
 
 ## Phase 08 mint-authority real Solana PDA correction
 
