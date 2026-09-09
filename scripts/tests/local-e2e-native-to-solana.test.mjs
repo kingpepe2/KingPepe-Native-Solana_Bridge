@@ -7,7 +7,7 @@ import { test } from "node:test";
 import {
   LOCAL_NATIVE_TO_SOLANA_BLOCKED,
   LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL,
-  LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_DRAFTED,
+  LOCAL_NATIVE_TO_SOLANA_TAPROOT_SIGHASHES_VALIDATED,
   LOCAL_NATIVE_TO_SOLANA_WAITING_FOR_DEPENDENCY,
   createLocalFrostTaprootCustodyContext,
   createNativeToSolanaFlowConfig,
@@ -33,7 +33,7 @@ const FEE_FUNDING_SCRIPT_HEX = SCRIPT_HEX;
 const FROST_TAPROOT_ADDRESS = taprootAddressFromXOnlyPublicKey(FROST_AGGREGATE_XONLY_HEX, "rkpepe");
 const REGTEST_GENESIS_HASH = h("kingpepe-regtest-genesis");
 const REGTEST_BEST_BLOCK_HASH = h("kingpepe-regtest-best-block");
-const UNSIGNED_SWEEP_HEX = "0200000001";
+const UNSIGNED_SWEEP_HEX = buildUnsignedSweepHex();
 
 test("native-to-solana runner blocks before executing deposit flow when local infrastructure is missing", async () => {
   const executor = new FakeExecutor();
@@ -71,9 +71,9 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
     });
 
     assert.equal(result.state, LOCAL_NATIVE_TO_SOLANA_WAITING_FOR_DEPENDENCY);
-    assert.equal(result.reason, "FROST_RESERVE_SWEEP_SIGNING_PENDING");
+    assert.equal(result.reason, "FROST_RESERVE_SWEEP_SIGNATURES_PENDING");
     assert.equal(result.fullNativeToSolanaE2e, "NOT_RUN_FULL_FLOW_NATIVE_RESERVE_SWEEP_PENDING");
-    assert.equal(result.nativeToSolanaE2e.completedStage, LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_DRAFTED);
+    assert.equal(result.nativeToSolanaE2e.completedStage, LOCAL_NATIVE_TO_SOLANA_TAPROOT_SIGHASHES_VALIDATED);
     assert.equal(result.nativeToSolanaE2e.noPerTransferKingPepeTeamApprovalState, true);
     assert.equal(result.nativeToSolanaE2e.deposit.txidHex, DEPOSIT_TXID);
     assert.equal(result.nativeToSolanaE2e.deposit.vout, 1);
@@ -98,12 +98,35 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
     assert.deepEqual(result.nativeToSolanaE2e.reserveSweep.feeFundingOutpoints, [`${FEE_FUNDING_TXID}:0`]);
     assert.equal(result.nativeToSolanaE2e.reserveSweep.signed, false);
     assert.equal(result.nativeToSolanaE2e.reserveSweep.broadcast, false);
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.unsignedNativeTransactionHex, UNSIGNED_SWEEP_HEX);
     assert.match(result.nativeToSolanaE2e.reserveSweep.unsignedNativeTransactionFingerprintHex, /^[0-9a-f]{64}$/u);
+    assert.match(result.nativeToSolanaE2e.reserveSweep.unsignedNativeTransactionId, /^[0-9a-f]{64}$/u);
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.taprootSighashEvidences.length, 2);
+    assert.deepEqual(
+      result.nativeToSolanaE2e.reserveSweep.taprootSighashEvidences.map((entry) => entry.signingInputIndex),
+      [0, 1],
+    );
+    for (const evidence of result.nativeToSolanaE2e.reserveSweep.taprootSighashEvidences) {
+      assert.equal(evidence.state, "LOCALLY_VALIDATED_NATIVE_SIGHASH");
+      assert.equal(evidence.unsignedNativeTransactionFingerprintHex, result.nativeToSolanaE2e.reserveSweep.unsignedNativeTransactionFingerprintHex);
+      assert.equal(evidence.nativeSweepTxidHex, result.nativeToSolanaE2e.reserveSweep.unsignedNativeTransactionId);
+      assert.equal(evidence.recipientScriptPubKeyHex, SCRIPT_HEX);
+      assert.equal(evidence.nativeMinerFeeAtomic, "1000");
+      assert.match(evidence.taprootSighashHex, /^[0-9a-f]{64}$/u);
+      assert.match(evidence.taprootSigMsgWithEpochHex, /^00/u);
+    }
     assert.match(result.nativeToSolanaE2e.stateRoot, /^\$\{LOCAL_E2E_RUN_ROOT\}/u);
     assert.equal(result.nativeToSolanaE2e.stateRoot.includes(runRoot), false);
     assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_INITIALIZE_EPHEMERAL_FROST_CUSTODY"));
     assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_CREATE_FROST_TAPROOT_DEPOSIT_INTENT"));
     assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_SELECT_FROST_CANONICAL_RESERVE"));
+    assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_COMPUTE_VALIDATED_TAPROOT_SIGHASHES"));
+    assert.equal(
+      result.nativeToSolanaE2e.nextRequiredImplementation.includes(
+        "COMPUTE_VALIDATED_TAPROOT_SIGHASHES_FOR_EACH_FROST_CONTROLLED_INPUT",
+      ),
+      false,
+    );
     const prohibitedApprovalState = "WAITING_FOR_" + "ADMIN_APPROVAL";
     assert.equal(JSON.stringify(result).includes(prohibitedApprovalState), false);
     assert.deepEqual(
@@ -312,6 +335,8 @@ test("unsigned reserve sweep draft preserves credited reserve and requires expli
   assert.equal(draft.nativeMinerFeeAtomic, "1000");
   assert.equal(draft.reserveAmountNative, "1.00000000");
   assert.deepEqual(draft.feeFundingOutpoints, [`${FEE_FUNDING_TXID}:0`]);
+  assert.equal(draft.unsignedNativeTransactionHex, UNSIGNED_SWEEP_HEX);
+  assert.match(draft.unsignedNativeTransactionId, /^[0-9a-f]{64}$/u);
   assert.equal(draft.signed, false);
   assert.equal(draft.broadcast, false);
   assert.deepEqual(calls[0], {
@@ -466,6 +491,30 @@ test("deposit observation flow rejects raw transaction txid mismatch", async () 
   }
 });
 
+function buildUnsignedSweepHex() {
+  return buildUnsignedTransactionHex({
+    inputs: [
+      { txid: DEPOSIT_TXID, vout: 1 },
+      { txid: FEE_FUNDING_TXID, vout: 0 },
+    ],
+    outputs: [{ amountAtomic: "100000000", scriptPubKeyHex: SCRIPT_HEX }],
+  });
+}
+
+function buildUnsignedTransactionHex({ inputs, outputs }) {
+  return [
+    "02000000",
+    varintHex(inputs.length),
+    ...inputs.map((input) => `${reverse32(input.txid)}${uint32Hex(input.vout)}00ffffffff`),
+    varintHex(outputs.length),
+    ...outputs.map(
+      (output) =>
+        `${uint64Hex(BigInt(output.amountAtomic))}${varintHex(output.scriptPubKeyHex.length / 2)}${output.scriptPubKeyHex}`,
+    ),
+    "00000000",
+  ].join("");
+}
+
 function readyPlan(runRoot) {
   return createLocalE2ePlan({
     repoRoot: REPO_ROOT,
@@ -612,4 +661,26 @@ function defaultOutput(step) {
 
 function h(label) {
   return createHash("sha256").update(label).digest("hex");
+}
+
+function reverse32(hex) {
+  assert.match(hex, /^[0-9a-f]{64}$/u);
+  return Buffer.from(hex, "hex").reverse().toString("hex");
+}
+
+function varintHex(value) {
+  assert.ok(Number.isSafeInteger(value) && value >= 0 && value < 0xfd);
+  return value.toString(16).padStart(2, "0");
+}
+
+function uint32Hex(value) {
+  const out = Buffer.alloc(4);
+  out.writeUInt32LE(value, 0);
+  return out.toString("hex");
+}
+
+function uint64Hex(value) {
+  const out = Buffer.alloc(8);
+  out.writeBigUInt64LE(value, 0);
+  return out.toString("hex");
 }
