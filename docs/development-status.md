@@ -76,8 +76,9 @@
 - Phase 08 fail-closed Solana entrypoint shell CI: PASS for `7eafd8a38d346dcb018005a7357a0012a84b0e0c`
 - Phase 08 validate-only Solana ABI CI: PASS for `201c5bdc2a2fb65601331b58115e0a7543179e12`
 - Phase 08 mint-authority real Solana PDA correction CI: PASS for `94da519e7a50ea6692c445cfd307beb0fa491347`
+- Phase 08 Solana account-state codecs: local tests PASS; CI pending publication
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
-- Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 45 Rust tests after real Solana PDA correction
+- Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 47 Rust tests after account-codec update
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
 
 ## Phase 03 local implementation
@@ -151,6 +152,21 @@
 - Source commit: `201c5bdc2a2fb65601331b58115e0a7543179e12`
 - CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34298518315`
 - CI status: `PASS`
+- Real daemon-backed Native-to-Solana E2E: `BLOCKED / NOT_RUN`
+
+## Phase 08 Solana account-state codec implementation
+
+- Added fixed binary account layouts for bridge state, deposit claim records,
+  withdrawal records, transceiver configuration, and verified-message receipts.
+- Added magic bytes, version checks, exact account-length validation, and
+  canonical padding checks for bounded recipient/destination data.
+- Added tests for state/record/receipt round trips, wrong magic, unsupported
+  versions, truncated account data, overlong destinations, and alternate
+  padding.
+- Account execution and SPL Token CPI remain disabled and fail-closed.
+- Source commit: pending publication
+- CI URL: pending
+- CI status: pending
 - Real daemon-backed Native-to-Solana E2E: `BLOCKED / NOT_RUN`
 
 ## Phase 08 mint-authority real Solana PDA correction

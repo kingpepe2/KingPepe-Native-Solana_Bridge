@@ -163,3 +163,8 @@
   `94da519e7a50ea6692c445cfd307beb0fa491347`
 - Phase 08 mint-authority PDA correction CI:
   `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34299827083` PASS.
+- Phase 08 Solana account-codec status:
+  fixed binary account codecs exist for bridge state, deposit claims,
+  withdrawal records, transceiver config, and verified receipts. Account
+  execution and SPL CPI are still disabled; source publication/CI verification
+  is pending for this increment.

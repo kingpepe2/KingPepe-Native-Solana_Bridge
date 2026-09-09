@@ -29,6 +29,12 @@ pub const PROGRAM_ABI_STATUS: &str = "ECONOMIC_ABI_VALIDATE_ONLY";
 pub const TRANSCEIVER_INSTRUCTION_INITIALIZE: u8 = 1;
 pub const TRANSCEIVER_INSTRUCTION_VERIFY_MESSAGE_FROM_ED25519: u8 = 2;
 pub const TRANSCEIVER_CONFIG_INSTRUCTION_LENGTH: usize = 197;
+pub const TRANSCEIVER_ACCOUNT_VERSION: u8 = 1;
+pub const TRANSCEIVER_CONFIG_ACCOUNT_MAGIC: [u8; 8] = *b"KPTCFG01";
+pub const TRANSCEIVER_RECEIPT_ACCOUNT_MAGIC: [u8; 8] = *b"KPTRCPT1";
+pub const TRANSCEIVER_CONFIG_ACCOUNT_LENGTH: usize =
+    8 + 1 + TRANSCEIVER_CONFIG_INSTRUCTION_LENGTH;
+pub const VERIFIED_RECEIPT_ACCOUNT_LENGTH: usize = 240;
 pub const ED25519_PROGRAM_ID: PubkeyBytes = [
     0x03, 0x7d, 0x46, 0xd6, 0x7c, 0x93, 0xfb, 0xbe, 0x12, 0xf9, 0x42, 0x8f, 0x83, 0x8d, 0x40, 0xff,
     0x05, 0x70, 0x74, 0x49, 0x27, 0xf4, 0x8a, 0x64, 0xfc, 0xca, 0x70, 0x44, 0x80, 0x00, 0x00, 0x00,
@@ -195,6 +201,16 @@ pub struct VerifiedMessageReceipt {
     pub consumed: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransceiverConfigAccount {
+    pub config: TransceiverConfig,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedReceiptAccount {
+    pub receipt: VerifiedMessageReceipt,
+}
+
 #[derive(Debug, Clone)]
 pub struct TransceiverProgram {
     config: TransceiverConfig,
@@ -348,6 +364,39 @@ fn encode_transceiver_config(config: &TransceiverConfig, out: &mut Vec<u8>) {
     out.extend(config.key_epoch.to_le_bytes());
 }
 
+pub fn encode_transceiver_config_account(config: &TransceiverConfig) -> Vec<u8> {
+    let mut out = Vec::with_capacity(TRANSCEIVER_CONFIG_ACCOUNT_LENGTH);
+    out.extend(TRANSCEIVER_CONFIG_ACCOUNT_MAGIC);
+    out.push(TRANSCEIVER_ACCOUNT_VERSION);
+    encode_transceiver_config(config, &mut out);
+    debug_assert_eq!(out.len(), TRANSCEIVER_CONFIG_ACCOUNT_LENGTH);
+    out
+}
+
+pub fn decode_transceiver_config_account(
+    data: &[u8],
+) -> Result<TransceiverConfigAccount, AccountCodecError> {
+    if data.len() != TRANSCEIVER_CONFIG_ACCOUNT_LENGTH {
+        return Err(AccountCodecError::InvalidAccountLength {
+            expected: TRANSCEIVER_CONFIG_ACCOUNT_LENGTH,
+            found: data.len(),
+        });
+    }
+    let mut cursor = AccountCursor::new(data);
+    if cursor.read_array::<8>()? != TRANSCEIVER_CONFIG_ACCOUNT_MAGIC {
+        return Err(AccountCodecError::InvalidMagic);
+    }
+    if cursor.read_u8()? != TRANSCEIVER_ACCOUNT_VERSION {
+        return Err(AccountCodecError::UnsupportedVersion);
+    }
+    let config = decode_transceiver_config(cursor.remaining())
+        .map_err(|_| AccountCodecError::InvalidEncoding)?;
+    cursor.advance(TRANSCEIVER_CONFIG_INSTRUCTION_LENGTH)?;
+    cursor.finish()?;
+    config.validate()?;
+    Ok(TransceiverConfigAccount { config })
+}
+
 fn decode_transceiver_config(data: &[u8]) -> Result<TransceiverConfig, EntrypointError> {
     let mut cursor = InstructionCursor::new(data);
     let transceiver_program_id = cursor.read_array::<32>()?;
@@ -368,6 +417,59 @@ fn decode_transceiver_config(data: &[u8]) -> Result<TransceiverConfig, Entrypoin
         active,
         key_epoch,
     })
+}
+
+pub fn encode_verified_receipt_account(receipt: &VerifiedMessageReceipt) -> Vec<u8> {
+    let mut out = Vec::with_capacity(VERIFIED_RECEIPT_ACCOUNT_LENGTH);
+    out.extend(TRANSCEIVER_RECEIPT_ACCOUNT_MAGIC);
+    out.push(TRANSCEIVER_ACCOUNT_VERSION);
+    out.extend(receipt.message_digest);
+    out.extend(receipt.operation_id);
+    out.extend(receipt.transceiver_program_id);
+    out.extend(receipt.manager_program_id);
+    out.extend(receipt.mint);
+    out.push(u8::from(receipt.direction));
+    out.push(u8::from(receipt.action));
+    out.extend(receipt.key_epoch.to_le_bytes());
+    out.extend(receipt.attesters[0]);
+    out.extend(receipt.attesters[1]);
+    out.push(receipt.consumed as u8);
+    debug_assert_eq!(out.len(), VERIFIED_RECEIPT_ACCOUNT_LENGTH);
+    out
+}
+
+pub fn decode_verified_receipt_account(
+    data: &[u8],
+) -> Result<VerifiedReceiptAccount, AccountCodecError> {
+    if data.len() != VERIFIED_RECEIPT_ACCOUNT_LENGTH {
+        return Err(AccountCodecError::InvalidAccountLength {
+            expected: VERIFIED_RECEIPT_ACCOUNT_LENGTH,
+            found: data.len(),
+        });
+    }
+    let mut cursor = AccountCursor::new(data);
+    if cursor.read_array::<8>()? != TRANSCEIVER_RECEIPT_ACCOUNT_MAGIC {
+        return Err(AccountCodecError::InvalidMagic);
+    }
+    if cursor.read_u8()? != TRANSCEIVER_ACCOUNT_VERSION {
+        return Err(AccountCodecError::UnsupportedVersion);
+    }
+    let receipt = VerifiedMessageReceipt {
+        message_digest: cursor.read_array::<32>()?,
+        operation_id: cursor.read_array::<32>()?,
+        transceiver_program_id: cursor.read_array::<32>()?,
+        manager_program_id: cursor.read_array::<32>()?,
+        mint: cursor.read_array::<32>()?,
+        direction: BridgeDirection::try_from(cursor.read_u8()?)
+            .map_err(|_| AccountCodecError::InvalidEncoding)?,
+        action: BridgeAction::try_from(cursor.read_u8()?)
+            .map_err(|_| AccountCodecError::InvalidEncoding)?,
+        key_epoch: cursor.read_u32_le()?,
+        attesters: [cursor.read_array::<32>()?, cursor.read_array::<32>()?],
+        consumed: cursor.read_bool()?,
+    };
+    cursor.finish()?;
+    Ok(VerifiedReceiptAccount { receipt })
 }
 
 fn parse_ed25519_instruction(
@@ -468,6 +570,73 @@ fn ranges_overlap(a_start: usize, a_end: usize, b_start: usize, b_end: usize) ->
     a_start < b_end && b_start < a_end
 }
 
+struct AccountCursor<'a> {
+    data: &'a [u8],
+    offset: usize,
+}
+
+impl<'a> AccountCursor<'a> {
+    fn new(data: &'a [u8]) -> Self {
+        Self { data, offset: 0 }
+    }
+
+    fn read_array<const N: usize>(&mut self) -> Result<[u8; N], AccountCodecError> {
+        let end = self
+            .offset
+            .checked_add(N)
+            .ok_or(AccountCodecError::InvalidEncoding)?;
+        let bytes = self
+            .data
+            .get(self.offset..end)
+            .ok_or(AccountCodecError::InvalidEncoding)?;
+        self.offset = end;
+        Ok(bytes.try_into().expect("slice length checked"))
+    }
+
+    fn read_u8(&mut self) -> Result<u8, AccountCodecError> {
+        Ok(self.read_array::<1>()?[0])
+    }
+
+    fn read_bool(&mut self) -> Result<bool, AccountCodecError> {
+        match self.read_u8()? {
+            0 => Ok(false),
+            1 => Ok(true),
+            _ => Err(AccountCodecError::InvalidEncoding),
+        }
+    }
+
+    fn read_u32_le(&mut self) -> Result<u32, AccountCodecError> {
+        Ok(u32::from_le_bytes(self.read_array::<4>()?))
+    }
+
+    fn advance(&mut self, count: usize) -> Result<(), AccountCodecError> {
+        let end = self
+            .offset
+            .checked_add(count)
+            .ok_or(AccountCodecError::InvalidEncoding)?;
+        if end > self.data.len() {
+            return Err(AccountCodecError::InvalidEncoding);
+        }
+        self.offset = end;
+        Ok(())
+    }
+
+    fn remaining(&self) -> &'a [u8] {
+        &self.data[self.offset..]
+    }
+
+    fn finish(&self) -> Result<(), AccountCodecError> {
+        if self.offset == self.data.len() {
+            Ok(())
+        } else {
+            Err(AccountCodecError::InvalidAccountLength {
+                expected: self.offset,
+                found: self.data.len(),
+            })
+        }
+    }
+}
+
 struct InstructionCursor<'a> {
     data: &'a [u8],
     offset: usize,
@@ -537,6 +706,20 @@ pub enum EntrypointError {
     InvalidCanonicalMessage,
     #[error("unsupported Solana instruction tag {0}")]
     UnsupportedInstructionTag(u8),
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum AccountCodecError {
+    #[error("Solana account data length mismatch, expected {expected}, found {found}")]
+    InvalidAccountLength { expected: usize, found: usize },
+    #[error("Solana account data magic is invalid")]
+    InvalidMagic,
+    #[error("Solana account data version is unsupported")]
+    UnsupportedVersion,
+    #[error("Solana account data encoding is invalid")]
+    InvalidEncoding,
+    #[error("transceiver error: {0}")]
+    Transceiver(#[from] TransceiverError),
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -743,6 +926,57 @@ mod tests {
             Err(EntrypointError::InvalidInstructionLength {
                 expected: 1 + MESSAGE_LENGTH + 4,
                 found: 2 + MESSAGE_LENGTH + 4,
+            })
+        );
+    }
+
+    #[test]
+    fn transceiver_account_codecs_round_trip_and_reject_malformed_data() {
+        let config = config();
+        let config_bytes = encode_transceiver_config_account(&config);
+        assert_eq!(config_bytes.len(), TRANSCEIVER_CONFIG_ACCOUNT_LENGTH);
+        assert_eq!(
+            decode_transceiver_config_account(&config_bytes).unwrap(),
+            TransceiverConfigAccount {
+                config: config.clone()
+            }
+        );
+
+        let mut wrong_magic = config_bytes.clone();
+        wrong_magic[0] ^= 1;
+        assert_eq!(
+            decode_transceiver_config_account(&wrong_magic),
+            Err(AccountCodecError::InvalidMagic)
+        );
+
+        let mut wrong_version = config_bytes.clone();
+        wrong_version[8] = TRANSCEIVER_ACCOUNT_VERSION + 1;
+        assert_eq!(
+            decode_transceiver_config_account(&wrong_version),
+            Err(AccountCodecError::UnsupportedVersion)
+        );
+
+        let message = message(&config);
+        let digest = message.message_digest().unwrap();
+        let mut program = TransceiverProgram::initialize(config.clone()).unwrap();
+        program
+            .verify_message(&message, &observations(&config, digest))
+            .unwrap();
+        let receipt = program.receipt(&digest).unwrap().clone();
+        let receipt_bytes = encode_verified_receipt_account(&receipt);
+        assert_eq!(receipt_bytes.len(), VERIFIED_RECEIPT_ACCOUNT_LENGTH);
+        assert_eq!(
+            decode_verified_receipt_account(&receipt_bytes).unwrap(),
+            VerifiedReceiptAccount { receipt }
+        );
+
+        let mut truncated = receipt_bytes;
+        truncated.pop();
+        assert_eq!(
+            decode_verified_receipt_account(&truncated),
+            Err(AccountCodecError::InvalidAccountLength {
+                expected: VERIFIED_RECEIPT_ACCOUNT_LENGTH,
+                found: VERIFIED_RECEIPT_ACCOUNT_LENGTH - 1,
             })
         );
     }

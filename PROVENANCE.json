@@ -553,7 +553,7 @@
     {
       "path": "solana/programs/kingpepe-bridge/src/lib.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Bridge manager implementation with Phase 08 validate-only economic instruction ABI decoding and real Solana PDA mint-authority derivation; account execution and SPL CPI remain disabled."
+      "notes": "Bridge manager implementation with Phase 08 validate-only economic instruction ABI decoding, real Solana PDA mint-authority derivation, and fixed binary account-state codecs; account execution and SPL CPI remain disabled."
     },
     {
       "path": "solana/programs/kingpepe-bridge/tests/bridge_smoke.rs",
@@ -568,7 +568,7 @@
     {
       "path": "solana/programs/kingpepe-transceiver/src/lib.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Transceiver implementation, receipt validation, Phase 07 Ed25519 instruction binding, and Phase 08 validate-only economic instruction ABI decoding."
+      "notes": "Transceiver implementation, receipt validation, Phase 07 Ed25519 instruction binding, Phase 08 validate-only economic instruction ABI decoding, and fixed binary config/receipt account codecs."
     },
     {
       "path": "solana/programs/kingpepe-transceiver/tests/transceiver_smoke.rs",

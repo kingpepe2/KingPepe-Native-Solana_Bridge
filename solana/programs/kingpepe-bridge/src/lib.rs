@@ -9,7 +9,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use bridge_messages::{BridgeAction, BridgeDirection, CanonicalBridgeMessage, Hash32, PubkeyBytes};
+use bridge_messages::{
+    BridgeAction, BridgeDirection, CanonicalBridgeMessage, Hash32, PubkeyBytes,
+    MAX_DESTINATION_LENGTH,
+};
 use kingpepe_transceiver::{TransceiverError, TransceiverProgram, VerifiedMessageReceipt};
 use solana_program::{
     account_info::AccountInfo, declare_id, entrypoint::ProgramResult, program_error::ProgramError,
@@ -31,6 +34,15 @@ pub const BRIDGE_INSTRUCTION_RECORD_WITHDRAWAL_REQUEST: u8 = 3;
 pub const BRIDGE_CONFIG_INSTRUCTION_LENGTH: usize = 256;
 pub const BURN_CHECKED_INSTRUCTION_LENGTH: usize = 105;
 pub const MINT_AUTHORITY_PDA_SEED_PREFIX: &[u8] = b"kingpepe-mint-authority";
+pub const BRIDGE_ACCOUNT_VERSION: u8 = 1;
+pub const BRIDGE_STATE_ACCOUNT_MAGIC: [u8; 8] = *b"KPBSTAT1";
+pub const DEPOSIT_CLAIM_ACCOUNT_MAGIC: [u8; 8] = *b"KPBCLM01";
+pub const WITHDRAWAL_RECORD_ACCOUNT_MAGIC: [u8; 8] = *b"KPBWDR01";
+pub const BRIDGE_STATE_ACCOUNT_LENGTH: usize =
+    8 + 1 + 1 + BRIDGE_CONFIG_INSTRUCTION_LENGTH + 16 + 16;
+pub const DEPOSIT_CLAIM_ACCOUNT_LENGTH: usize = 8 + 1 + 32 + 32 + 8 + 2 + MAX_DESTINATION_LENGTH;
+pub const WITHDRAWAL_RECORD_ACCOUNT_LENGTH: usize =
+    8 + 1 + 32 + 32 + 32 + 8 + 8 + 2 + MAX_DESTINATION_LENGTH + 32;
 pub const KPEPE_SYMBOL: &str = "KPEPE";
 pub const KPEPE_NAME: &str = "KingPepe";
 pub const EXPECTED_INITIAL_SUPPLY: u128 = 0;
@@ -319,6 +331,24 @@ pub struct WithdrawalRecord {
     pub fee_atomic: u64,
     pub native_destination: Vec<u8>,
     pub burn_authority: PubkeyBytes,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BridgeStateAccount {
+    pub state: ProgramState,
+    pub config: BridgeConfig,
+    pub minted_supply: u128,
+    pub burned_unpaid_withdrawals: u128,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DepositClaimAccount {
+    pub record: DepositClaimRecord,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WithdrawalRecordAccount {
+    pub record: WithdrawalRecord,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -654,6 +684,176 @@ fn validate_burn(
     Ok(())
 }
 
+pub fn encode_bridge_state_account(
+    state: &BridgeStateAccount,
+) -> Result<Vec<u8>, AccountCodecError> {
+    validate_config(&state.config)?;
+    let mut out = Vec::with_capacity(BRIDGE_STATE_ACCOUNT_LENGTH);
+    out.extend(BRIDGE_STATE_ACCOUNT_MAGIC);
+    out.push(BRIDGE_ACCOUNT_VERSION);
+    out.push(program_state_to_u8(&state.state));
+    encode_bridge_config(&state.config, &mut out);
+    out.extend(state.minted_supply.to_le_bytes());
+    out.extend(state.burned_unpaid_withdrawals.to_le_bytes());
+    debug_assert_eq!(out.len(), BRIDGE_STATE_ACCOUNT_LENGTH);
+    Ok(out)
+}
+
+pub fn decode_bridge_state_account(data: &[u8]) -> Result<BridgeStateAccount, AccountCodecError> {
+    if data.len() != BRIDGE_STATE_ACCOUNT_LENGTH {
+        return Err(AccountCodecError::InvalidAccountLength {
+            expected: BRIDGE_STATE_ACCOUNT_LENGTH,
+            found: data.len(),
+        });
+    }
+    let mut cursor = AccountCursor::new(data);
+    if cursor.read_array::<8>()? != BRIDGE_STATE_ACCOUNT_MAGIC {
+        return Err(AccountCodecError::InvalidMagic);
+    }
+    if cursor.read_u8()? != BRIDGE_ACCOUNT_VERSION {
+        return Err(AccountCodecError::UnsupportedVersion);
+    }
+    let state = program_state_from_u8(cursor.read_u8()?)?;
+    let config_bytes = cursor.read_array::<BRIDGE_CONFIG_INSTRUCTION_LENGTH>()?;
+    let config =
+        decode_bridge_config(&config_bytes).map_err(|_| AccountCodecError::InvalidEncoding)?;
+    let minted_supply = cursor.read_u128_le()?;
+    let burned_unpaid_withdrawals = cursor.read_u128_le()?;
+    cursor.finish()?;
+    validate_config(&config)?;
+    Ok(BridgeStateAccount {
+        state,
+        config,
+        minted_supply,
+        burned_unpaid_withdrawals,
+    })
+}
+
+pub fn encode_deposit_claim_account(
+    record: &DepositClaimRecord,
+) -> Result<Vec<u8>, AccountCodecError> {
+    let mut out = Vec::with_capacity(DEPOSIT_CLAIM_ACCOUNT_LENGTH);
+    out.extend(DEPOSIT_CLAIM_ACCOUNT_MAGIC);
+    out.push(BRIDGE_ACCOUNT_VERSION);
+    out.extend(record.operation_id);
+    out.extend(record.message_digest);
+    out.extend(record.amount_atomic.to_le_bytes());
+    write_bounded_bytes(&mut out, &record.recipient)?;
+    debug_assert_eq!(out.len(), DEPOSIT_CLAIM_ACCOUNT_LENGTH);
+    Ok(out)
+}
+
+pub fn decode_deposit_claim_account(
+    data: &[u8],
+) -> Result<DepositClaimAccount, AccountCodecError> {
+    if data.len() != DEPOSIT_CLAIM_ACCOUNT_LENGTH {
+        return Err(AccountCodecError::InvalidAccountLength {
+            expected: DEPOSIT_CLAIM_ACCOUNT_LENGTH,
+            found: data.len(),
+        });
+    }
+    let mut cursor = AccountCursor::new(data);
+    if cursor.read_array::<8>()? != DEPOSIT_CLAIM_ACCOUNT_MAGIC {
+        return Err(AccountCodecError::InvalidMagic);
+    }
+    if cursor.read_u8()? != BRIDGE_ACCOUNT_VERSION {
+        return Err(AccountCodecError::UnsupportedVersion);
+    }
+    let record = DepositClaimRecord {
+        operation_id: cursor.read_array::<32>()?,
+        message_digest: cursor.read_array::<32>()?,
+        amount_atomic: cursor.read_u64_le()?,
+        recipient: read_bounded_bytes(&mut cursor)?,
+    };
+    cursor.finish()?;
+    Ok(DepositClaimAccount { record })
+}
+
+pub fn encode_withdrawal_record_account(
+    record: &WithdrawalRecord,
+) -> Result<Vec<u8>, AccountCodecError> {
+    let mut out = Vec::with_capacity(WITHDRAWAL_RECORD_ACCOUNT_LENGTH);
+    out.extend(WITHDRAWAL_RECORD_ACCOUNT_MAGIC);
+    out.push(BRIDGE_ACCOUNT_VERSION);
+    out.extend(record.withdrawal_id);
+    out.extend(record.operation_id);
+    out.extend(record.message_digest);
+    out.extend(record.gross_amount_atomic.to_le_bytes());
+    out.extend(record.fee_atomic.to_le_bytes());
+    write_bounded_bytes(&mut out, &record.native_destination)?;
+    out.extend(record.burn_authority);
+    debug_assert_eq!(out.len(), WITHDRAWAL_RECORD_ACCOUNT_LENGTH);
+    Ok(out)
+}
+
+pub fn decode_withdrawal_record_account(
+    data: &[u8],
+) -> Result<WithdrawalRecordAccount, AccountCodecError> {
+    if data.len() != WITHDRAWAL_RECORD_ACCOUNT_LENGTH {
+        return Err(AccountCodecError::InvalidAccountLength {
+            expected: WITHDRAWAL_RECORD_ACCOUNT_LENGTH,
+            found: data.len(),
+        });
+    }
+    let mut cursor = AccountCursor::new(data);
+    if cursor.read_array::<8>()? != WITHDRAWAL_RECORD_ACCOUNT_MAGIC {
+        return Err(AccountCodecError::InvalidMagic);
+    }
+    if cursor.read_u8()? != BRIDGE_ACCOUNT_VERSION {
+        return Err(AccountCodecError::UnsupportedVersion);
+    }
+    let record = WithdrawalRecord {
+        withdrawal_id: cursor.read_array::<32>()?,
+        operation_id: cursor.read_array::<32>()?,
+        message_digest: cursor.read_array::<32>()?,
+        gross_amount_atomic: cursor.read_u64_le()?,
+        fee_atomic: cursor.read_u64_le()?,
+        native_destination: read_bounded_bytes(&mut cursor)?,
+        burn_authority: cursor.read_array::<32>()?,
+    };
+    cursor.finish()?;
+    Ok(WithdrawalRecordAccount { record })
+}
+
+fn program_state_to_u8(state: &ProgramState) -> u8 {
+    match state {
+        ProgramState::Uninitialized => 0,
+        ProgramState::Phase0Disabled => 1,
+        ProgramState::LocalnetTesting => 2,
+    }
+}
+
+fn program_state_from_u8(value: u8) -> Result<ProgramState, AccountCodecError> {
+    match value {
+        0 => Ok(ProgramState::Uninitialized),
+        1 => Ok(ProgramState::Phase0Disabled),
+        2 => Ok(ProgramState::LocalnetTesting),
+        _ => Err(AccountCodecError::InvalidEncoding),
+    }
+}
+
+fn write_bounded_bytes(out: &mut Vec<u8>, value: &[u8]) -> Result<(), AccountCodecError> {
+    if value.is_empty() || value.len() > MAX_DESTINATION_LENGTH {
+        return Err(AccountCodecError::InvalidEncoding);
+    }
+    out.extend((value.len() as u16).to_le_bytes());
+    out.extend(value);
+    out.resize(out.len() + (MAX_DESTINATION_LENGTH - value.len()), 0);
+    Ok(())
+}
+
+fn read_bounded_bytes(cursor: &mut AccountCursor<'_>) -> Result<Vec<u8>, AccountCodecError> {
+    let len = cursor.read_u16_le()? as usize;
+    if len == 0 || len > MAX_DESTINATION_LENGTH {
+        return Err(AccountCodecError::InvalidEncoding);
+    }
+    let padded = cursor.read_array::<MAX_DESTINATION_LENGTH>()?;
+    if padded[len..].iter().any(|byte| *byte != 0) {
+        return Err(AccountCodecError::InvalidEncoding);
+    }
+    Ok(padded[..len].to_vec())
+}
+
 fn encode_burn_checked(burn: &BurnChecked, out: &mut Vec<u8>) {
     out.extend(burn.token_program_id);
     out.extend(burn.mint);
@@ -673,6 +873,57 @@ fn decode_burn_checked(data: &[u8]) -> Result<BurnChecked, EntrypointError> {
     };
     cursor.finish()?;
     Ok(burn)
+}
+
+struct AccountCursor<'a> {
+    data: &'a [u8],
+    offset: usize,
+}
+
+impl<'a> AccountCursor<'a> {
+    fn new(data: &'a [u8]) -> Self {
+        Self { data, offset: 0 }
+    }
+
+    fn read_array<const N: usize>(&mut self) -> Result<[u8; N], AccountCodecError> {
+        let end = self
+            .offset
+            .checked_add(N)
+            .ok_or(AccountCodecError::InvalidEncoding)?;
+        let bytes = self
+            .data
+            .get(self.offset..end)
+            .ok_or(AccountCodecError::InvalidEncoding)?;
+        self.offset = end;
+        Ok(bytes.try_into().expect("slice length checked"))
+    }
+
+    fn read_u8(&mut self) -> Result<u8, AccountCodecError> {
+        Ok(self.read_array::<1>()?[0])
+    }
+
+    fn read_u16_le(&mut self) -> Result<u16, AccountCodecError> {
+        Ok(u16::from_le_bytes(self.read_array::<2>()?))
+    }
+
+    fn read_u64_le(&mut self) -> Result<u64, AccountCodecError> {
+        Ok(u64::from_le_bytes(self.read_array::<8>()?))
+    }
+
+    fn read_u128_le(&mut self) -> Result<u128, AccountCodecError> {
+        Ok(u128::from_le_bytes(self.read_array::<16>()?))
+    }
+
+    fn finish(&self) -> Result<(), AccountCodecError> {
+        if self.offset == self.data.len() {
+            Ok(())
+        } else {
+            Err(AccountCodecError::InvalidAccountLength {
+                expected: self.offset,
+                found: self.data.len(),
+            })
+        }
+    }
 }
 
 struct InstructionCursor<'a> {
@@ -748,6 +999,20 @@ pub enum EntrypointError {
     InvalidCanonicalMessage,
     #[error("unsupported Solana instruction tag {0}")]
     UnsupportedInstructionTag(u8),
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum AccountCodecError {
+    #[error("Solana account data length mismatch, expected {expected}, found {found}")]
+    InvalidAccountLength { expected: usize, found: usize },
+    #[error("Solana account data magic is invalid")]
+    InvalidMagic,
+    #[error("Solana account data version is unsupported")]
+    UnsupportedVersion,
+    #[error("Solana account data encoding is invalid")]
+    InvalidEncoding,
+    #[error("bridge error: {0}")]
+    Bridge(#[from] BridgeError),
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -1023,6 +1288,91 @@ mod tests {
 
         assert_eq!(derived, expected.to_bytes());
         assert_ne!(derived, [0u8; 32]);
+    }
+
+    #[test]
+    fn bridge_account_codecs_round_trip_and_reject_malformed_data() {
+        let config = base_config();
+        let state = BridgeStateAccount {
+            state: ProgramState::LocalnetTesting,
+            config: config.clone(),
+            minted_supply: 55,
+            burned_unpaid_withdrawals: 13,
+        };
+        let state_bytes = encode_bridge_state_account(&state).unwrap();
+        assert_eq!(state_bytes.len(), BRIDGE_STATE_ACCOUNT_LENGTH);
+        assert_eq!(decode_bridge_state_account(&state_bytes).unwrap(), state);
+
+        let mut wrong_magic = state_bytes.clone();
+        wrong_magic[0] ^= 1;
+        assert_eq!(
+            decode_bridge_state_account(&wrong_magic),
+            Err(AccountCodecError::InvalidMagic)
+        );
+
+        let mut wrong_version = state_bytes;
+        wrong_version[8] = BRIDGE_ACCOUNT_VERSION + 1;
+        assert_eq!(
+            decode_bridge_state_account(&wrong_version),
+            Err(AccountCodecError::UnsupportedVersion)
+        );
+
+        let deposit = DepositClaimRecord {
+            operation_id: h(10),
+            message_digest: h(11),
+            amount_atomic: 144,
+            recipient: vec![1, 2, 3],
+        };
+        let deposit_bytes = encode_deposit_claim_account(&deposit).unwrap();
+        assert_eq!(deposit_bytes.len(), DEPOSIT_CLAIM_ACCOUNT_LENGTH);
+        assert_eq!(
+            decode_deposit_claim_account(&deposit_bytes).unwrap(),
+            DepositClaimAccount {
+                record: deposit.clone()
+            }
+        );
+
+        let mut alternate_padding = deposit_bytes;
+        let padding_index = 8 + 1 + 32 + 32 + 8 + 2 + deposit.recipient.len();
+        alternate_padding[padding_index] = 9;
+        assert_eq!(
+            decode_deposit_claim_account(&alternate_padding),
+            Err(AccountCodecError::InvalidEncoding)
+        );
+
+        let overlong_deposit = DepositClaimRecord {
+            recipient: vec![7; MAX_DESTINATION_LENGTH + 1],
+            ..deposit
+        };
+        assert_eq!(
+            encode_deposit_claim_account(&overlong_deposit),
+            Err(AccountCodecError::InvalidEncoding)
+        );
+
+        let withdrawal = WithdrawalRecord {
+            withdrawal_id: h(12),
+            operation_id: h(13),
+            message_digest: h(14),
+            gross_amount_atomic: 233,
+            fee_atomic: 1,
+            native_destination: vec![4, 5, 6, 7],
+            burn_authority: h(15),
+        };
+        let withdrawal_bytes = encode_withdrawal_record_account(&withdrawal).unwrap();
+        assert_eq!(withdrawal_bytes.len(), WITHDRAWAL_RECORD_ACCOUNT_LENGTH);
+        assert_eq!(
+            decode_withdrawal_record_account(&withdrawal_bytes).unwrap(),
+            WithdrawalRecordAccount { record: withdrawal }
+        );
+
+        let truncated = &withdrawal_bytes[..WITHDRAWAL_RECORD_ACCOUNT_LENGTH - 1];
+        assert_eq!(
+            decode_withdrawal_record_account(truncated),
+            Err(AccountCodecError::InvalidAccountLength {
+                expected: WITHDRAWAL_RECORD_ACCOUNT_LENGTH,
+                found: WITHDRAWAL_RECORD_ACCOUNT_LENGTH - 1,
+            })
+        );
     }
 
     #[test]

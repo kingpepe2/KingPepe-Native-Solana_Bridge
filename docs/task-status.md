@@ -282,3 +282,31 @@
   - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
 - next:
   - Continue Phase 08 account execution and SPL Token CPI. Do not proceed to Phase 09 until the Native-to-Solana local E2E gate actually passes.
+
+## Phase 08 Solana account-state codec implementation
+
+- PHASE: `08`
+- source commit: pending publication
+- push result: pending
+- CI URL: pending
+- CI status: pending
+- tests:
+  - `cd solana && cargo check --locked --workspace --all-targets` (pass under WSL)
+  - `cd solana && cargo test --locked --workspace --all-targets` (pass under WSL, 47 Rust tests)
+  - `npm test` (pass, 2 vectors plus 26 Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - `npm run doctor:local-e2e` (expected BLOCKED, exit 2)
+  - local `cargo clippy`: NOT_RUN locally; this WSL Cargo installation has no `clippy` command
+  - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
+- changed:
+  - Added fixed binary account codecs for bridge state, deposit claims, withdrawal records, transceiver config, and verified receipts.
+  - Added magic/version/exact-length validation for those account layouts.
+  - Rejected overlong recipient/destination data and alternate padded account encodings.
+  - Kept economic execution and SPL Token CPI disabled and fail-closed.
+- blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`
+  - `SOLANA_PROGRAM_EXECUTION_NOT_READY`
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
+- next:
+  - Publish and verify this account-codec increment, then continue Phase 08 account execution and SPL Token CPI. Do not proceed to Phase 09 until the Native-to-Solana local E2E gate actually passes.
