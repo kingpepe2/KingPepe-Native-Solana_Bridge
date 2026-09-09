@@ -138,8 +138,10 @@
 - The local Native-to-Solana runner now computes BIP-341 key-path
   `SIGHASH_DEFAULT` evidence for the deposit and fee-funding Taproot inputs,
   prepares input-specific FROST signing intents, runs disposable local
-  software FROST A+B signatures, and attaches key-path Taproot witnesses. It
-  still stops before Native broadcast/finality, Solana mint submission, and
+  software FROST A+B signatures, attaches key-path Taproot witnesses,
+  broadcasts the signed reserve sweep with `sendrawtransaction` when local
+  daemons are available, mines local finality, and validates the finalized
+  reserve output. It still stops before Solana mint submission and
   reconciliation.
 - Do not mark Native-to-Solana local E2E as passed until a disposable
   KingPepe regtest node and Solana local validator execute the full automated

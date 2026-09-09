@@ -1046,3 +1046,30 @@
   - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
   - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
   - Real daemon-backed Native broadcast/finality, Solana mint submission, and reconciliation remain `BLOCKED / NOT_RUN`.
+
+## Phase 08 local reserve-sweep broadcast and finality validation
+
+- Source status: implemented locally; exact source SHA and CI will be recorded after push.
+- What changed:
+  - The local Native-to-Solana runner now broadcasts the already FROST-signed, witness-attached reserve sweep with `sendrawtransaction` when local REGTEST infrastructure is available.
+  - The runner mines local finality blocks, observes the finalized reserve-sweep transaction, and validates exact txid, input outpoints, reserve output amount, reserve script, and confirmation depth.
+  - The runner now advances to `LOCAL_NATIVE_RESERVE_SWEEP_FINALIZED` and stops at `SOLANA_MINT_PENDING`.
+  - The runner still does not claim a full E2E pass until Solana mint submission, finalized mint observation, and reconciliation execute against real local daemons.
+- Local tests run before source commit:
+  - `node --check scripts/local-e2e-native-to-solana.mjs`: PASS.
+  - `node --check scripts/tests/local-e2e-native-to-solana.test.mjs`: PASS.
+  - `node --test scripts/tests/local-e2e-native-to-solana.test.mjs`: PASS, 12 tests.
+  - `npm test`: PASS, 2 protocol vectors plus 105 Node tests.
+  - `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
+  - `python .github/scripts/guardrails.py`: PASS.
+  - JSON manifest parse checks: PASS.
+  - WSL Solana Rust workspace tests: PASS, 52 tests.
+  - WSL Native FROST Rust tests: PASS, 7 tests.
+  - WSL Native proof Rust tests: PASS, 8 tests.
+  - WSL Native reserve Rust tests: PASS, 4 tests.
+  - WSL Native recovery Rust tests: PASS, 3 tests.
+  - `npm run local:e2e:native-to-solana`: `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
+- Current blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
+  - Real daemon-backed Solana mint submission, finalized mint observation, and reconciliation remain `BLOCKED / NOT_RUN`.
