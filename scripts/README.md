@@ -17,7 +17,8 @@ Current safe utilities:
   fail-closed.
 - `local-e2e-native-to-solana.mjs` is the Phase 08 Native-to-Solana command
   runner. It composes the bootstrap harness with local REGTEST wallet funding,
-  deposit intent creation, deposit transaction observation, and UTXO/finality
-  checks. Until reserve-sweep construction, FROST-backed reserve broadcast,
-  Solana mint submission, and reconciliation are exercised against real local
-  daemons, it reports the full flow as not run rather than passed.
+  deposit intent creation, local Native source/genesis validation, raw deposit
+  transaction identity checks, UTXO/finality checks, and non-secret proof
+  fingerprinting. Until reserve-sweep construction, FROST-backed reserve
+  broadcast, Solana mint submission, and reconciliation are exercised against
+  real local daemons, it reports the full flow as not run rather than passed.

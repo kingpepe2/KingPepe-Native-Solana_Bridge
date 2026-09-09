@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { hashJson } from "../shared/protocol/canonical-message.mjs";
 import {
   buildRegtestCliArguments,
   sanitizePlanForReport,
@@ -25,9 +26,12 @@ export const LOCAL_NATIVE_TO_SOLANA_WAITING_FOR_DEPENDENCY = "WAITING_FOR_DEPEND
 export const LOCAL_NATIVE_TO_SOLANA_BLOCKED = "BLOCKED_LOCAL_INFRASTRUCTURE_MISSING";
 export const LOCAL_NATIVE_TO_SOLANA_FAILED = "LOCAL_NATIVE_TO_SOLANA_E2E_FAILED";
 export const LOCAL_NATIVE_TO_SOLANA_DEPOSIT_OBSERVED = "LOCAL_NATIVE_DEPOSIT_OBSERVED";
+export const LOCAL_NATIVE_TO_SOLANA_DEPOSIT_EVIDENCE_VALIDATED =
+  "LOCAL_NATIVE_DEPOSIT_EVIDENCE_VALIDATED";
 
 const DEFAULT_AMOUNT_NATIVE = "1.00000000";
 const DEFAULT_NATIVE_DECIMALS = 8;
+const DEFAULT_NATIVE_CHAIN_NAME = "regtest";
 const DEFAULT_COINBASE_MATURITY_BLOCKS = 101;
 const DEFAULT_DEPOSIT_FINALITY_BLOCKS = 6;
 
@@ -109,6 +113,7 @@ export function createNativeToSolanaFlowConfig(options) {
     amountNative,
     amountAtomic: amountAtomic.toString(),
     nativeDecimals,
+    nativeChainName: sanitizeNetworkName(value.nativeChainName ?? DEFAULT_NATIVE_CHAIN_NAME),
     coinbaseMaturityBlocks: checkedInteger(
       value.coinbaseMaturityBlocks ?? DEFAULT_COINBASE_MATURITY_BLOCKS,
       "coinbaseMaturityBlocks",
@@ -197,12 +202,32 @@ export async function executeNativeDepositObservationFlow({
     command: "generatetoaddress",
     parameters: [String(config.depositFinalityBlocks), miningAddress],
   });
+  const blockchainInfo = await cli({
+    step: "LOCAL_E2E_OBSERVE_NATIVE_SOURCE_SNAPSHOT",
+    command: "getblockchaininfo",
+    parseJson: true,
+  });
+  const nativeGenesisHash = normalizeHash32(
+    await cli({
+      step: "LOCAL_E2E_OBSERVE_NATIVE_GENESIS_HASH",
+      command: "getblockhash",
+      parameters: ["0"],
+    }),
+    "nativeGenesisHash",
+  );
+  const nativeSource = validateLocalNativeSourceSnapshot({
+    blockchainInfo,
+    genesisHash: nativeGenesisHash,
+    expectedChain: config.nativeChainName,
+    minimumBlocks: config.coinbaseMaturityBlocks + config.depositFinalityBlocks,
+  });
   const rawTransaction = await cli({
     step: "LOCAL_E2E_OBSERVE_DEPOSIT_TRANSACTION",
     command: "getrawtransaction",
     parameters: [depositTxidHex, "true"],
     parseJson: true,
   });
+  validateRawDepositTransaction({ rawTransaction, expectedTxidHex: depositTxidHex });
   const depositOutput = findDepositOutput({
     rawTransaction,
     depositAddress,
@@ -215,23 +240,30 @@ export async function executeNativeDepositObservationFlow({
     parameters: [depositTxidHex, String(depositOutput.vout), "false"],
     parseJson: true,
   });
-  validateDepositUtxo({
+  const depositUtxo = validateDepositUtxo({
     utxo,
     output: depositOutput,
     expectedConfirmations: config.depositFinalityBlocks,
     nativeDecimals: config.nativeDecimals,
+  });
+  const proofFingerprintHex = localDepositProofFingerprintHex({
+    nativeSource,
+    depositTxidHex,
+    depositOutput,
+    depositUtxo,
   });
 
   return Object.freeze({
     protocol: LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL,
     state: LOCAL_NATIVE_TO_SOLANA_WAITING_FOR_DEPENDENCY,
     reason: "NATIVE_RESERVE_SWEEP_CONSTRUCTION_PENDING",
-    completedStage: LOCAL_NATIVE_TO_SOLANA_DEPOSIT_OBSERVED,
+    completedStage: LOCAL_NATIVE_TO_SOLANA_DEPOSIT_EVIDENCE_VALIDATED,
     productionReady: false,
     mainnetActivation: "DISABLED",
     noPerTransferKingPepeTeamApprovalState: true,
     trustBoundary: RPC_OBSERVATION,
     stages,
+    nativeSource,
     stateRoot: config.stateRoot,
     deposit: Object.freeze({
       txidHex: depositTxidHex,
@@ -239,7 +271,13 @@ export async function executeNativeDepositObservationFlow({
       amountAtomic: config.amountAtomic,
       scriptPubKeyHex: depositOutput.scriptPubKeyHex,
       finalityBlocks: config.depositFinalityBlocks,
+      finalitySatisfied: depositUtxo.finalitySatisfied,
       utxoUnspent: true,
+      nativeNetwork: nativeSource.nativeNetwork,
+      nativeGenesisHash: nativeSource.nativeGenesisHash,
+      sourceBestBlockHash: nativeSource.bestBlockHash,
+      sourceBestHeight: nativeSource.bestHeight,
+      proofFingerprintHex,
     }),
     nextRequiredImplementation: Object.freeze([
       "CONSTRUCT_CANONICAL_RESERVE_SWEEP_WITH_NATIVE_RULES",
@@ -248,6 +286,62 @@ export async function executeNativeDepositObservationFlow({
       "SUBMIT_AND_OBSERVE_SOLANA_MINT",
       "RECONCILE_RESERVE_SUPPLY_AND_LIABILITIES",
     ]),
+  });
+}
+
+export function validateLocalNativeSourceSnapshot({
+  blockchainInfo,
+  genesisHash,
+  expectedChain = DEFAULT_NATIVE_CHAIN_NAME,
+  minimumBlocks = 0,
+}) {
+  const info = requireObject(blockchainInfo, "blockchainInfo");
+  const chain = checkedNetworkName(info.chain, "blockchainInfo.chain");
+  const expected = checkedNetworkName(expectedChain, "expectedChain");
+  const blocks = checkedInteger(info.blocks, "blockchainInfo.blocks", 0, 10_000_000);
+  const headers = checkedInteger(info.headers ?? blocks, "blockchainInfo.headers", 0, 10_000_000);
+  const minimum = checkedInteger(minimumBlocks, "minimumBlocks", 0, 10_000_000);
+  const bestBlockHash = normalizeHash32(info.bestblockhash, "blockchainInfo.bestblockhash");
+  const normalizedGenesisHash = normalizeHash32(genesisHash, "genesisHash");
+  const chainworkHex = normalizeNonEmptyHexText(info.chainwork, "blockchainInfo.chainwork");
+  const inInitialBlockDownload = info.initialblockdownload === true;
+
+  if (chain !== expected) {
+    throw new Error("LocalNativeSourceWrongNetwork");
+  }
+  if (inInitialBlockDownload) {
+    throw new Error("LocalNativeSourceInInitialBlockDownload");
+  }
+  if (headers < blocks) {
+    throw new Error("LocalNativeSourceHeadersBehindBlocks");
+  }
+  if (blocks < minimum) {
+    throw new Error("LocalNativeSourceHeightInsufficient");
+  }
+
+  return Object.freeze({
+    protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/NATIVE_SOURCE_SNAPSHOT`,
+    trust: RPC_OBSERVATION,
+    state: "READY",
+    nativeNetwork: chain,
+    nativeGenesisHash: normalizedGenesisHash,
+    bestBlockHash,
+    bestHeight: blocks,
+    headers,
+    chainworkHex,
+    inInitialBlockDownload,
+  });
+}
+
+export function validateRawDepositTransaction({ rawTransaction, expectedTxidHex }) {
+  const tx = requireObject(rawTransaction, "rawTransaction");
+  const observedTxidHex = normalizeHash32(tx.txid, "rawTransaction.txid");
+  const expected = normalizeHash32(expectedTxidHex, "expectedTxidHex");
+  if (observedTxidHex !== expected) {
+    throw new Error("LocalNativeDepositTxidMismatch");
+  }
+  return Object.freeze({
+    txidHex: observedTxidHex,
   });
 }
 
@@ -288,6 +382,46 @@ export function validateDepositUtxo({ utxo, output, expectedConfirmations, nativ
   if (confirmations < expectedConfirmations) {
     throw new Error("LocalNativeDepositUtxoFinalityInsufficient");
   }
+  if (value.coinbase === true) {
+    throw new Error("LocalNativeDepositUtxoCoinbaseRejected");
+  }
+  return Object.freeze({
+    unspent: true,
+    amountAtomic: actualAmountAtomic,
+    scriptPubKeyHex,
+    confirmations,
+    finalitySatisfied: true,
+    bestBlockHash:
+      value.bestblock === undefined ? undefined : normalizeHash32(value.bestblock, "utxo.bestblock"),
+    coinbase: value.coinbase === true,
+  });
+}
+
+export function localDepositProofFingerprintHex({
+  nativeSource,
+  depositTxidHex,
+  depositOutput,
+  depositUtxo,
+}) {
+  const source = requireObject(nativeSource, "nativeSource");
+  const output = requireObject(depositOutput, "depositOutput");
+  const utxo = requireObject(depositUtxo, "depositUtxo");
+  return hashJson({
+    protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/DEPOSIT_PROOF_FINGERPRINT`,
+    trust: source.trust,
+    nativeNetwork: source.nativeNetwork,
+    nativeGenesisHash: source.nativeGenesisHash,
+    bestBlockHash: source.bestBlockHash,
+    bestHeight: source.bestHeight,
+    depositTxidHex: normalizeHash32(depositTxidHex, "depositTxidHex"),
+    depositVout: checkedInteger(output.vout, "depositOutput.vout", 0, 10_000_000),
+    amountAtomic: canonicalUintDecimal(output.amountAtomic, "depositOutput.amountAtomic"),
+    scriptPubKeyHex: normalizeHexText(output.scriptPubKeyHex, "depositOutput.scriptPubKeyHex"),
+    utxoConfirmations: checkedInteger(utxo.confirmations, "depositUtxo.confirmations", 0, 10_000_000),
+    utxoBestBlockHash: utxo.bestBlockHash ?? null,
+    finalitySatisfied: utxo.finalitySatisfied === true,
+    noPriorConsumption: utxo.unspent === true,
+  });
 }
 
 function localE2eResult(state, reason, extra = {}) {
@@ -379,6 +513,17 @@ function sanitizeWalletName(value) {
   return value;
 }
 
+function checkedNetworkName(value, label) {
+  if (typeof value !== "string" || !/^[a-z0-9_-]{1,32}$/iu.test(value)) {
+    throw new Error(`${label}:InvalidNetworkName`);
+  }
+  return value.toLowerCase();
+}
+
+function sanitizeNetworkName(value) {
+  return checkedNetworkName(value, "nativeChainName");
+}
+
 function validateNativeDecimal(value, label) {
   if (typeof value !== "string" || !/^(0|[1-9][0-9]*)(\.[0-9]+)?$/u.test(value)) {
     throw new Error(`${label}:ExpectedCanonicalDecimal`);
@@ -406,6 +551,14 @@ function normalizeHexText(value, label) {
     throw new Error(`${label}:ExpectedHex`);
   }
   return value.toLowerCase();
+}
+
+function normalizeNonEmptyHexText(value, label) {
+  const normalized = normalizeHexText(value, label);
+  if (normalized.length === 0) {
+    throw new Error(`${label}:ExpectedNonEmptyHex`);
+  }
+  return normalized;
 }
 
 function requireNonEmptyText(value, label) {
