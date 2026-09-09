@@ -23,7 +23,7 @@
     {
       "path": ".github/workflows/ci.yml",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "CI workflow configuration and job sequencing, including Phase 08 Native node adapter tests."
+      "notes": "CI workflow configuration and job sequencing, including Phase 08 Native node adapter and bridge-validator tests."
     },
     {
       "path": ".gitignore",
@@ -481,9 +481,19 @@
       "notes": "Bridge validator service export surface."
     },
     {
+      "path": "services/bridge-validator/solana-deposit-claim-submitter.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 localnet Solana deposit claim submission boundary with canonical-message, attestation-threshold, persist-before-broadcast, status retry, and finalized claim-observation checks."
+    },
+    {
       "path": "services/bridge-validator/tests/automatic-deposit-pipeline.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Phase 08 deposit pipeline tests using temporary in-memory keys and temp-directory FROST state outside the repository."
+    },
+    {
+      "path": "services/bridge-validator/tests/solana-deposit-claim-submitter.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 Solana deposit claim submitter tests using disposable local RPC fixtures, runtime-generated public test attestations, and temp-directory journal state outside the repository."
     },
     {
       "path": "services/indexer/README.md",

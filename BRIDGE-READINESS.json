@@ -60,6 +60,8 @@
     "phase08NativeRpcAdapterImplemented": true,
     "phase08NativeRpcAdapterLocalTestsPassed": true,
     "phase08NativeRpcAdapterCiVerified": true,
+    "phase08SolanaDepositClaimSubmitterImplemented": true,
+    "phase08SolanaDepositClaimSubmitterLocalTestsPassed": true,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true

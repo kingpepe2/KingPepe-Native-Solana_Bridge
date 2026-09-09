@@ -132,6 +132,8 @@
   deposit flow without per-transfer KingPepe Team approval.
 - Current local source-boundary check:
   - `npm run test:bridge-validator`
+  - This covers the automatic deposit pipeline and the Solana deposit claim
+    submitter source-boundary tests.
 - Current Native RPC adapter check:
   - `npm run test:native-node`
 - Current local E2E readiness check:
@@ -215,5 +217,12 @@
   `845dfc4a86a1ef87f15e3d5ec2ca4ad91fd8fe8d`
 - Phase 08 Native REGTEST RPC adapter CI:
   `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34308850060` PASS.
+- Phase 08 Solana deposit claim submitter:
+  `services/bridge-validator/solana-deposit-claim-submitter.mjs` provides a
+  localnet-only Solana RPC submission boundary for prebuilt deposit-claim
+  transaction bytes after two project attestations. It persists the prepared
+  operation before broadcast, checks submitted signature status before retry,
+  requires finalized claim observation before reporting completion, and does
+  not create a production activation path.
 - Real local E2E is still blocked by missing `kingpeped`, `kingpepe-cli`,
   `solana`, `solana-test-validator`, and `anchor`.

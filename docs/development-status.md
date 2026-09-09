@@ -68,7 +68,7 @@
 - Phase 07 CI: PASS for `d17ba8fe61d20a88d4206f72d68a010a2d146524`
 - Phase 08 `Get-Command kingpeped kingpepe-cli solana solana-test-validator anchor`: NOT_FOUND on Windows
 - Phase 08 `command -v kingpeped kingpepe-cli solana-test-validator solana anchor`: NOT_FOUND under WSL
-- Phase 08 `npm run test:bridge-validator`: PASS, 6 automatic deposit pipeline tests
+- Phase 08 `npm run test:bridge-validator`: PASS, 13 bridge-validator tests (automatic deposit pipeline plus Solana deposit claim submitter)
 - Phase 08 `npm run test:native-node`: PASS, 7 Native REGTEST RPC adapter tests
 - Phase 08 `npm run test:local-e2e-readiness`: PASS, 8 readiness/orchestration tests
 - Phase 08 `npm run doctor:local-e2e`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING; missing localnet executables; both Solana programs report `READY` at the source/readiness-gate level after account-execution wiring
@@ -84,6 +84,7 @@
 - Phase 08 local E2E orchestration plan: PASS for `7ffd331358146bb990f9830d4f39c0849cc0bdeb`
 - Phase 08 local E2E bootstrap runner: PASS for `d392403733bbfb92fcfd2d50a1d3879d63f0e3bb`
 - Phase 08 Native REGTEST RPC adapter: PASS for `845dfc4a86a1ef87f15e3d5ec2ca4ad91fd8fe8d`
+- Phase 08 Solana deposit claim submitter: local source-boundary tests PASS; SHA and CI evidence to be recorded after push verification.
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 52 Rust tests after account-execution update
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
@@ -288,6 +289,31 @@
   - CI Windows workspace, Node, and native crate tests (PASS)
   - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
 - Real daemon-backed Native-to-Solana E2E: `BLOCKED / NOT_RUN`
+
+## Phase 08 Solana deposit claim submitter
+
+- Added `services/bridge-validator/solana-deposit-claim-submitter.mjs`.
+- Added `services/bridge-validator/tests/solana-deposit-claim-submitter.test.mjs`.
+- Updated bridge-validator documentation and CI step labels.
+- The submitter is localnet-only in this phase and accepts prebuilt Solana
+  deposit-claim transaction bytes from the local harness/SDK boundary.
+- Before Solana RPC submission it validates:
+  - canonical deposit message action, direction, domain, operation ID, digest,
+    amount, recipient, policy epoch, and key epoch;
+  - exactly two valid project attestations over the same canonical message;
+  - prepared transaction encoding, recent blockhash, and last valid block
+    height.
+- It persists the prepared operation before broadcast, records the submitted
+  signature, checks the previous signature outcome before retry, and refuses to
+  rebuild a new economic operation when a submitted transaction's blockhash has
+  expired but the outcome is unknown.
+- It returns `COMPLETED` only after finalized claim observation confirms the
+  expected operation, message digest, Mint, recipient, and minted amount.
+- Local test status:
+  - `npm run test:bridge-validator` (pass, 13 tests)
+  - real Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
+- Source commit and CI evidence will be recorded after publication and Actions
+  verification.
 
 ## Phase 08 mint-authority real Solana PDA correction
 

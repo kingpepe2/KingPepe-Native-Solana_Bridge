@@ -418,6 +418,37 @@
     proceed to Phase 09 until the Native-to-Solana local E2E gate actually
     passes.
 
+## Phase 08 Solana deposit claim submitter
+
+- PHASE: `08`
+- source commit: to be recorded after commit and push
+- push result: pending
+- CI URL: pending
+- CI status: pending
+- tests:
+  - `npm run test:bridge-validator` (pass, 13 bridge-validator tests)
+  - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
+- changed:
+  - Added a localnet-only Solana deposit claim submitter for the automated
+    Native-to-Solana path.
+  - The submitter validates the canonical deposit message, operation ID,
+    digest, amount, recipient, domain, policy epoch, key epoch, and two project
+    attestations before Solana RPC submission.
+  - Added persist-before-broadcast journal support with an in-memory adapter
+    and a file-backed adapter that rejects source-tree runtime state roots.
+  - Added retry behavior that checks a submitted signature before any rebuild
+    and returns a dependency wait if the prior transaction outcome is unknown
+    after blockhash expiry.
+  - Added finalized claim observation checks before returning mint completion.
+- blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`,
+    `solana-test-validator`, and `anchor`.
+- next:
+  - Commit, push, verify CI, and then continue Phase 08 only if another
+    meaningful source increment can be implemented without falsely reporting
+    a daemon-backed local E2E pass.
+
 ## Phase 08 Solana account-state codec implementation
 
 - PHASE: `08`
