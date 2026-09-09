@@ -498,7 +498,12 @@
     {
       "path": "services/bridge-validator/index.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Bridge validator service export surface, including Phase 08 deposit pipeline, reserve-sweep, Solana submitter, and transaction-plan boundaries."
+      "notes": "Bridge validator service export surface, including Phase 08 deposit pipeline, reserve-sweep, Solana submitter, transaction-plan, and localnet setup-plan boundaries."
+    },
+    {
+      "path": "services/bridge-validator/localnet-solana-setup-plan.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 localnet-only Solana setup transaction planner for zero-supply KPEPE Mint, recipient SPL token account, transceiver config PDA, and bridge state PDA initialization with injected runtime signers."
     },
     {
       "path": "services/bridge-validator/native-reserve-sweep-adapters.mjs",
@@ -544,6 +549,11 @@
       "path": "services/bridge-validator/tests/localnet-solana-deposit-claim-bridge.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Phase 08 tests for localnet Solana deposit-claim bridge adapter transaction preparation, submission, retry, dependency failure behavior, and real observer per-operation account pass-through."
+    },
+    {
+      "path": "services/bridge-validator/tests/localnet-solana-setup-plan.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 tests for localnet Solana setup transaction planning, SPL Token initialize instruction encoding, PDA initialization account ordering, and injected runtime signer validation."
     },
     {
       "path": "services/bridge-validator/tests/solana-deposit-claim-submitter.test.mjs",

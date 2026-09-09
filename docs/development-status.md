@@ -1131,3 +1131,19 @@
   - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
   - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
   - Real local-validator execution, funded disposable fee payer, SPL Mint setup, token account setup, finalized claim observation, and reconciliation remain `BLOCKED / NOT_RUN`.
+
+## Phase 08 localnet Solana setup transaction plan
+
+- Source status: implemented locally; CI verification pending for this source increment.
+- What changed:
+  - Added a localnet-only Solana setup transaction planner that creates a disposable KPEPE SPL Mint with zero initial supply, PDA mint authority, and no freeze authority.
+  - Added localnet recipient SPL token-account creation/initialization so the deposit-claim mint path has a real target token account during local E2E execution.
+  - Added transceiver config and bridge state PDA initialization instructions using the current on-chain ABI account order and optional payer/System Program allocation path.
+  - Requires explicit rent lamport values and injected runtime signers for the fee payer, mint account, and recipient token account; no keypair files or operational state are generated in the repository.
+- Local tests run so far:
+  - `node --check services/bridge-validator/localnet-solana-setup-plan.mjs`: PASS.
+  - `node --test services/bridge-validator/tests/localnet-solana-setup-plan.test.mjs`: PASS, 5 tests.
+- Current blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
+  - The planner has not been submitted to a real Solana local validator yet.

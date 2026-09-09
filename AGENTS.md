@@ -381,6 +381,13 @@
   `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34366351989`.
   This is source-level implementation only until local Solana validator
   infrastructure is available and exercised.
+- Phase 08 localnet Solana setup transaction plan:
+  `services/bridge-validator/localnet-solana-setup-plan.mjs` builds and signs
+  a localnet-only bootstrap transaction for a disposable zero-supply KPEPE SPL
+  Mint, a disposable recipient SPL token account, the transceiver config PDA,
+  and the bridge state PDA. It requires injected runtime signers and explicit
+  rent lamports, keeps Mainnet disabled, and does not generate or store keypair
+  files in the repository. CI verification is pending for this increment.
 - Phase 08 Solana deposit-claim transaction plan commit:
   `42a5cdb3bcc60e0be7fb5d2395503f148b6d632f`
 - Phase 08 Solana deposit-claim transaction plan CI:

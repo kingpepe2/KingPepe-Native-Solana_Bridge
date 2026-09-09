@@ -138,6 +138,9 @@
     "phase08SolanaPdaAllocationPathImplemented": true,
     "phase08SolanaPdaAllocationPathLocalTestsPassed": true,
     "phase08SolanaPdaAllocationPathCiVerified": true,
+    "phase08LocalnetSolanaSetupPlanImplemented": true,
+    "phase08LocalnetSolanaSetupPlanLocalTestsPassed": true,
+    "phase08LocalnetSolanaSetupPlanCiVerified": false,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true
