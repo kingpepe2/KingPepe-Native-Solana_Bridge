@@ -53,6 +53,7 @@
     "phase08SolanaAccountExecutionCiVerified": true,
     "phase08LocalE2eOrchestratorImplemented": true,
     "phase08LocalE2eOrchestratorLocalTestsPassed": true,
+    "phase08LocalE2eOrchestratorCiVerified": true,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true
