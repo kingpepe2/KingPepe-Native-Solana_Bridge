@@ -11,7 +11,6 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use bridge_messages::{BridgeAction, BridgeDirection, CanonicalBridgeMessage, Hash32, PubkeyBytes};
 use kingpepe_transceiver::{TransceiverError, TransceiverProgram, VerifiedMessageReceipt};
-use sha2::{Digest, Sha256};
 use solana_program::{
     account_info::AccountInfo, declare_id, entrypoint::ProgramResult, program_error::ProgramError,
     pubkey::Pubkey,
@@ -31,6 +30,7 @@ pub const BRIDGE_INSTRUCTION_ACCEPT_DEPOSIT_CLAIM: u8 = 2;
 pub const BRIDGE_INSTRUCTION_RECORD_WITHDRAWAL_REQUEST: u8 = 3;
 pub const BRIDGE_CONFIG_INSTRUCTION_LENGTH: usize = 256;
 pub const BURN_CHECKED_INSTRUCTION_LENGTH: usize = 105;
+pub const MINT_AUTHORITY_PDA_SEED_PREFIX: &[u8] = b"kingpepe-mint-authority";
 pub const KPEPE_SYMBOL: &str = "KPEPE";
 pub const KPEPE_NAME: &str = "KingPepe";
 pub const EXPECTED_INITIAL_SUPPLY: u128 = 0;
@@ -512,11 +512,20 @@ pub fn derive_mint_authority_pda(
     manager_program_id: &PubkeyBytes,
     mint: &PubkeyBytes,
 ) -> PubkeyBytes {
-    let mut digest = Sha256::new();
-    digest.update(b"KINGPEPE_BRIDGE_MINT_AUTHORITY_PDA_V1");
-    digest.update(manager_program_id);
-    digest.update(mint);
-    digest.finalize().into()
+    derive_mint_authority_pda_with_bump(manager_program_id, mint).0
+}
+
+pub fn derive_mint_authority_pda_with_bump(
+    manager_program_id: &PubkeyBytes,
+    mint: &PubkeyBytes,
+) -> (PubkeyBytes, u8) {
+    let manager_program_id = Pubkey::new_from_array(*manager_program_id);
+    let mint = Pubkey::new_from_array(*mint);
+    let (pda, bump) = Pubkey::find_program_address(
+        &[MINT_AUTHORITY_PDA_SEED_PREFIX, mint.as_ref()],
+        &manager_program_id,
+    );
+    (pda.to_bytes(), bump)
 }
 
 fn validate_config(config: &BridgeConfig) -> Result<(), BridgeError> {
@@ -997,6 +1006,23 @@ mod tests {
                 found: 2 + bridge_messages::MESSAGE_LENGTH,
             })
         );
+    }
+
+    #[test]
+    fn mint_authority_derivation_uses_solana_pda_seeds_and_bump() {
+        let manager_program_id = h(1);
+        let mint = h(2);
+        let (derived, bump) = derive_mint_authority_pda_with_bump(&manager_program_id, &mint);
+        let manager_program_id = Pubkey::new_from_array(manager_program_id);
+        let mint = Pubkey::new_from_array(mint);
+        let expected = Pubkey::create_program_address(
+            &[MINT_AUTHORITY_PDA_SEED_PREFIX, mint.as_ref(), &[bump]],
+            &manager_program_id,
+        )
+        .unwrap();
+
+        assert_eq!(derived, expected.to_bytes());
+        assert_ne!(derived, [0u8; 32]);
     }
 
     #[test]

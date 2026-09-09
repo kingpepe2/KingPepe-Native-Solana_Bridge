@@ -254,3 +254,31 @@
   - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
 - next:
   - Continue Phase 08 by implementing account execution and SPL Token CPI, then provide disposable localnet infrastructure. Do not proceed to Phase 09 until the Native-to-Solana local E2E gate actually passes.
+
+## Phase 08 mint-authority real Solana PDA correction
+
+- PHASE: `08`
+- source commit: pending publication
+- push result: pending
+- CI URL: pending
+- CI status: pending
+- tests:
+  - `cd solana && cargo check --locked --workspace --all-targets` (pass under WSL)
+  - `cd solana && cargo test --locked --workspace --all-targets` (pass under WSL, 45 Rust tests)
+  - `npm test` (pass, 2 vectors plus 26 Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - `npm run doctor:local-e2e` (expected BLOCKED, exit 2)
+  - local `cargo clippy`: NOT_RUN locally; this WSL Cargo installation has no `clippy` command
+  - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
+- changed:
+  - Replaced the bridge manager's prior SHA-256 mint-authority model with real Solana PDA derivation using `Pubkey::find_program_address`.
+  - Exposed the PDA bump for future account initialization and SPL Token CPI signer checks.
+  - Removed the bridge manager's direct `sha2` dependency and updated `solana/Cargo.lock`.
+  - Added a regression test that reconstructs the PDA using `Pubkey::create_program_address`.
+- blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`
+  - `SOLANA_PROGRAM_EXECUTION_NOT_READY`
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
+- next:
+  - Publish and verify this PDA correction, then continue Phase 08 account execution and SPL Token CPI. Do not proceed to Phase 09 until the Native-to-Solana local E2E gate actually passes.

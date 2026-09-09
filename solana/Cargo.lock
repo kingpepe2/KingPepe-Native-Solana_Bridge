@@ -734,7 +734,6 @@ version = "0.1.0"
 dependencies = [
  "bridge-messages",
  "kingpepe-transceiver",
- "sha2 0.10.9",
  "solana-program",
  "thiserror",
  "zeroize_derive",

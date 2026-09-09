@@ -548,12 +548,12 @@
     {
       "path": "solana/programs/kingpepe-bridge/Cargo.toml",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Bridge manager program manifest with cdylib/lib crate types, solana-program dependency, and no-entrypoint test feature."
+      "notes": "Bridge manager program manifest with cdylib/lib crate types, solana-program dependency, and no-entrypoint test feature; direct sha2 dependency removed after moving mint authority derivation to real Solana PDA primitives."
     },
     {
       "path": "solana/programs/kingpepe-bridge/src/lib.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Bridge manager implementation with Phase 08 validate-only economic instruction ABI decoding; account execution and SPL CPI remain disabled."
+      "notes": "Bridge manager implementation with Phase 08 validate-only economic instruction ABI decoding and real Solana PDA mint-authority derivation; account execution and SPL CPI remain disabled."
     },
     {
       "path": "solana/programs/kingpepe-bridge/tests/bridge_smoke.rs",
