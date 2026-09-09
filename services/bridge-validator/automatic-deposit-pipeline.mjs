@@ -644,8 +644,12 @@ function validatePreparedReserveSweep(operation, message) {
   if (intent.proofFingerprint !== operation.deposit.proofFingerprint) throw new Error("ReserveSweepProofFingerprintMismatch");
   if (intent.amountAtomic !== operation.deposit.amountAtomic) throw new Error("ReserveSweepAmountMismatch");
   if (intent.feeAtomic !== operation.reserveSweep.nativeMinerFeeAtomic) throw new Error("ReserveSweepFeeMismatch");
-  if (intent.inputOutpoints.length !== 1 || intent.inputOutpoints[0] !== outpointText(operation.deposit.depositOutpoint)) {
+  const depositOutpointText = outpointText(operation.deposit.depositOutpoint);
+  if (!intent.inputOutpoints.includes(depositOutpointText)) {
     throw new Error("ReserveSweepInputOutpointMismatch");
+  }
+  if (BigInt(intent.feeAtomic) > 0n && intent.inputOutpoints.length < 2) {
+    throw new Error("ReserveSweepFeeFundingInputRequired");
   }
   if (intent.changeScriptPubKeyHex !== operation.reserveSweep.canonicalReserveScriptPubKeyHex) {
     throw new Error("ReserveSweepChangeScriptMismatch");

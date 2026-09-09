@@ -86,6 +86,7 @@ function baseConfig(overrides = {}) {
 
 function baseOperation(config, operationId = ZERO_HASH, overrides = {}) {
   const depositOutpoint = outpoint("phase08-deposit-outpoint", 2);
+  const feeFundingOutpoint = outpoint("phase08-reserve-sweep-fee-funding", 0);
   const base = {
     messageNonceHex: h("phase08-message-nonce"),
     validFrom: "1700000000",
@@ -133,7 +134,7 @@ function baseOperation(config, operationId = ZERO_HASH, overrides = {}) {
         feeAtomic: "1200",
         changeScriptPubKeyHex: p2tr("canonical-reserve"),
         changeAtomic: "0",
-        inputOutpoints: [outpointText(depositOutpoint)],
+        inputOutpoints: [outpointText(depositOutpoint), outpointText(feeFundingOutpoint)],
         outputCommitments: [h("reserve-sweep-output")],
         reserveCommitment: h("reserve-commitment"),
         pauseWithdrawals: false,
@@ -178,6 +179,7 @@ function createFrostRuntime(config, operation) {
     withdrawalId: operation.reserveSweep.signingIntent.withdrawalId,
     taprootSighashHex: operation.reserveSweep.signingIntent.taprootSighashHex,
     transactionCommitment: operation.reserveSweep.signingIntent.transactionCommitment,
+    signingInputIndex: operation.reserveSweep.signingIntent.signingInputIndex,
     recipientScriptPubKeyHex: operation.reserveSweep.signingIntent.recipientScriptPubKeyHex,
     amountAtomic: operation.reserveSweep.signingIntent.amountAtomic,
     feeAtomic: operation.reserveSweep.signingIntent.feeAtomic,

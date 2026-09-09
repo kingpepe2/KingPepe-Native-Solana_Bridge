@@ -135,6 +135,12 @@
   IDs, economic ABI decoding, program-owned account validation, receipt writes,
   and SPL Token CPI construction. A real local-validator E2E flow is still not
   claimed until the required localnet executables are available and exercised.
+- The local Native-to-Solana runner now computes BIP-341 key-path
+  `SIGHASH_DEFAULT` evidence for the deposit and fee-funding Taproot inputs,
+  prepares input-specific FROST signing intents, runs disposable local
+  software FROST A+B signatures, and attaches key-path Taproot witnesses. It
+  still stops before Native broadcast/finality, Solana mint submission, and
+  reconciliation.
 - Do not mark Native-to-Solana local E2E as passed until a disposable
   KingPepe regtest node and Solana local validator execute the full automated
   deposit flow without per-transfer KingPepe Team approval.

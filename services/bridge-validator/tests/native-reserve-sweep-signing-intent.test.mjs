@@ -52,6 +52,7 @@ function baseInput(overrides = {}) {
       depositOutpoint,
       reserveAmountAtomic: "100000000",
       nativeMinerFeeAtomic: "1000",
+      feeFundingOutpoints: [feeFundingOutpoint],
       unsignedNativeTransactionFingerprintHex: h("unsigned-reserve-sweep-raw-tx"),
       proofFingerprintHex: h("validated-local-native-proof"),
       signed: false,
@@ -99,6 +100,23 @@ test("validated local reserve-sweep sighash evidence produces a FROST signing in
   assert.equal(prepared.signingIntent.changeAtomic, "0");
   assert.deepEqual(prepared.signingIntent.inputOutpoints, baseInput().nativeSighashEvidence.inputOutpoints);
   assert.equal(prepared.authorizedOperation.taprootSighashHex, prepared.signingIntent.taprootSighashHex);
+  assert.equal(prepared.authorizedOperation.signingInputIndex, 0);
+});
+
+test("validated fee-funding input sighash evidence produces a distinct FROST signing intent", () => {
+  const prepared = prepareLocalNativeReserveSweepSigningIntent(
+    baseInput({
+      nativeSighashEvidence: {
+        signingInputIndex: 1,
+        taprootSighashHex: h("reserve-sweep-fee-funding-input-sighash"),
+      },
+    }),
+  );
+
+  assert.equal(prepared.state, "VERIFIED_READY");
+  assert.equal(prepared.signingIntent.signingInputIndex, 1);
+  assert.equal(prepared.authorizedOperation.signingInputIndex, 1);
+  assert.equal(prepared.signerPolicyDecision.result, "APPROVED");
 });
 
 test("missing or unvalidated Native sighash evidence cannot produce a signing intent", () => {
@@ -183,6 +201,9 @@ test("signing intent preparation rejects altered sweep evidence before FROST can
         baseInput({
           nativeSighashEvidence: {
             inputOutpoints: [baseInput().deposit.depositOutpoint],
+          },
+          reserveSweepDraft: {
+            feeFundingOutpoints: [],
           },
         }),
       ),

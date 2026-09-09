@@ -99,6 +99,7 @@ function normalizeAuthorization(value) {
     withdrawalId: assertHashHex(value.withdrawalId, "authorized withdrawal ID"),
     taprootSighashHex: assertHashHex(value.taprootSighashHex, "authorized Taproot sighash"),
     transactionCommitment: assertHashHex(value.transactionCommitment, "authorized transaction commitment"),
+    signingInputIndex: checkedNonNegativeIndex(value.signingInputIndex, "authorized signing input index"),
     recipientScriptPubKeyHex: assertHex(value.recipientScriptPubKeyHex, undefined, "authorized recipient scriptPubKey"),
     amountAtomic: canonicalUintDecimal(value.amountAtomic, "authorized amount"),
     feeAtomic: canonicalUintDecimal(value.feeAtomic, "authorized fee"),
@@ -224,6 +225,7 @@ function authorizationMatches(authorization, intent) {
     authorization.withdrawalId === intent.withdrawalId &&
     authorization.taprootSighashHex === intent.taprootSighashHex &&
     authorization.transactionCommitment === intent.transactionCommitment &&
+    authorization.signingInputIndex === intent.signingInputIndex &&
     authorization.recipientScriptPubKeyHex === intent.recipientScriptPubKeyHex &&
     authorization.amountAtomic === intent.amountAtomic &&
     authorization.feeAtomic === intent.feeAtomic &&

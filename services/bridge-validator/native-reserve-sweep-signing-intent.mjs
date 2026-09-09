@@ -1,6 +1,7 @@
 import {
   FROST_SIGNING_INTENT_PROTOCOL,
   FROST_SIGNING_MODE,
+  canonicalJson,
   createNativeSigningPolicy,
   evaluateNativeSigningPolicy,
   nativeSigningIntentDigest,
@@ -37,7 +38,15 @@ export function prepareLocalNativeReserveSweepSigningIntent(input) {
   if (depositInputIndex === -1) {
     throw new Error("LocalReserveSweepSigningIntentInputOutpointMismatch");
   }
-  if (sighashEvidence.signingInputIndex !== depositInputIndex) {
+  const expectedInputOutpoints = [deposit.depositOutpoint, ...draft.feeFundingOutpoints];
+  if (canonicalJson(sighashEvidence.inputOutpoints) !== canonicalJson(expectedInputOutpoints)) {
+    throw new Error("LocalReserveSweepSigningIntentInputSetMismatch");
+  }
+  const signingOutpoint = sighashEvidence.inputOutpoints[sighashEvidence.signingInputIndex];
+  if (signingOutpoint === undefined) {
+    throw new Error("LocalReserveSweepSigningIntentSigningInputOutOfRange");
+  }
+  if (sighashEvidence.signingInputIndex !== depositInputIndex && !draft.feeFundingOutpoints.includes(signingOutpoint)) {
     throw new Error("LocalReserveSweepSigningIntentUnexpectedSigningInput");
   }
   if (sighashEvidence.nativeMinerFeeAtomic !== draft.nativeMinerFeeAtomic) {
@@ -99,6 +108,7 @@ export function prepareLocalNativeReserveSweepSigningIntent(input) {
     withdrawalId: signingIntent.withdrawalId,
     taprootSighashHex: signingIntent.taprootSighashHex,
     transactionCommitment: signingIntent.transactionCommitment,
+    signingInputIndex: signingIntent.signingInputIndex,
     recipientScriptPubKeyHex: signingIntent.recipientScriptPubKeyHex,
     amountAtomic: signingIntent.amountAtomic,
     feeAtomic: signingIntent.feeAtomic,
@@ -189,6 +199,9 @@ function normalizeUnsignedReserveSweepDraft(draft) {
     depositOutpoint: normalizeOutpoint(value.depositOutpoint, "reserveSweepDraft.depositOutpoint"),
     reserveAmountAtomic: canonicalUintDecimal(value.reserveAmountAtomic, "reserveSweepDraft.reserveAmountAtomic"),
     nativeMinerFeeAtomic: canonicalUintDecimal(value.nativeMinerFeeAtomic, "reserveSweepDraft.nativeMinerFeeAtomic"),
+    feeFundingOutpoints: normalizeOutpointList(value.feeFundingOutpoints ?? [], "reserveSweepDraft.feeFundingOutpoints", {
+      allowEmpty: true,
+    }),
     unsignedNativeTransactionFingerprintHex: normalizeHash32(
       value.unsignedNativeTransactionFingerprintHex,
       "reserveSweepDraft.unsignedNativeTransactionFingerprintHex",
@@ -265,8 +278,8 @@ function normalizeOutpoint(value, label) {
   return `${txid}:${vout}`;
 }
 
-function normalizeOutpointList(value, label) {
-  if (!Array.isArray(value) || value.length === 0) {
+function normalizeOutpointList(value, label, options = {}) {
+  if (!Array.isArray(value) || (value.length === 0 && options.allowEmpty !== true)) {
     throw new Error(`${label}:ExpectedNonEmptyArray`);
   }
   const normalized = value.map((entry, index) => normalizeOutpoint(entry, `${label}[${index}]`));

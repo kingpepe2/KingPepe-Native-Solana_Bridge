@@ -32,7 +32,7 @@
     {
       "project": "BIP-341",
       "url": "https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki",
-      "use": "Reference-only Taproot P2TR scriptPubKey shape, key-path SIGHASH_DEFAULT message construction, tagged TapSighash hashing, and selected public wallet vector verification."
+      "use": "Reference-only Taproot P2TR scriptPubKey shape, key-path SIGHASH_DEFAULT message construction, tagged TapSighash hashing, key-path witness shape, and selected public wallet vector verification."
     }
   ],
   "comparison": {

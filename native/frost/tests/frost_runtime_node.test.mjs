@@ -44,6 +44,7 @@ function baseAuthorization(overrides = {}) {
     withdrawalId: h("withdrawal"),
     taprootSighashHex: h("taproot-sighash"),
     transactionCommitment: h("native-transaction-commitment"),
+    signingInputIndex: 0,
     recipientScriptPubKeyHex: p2tr("recipient"),
     amountAtomic: "250000000",
     feeAtomic: "1200",

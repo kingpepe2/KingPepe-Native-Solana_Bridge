@@ -1311,3 +1311,56 @@ OPEN BLOCKERS:
 
 NEXT PHASE:
 Continue Phase 08. Do not start Phase 09 until the real daemon-backed Native-to-Solana local E2E flow passes.
+
+## Phase 08 report - Local FROST reserve-sweep witness attachment
+
+PHASE:
+`PHASE 08 - Automatic Native to Solana local end-to-end`
+
+COMMIT SHA:
+`PENDING_SOURCE_PUSH`
+
+COMMIT MESSAGE:
+`feat(phase-08): sign local reserve sweep witnesses`
+
+PUSH RESULT:
+`PENDING_SOURCE_PUSH`
+
+CI RUN URL:
+`PENDING_SOURCE_PUSH`
+
+CI STATUS:
+`PENDING_SOURCE_PUSH`
+
+TESTS PASS/FAIL/SKIP/NOT_RUN:
+- `node --test scripts/tests/local-e2e-native-to-solana.test.mjs`: PASS, 11 tests.
+- `node --test services/bridge-validator/tests/native-reserve-sweep-signing-intent.test.mjs`: PASS, 5 tests.
+- `node --test native/frost/tests/frost_runtime_node.test.mjs`: PASS, 5 tests.
+- `node --test services/bridge-validator/tests/automatic-deposit-pipeline.test.mjs`: PASS, 13 tests.
+- `npm test`: PASS, 2 protocol vectors plus 104 Node tests.
+- `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
+- `python .github/scripts/guardrails.py`: PASS.
+- JSON manifest parse checks: PASS.
+- WSL Solana Rust workspace tests: PASS, 52 tests.
+- WSL Native FROST Rust tests: PASS, 7 tests.
+- WSL Native proof Rust tests: PASS, 8 tests.
+- WSL Native reserve Rust tests: PASS, 4 tests.
+- WSL Native recovery Rust tests: PASS, 3 tests.
+- `npm run local:e2e:native-to-solana`: `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
+- Full local gate set, staged/outgoing secret scans, push, and CI: pending for this source edit.
+- Real daemon-backed Native-to-Solana local E2E: `BLOCKED / NOT_RUN`.
+
+WHAT CHANGED:
+- Converted validated Taproot sighash evidence into localnet-only, input-specific FROST reserve-sweep signing intents.
+- Bound `signingInputIndex` into each FROST authorized operation so A and B validate the exact Native transaction input before producing a share.
+- Reopened disposable local FROST A/B signer state from outside-repository roots using a narrow policy generated after deposit evidence is known.
+- Signed the deposit input and fee-funding input with real software FROST A+B, verified signatures independently, and attached key-path Taproot witnesses.
+- Advanced the local Native-to-Solana runner from `LOCAL_NATIVE_TAPROOT_SIGHASHES_VALIDATED` to `LOCAL_NATIVE_RESERVE_SWEEP_SIGNED`.
+- Kept `sendrawtransaction`, Solana mint submission, and reconciliation unexecuted until local daemon infrastructure is available.
+
+OPEN BLOCKERS:
+- Missing local `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor` executables prevent real daemon-backed Native-to-Solana local E2E.
+- Native broadcast/finality, Solana mint submission, finalized mint observation, and reconciliation remain `BLOCKED / NOT_RUN`.
+
+NEXT PHASE:
+Continue Phase 08. Do not start Phase 09 until the real daemon-backed Native-to-Solana local E2E flow passes.

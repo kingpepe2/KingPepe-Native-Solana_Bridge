@@ -1016,3 +1016,32 @@
   - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
   - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
   - Real daemon-backed Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
+
+## Phase 08 local FROST reserve-sweep witness attachment
+
+- Source status: implemented locally; exact source SHA and CI will be recorded after push.
+- What changed:
+  - The local Native-to-Solana runner now converts validated Taproot sighash evidence into localnet-only, input-specific FROST reserve-sweep signing intents.
+  - Each authorized FROST operation now binds `signingInputIndex`, so A and B authorize the exact Native transaction input they sign.
+  - The disposable local FROST custody context retains public package data and outside-repository signer state roots so A and B can be reopened with a narrow reserve-sweep signing policy after deposit evidence is known.
+  - The runner signs the deposit input and explicit fee-funding input with real software FROST A+B, attaches key-path Taproot witnesses, and stops before Native broadcast.
+  - The automatic deposit pipeline now accepts multi-input reserve sweeps and requires at least one explicit fee-funding input when Native miner fee is nonzero.
+- Local tests run before source commit:
+  - `node --test scripts/tests/local-e2e-native-to-solana.test.mjs`: PASS, 11 tests.
+  - `node --test services/bridge-validator/tests/native-reserve-sweep-signing-intent.test.mjs`: PASS, 5 tests.
+  - `node --test native/frost/tests/frost_runtime_node.test.mjs`: PASS, 5 tests.
+  - `node --test services/bridge-validator/tests/automatic-deposit-pipeline.test.mjs`: PASS, 13 tests.
+  - `npm test`: PASS, 2 protocol vectors plus 104 Node tests.
+  - `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
+  - `python .github/scripts/guardrails.py`: PASS.
+  - JSON manifest parse checks: PASS.
+  - WSL Solana Rust workspace tests: PASS, 52 tests.
+  - WSL Native FROST Rust tests: PASS, 7 tests.
+  - WSL Native proof Rust tests: PASS, 8 tests.
+  - WSL Native reserve Rust tests: PASS, 4 tests.
+  - WSL Native recovery Rust tests: PASS, 3 tests.
+  - `npm run local:e2e:native-to-solana`: `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
+- Current blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
+  - Real daemon-backed Native broadcast/finality, Solana mint submission, and reconciliation remain `BLOCKED / NOT_RUN`.
