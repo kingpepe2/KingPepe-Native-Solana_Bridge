@@ -18,6 +18,7 @@ export const LOCAL_E2E_BOOTSTRAP_BLOCKED = "BLOCKED_LOCAL_INFRASTRUCTURE_MISSING
 export const BLOCKED_LOCAL_E2E_VERSION_MISMATCH = "BLOCKED_LOCAL_E2E_VERSION_MISMATCH";
 export const BLOCKED_PROGRAM_ARTIFACT_MISSING = "BLOCKED_PROGRAM_ARTIFACT_MISSING";
 export const LOCAL_E2E_BOOTSTRAP_FAILED = "LOCAL_E2E_BOOTSTRAP_FAILED";
+export const LOCAL_E2E_FLOW_FAILED = "LOCAL_E2E_FLOW_FAILED";
 
 const MAXIMUM_CAPTURE_BYTES = 16 * 1024;
 const DEFAULT_COMMAND_TIMEOUT_MS = 20_000;
@@ -25,6 +26,12 @@ const DEFAULT_HEALTH_ATTEMPTS = 12;
 const DEFAULT_HEALTH_DELAY_MS = 250;
 
 export async function runLocalE2eBootstrap(options = {}) {
+  return withLocalE2eInfrastructure(options, async () => ({
+    fullNativeToSolanaE2e: "NOT_RUN_BY_BOOTSTRAP",
+  }));
+}
+
+export async function withLocalE2eInfrastructure(options = {}, runFlow = async () => ({})) {
   const plan =
     options.plan ??
     createLocalE2ePlan({
@@ -40,6 +47,10 @@ export async function runLocalE2eBootstrap(options = {}) {
       blockers: plan.blockers,
       commandsStarted: [],
     });
+  }
+
+  if (typeof runFlow !== "function") {
+    throw new Error("LocalE2eFlowCallbackRequired");
   }
 
   const executor = options.executor ?? new DefaultLocalE2eExecutor();
@@ -119,17 +130,25 @@ export async function runLocalE2eBootstrap(options = {}) {
       delayMs: options.healthDelayMs,
     });
 
+    const flowExtra = await runLocalE2eFlowCallback(runFlow, {
+      plan,
+      executor,
+      commandPaths,
+      services,
+      checks,
+    });
+
     return bootstrapResult(LOCAL_E2E_BOOTSTRAP_READY, "LOCAL_INFRASTRUCTURE_BOOTSTRAPPED", plan, {
       checks,
       commandsStarted: services.map((service) => service.step),
-      fullNativeToSolanaE2e: "NOT_RUN_BY_BOOTSTRAP",
+      ...sanitizeFlowExtra(flowExtra),
     });
   } catch (error) {
     return bootstrapResult(LOCAL_E2E_BOOTSTRAP_FAILED, error.code ?? "BOOTSTRAP_COMMAND_FAILED", plan, {
       checks,
       error: String(error.message ?? error).slice(0, 512),
       commandsStarted: services.map((service) => service.step),
-      fullNativeToSolanaE2e: "NOT_RUN",
+      fullNativeToSolanaE2e: error.code === LOCAL_E2E_FLOW_FAILED ? "FAILED" : "NOT_RUN",
     });
   } finally {
     await stopServices({ executor, commandPaths, plan, services });
@@ -307,6 +326,43 @@ function commandError(step, detail) {
 
 function artifactBasename(value) {
   return path.basename(value);
+}
+
+async function runLocalE2eFlowCallback(runFlow, context) {
+  try {
+    return await runFlow(context);
+  } catch (error) {
+    throw Object.assign(new Error(String(error.message ?? error).slice(0, 512)), {
+      code: LOCAL_E2E_FLOW_FAILED,
+    });
+  }
+}
+
+function sanitizeFlowExtra(value) {
+  if (value === undefined) return {};
+  const extra = requirePlainObject(value, "localE2eFlowResult");
+  const forbidden = new Set([
+    "protocol",
+    "state",
+    "reason",
+    "productionReady",
+    "mainnetActivation",
+    "plan",
+    "checks",
+    "commandsStarted",
+  ]);
+  return Object.freeze(
+    Object.fromEntries(Object.entries(extra).filter(([key]) => !forbidden.has(key))),
+  );
+}
+
+function requirePlainObject(value, label) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw Object.assign(new Error(`${label}:ExpectedObject`), {
+      code: LOCAL_E2E_FLOW_FAILED,
+    });
+  }
+  return value;
 }
 
 if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {

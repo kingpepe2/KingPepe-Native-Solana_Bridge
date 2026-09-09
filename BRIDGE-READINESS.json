@@ -93,6 +93,9 @@
     "phase08DepositPipelineAdapterJournalRestartImplemented": true,
     "phase08DepositPipelineAdapterJournalRestartLocalTestsPassed": true,
     "phase08DepositPipelineAdapterJournalRestartCiVerified": true,
+    "phase08LocalE2eReusableInfrastructureHarnessImplemented": true,
+    "phase08LocalE2eReusableInfrastructureHarnessLocalTestsPassed": true,
+    "phase08LocalE2eReusableInfrastructureHarnessCiVerified": false,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true

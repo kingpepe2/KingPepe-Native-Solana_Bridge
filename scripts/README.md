@@ -12,3 +12,6 @@ Current safe utilities:
   version checks, Anchor build, disposable local validator startup, REGTEST
   startup, health checks, and cleanup. It does not claim that the full economic
   Native-to-Solana E2E flow has passed.
+  It also exports a reusable harness that keeps the disposable services active
+  while an injected local Native-to-Solana flow runs, then stops those services
+  fail-closed.
