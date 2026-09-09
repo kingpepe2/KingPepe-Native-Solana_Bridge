@@ -416,6 +416,11 @@
       "notes": "Phase 08 local-only Native REGTEST and Solana local-validator orchestration plan. Generic REGTEST command safety conventions were reviewed from the read-only legacy KingPepe repository; TON-specific flow was excluded."
     },
     {
+      "path": "scripts/local-e2e-bootstrap.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 local-only bootstrap runner for version checks, Anchor build, disposable validator startup, health checks, and cleanup without production secrets or full E2E success claims."
+    },
+    {
       "path": "scripts/tests/local-e2e-readiness.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Phase 08 readiness-gate tests using temporary fake toolchain and manifest fixtures only, including validate-only ABI classification."
@@ -424,6 +429,11 @@
       "path": "scripts/tests/local-e2e-orchestrator.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Phase 08 local E2E orchestration tests using temporary fake toolchain paths outside the repository."
+    },
+    {
+      "path": "scripts/tests/local-e2e-bootstrap.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 local bootstrap runner tests using injected fake executor only."
     },
     {
       "path": "services/attesters/README.md",

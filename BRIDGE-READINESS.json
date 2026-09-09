@@ -54,6 +54,8 @@
     "phase08LocalE2eOrchestratorImplemented": true,
     "phase08LocalE2eOrchestratorLocalTestsPassed": true,
     "phase08LocalE2eOrchestratorCiVerified": true,
+    "phase08LocalE2eBootstrapImplemented": true,
+    "phase08LocalE2eBootstrapLocalTestsPassed": true,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true

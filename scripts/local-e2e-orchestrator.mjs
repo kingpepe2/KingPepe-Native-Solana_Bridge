@@ -101,6 +101,12 @@ export function createLocalE2ePlan(options = {}) {
     readiness,
     blockers,
     programIds,
+    ports: Object.freeze({
+      nativeRpcPort,
+      nativeP2pPort,
+      solanaRpcPort,
+      solanaFaucetPort,
+    }),
     paths,
     commands: Object.freeze([
       Object.freeze({
