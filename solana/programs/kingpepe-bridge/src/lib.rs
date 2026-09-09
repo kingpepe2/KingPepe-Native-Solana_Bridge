@@ -743,9 +743,7 @@ pub fn encode_deposit_claim_account(
     Ok(out)
 }
 
-pub fn decode_deposit_claim_account(
-    data: &[u8],
-) -> Result<DepositClaimAccount, AccountCodecError> {
+pub fn decode_deposit_claim_account(data: &[u8]) -> Result<DepositClaimAccount, AccountCodecError> {
     if data.len() != DEPOSIT_CLAIM_ACCOUNT_LENGTH {
         return Err(AccountCodecError::InvalidAccountLength {
             expected: DEPOSIT_CLAIM_ACCOUNT_LENGTH,
