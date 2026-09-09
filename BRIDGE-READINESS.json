@@ -65,7 +65,7 @@
     "phase08SolanaDepositClaimSubmitterCiVerified": true,
     "phase08AsyncDepositPipelineImplemented": true,
     "phase08AsyncDepositPipelineLocalTestsPassed": true,
-    "phase08AsyncDepositPipelineCiVerified": false,
+    "phase08AsyncDepositPipelineCiVerified": true,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true
