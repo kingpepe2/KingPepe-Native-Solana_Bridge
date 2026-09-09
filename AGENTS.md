@@ -319,11 +319,13 @@
   doctor:local-e2e` (`BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`). This remains
   below the required daemon-backed local E2E gate.
 - Phase 08 adapter-journal restart retry coverage:
-  source changes are pending commit/CI. The automatic Native-to-Solana
-  pipeline now has source-level coverage for a restart after Native sweep
-  broadcast but before reserve finality using file-backed deposit,
-  Native reserve-sweep, and Solana claim journals together. It verifies the
-  retry does not rebroadcast the Native sweep, does not introduce
-  per-transfer KingPepe Team approval, and mints once after finality.
+  source commit `6fa2a41bc29d46c1a24308a6a46ca1b5df99e9a1`, CI
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34328709477`
+  PASS. The automatic Native-to-Solana pipeline now has source-level coverage
+  for a restart after Native sweep broadcast but before reserve finality using
+  file-backed deposit, Native reserve-sweep, and Solana claim journals
+  together. It verifies the retry does not rebroadcast the Native sweep, does
+  not introduce per-transfer KingPepe Team approval, and mints once after
+  finality.
 - Real local E2E is still blocked by missing `kingpeped`, `kingpepe-cli`,
   `solana`, `solana-test-validator`, and `anchor`.

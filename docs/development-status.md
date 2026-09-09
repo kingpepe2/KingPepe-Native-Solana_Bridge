@@ -584,7 +584,10 @@
 
 ## Phase 08 adapter-journal restart retry coverage
 
-- Source changes are pending commit/CI.
+- Source commit: `6fa2a41bc29d46c1a24308a6a46ca1b5df99e9a1`
+- CI URL:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34328709477`
+- CI status: `PASS`
 - Added source-level integration coverage for a restart after Native sweep
   broadcast but before reserve finality.
 - The test uses file-backed deposit, Native reserve-sweep, and Solana claim
@@ -595,6 +598,13 @@
   once.
 - Local test status:
   - `npm run test:bridge-validator` (pass, 39 bridge-validator tests)
+  - `npm test` (pass, 2 protocol vectors plus 83 Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - JSON manifest parse checks (pass)
+  - staged and outgoing-range secret-pattern scans (pass)
+  - `npm run doctor:local-e2e` (`BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`;
+    missing localnet executables)
   - real daemon-backed Native-to-Solana E2E remains `BLOCKED / NOT_RUN`.
 
 ## Phase 08 mint-authority real Solana PDA correction

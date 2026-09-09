@@ -807,3 +807,51 @@
   - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
 - next:
   - Continue Phase 08 account execution and SPL Token CPI. Do not proceed to Phase 09 until the Native-to-Solana local E2E gate actually passes.
+
+## Phase 08 report - adapter-journal restart retry coverage
+
+PHASE:
+`PHASE 08 - Automatic Native to Solana local end-to-end`
+
+COMMIT SHA:
+`6fa2a41bc29d46c1a24308a6a46ca1b5df99e9a1`
+
+COMMIT MESSAGE:
+`test(phase-08): cover deposit restart after native sweep`
+
+PUSH RESULT:
+Pushed to private `kingpepe2/KingPepe-Native-Solana_Bridge` on `main`.
+
+CI RUN URL:
+`https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34328709477`
+
+CI STATUS:
+`PASS`
+
+TESTS PASS/FAIL/SKIP/NOT_RUN:
+- `npm run test:bridge-validator`: PASS, 39 bridge-validator tests.
+- `npm test`: PASS, 2 protocol vectors plus 83 Node tests.
+- `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
+- `python .github/scripts/guardrails.py`: PASS.
+- JSON manifest parse checks: PASS.
+- Staged and outgoing-range secret-pattern scans: PASS.
+- `npm run doctor:local-e2e`: `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
+- Real daemon-backed Native-to-Solana local E2E: `BLOCKED / NOT_RUN`.
+
+WHAT CHANGED:
+- Added an integration regression for restart after Native sweep broadcast but
+  before reserve finality.
+- The regression uses file-backed deposit, Native reserve-sweep, and Solana
+  claim journals outside the source tree.
+- Restart resumes from persisted journals, does not rebroadcast the Native
+  sweep, submits one Solana claim after reserve finality, and does not
+  introduce per-transfer KingPepe Team approval.
+
+OPEN BLOCKERS:
+- Missing local `kingpeped`, `kingpepe-cli`, `solana`,
+  `solana-test-validator`, and `anchor` executables prevent real
+  daemon-backed Native-to-Solana local E2E.
+
+NEXT PHASE:
+Continue Phase 08. Do not start Phase 09 until the real daemon-backed
+Native-to-Solana local E2E flow passes.
