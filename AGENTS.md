@@ -251,6 +251,8 @@
 - Phase 08 Native reserve-sweep adapter CI:
   `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34313600140` PASS.
 - Phase 08 deposit pipeline file-backed journal:
-  local tests pass; source commit and CI are pending for this increment.
+  source commit `73df9906998f9783c309a0671739d19cfc6b589f`, CI
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34315069345`
+  PASS.
 - Real local E2E is still blocked by missing `kingpeped`, `kingpepe-cli`,
   `solana`, `solana-test-validator`, and `anchor`.

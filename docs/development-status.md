@@ -87,7 +87,7 @@
 - Phase 08 Solana deposit claim submitter: PASS for `905a45b4c79d879e6ae27a05b3c7a39fed0a30f6`
 - Phase 08 async deposit pipeline entrypoint: PASS for `024c0019745bc4671299af135740aa9d29963116`
 - Phase 08 Native reserve-sweep adapters: PASS for `9af93d22b9af9c1278354a33e35db469311332d9`
-- Phase 08 deposit pipeline file-backed journal: local tests PASS; CI pending for the next pushed source SHA
+- Phase 08 deposit pipeline file-backed journal: PASS for `73df9906998f9783c309a0671739d19cfc6b589f`
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 52 Rust tests after account-execution update
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
@@ -402,8 +402,9 @@
   - `npm run doctor:local-e2e` (expected BLOCKED, exit 2)
   - `npm run local:e2e:bootstrap` (expected BLOCKED, exit 2)
   - real Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
-- Source commit: pending until this source increment is committed and pushed
-- CI status: pending
+- Source commit: `73df9906998f9783c309a0671739d19cfc6b589f`
+- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34315069345`
+- CI status: `PASS`
 
 ## Phase 08 mint-authority real Solana PDA correction
 
