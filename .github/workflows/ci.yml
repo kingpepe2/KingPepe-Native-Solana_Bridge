@@ -72,6 +72,8 @@ jobs:
         run: npm run test:solana-observer
       - name: Run bridge validator deposit pipeline tests
         run: npm run test:bridge-validator
+      - name: Run local E2E readiness gate tests
+        run: npm run test:local-e2e-readiness
       - name: Validate native FROST runtime
         run: cargo check --locked --manifest-path native/frost/Cargo.toml
       - name: Run native FROST tests
@@ -126,6 +128,8 @@ jobs:
         run: npm run test:solana-observer
       - name: Run bridge validator deposit pipeline tests
         run: npm run test:bridge-validator
+      - name: Run local E2E readiness gate tests
+        run: npm run test:local-e2e-readiness
       - name: Validate native FROST runtime
         run: cargo check --locked --manifest-path native/frost/Cargo.toml
       - name: Run native FROST tests

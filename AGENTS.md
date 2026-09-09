@@ -130,6 +130,12 @@
   deposit flow without per-transfer KingPepe Team approval.
 - Current local source-boundary check:
   - `npm run test:bridge-validator`
+- Current local E2E readiness check:
+  - `npm run test:local-e2e-readiness`
+  - `npm run doctor:local-e2e` reports
+    `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING` until the required localnet
+    executables, deployable Solana programs, and non-placeholder localnet
+    program IDs exist.
 - Phase 08 source-boundary implementation commit:
   `09e42e6856312a0c617eb9c14a0312012263722a`
 - Phase 08 source-boundary CI:
