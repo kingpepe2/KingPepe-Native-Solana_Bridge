@@ -262,6 +262,16 @@
   temporary-deposit amount to become the canonical reserve allocation. Nonzero
   Native miner fees require exact separate fee-funding inputs and reject
   missing, duplicate, aliasing, not-spent, or wrong-amount fee evidence.
+- Phase 08 local FROST Taproot deposit/fee/reserve intent source update:
+  implemented and locally tested; CI verification is pending for the source
+  commit. The local Native-to-Solana runner now derives a disposable
+  FROST aggregate Taproot address under the local E2E run root outside the
+  repository, uses the recovered KingPepe REGTEST Bech32m HRP `rkpepe` and
+  coinbase maturity `20`, sends the deposit and separate fee-funding output to
+  that FROST-controlled P2TR script, and uses the same FROST script as the
+  local canonical reserve address. It still stops before real sighash
+  computation, FROST witness attachment, Native broadcast, Solana mint, and
+  reconciliation.
 - Phase 08 Native-to-Solana deposit evidence validation status:
   implemented and CI verified for source commit
   `48a3bae917b6ddc80dcbd0a8d1e45b28fc1eff49`.

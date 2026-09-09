@@ -9,10 +9,13 @@ import {
   LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL,
   LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_DRAFTED,
   LOCAL_NATIVE_TO_SOLANA_WAITING_FOR_DEPENDENCY,
+  createLocalFrostTaprootCustodyContext,
   createNativeToSolanaFlowConfig,
   draftLocalReserveSweep,
   executeNativeDepositObservationFlow,
   findDepositOutput,
+  p2trScriptPubKeyHex,
+  taprootAddressFromXOnlyPublicKey,
   validateLocalNativeSourceSnapshot,
   validateRawDepositTransaction,
   runLocalNativeToSolanaE2e,
@@ -24,8 +27,10 @@ import { REQUIRED_LOCAL_E2E_EXECUTABLES } from "../local-e2e-readiness.mjs";
 const REPO_ROOT = path.resolve(import.meta.dirname, "../..");
 const DEPOSIT_TXID = h("phase08-real-daemon-deposit-txid");
 const FEE_FUNDING_TXID = h("phase08-reserve-sweep-fee-funding-txid");
-const SCRIPT_HEX = `5120${h("phase08-local-deposit-script")}`;
-const FEE_FUNDING_SCRIPT_HEX = `5120${h("phase08-local-fee-funding-script")}`;
+const FROST_AGGREGATE_XONLY_HEX = h("phase08-local-frost-aggregate-xonly");
+const SCRIPT_HEX = p2trScriptPubKeyHex(FROST_AGGREGATE_XONLY_HEX);
+const FEE_FUNDING_SCRIPT_HEX = SCRIPT_HEX;
+const FROST_TAPROOT_ADDRESS = taprootAddressFromXOnlyPublicKey(FROST_AGGREGATE_XONLY_HEX, "rkpepe");
 const REGTEST_GENESIS_HASH = h("kingpepe-regtest-genesis");
 const REGTEST_BEST_BLOCK_HASH = h("kingpepe-regtest-best-block");
 const UNSIGNED_SWEEP_HEX = "0200000001";
@@ -58,6 +63,7 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
       executor,
       programArtifactExists: () => true,
       healthAttempts: 1,
+      custodyFactory: fakeCustodyFactory,
       flowConfig: {
         runId: "test-run",
         amountNative: "1.00000000",
@@ -75,8 +81,15 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
     assert.equal(result.nativeToSolanaE2e.deposit.nativeNetwork, "regtest");
     assert.equal(result.nativeToSolanaE2e.deposit.nativeGenesisHash, REGTEST_GENESIS_HASH);
     assert.equal(result.nativeToSolanaE2e.deposit.sourceBestBlockHash, REGTEST_BEST_BLOCK_HASH);
-    assert.equal(result.nativeToSolanaE2e.deposit.sourceBestHeight, 107);
+    assert.equal(result.nativeToSolanaE2e.deposit.sourceBestHeight, 26);
+    assert.equal(result.nativeToSolanaE2e.deposit.scriptPubKeyHex, SCRIPT_HEX);
     assert.match(result.nativeToSolanaE2e.deposit.proofFingerprintHex, /^[0-9a-f]{64}$/u);
+    assert.equal(result.nativeToSolanaE2e.depositIntent.address, FROST_TAPROOT_ADDRESS);
+    assert.equal(result.nativeToSolanaE2e.depositIntent.scriptPubKeyHex, SCRIPT_HEX);
+    assert.equal(result.nativeToSolanaE2e.depositIntent.custody, "LOCAL_EPHEMERAL_FROST_TAPROOT");
+    assert.equal(result.nativeToSolanaE2e.frostCustody.aggregateTweakedXOnlyPublicKey, FROST_AGGREGATE_XONLY_HEX);
+    assert.equal(result.nativeToSolanaE2e.frostCustody.depositAddress, FROST_TAPROOT_ADDRESS);
+    assert.equal(result.nativeToSolanaE2e.frostCustody.canonicalReserveAddress, FROST_TAPROOT_ADDRESS);
     assert.equal(result.nativeToSolanaE2e.nativeSource.trust, "RPC_OBSERVATION");
     assert.equal(result.nativeToSolanaE2e.reserveSweep.state, "UNSIGNED_DRAFT_ONLY");
     assert.equal(result.nativeToSolanaE2e.reserveSweep.reserveAmountAtomic, "100000000");
@@ -88,25 +101,23 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
     assert.match(result.nativeToSolanaE2e.reserveSweep.unsignedNativeTransactionFingerprintHex, /^[0-9a-f]{64}$/u);
     assert.match(result.nativeToSolanaE2e.stateRoot, /^\$\{LOCAL_E2E_RUN_ROOT\}/u);
     assert.equal(result.nativeToSolanaE2e.stateRoot.includes(runRoot), false);
-    assert.doesNotMatch(JSON.stringify(result), /WAITING_FOR_ADMIN_APPROVAL/u);
+    assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_INITIALIZE_EPHEMERAL_FROST_CUSTODY"));
+    assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_CREATE_FROST_TAPROOT_DEPOSIT_INTENT"));
+    assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_SELECT_FROST_CANONICAL_RESERVE"));
+    const prohibitedApprovalState = "WAITING_FOR_" + "ADMIN_APPROVAL";
+    assert.equal(JSON.stringify(result).includes(prohibitedApprovalState), false);
     assert.deepEqual(
       executor.calls.filter((step) => step.startsWith("LOCAL_E2E_")),
       [
         "LOCAL_E2E_CREATE_USER_WALLET",
-        "LOCAL_E2E_CREATE_DEPOSIT_WALLET",
         "LOCAL_E2E_GET_USER_MINING_ADDRESS",
         "LOCAL_E2E_MINE_USER_FUNDS",
-        "LOCAL_E2E_CREATE_NATIVE_DEPOSIT_INTENT",
         "LOCAL_E2E_SEND_NATIVE_DEPOSIT",
         "LOCAL_E2E_MINE_DEPOSIT_FINALITY",
         "LOCAL_E2E_OBSERVE_NATIVE_SOURCE_SNAPSHOT",
         "LOCAL_E2E_OBSERVE_NATIVE_GENESIS_HASH",
         "LOCAL_E2E_OBSERVE_DEPOSIT_TRANSACTION",
         "LOCAL_E2E_VERIFY_DEPOSIT_UTXO_UNSPENT",
-        "LOCAL_E2E_CREATE_RESERVE_WALLET",
-        "LOCAL_E2E_GET_CANONICAL_RESERVE_ADDRESS",
-        "LOCAL_E2E_CREATE_RESERVE_SWEEP_FEE_WALLET",
-        "LOCAL_E2E_GET_RESERVE_SWEEP_FEE_ADDRESS",
         "LOCAL_E2E_FUND_RESERVE_SWEEP_FEE_INPUT",
         "LOCAL_E2E_MINE_RESERVE_SWEEP_FEE_FUNDING_FINALITY",
         "LOCAL_E2E_OBSERVE_RESERVE_SWEEP_FEE_FUNDING_TRANSACTION",
@@ -122,6 +133,43 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
   } finally {
     rmSync(runRoot, { recursive: true, force: true });
   }
+});
+
+test("local FROST Taproot custody context derives disposable rkpepe P2TR custody outside the repository", async () => {
+  const runRoot = mkdtempSync(path.join(os.tmpdir(), "kingpepe-native-to-solana-frost-custody-"));
+  try {
+    const plan = readyPlan(runRoot);
+    const config = createNativeToSolanaFlowConfig({
+      plan,
+      repoRoot: REPO_ROOT,
+      runId: "frost-custody",
+    });
+    const custody = await createLocalFrostTaprootCustodyContext({
+      plan,
+      flowConfig: config,
+    });
+
+    assert.equal(custody.state, "READY");
+    assert.equal(custody.localOnly, true);
+    assert.deepEqual(custody.signerIds, ["KINGPEPE_FROST_A", "KINGPEPE_FROST_B"]);
+    assert.equal(custody.keyEpoch, 1);
+    assert.match(custody.aggregateTweakedXOnlyPublicKey, /^[0-9a-f]{64}$/u);
+    assert.equal(custody.taprootScriptPubKeyHex, p2trScriptPubKeyHex(custody.aggregateTweakedXOnlyPublicKey));
+    assert.match(custody.taprootAddress, /^rkpepe1p[ac-hj-np-z02-9]+$/u);
+    assert.equal(custody.taprootAddress.includes(String(REPO_ROOT)), false);
+  } finally {
+    rmSync(runRoot, { recursive: true, force: true });
+  }
+});
+
+test("Taproot address helper matches the BIP350 v1 witness address vector", () => {
+  assert.equal(
+    taprootAddressFromXOnlyPublicKey(
+      "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "bc",
+    ),
+    "bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqzk5jj0",
+  );
 });
 
 test("flow config keeps local runtime state under the local E2E run root and outside the repository", () => {
@@ -168,6 +216,26 @@ test("deposit output and UTXO validation reject ambiguous or unsafe observations
           ],
         },
         depositAddress: "bcrt1deposit",
+        amountAtomic: "100000000",
+        nativeDecimals: 8,
+      }),
+    /LocalNativeDepositOutputNotUnique/u,
+  );
+
+  assert.throws(
+    () =>
+      findDepositOutput({
+        rawTransaction: {
+          vout: [
+            {
+              n: 0,
+              value: "1.00000000",
+              scriptPubKey: { hex: `5120${h("wrong-frost-script")}`, address: FROST_TAPROOT_ADDRESS },
+            },
+          ],
+        },
+        depositAddress: FROST_TAPROOT_ADDRESS,
+        expectedScriptPubKeyHex: SCRIPT_HEX,
         amountAtomic: "100000000",
         nativeDecimals: 8,
       }),
@@ -234,7 +302,7 @@ test("unsigned reserve sweep draft preserves credited reserve and requires expli
     depositAmountAtomic: "100000000",
     nativeMinerFeeAtomic: "1000",
     nativeDecimals: 8,
-    canonicalReserveAddress: "bcrt1qkingpepereserveaddress",
+    canonicalReserveAddress: FROST_TAPROOT_ADDRESS,
     feeFundingInputs: [{ txidHex: FEE_FUNDING_TXID, vout: 0 }],
     proofFingerprintHex: h("proof-fingerprint"),
   });
@@ -254,7 +322,7 @@ test("unsigned reserve sweep draft preserves credited reserve and requires expli
         { txid: DEPOSIT_TXID, vout: 1 },
         { txid: FEE_FUNDING_TXID, vout: 0 },
       ]),
-      JSON.stringify({ bcrt1qkingpepereserveaddress: "1.00000000" }),
+      JSON.stringify({ [FROST_TAPROOT_ADDRESS]: "1.00000000" }),
     ],
   });
 
@@ -267,7 +335,7 @@ test("unsigned reserve sweep draft preserves credited reserve and requires expli
         depositAmountAtomic: "1000",
         nativeMinerFeeAtomic: "1000",
         nativeDecimals: 8,
-        canonicalReserveAddress: "bcrt1qkingpepereserveaddress",
+        canonicalReserveAddress: FROST_TAPROOT_ADDRESS,
         proofFingerprintHex: h("proof-fingerprint"),
       }),
     /LocalNativeReserveSweepFeeFundingInputRequired/u,
@@ -306,6 +374,7 @@ test("deposit observation flow rejects missing deposit output before claiming E2
             repoRoot: REPO_ROOT,
             runId: "missing-output",
           }),
+          custodyFactory: fakeCustodyFactory,
         }),
       /LocalNativeDepositOutputNotUnique/u,
     );
@@ -344,6 +413,7 @@ test("deposit observation flow rejects wrong local Native source before reserve 
             repoRoot: REPO_ROOT,
             runId: "wrong-source",
           }),
+          custodyFactory: fakeCustodyFactory,
         }),
       /LocalNativeSourceWrongNetwork/u,
     );
@@ -368,7 +438,7 @@ test("deposit observation flow rejects raw transaction txid mismatch", async () 
                 value: "1.00000000",
                 scriptPubKey: {
                   hex: SCRIPT_HEX,
-                  address: "bcrt1qkingpepedepositaddress",
+                  address: FROST_TAPROOT_ADDRESS,
                 },
               },
             ],
@@ -387,6 +457,7 @@ test("deposit observation flow rejects raw transaction txid mismatch", async () 
             repoRoot: REPO_ROOT,
             runId: "wrong-txid",
           }),
+          custodyFactory: fakeCustodyFactory,
         }),
       /LocalNativeDepositTxidMismatch/u,
     );
@@ -417,6 +488,18 @@ function readyPlan(runRoot) {
 
 function commandPathMap() {
   return new Map(REQUIRED_LOCAL_E2E_EXECUTABLES.map((command) => [command, `/fake/bin/${command}`]));
+}
+
+async function fakeCustodyFactory() {
+  return {
+    state: "READY",
+    localOnly: true,
+    keyEpoch: 1,
+    signerIds: ["KINGPEPE_FROST_A", "KINGPEPE_FROST_B"],
+    aggregateTweakedXOnlyPublicKey: FROST_AGGREGATE_XONLY_HEX,
+    taprootScriptPubKeyHex: SCRIPT_HEX,
+    taprootAddress: FROST_TAPROOT_ADDRESS,
+  };
 }
 
 class FakeExecutor {
@@ -457,17 +540,14 @@ function defaultOutput(step) {
     return "KingPepe Core version v31.1.0";
   }
   if (step === "LOCAL_E2E_GET_USER_MINING_ADDRESS") return "bcrt1qkingpepeminingaddress";
-  if (step === "LOCAL_E2E_CREATE_NATIVE_DEPOSIT_INTENT") return "bcrt1qkingpepedepositaddress";
-  if (step === "LOCAL_E2E_GET_CANONICAL_RESERVE_ADDRESS") return "bcrt1qkingpepereserveaddress";
-  if (step === "LOCAL_E2E_GET_RESERVE_SWEEP_FEE_ADDRESS") return "bcrt1qkingpepefeefundingaddress";
   if (step === "LOCAL_E2E_SEND_NATIVE_DEPOSIT") return DEPOSIT_TXID;
   if (step === "LOCAL_E2E_FUND_RESERVE_SWEEP_FEE_INPUT") return FEE_FUNDING_TXID;
   if (step === "LOCAL_E2E_CREATE_UNSIGNED_NATIVE_RESERVE_SWEEP") return UNSIGNED_SWEEP_HEX;
   if (step === "LOCAL_E2E_OBSERVE_NATIVE_SOURCE_SNAPSHOT") {
     return JSON.stringify({
       chain: "regtest",
-      blocks: 107,
-      headers: 107,
+      blocks: 26,
+      headers: 26,
       bestblockhash: REGTEST_BEST_BLOCK_HASH,
       chainwork: "01",
       initialblockdownload: false,
@@ -488,7 +568,7 @@ function defaultOutput(step) {
           value: "1.00000000",
           scriptPubKey: {
             hex: SCRIPT_HEX,
-            address: "bcrt1qkingpepedepositaddress",
+            address: FROST_TAPROOT_ADDRESS,
           },
         },
       ],
@@ -503,7 +583,7 @@ function defaultOutput(step) {
           value: "0.00001000",
           scriptPubKey: {
             hex: FEE_FUNDING_SCRIPT_HEX,
-            address: "bcrt1qkingpepefeefundingaddress",
+            address: FROST_TAPROOT_ADDRESS,
           },
         },
       ],

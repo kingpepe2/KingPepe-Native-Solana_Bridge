@@ -19,10 +19,13 @@ Current safe utilities:
   fail-closed.
 - `local-e2e-native-to-solana.mjs` is the Phase 08 Native-to-Solana command
   runner. It composes the bootstrap harness with local REGTEST wallet funding,
-  deposit intent creation, local Native source/genesis validation, raw deposit
-  transaction identity checks, UTXO/finality checks, and non-secret proof
-  fingerprinting. It now drafts an unsigned local REGTEST reserve sweep with
+  a disposable FROST aggregate Taproot deposit/fee/reserve intent, local Native
+  source/genesis validation, raw deposit transaction identity checks,
+  UTXO/finality checks, and non-secret proof fingerprinting. It uses the
+  recovered KingPepe REGTEST facts of 8 decimals, coinbase maturity 20, and
+  Bech32m HRP `rkpepe`. It drafts an unsigned local REGTEST reserve sweep with
   exact integer miner-fee accounting, but does not wallet-sign, FROST-sign, or
-  broadcast that transaction. Until FROST-backed reserve broadcast, Solana mint
-  submission, and reconciliation are exercised against real local daemons, it
-  reports the full flow as not run rather than passed.
+  broadcast that transaction. Until validated Taproot sighash computation,
+  FROST-backed reserve broadcast, Solana mint submission, and reconciliation
+  are exercised against real local daemons, it reports the full flow as not run
+  rather than passed.

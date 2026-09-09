@@ -433,7 +433,7 @@
     {
       "path": "scripts/local-e2e-native-to-solana.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 local-only Native-to-Solana E2E command runner that composes the bootstrap harness with daemon deposit observation, local Native source/genesis/txid validation, non-secret proof fingerprinting, explicit local fee-funding inputs for nonzero reserve-sweep miner fees, credited deposit preservation as the canonical reserve allocation, runtime state under the local E2E run root outside the repository, and fail-closed blocking before FROST reserve-sweep signing/broadcast without claiming a full E2E pass."
+      "notes": "Phase 08 local-only Native-to-Solana E2E command runner that composes the bootstrap harness with daemon deposit observation, disposable FROST aggregate Taproot deposit/fee/reserve intent generation using KingPepe REGTEST Bech32m HRP rkpepe and coinbase maturity 20 from read-only recovery network config, local Native source/genesis/txid validation, non-secret proof fingerprinting, explicit local fee-funding inputs for nonzero reserve-sweep miner fees, credited deposit preservation as the canonical reserve allocation, runtime state under the local E2E run root outside the repository, and fail-closed blocking before validated sighash/FROST reserve-sweep signing/broadcast without claiming a full E2E pass."
     },
     {
       "path": "scripts/tests/local-e2e-readiness.test.mjs",
@@ -453,7 +453,7 @@
     {
       "path": "scripts/tests/local-e2e-native-to-solana.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 local Native-to-Solana command runner tests using injected fake executors, temporary run roots outside the repository, wrong-source and wrong-txid rejection fixtures, explicit fee-funding and full credited-reserve allocation checks, and no operational secrets."
+      "notes": "Phase 08 local Native-to-Solana command runner tests using injected fake executors, temporary run roots outside the repository, disposable FROST Taproot custody generation, wrong-source and wrong-txid rejection fixtures, explicit fee-funding and full credited-reserve allocation checks, and no operational secrets."
     },
     {
       "path": "services/attesters/README.md",
