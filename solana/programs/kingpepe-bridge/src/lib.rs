@@ -15,9 +15,9 @@ use bridge_messages::{
 };
 use kingpepe_transceiver::{TransceiverError, TransceiverProgram, VerifiedMessageReceipt};
 use solana_program::{
-    account_info::AccountInfo,
-    declare_id, entrypoint::ProgramResult, program::invoke, program::invoke_signed,
-    program_error::ProgramError, program_option::COption, program_pack::Pack, pubkey::Pubkey,
+    account_info::AccountInfo, declare_id, entrypoint::ProgramResult, program::invoke,
+    program::invoke_signed, program_error::ProgramError, program_option::COption,
+    program_pack::Pack, pubkey::Pubkey,
 };
 use spl_token::state::{Account as TokenAccount, Mint as TokenMint};
 use thiserror::Error;
@@ -784,7 +784,12 @@ fn process_record_withdrawal_accounts(
         return Err(BridgeError::WrongMessageKind.into());
     }
     validate_burn(&config, &message, &burn)?;
-    validate_source_token_account(source_token_account, mint.key, burn_authority.key, burn.amount_atomic)?;
+    validate_source_token_account(
+        source_token_account,
+        mint.key,
+        burn_authority.key,
+        burn.amount_atomic,
+    )?;
 
     invoke_burn_checked_if_enabled(
         source_token_account,
@@ -812,7 +817,10 @@ fn process_record_withdrawal_accounts(
         .burned_unpaid_withdrawals
         .checked_add(message.amount_atomic as u128)
         .ok_or(BridgeError::ArithmeticOverflow)?;
-    write_account_data(withdrawal_record, &encode_withdrawal_record_account(&record)?)?;
+    write_account_data(
+        withdrawal_record,
+        &encode_withdrawal_record_account(&record)?,
+    )?;
     write_account_data(bridge_state, &encode_bridge_state_account(&state)?)?;
     Ok(())
 }
@@ -837,7 +845,10 @@ pub fn derive_mint_authority_pda_with_bump(
     (pda.to_bytes(), bump)
 }
 
-pub fn derive_bridge_state_pda(manager_program_id: &PubkeyBytes, mint: &PubkeyBytes) -> PubkeyBytes {
+pub fn derive_bridge_state_pda(
+    manager_program_id: &PubkeyBytes,
+    mint: &PubkeyBytes,
+) -> PubkeyBytes {
     let manager_program_id = Pubkey::new_from_array(*manager_program_id);
     let mint = Pubkey::new_from_array(*mint);
     Pubkey::find_program_address(
@@ -922,7 +933,9 @@ fn read_verified_receipt_account(
     let data = account
         .try_borrow_data()
         .map_err(|_| EntrypointError::AccountBorrowFailed)?;
-    Ok(kingpepe_transceiver::decode_verified_receipt_account(&data)?)
+    Ok(kingpepe_transceiver::decode_verified_receipt_account(
+        &data,
+    )?)
 }
 
 fn next_required_account<'a, 'b, I>(
@@ -971,7 +984,10 @@ fn require_account_owner(account: &AccountInfo, expected: &Pubkey) -> Result<(),
     }
 }
 
-fn require_account_key(account: &AccountInfo, expected: &PubkeyBytes) -> Result<(), EntrypointError> {
+fn require_account_key(
+    account: &AccountInfo,
+    expected: &PubkeyBytes,
+) -> Result<(), EntrypointError> {
     if account.key.to_bytes() == *expected {
         Ok(())
     } else {
@@ -1018,7 +1034,9 @@ fn validate_mint_account(mint: &AccountInfo, config: &BridgeConfig) -> Result<()
         || mint_state.decimals != config.mint_binding.decimals
         || mint_state.freeze_authority != COption::None
         || mint_state.mint_authority
-            != COption::Some(Pubkey::new_from_array(config.mint_binding.mint_authority_pda))
+            != COption::Some(Pubkey::new_from_array(
+                config.mint_binding.mint_authority_pda,
+            ))
     {
         return Err(EntrypointError::InvalidAccountData);
     }
@@ -1949,10 +1967,7 @@ mod tests {
         let deposit = BridgeInstruction::AcceptDepositClaim(Box::new(deposit_message(&config)));
         let deposit_bytes = deposit.encode().unwrap();
         assert_eq!(decode_bridge_instruction(&deposit_bytes).unwrap(), deposit);
-        assert_eq!(
-            process_instruction_boundary(&deposit_bytes),
-            Ok(())
-        );
+        assert_eq!(process_instruction_boundary(&deposit_bytes), Ok(()));
 
         let withdrawal_message = withdrawal_message(&config);
         let burn = BurnChecked {
