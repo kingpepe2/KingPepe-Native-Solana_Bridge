@@ -27,6 +27,10 @@ The pipeline:
 The pipeline exposes synchronous and asynchronous processing entrypoints. The
 asynchronous entrypoint is for promise-returning local RPC adapters and keeps
 the same validation, FROST, attestation, replay, and accounting checks.
+Phase 08 source tests also connect this pipeline to the localnet Solana
+deposit-claim bridge, durable submitter, and finalized claim observer through
+fake loopback RPC fixtures; this is not a substitute for daemon-backed local
+E2E validation.
 
 `FileBackedDepositJournal` persists completed deposit terminal results and
 deposit-outpoint reservations outside the source repository. It is used for

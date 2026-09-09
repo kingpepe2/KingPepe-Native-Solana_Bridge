@@ -527,6 +527,31 @@
     and `anchor`)
 - Real Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
 
+## Phase 08 automatic pipeline to localnet Solana bridge/observer integration
+
+- Extended
+  `services/bridge-validator/tests/automatic-deposit-pipeline.test.mjs` with a
+  source-level integration test that connects the automatic deposit pipeline to
+  `LocalnetSolanaDepositClaimBridge`.
+- The test exercises the real localnet Solana deposit-claim bridge, durable
+  submitter, and `SolanaDepositClaimObserver` using fake loopback RPC fixtures.
+- It verifies automatic completion without a per-transfer KingPepe Team
+  approval state, one Solana submission, finalized claim observation, exact
+  minted amount, and ledger mint accounting.
+- Source commit: `PENDING`
+- CI URL: `PENDING`
+- CI status: `PENDING`
+- Local test status:
+  - `npm run test:bridge-validator` (pass, 37 tests)
+  - `npm test` (pass, 2 protocol vectors plus 81 Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - JSON manifest parse checks (pass)
+  - `npm run doctor:local-e2e` (`BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`;
+    missing `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`,
+    and `anchor`)
+- Real Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
+
 ## Phase 08 mint-authority real Solana PDA correction
 
 - Replaced the bridge manager's prior SHA-256 mint-authority model with

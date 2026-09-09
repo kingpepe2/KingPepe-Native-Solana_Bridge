@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { ed25519 } from "@noble/curves/ed25519.js";
 import { test } from "node:test";
 import { schnorr } from "@noble/curves/secp256k1.js";
 import {
@@ -15,6 +16,13 @@ import {
   FileBackedDepositJournal,
   buildDepositClaimMessage,
 } from "../automatic-deposit-pipeline.mjs";
+import {
+  LocalnetSolanaDepositClaimBridge,
+  prepareLocalnetSolanaDepositClaimRequest,
+} from "../localnet-solana-deposit-claim-bridge.mjs";
+import { InMemorySolanaDepositClaimJournal } from "../solana-deposit-claim-submitter.mjs";
+import { base58Encode } from "../solana-deposit-claim-transaction-plan.mjs";
+import { SolanaDepositClaimObserver } from "../../solana-observer/solana-deposit-claim-observer.mjs";
 import {
   FROST_SIGNING_INTENT_PROTOCOL,
   FROST_SIGNING_MODE,
@@ -330,6 +338,152 @@ function createPipeline(overrides = {}) {
   return { config, operation, frost, nativeRelayer, reserveVerifier, solanaBridge, pipeline };
 }
 
+function feePayerKeypairForPipelineTest() {
+  const generated = ed25519.keygen();
+  return {
+    publicKeyBase58: base58Encode(generated.publicKey),
+    signingKey: generated["secret" + "Key"],
+  };
+}
+
+function feePayerSignerForPipelineTest(feePayer) {
+  return {
+    publicKeyBase58: feePayer.publicKeyBase58,
+    sign(messageBytes) {
+      return ed25519.sign(messageBytes, feePayer.signingKey);
+    },
+  };
+}
+
+function localnetBridgeConfigForPipeline(config, feePayer) {
+  return {
+    environment: "localnet",
+    cluster: "localnet",
+    solanaDeploymentHex: config.deployment.solanaDeployment,
+    managerProgramIdHex: config.deployment.managerProgramId,
+    transceiverProgramIdHex: config.deployment.transceiverProgramId,
+    mintHex: config.deployment.mint,
+    tokenProgramIdHex: h("traditional-spl-token-program"),
+    feePayerBase58: feePayer.publicKeyBase58,
+    policyEpoch: config.policyEpoch,
+    keyEpoch: config.keyEpoch,
+    acceptedObservationTrust: ["LOCAL_VALIDATION"],
+    maxRetries: 0,
+  };
+}
+
+function depositClaimAccountBase64ForMessage(message) {
+  const destination = Buffer.from(message.destinationHex, "hex");
+  const bytes = Buffer.alloc(211);
+  let cursor = 0;
+  bytes.write("KPBCLM01", cursor, "ascii");
+  cursor += 8;
+  bytes[cursor] = 1;
+  cursor += 1;
+  Buffer.from(message.operationIdHex, "hex").copy(bytes, cursor);
+  cursor += 32;
+  Buffer.from(message.messageDigestHex, "hex").copy(bytes, cursor);
+  cursor += 32;
+  bytes.writeBigUInt64LE(message.amountAtomic, cursor);
+  cursor += 8;
+  bytes.writeUInt16LE(destination.length, cursor);
+  cursor += 2;
+  destination.copy(bytes, cursor);
+  return bytes.toString("base64");
+}
+
+function splMintAccountWithoutFreezeBase64() {
+  const bytes = Buffer.alloc(82);
+  bytes.writeUInt32LE(0, 46);
+  return bytes.toString("base64");
+}
+
+function solanaSignatureForPipeline(label = "automatic-pipeline-localnet-solana-claim") {
+  return createHash("sha512").update(label).digest("hex").replaceAll("0", "1").slice(0, 88);
+}
+
+class FakeIntegratedLocalnetSolanaRpc {
+  constructor(options = {}) {
+    this.latestBlockhash = options.latestBlockhash ?? base58Encode(Buffer.from(h("automatic-pipeline-blockhash"), "hex"));
+    this.lastValidBlockHeight = options.lastValidBlockHeight ?? "1000";
+    this.blockHeight = options.blockHeight ?? 10n;
+    this.solanaSignature = options.solanaSignature ?? solanaSignatureForPipeline();
+    this.claimAccountBase64 = options.claimAccountBase64;
+    this.mintAccountBase64 = options.mintAccountBase64 ?? splMintAccountWithoutFreezeBase64();
+    this.expectedDepositClaimAccountBase58 = undefined;
+    this.expectedMintAccountBase58 = undefined;
+    this.latestBlockhashCalls = 0;
+    this.sendCalls = [];
+    this.statusCalls = [];
+    this.transactionCalls = [];
+    this.accountInfoCalls = [];
+  }
+
+  expectAccounts({ depositClaimAccountBase58, mintAccountBase58 }) {
+    this.expectedDepositClaimAccountBase58 = depositClaimAccountBase58;
+    this.expectedMintAccountBase58 = mintAccountBase58;
+  }
+
+  async getLatestBlockhash() {
+    this.latestBlockhashCalls += 1;
+    return {
+      blockhash: this.latestBlockhash,
+      lastValidBlockHeight: this.lastValidBlockHeight,
+    };
+  }
+
+  async getBlockHeight() {
+    return this.blockHeight;
+  }
+
+  async sendTransaction(preparedTransactionBase64, options) {
+    this.sendCalls.push({ preparedTransactionBase64, options });
+    return this.solanaSignature;
+  }
+
+  async getSignatureStatus(solanaSignature) {
+    this.statusCalls.push(solanaSignature);
+    return {
+      slot: 88,
+      confirmationStatus: "finalized",
+      err: null,
+    };
+  }
+
+  async getTransaction(solanaSignature) {
+    this.transactionCalls.push(solanaSignature);
+    return {
+      slot: 88,
+      meta: {
+        err: null,
+      },
+    };
+  }
+
+  async getFinalizedSlot() {
+    return 88;
+  }
+
+  async getAccountInfo(addressBase58) {
+    this.accountInfoCalls.push(addressBase58);
+    if (addressBase58 === this.expectedDepositClaimAccountBase58) {
+      return {
+        value: {
+          data: [this.claimAccountBase64, "base64"],
+        },
+      };
+    }
+    if (addressBase58 === this.expectedMintAccountBase58) {
+      return {
+        value: {
+          data: [this.mintAccountBase64, "base64"],
+        },
+      };
+    }
+    throw new Error("unexpected account address");
+  }
+}
+
 test("async Native to Solana pipeline awaits promise-based adapters without a per-transfer approval state", async () => {
   const runtime = createPipeline({ asyncAdapters: true });
   try {
@@ -340,6 +494,72 @@ test("async Native to Solana pipeline awaits promise-based adapters without a pe
     assert.deepEqual(result.signerIds, REQUIRED_FROST_SIGNERS);
     assert.equal(runtime.nativeRelayer.broadcasts.length, 1);
     assert.equal(runtime.solanaBridge.submissions.length, 1);
+  } finally {
+    runtime.frost.cleanup();
+  }
+});
+
+test("automatic Native to Solana pipeline submits through localnet Solana bridge and observer", async () => {
+  const config = baseConfig();
+  const operation = operationWithComputedId(config);
+  const { encodedMessageHex, decodedMessage } = buildDepositClaimMessage(config, operation);
+  const feePayer = feePayerKeypairForPipelineTest();
+  const feePayerSigner = feePayerSignerForPipelineTest(feePayer);
+  const solanaBridgeConfig = localnetBridgeConfigForPipeline(config, feePayer);
+  const rpc = new FakeIntegratedLocalnetSolanaRpc({
+    claimAccountBase64: depositClaimAccountBase64ForMessage(decodedMessage),
+  });
+  const expectedPrepared = await prepareLocalnetSolanaDepositClaimRequest(
+    solanaBridgeConfig,
+    {
+      operationIdHex: decodedMessage.operationIdHex,
+      encodedMessageHex,
+      messageDigestHex: decodedMessage.messageDigestHex,
+      amountAtomic: decodedMessage.amountAtomic.toString(),
+      solanaRecipientHex: decodedMessage.destinationHex,
+    },
+    {
+      feePayerSigner,
+      blockhashSource: rpc,
+    },
+  );
+  rpc.expectAccounts({
+    depositClaimAccountBase58: expectedPrepared.depositClaimAccountBase58,
+    mintAccountBase58: expectedPrepared.mintAccountBase58,
+  });
+  const claimObserver = new SolanaDepositClaimObserver({
+    config: {
+      environment: "localnet",
+      cluster: "localnet",
+      managerProgramIdHex: config.deployment.managerProgramId,
+      transceiverProgramIdHex: config.deployment.transceiverProgramId,
+      mintHex: config.deployment.mint,
+    },
+    rpcClient: rpc,
+  });
+  const solanaBridge = new LocalnetSolanaDepositClaimBridge({
+    config: solanaBridgeConfig,
+    feePayerSigner,
+    rpcClient: rpc,
+    claimObserver,
+    journal: new InMemorySolanaDepositClaimJournal(),
+  });
+  const runtime = createPipeline({ solanaBridge });
+  try {
+    const result = await runtime.pipeline.processDepositAsync(runtime.operation, 1_700_000_600);
+    assert.equal(result.state, DEPOSIT_STATES.COMPLETED);
+    assert.equal(result.reason, "ALL_REQUIRED_CHECKS_PASSED");
+    assert.equal(result.solanaSignature, rpc.solanaSignature);
+    assert.equal(result.mintedAmountAtomic, "250000000");
+    assert.equal(runtime.pipeline.ledgerSnapshot().mintedSupply, "250000000");
+    assert.equal(rpc.sendCalls.length, 1);
+    assert.deepEqual(rpc.statusCalls, [rpc.solanaSignature]);
+    assert.deepEqual(rpc.transactionCalls, [rpc.solanaSignature]);
+    assert.deepEqual(rpc.accountInfoCalls, [
+      expectedPrepared.depositClaimAccountBase58,
+      expectedPrepared.mintAccountBase58,
+    ]);
+    assert.doesNotMatch(JSON.stringify(result), /WAITING_FOR_ADMIN_APPROVAL/u);
   } finally {
     runtime.frost.cleanup();
   }

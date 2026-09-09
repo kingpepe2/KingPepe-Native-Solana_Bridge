@@ -84,6 +84,9 @@
     "phase08SolanaDepositClaimObserverAddressPassThroughImplemented": true,
     "phase08SolanaDepositClaimObserverAddressPassThroughLocalTestsPassed": true,
     "phase08SolanaDepositClaimObserverAddressPassThroughCiVerified": true,
+    "phase08AutomaticDepositPipelineLocalnetSolanaBridgeIntegrationImplemented": true,
+    "phase08AutomaticDepositPipelineLocalnetSolanaBridgeIntegrationLocalTestsPassed": true,
+    "phase08AutomaticDepositPipelineLocalnetSolanaBridgeIntegrationCiVerified": false,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true

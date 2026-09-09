@@ -503,7 +503,7 @@
     {
       "path": "services/bridge-validator/tests/automatic-deposit-pipeline.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 deposit pipeline tests using temporary in-memory keys and temp-directory FROST state outside the repository, including promise-returning adapter coverage."
+      "notes": "Phase 08 deposit pipeline tests using temporary in-memory keys and temp-directory FROST state outside the repository, including promise-returning adapter coverage and source-level localnet Solana bridge/observer integration fixtures."
     },
     {
       "path": "services/bridge-validator/tests/native-reserve-sweep-adapters.test.mjs",
