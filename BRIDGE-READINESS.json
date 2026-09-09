@@ -107,7 +107,7 @@
     "phase08NativeToSolanaUnsignedReserveSweepDraftCiVerified": true,
     "phase08LocalE2eWalletRawSigningBlockedImplemented": true,
     "phase08LocalE2eWalletRawSigningBlockedLocalTestsPassed": true,
-    "phase08LocalE2eWalletRawSigningBlockedCiVerified": false,
+    "phase08LocalE2eWalletRawSigningBlockedCiVerified": true,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true
