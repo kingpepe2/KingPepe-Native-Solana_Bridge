@@ -8,3 +8,7 @@ Current safe utilities:
   Native-to-Solana local E2E gate. It keeps Mainnet disabled, keeps runtime
   state outside the repository, and exits blocked until required executables
   are present.
+- `local-e2e-bootstrap.mjs` executes only the local infrastructure bootstrap:
+  version checks, Anchor build, disposable local validator startup, REGTEST
+  startup, health checks, and cleanup. It does not claim that the full economic
+  Native-to-Solana E2E flow has passed.
