@@ -174,7 +174,7 @@
 - local E2E readiness gate CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34293107931`
 - local E2E readiness gate CI status: `PASS`
 - tests:
-  - `Get-Command kingpeped kingpepe-cli solana-test-validator anchor` (NOT_FOUND on Windows)
+  - `Get-Command kingpeped kingpepe-cli solana solana-test-validator anchor` (NOT_FOUND on Windows)
   - `command -v kingpeped kingpepe-cli solana-test-validator solana anchor` (NOT_FOUND under WSL)
   - `npm run test:bridge-validator` (pass, 6 automatic deposit pipeline tests)
   - `npm run test:local-e2e-readiness` (pass, 3 readiness-gate tests)
@@ -194,6 +194,35 @@
 - blocker:
   - `LOCAL_E2E_INFRASTRUCTURE_MISSING`
   - The environment does not currently provide the KingPepe regtest daemon/CLI or Solana local validator/Anchor tooling needed for the required real local E2E gate.
-  - Current Solana crates are tested Rust boundary models and are not yet deployable SBF/Anchor local-validator programs.
+  - Current Solana crates have deterministic non-production localnet Program IDs and fail-closed entrypoint shells, but the economic instruction ABI remains disabled.
 - next:
-  - Provide pinned disposable local KingPepe regtest and Solana local-validator tooling, then continue Phase 08 without claiming an E2E pass until the full automated deposit flow actually runs.
+  - Provide pinned disposable local KingPepe regtest and Solana local-validator tooling, implement the Solana economic instruction ABI, then continue Phase 08 without claiming an E2E pass until the full automated deposit flow actually runs.
+
+## Phase 08 fail-closed Solana entrypoint shell summary
+
+- PHASE: `08`
+- source commit: `09d314aa1755bc5e07549ad5d919df93cebaf497`
+- corrective commit: `7eafd8a38d346dcb018005a7357a0012a84b0e0c`
+- push result: pushed to private `origin/main`
+- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34295554332`
+- CI status: `PASS`
+- tests:
+  - `cd solana && cargo check --locked --workspace --all-targets` (pass under WSL)
+  - `cd solana && cargo test --locked --workspace --all-targets` (pass under WSL, 42 Rust tests)
+  - `npm run test:local-e2e-readiness` (pass, 3 readiness-gate tests)
+  - `npm run test:bridge-validator` (pass, 6 automatic deposit pipeline tests)
+  - GitHub Linux Rust formatting and clippy gates (pass)
+  - GitHub Linux and Windows Solana/native/service test gates (pass)
+  - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
+- changed:
+  - Added deterministic non-production localnet Program IDs.
+  - Added Solana `solana_program` entrypoint shells for bridge and transceiver.
+  - Kept economic instruction processing disabled and fail-closed.
+  - Updated the readiness gate to report `SOLANA_PROGRAM_ABI_NOT_READY` instead of treating localnet IDs as placeholders.
+  - Expanded the Solana lockfile with the pinned Solana dependency graph.
+- blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`
+  - `SOLANA_PROGRAM_ABI_NOT_READY`
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
+- next:
+  - Continue Phase 08 with real economic Solana instructions and disposable localnet infrastructure. Do not proceed to Phase 09 until the Native-to-Solana local E2E gate actually passes.
