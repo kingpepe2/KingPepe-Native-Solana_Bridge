@@ -1147,3 +1147,55 @@ OPEN BLOCKERS:
 
 NEXT PHASE:
 Continue Phase 08. Do not start Phase 09 until the real daemon-backed Native-to-Solana local E2E flow passes.
+
+## Phase 08 report - Native reserve fee-funding model alignment
+
+PHASE:
+`PHASE 08 - Automatic Native to Solana local end-to-end`
+
+COMMIT SHA:
+`894cdb6b9361b5b0bba46d66741d2cf6ecd2bc4e`
+
+COMMIT MESSAGE:
+`style(phase-08): format native reserve fee funding`
+
+PUSH RESULT:
+Pushed to private `kingpepe2/KingPepe-Native-Solana_Bridge` on `main`.
+
+CI RUN URL:
+`https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34345811287`
+
+CI STATUS:
+`PASS`
+
+TESTS PASS/FAIL/SKIP/NOT_RUN:
+- `wsl --cd /mnt/d/KingPepe-Native-Solana_Bridge/native/frost cargo test --locked --all-targets`: PASS, 7 tests.
+- `wsl --cd /mnt/d/KingPepe-Native-Solana_Bridge/native/proof cargo test --locked --all-targets`: PASS, 8 tests.
+- `wsl --cd /mnt/d/KingPepe-Native-Solana_Bridge/native/reserve cargo test --locked --all-targets`: PASS, 4 tests.
+- `wsl --cd /mnt/d/KingPepe-Native-Solana_Bridge/native/recovery cargo test --locked --all-targets`: PASS, 3 tests.
+- `npm test`: PASS, 2 protocol vectors plus 97 Node tests.
+- `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
+- `python .github/scripts/guardrails.py`: PASS.
+- JSON manifest parse checks: PASS.
+- `git diff --check`: PASS.
+- Staged and outgoing-range secret-pattern scans: PASS.
+- CI Linux formatting, clippy, Rust/Node tests, guardrails, and audit: PASS.
+- CI Windows portable checks: PASS.
+- Local `rustfmt` / `cargo fmt`: NOT_RUN locally; WSL has Cargo but no installed rustfmt component.
+- `npm run local:e2e:native-to-solana`: `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
+- Real daemon-backed Native-to-Solana local E2E: `BLOCKED / NOT_RUN`.
+
+WHAT CHANGED:
+- Aligned the Rust Native reserve primitive with the Phase 08 full credited-reserve model.
+- Reserve sweeps now require the credited temporary-deposit amount to become the canonical reserve allocation.
+- Nonzero Native miner fees require exact separate fee-funding inputs and reject missing, duplicate, temporary-outpoint-aliasing, not-spent, or wrong-amount fee evidence.
+- Reserve records retain non-secret fee-funding outpoints for accounting and reconciliation provenance.
+- Updated Native reserve validation documentation, readiness, and provenance records.
+- Superseded source commit `74bd3742e8b5846f477ac90054a6f9fd83fc17b8` failed Linux formatting; corrective commit `894cdb6b9361b5b0bba46d66741d2cf6ecd2bc4e` passed CI.
+
+OPEN BLOCKERS:
+- Missing local `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor` executables prevent real daemon-backed Native-to-Solana local E2E.
+- Real daemon-backed reserve sweep signing/broadcast, Solana mint submission, and reconciliation remain `BLOCKED / NOT_RUN`.
+
+NEXT PHASE:
+Continue Phase 08. Do not start Phase 09 until the real daemon-backed Native-to-Solana local E2E flow passes.

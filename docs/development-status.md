@@ -181,8 +181,17 @@
 
 ## Phase 08 Native reserve fee-funding model alignment
 
-- Source status: implemented locally; source commit and CI verification
-  pending.
+- Source status: implemented and CI verified.
+- Source commit:
+  `74bd3742e8b5846f477ac90054a6f9fd83fc17b8`
+- Corrective/tested source SHA:
+  `894cdb6b9361b5b0bba46d66741d2cf6ecd2bc4e`
+- CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34345811287` PASS.
+- Superseded CI failure:
+  `74bd3742e8b5846f477ac90054a6f9fd83fc17b8` failed Linux native reserve
+  formatting and was corrected by
+  `894cdb6b9361b5b0bba46d66741d2cf6ecd2bc4e`.
 - What changed:
   - The Rust Native reserve primitive now matches the Phase 08 local
     reserve-sweep fee model.
