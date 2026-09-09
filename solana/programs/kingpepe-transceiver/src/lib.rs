@@ -716,7 +716,10 @@ mod tests {
             ed25519_instruction_indexes: [0, 1],
         };
         let verify_bytes = verify.encode().unwrap();
-        assert_eq!(decode_transceiver_instruction(&verify_bytes).unwrap(), verify);
+        assert_eq!(
+            decode_transceiver_instruction(&verify_bytes).unwrap(),
+            verify
+        );
         assert_eq!(
             process_instruction_boundary(&verify_bytes),
             Err(EntrypointError::InstructionExecutionDisabled)
