@@ -307,11 +307,16 @@
   doctor:local-e2e`
   (`BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`).
 - Phase 08 automatic pipeline Native plus Solana adapter integration:
-  source commit PENDING, CI PENDING. The automatic Native-to-Solana pipeline now
-  has a source-level integration test that drives real Native reserve-sweep
-  relayer/verifier adapter classes and the real localnet Solana deposit-claim
-  bridge/observer adapter classes with fake loopback RPC fixtures. Local
-  `npm run test:bridge-validator` passed with 38 tests. This remains below the
-  required daemon-backed local E2E gate.
+  source commit `2f0d2dd63d1ec096044c8f07032e8b12a3cbd998`, CI
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34326646202`
+  PASS. The automatic Native-to-Solana pipeline now has a source-level
+  integration test that drives real Native reserve-sweep relayer/verifier
+  adapter classes and the real localnet Solana deposit-claim bridge/observer
+  adapter classes with fake loopback RPC fixtures. Local tests passed: `npm run
+  test:bridge-validator` (38 tests), `npm test` (2 protocol vectors plus 82
+  Node tests), `npm audit --audit-level=low`, guardrails, JSON parse checks,
+  staged and outgoing-range secret-pattern scans, and `npm run
+  doctor:local-e2e` (`BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`). This remains
+  below the required daemon-backed local E2E gate.
 - Real local E2E is still blocked by missing `kingpeped`, `kingpepe-cli`,
   `solana`, `solana-test-validator`, and `anchor`.

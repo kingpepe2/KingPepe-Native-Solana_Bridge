@@ -283,6 +283,49 @@
 - next:
   - Continue Phase 08 account execution and SPL Token CPI. Do not proceed to Phase 09 until the Native-to-Solana local E2E gate actually passes.
 
+## Phase 08 automatic pipeline Native plus Solana adapter integration
+
+- PHASE: `08`
+- source commit: `2f0d2dd63d1ec096044c8f07032e8b12a3cbd998`
+- commit message:
+  `test(phase-08): connect deposit pipeline to native and solana adapters`
+- push result: pushed to private GitHub repository
+- CI URL:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34326646202`
+- CI status: `PASS`
+- tests:
+  - `npm run test:bridge-validator` (pass, 38 bridge-validator tests)
+  - `npm test` (pass, 2 protocol vectors plus 82 Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - JSON manifest parse checks (pass)
+  - staged and outgoing-range secret-pattern scans (pass)
+  - `npm run doctor:local-e2e` (`BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`)
+  - CI Linux format, clippy, workspace, Node, and native crate tests (PASS)
+  - CI Windows workspace, Node, and native crate tests (PASS)
+  - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
+- changed:
+  - Added a source-level integration test connecting the automatic
+    Native-to-Solana deposit pipeline to real Native reserve-sweep relayer and
+    verifier adapter classes.
+  - Kept real software FROST A+B signing, two project attestations, localnet
+    Solana claim bridge, durable submitter, and finalized claim observer in the
+    same automatic test path.
+  - Used fake loopback RPC fixtures for Native REGTEST and Solana localnet
+    because the required local daemons/toolchain are unavailable.
+  - Verified exact reserve/mint accounting, one Native broadcast, one Solana
+    submission, finalized observer account checks, and no per-transfer KingPepe
+    Team approval state.
+- blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`,
+    `solana-test-validator`, and `anchor`.
+- next:
+  - Continue Phase 08 only if another meaningful source increment can be
+    implemented without falsely reporting a daemon-backed local E2E pass. Do
+    not proceed to Phase 09 until the Native-to-Solana local E2E gate actually
+    passes.
+
 ## Phase 08 Solana deposit-claim observer
 
 - PHASE: `08`

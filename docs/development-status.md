@@ -555,9 +555,10 @@
 
 ## Phase 08 automatic pipeline Native plus Solana adapter integration
 
-- Source commit: PENDING
-- CI URL: PENDING
-- CI status: PENDING
+- Source commit: `2f0d2dd63d1ec096044c8f07032e8b12a3cbd998`
+- CI URL:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34326646202`
+- CI status: `PASS`
 - Added a source-level integration test that runs the automatic
   Native-to-Solana deposit pipeline through:
 
@@ -569,8 +570,16 @@
 - The test uses fake loopback RPC fixtures for Native REGTEST and Solana
   localnet because the required daemon/toolchain executables are not present in
   the current environment.
-- Local test result so far: `npm run test:bridge-validator` passed with 38
-  tests.
+- Local test status:
+  - `npm run test:bridge-validator` (pass, 38 bridge-validator tests)
+  - `npm test` (pass, 2 protocol vectors plus 82 Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - JSON manifest parse checks (pass)
+  - staged and outgoing-range secret-pattern scans (pass)
+  - `npm run doctor:local-e2e` (`BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`;
+    missing `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`,
+    and `anchor`)
 - Real daemon-backed Native-to-Solana E2E: `BLOCKED / NOT_RUN`
 
 ## Phase 08 mint-authority real Solana PDA correction
