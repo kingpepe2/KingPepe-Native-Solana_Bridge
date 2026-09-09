@@ -101,7 +101,7 @@
     "phase08NativeToSolanaLocalE2eRunnerCiVerified": true,
     "phase08NativeToSolanaDepositEvidenceValidationImplemented": true,
     "phase08NativeToSolanaDepositEvidenceValidationLocalTestsPassed": true,
-    "phase08NativeToSolanaDepositEvidenceValidationCiVerified": false,
+    "phase08NativeToSolanaDepositEvidenceValidationCiVerified": true,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true
