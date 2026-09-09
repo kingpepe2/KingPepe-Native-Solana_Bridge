@@ -22,6 +22,7 @@ export const ALLOWED_REGTEST_CLI_COMMANDS = Object.freeze(
     "getnewaddress",
     "getrawtransaction",
     "gettxout",
+    "sendtoaddress",
     "sendrawtransaction",
     "signrawtransactionwithwallet",
     "stop",
