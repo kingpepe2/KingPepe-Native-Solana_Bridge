@@ -119,7 +119,7 @@
     "phase08NativeReserveFeeFundingModelCiVerified": true,
     "phase08LocalFrostTaprootDepositIntentImplemented": true,
     "phase08LocalFrostTaprootDepositIntentLocalTestsPassed": true,
-    "phase08LocalFrostTaprootDepositIntentCiVerified": false,
+    "phase08LocalFrostTaprootDepositIntentCiVerified": true,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true
