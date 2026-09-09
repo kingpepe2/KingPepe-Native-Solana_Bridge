@@ -3,6 +3,7 @@ export {
   FROST_SIGNING_MODE,
   REQUIRED_FROST_SIGNERS,
   REQUIRED_FROST_THRESHOLD,
+  canonicalJson,
   createNativeSigningPolicy,
   evaluateNativeSigningPolicy,
   nativeSigningIntentDigest,

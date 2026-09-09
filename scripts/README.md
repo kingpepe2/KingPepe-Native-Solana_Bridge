@@ -25,8 +25,10 @@ Current safe utilities:
   recovered KingPepe REGTEST facts of 8 decimals, coinbase maturity 20, and
   Bech32m HRP `rkpepe`. It drafts an unsigned local REGTEST reserve sweep with
   exact integer miner-fee accounting and computes BIP-341 key-path
-  `SIGHASH_DEFAULT` evidence for each FROST-controlled input. It does not
-  wallet-sign, aggregate FROST signatures, attach final witnesses, or broadcast
-  that transaction. Until FROST-backed reserve broadcast, Solana mint
+  `SIGHASH_DEFAULT` evidence for each FROST-controlled input. It then prepares
+  localnet-only per-input signing intents, signs each input with the disposable
+  software FROST A+B runtime, and attaches key-path Taproot witnesses without
+  using wallet raw-signing RPC shortcuts. It does not broadcast the signed
+  reserve sweep yet. Until FROST-backed reserve broadcast, Solana mint
   submission, and reconciliation are exercised against real local daemons, it
   reports the full flow as not run rather than passed.

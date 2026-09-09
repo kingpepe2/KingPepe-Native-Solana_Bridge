@@ -5,11 +5,15 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import {
   FileBackedFrostStateStore,
+  NativeFrostCoordinator,
   NativeFrostSigner,
   REQUIRED_FROST_SIGNERS,
+  createNativeSigningPolicy,
   runTwoPartyDkg,
 } from "../native/frost/index.mjs";
 import { hashJson } from "../shared/protocol/canonical-message.mjs";
+import { base58Decode } from "../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs";
+import { prepareLocalNativeReserveSweepSigningIntent } from "../services/bridge-validator/native-reserve-sweep-signing-intent.mjs";
 import {
   buildRegtestCliArguments,
   sanitizePlanForReport,
@@ -25,6 +29,7 @@ import {
   decimalCoinsToAtomic,
 } from "../native/node/native-rpc-client.mjs";
 import {
+  attachKeyPathTaprootWitnesses,
   createLocalTaprootSighashEvidences,
   parseNativeTransactionHex,
 } from "../native/node/native-taproot-transaction.mjs";
@@ -42,6 +47,10 @@ export const LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_DRAFTED =
   "LOCAL_NATIVE_RESERVE_SWEEP_DRAFTED";
 export const LOCAL_NATIVE_TO_SOLANA_TAPROOT_SIGHASHES_VALIDATED =
   "LOCAL_NATIVE_TAPROOT_SIGHASHES_VALIDATED";
+export const LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_SIGNED =
+  "LOCAL_NATIVE_RESERVE_SWEEP_SIGNED";
+export const LOCAL_NATIVE_RESERVE_SWEEP_FROST_SIGNATURES_PROTOCOL =
+  "KINGPEPE_NATIVE_SOLANA_BRIDGE/LOCAL_NATIVE_RESERVE_SWEEP_FROST_SIGNATURES/V1";
 
 const DEFAULT_AMOUNT_NATIVE = "1.00000000";
 const DEFAULT_NATIVE_DECIMALS = 8;
@@ -62,6 +71,7 @@ export async function runLocalNativeToSolanaE2e(options = {}) {
     flowResult = await executeNativeDepositObservationFlow({
       ...context,
       custodyFactory: options.custodyFactory,
+      reserveSweepSigner: options.reserveSweepSigner,
       flowConfig: createNativeToSolanaFlowConfig({
         plan: context.plan,
         repoRoot: context.plan.repoRoot,
@@ -72,7 +82,7 @@ export async function runLocalNativeToSolanaE2e(options = {}) {
       fullNativeToSolanaE2e:
         flowResult.state === LOCAL_NATIVE_TO_SOLANA_COMPLETED
           ? "PASS"
-          : "NOT_RUN_FULL_FLOW_NATIVE_RESERVE_SWEEP_PENDING",
+          : "NOT_RUN_FULL_FLOW_NATIVE_BROADCAST_PENDING",
       nativeToSolanaE2e: sanitizeFlowForReport(flowResult, context.plan),
     };
   });
@@ -103,7 +113,7 @@ export async function runLocalNativeToSolanaE2e(options = {}) {
     infrastructure,
     nativeToSolanaE2e: sanitizeFlowForReport(flow, actualPlan ?? infrastructure.plan),
     fullNativeToSolanaE2e:
-      infrastructure.fullNativeToSolanaE2e ?? "NOT_RUN_FULL_FLOW_NATIVE_RESERVE_SWEEP_PENDING",
+      infrastructure.fullNativeToSolanaE2e ?? "NOT_RUN_FULL_FLOW_NATIVE_BROADCAST_PENDING",
   });
 }
 
@@ -127,6 +137,34 @@ export function createNativeToSolanaFlowConfig(options) {
     value.reserveMinerFeeNative ?? DEFAULT_RESERVE_MINER_FEE_NATIVE,
     "reserveMinerFeeNative",
   );
+  const reserveMinerFeeAtomic = decimalCoinsToAtomic(reserveMinerFeeNative, nativeDecimals);
+  const bridgeProgramIdHex = normalizeSolanaProgramIdHex(
+    value.bridgeProgramIdHex ?? value.bridgeProgramId ?? plan.programIds?.kingpepeBridge,
+    "bridgeProgramId",
+  );
+  const transceiverProgramIdHex = normalizeSolanaProgramIdHex(
+    value.transceiverProgramIdHex ?? value.transceiverProgramId ?? plan.programIds?.kingpepeTransceiver,
+    "transceiverProgramId",
+  );
+  const solanaDeploymentHex = normalizeHash32(
+    value.solanaDeploymentHex ??
+      hashJson({
+        protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/LOCALNET_SOLANA_DEPLOYMENT/V1`,
+        cluster: "localnet",
+        bridgeProgramIdHex,
+        transceiverProgramIdHex,
+      }),
+    "solanaDeploymentHex",
+  );
+  const mintHex = normalizeHash32(
+    value.mintHex ??
+      hashJson({
+        protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/LOCALNET_KPEPE_MINT_PLACEHOLDER/V1`,
+        solanaDeploymentHex,
+        runId,
+      }),
+    "mintHex",
+  );
 
   return Object.freeze({
     protocol: LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL,
@@ -139,7 +177,13 @@ export function createNativeToSolanaFlowConfig(options) {
     nativeChainName: sanitizeNetworkName(value.nativeChainName ?? DEFAULT_NATIVE_CHAIN_NAME),
     nativeBech32Hrp: sanitizeBech32Hrp(value.nativeBech32Hrp ?? DEFAULT_NATIVE_BECH32_HRP),
     reserveMinerFeeNative,
-    reserveMinerFeeAtomic: decimalCoinsToAtomic(reserveMinerFeeNative, nativeDecimals).toString(),
+    reserveMinerFeeAtomic: reserveMinerFeeAtomic.toString(),
+    solanaDeploymentHex,
+    bridgeProgramIdHex,
+    transceiverProgramIdHex,
+    mintHex,
+    maxAmountAtomic: canonicalUintDecimal(value.maxAmountAtomic ?? amountAtomic.toString(), "maxAmountAtomic"),
+    maxFeeAtomic: canonicalUintDecimal(value.maxFeeAtomic ?? reserveMinerFeeAtomic.toString(), "maxFeeAtomic"),
     coinbaseMaturityBlocks: checkedInteger(
       value.coinbaseMaturityBlocks ?? DEFAULT_COINBASE_MATURITY_BLOCKS,
       "coinbaseMaturityBlocks",
@@ -161,6 +205,7 @@ export async function executeNativeDepositObservationFlow({
   commandPaths,
   flowConfig,
   custodyFactory = createLocalFrostTaprootCustodyContext,
+  reserveSweepSigner = signLocalReserveSweepWithFrost,
 }) {
   const config = requireObject(flowConfig, "flowConfig");
   mkdirSync(config.stateRoot, { recursive: true });
@@ -318,12 +363,42 @@ export async function executeNativeDepositObservationFlow({
     expectedChangeScriptPubKeyHex: custodyScriptPubKeyHex,
   });
   stages.push("LOCAL_E2E_COMPUTE_VALIDATED_TAPROOT_SIGHASHES");
+  const operationIdHex = hashJson({
+    protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/LOCAL_RESERVE_SWEEP_OPERATION_ID/V1`,
+    nativeGenesisHash: nativeSource.nativeGenesisHash,
+    depositOutpoint: `${depositTxidHex}:${depositOutput.vout}`,
+    amountAtomic: config.amountAtomic,
+    proofFingerprintHex,
+    unsignedNativeTransactionFingerprintHex: reserveSweepDraft.unsignedNativeTransactionFingerprintHex,
+    reserveAmountAtomic: reserveSweepDraft.reserveAmountAtomic,
+  });
+  const signedReserveSweep = await reserveSweepSigner({
+    plan,
+    flowConfig: config,
+    frostCustody,
+    nativeSource,
+    deposit: {
+      txidHex: depositTxidHex,
+      vout: depositOutput.vout,
+      depositOutpoint: `${depositTxidHex}:${depositOutput.vout}`,
+      amountAtomic: config.amountAtomic,
+      proofFingerprintHex,
+      finalitySatisfied: true,
+      utxoUnspent: true,
+      noPriorConsumption: true,
+    },
+    reserveSweepDraft,
+    taprootSighashEvidences,
+    operationIdHex,
+  });
+  stages.push("LOCAL_E2E_SIGN_RESERVE_SWEEP_WITH_FROST_A_B");
+  stages.push("LOCAL_E2E_ATTACH_FROST_TAPROOT_WITNESSES");
 
   return Object.freeze({
     protocol: LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL,
     state: LOCAL_NATIVE_TO_SOLANA_WAITING_FOR_DEPENDENCY,
-    reason: "FROST_RESERVE_SWEEP_SIGNATURES_PENDING",
-    completedStage: LOCAL_NATIVE_TO_SOLANA_TAPROOT_SIGHASHES_VALIDATED,
+    reason: "RESERVE_SWEEP_BROADCAST_PENDING",
+    completedStage: LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_SIGNED,
     productionReady: false,
     mainnetActivation: "DISABLED",
     noPerTransferKingPepeTeamApprovalState: true,
@@ -365,15 +440,179 @@ export async function executeNativeDepositObservationFlow({
     }),
     reserveSweep: Object.freeze({
       ...reserveSweepDraft,
+      state: signedReserveSweep.state,
+      operationIdHex,
+      signed: true,
+      signedNativeTransactionHex: signedReserveSweep.signedNativeTransactionHex,
+      signedNativeTransactionFingerprintHex: signedReserveSweep.signedNativeTransactionFingerprintHex,
+      nativeSweepTxidHex: signedReserveSweep.nativeSweepTxidHex,
+      nativeSweepWtxidHex: signedReserveSweep.nativeSweepWtxidHex,
+      frostSignatureState: signedReserveSweep.state,
+      signingIntents: signedReserveSweep.signingIntents,
+      frostResults: signedReserveSweep.frostResults,
+      witnessInputCount: signedReserveSweep.witnessInputCount,
       taprootSighashEvidences,
     }),
     nextRequiredImplementation: Object.freeze([
-      "SIGN_EACH_RESERVE_SWEEP_INPUT_WITH_REAL_NATIVE_COMPATIBLE_FROST_A_B",
-      "ATTACH_FROST_SIGNATURE_WITNESSES_TO_NATIVE_TRANSACTION",
       "BROADCAST_AND_FINALIZE_RESERVE_SWEEP",
       "SUBMIT_AND_OBSERVE_SOLANA_MINT",
       "RECONCILE_RESERVE_SUPPLY_AND_LIABILITIES",
     ]),
+  });
+}
+
+export function signLocalReserveSweepWithFrost({
+  plan,
+  flowConfig,
+  frostCustody,
+  nativeSource,
+  deposit,
+  reserveSweepDraft,
+  taprootSighashEvidences,
+  operationIdHex,
+}) {
+  const config = requireObject(flowConfig, "flowConfig");
+  const custody = requireObject(frostCustody, "frostCustody");
+  const source = requireObject(nativeSource, "nativeSource");
+  const evidences = requireNonEmptyArray(taprootSighashEvidences, "taprootSighashEvidences");
+  const normalizedOperationId = normalizeHash32(operationIdHex, "operationIdHex");
+  const localSigningConfig = {
+    environment: "localnet",
+    nativeNetworkName: config.nativeChainName,
+    nativeGenesisHash: source.nativeGenesisHash,
+    solanaDeployment: config.solanaDeploymentHex,
+    bridgeProgramId: config.bridgeProgramIdHex,
+    transceiverProgramId: config.transceiverProgramIdHex,
+    mint: config.mintHex,
+    keyEpoch: custody.keyEpoch,
+    maxAmountAtomic: config.maxAmountAtomic,
+    maxFeeAtomic: config.maxFeeAtomic,
+  };
+  const prepared = evidences.map((nativeSighashEvidence) =>
+    prepareLocalNativeReserveSweepSigningIntent({
+      config: localSigningConfig,
+      operationIdHex: normalizedOperationId,
+      deposit,
+      reserveSweepDraft,
+      nativeSighashEvidence,
+    }),
+  );
+  const authorizedOperations = prepared.map((entry) => entry.authorizedOperation);
+  const signerPolicy = createNativeSigningPolicy({
+    nativeNetwork: localSigningConfig.nativeNetworkName,
+    nativeGenesisHash: localSigningConfig.nativeGenesisHash,
+    solanaDeployment: localSigningConfig.solanaDeployment,
+    bridgeProgramId: localSigningConfig.bridgeProgramId,
+    transceiverProgramId: localSigningConfig.transceiverProgramId,
+    mint: localSigningConfig.mint,
+    keyEpoch: localSigningConfig.keyEpoch,
+    maxAmountAtomic: localSigningConfig.maxAmountAtomic,
+    maxFeeAtomic: localSigningConfig.maxFeeAtomic,
+    reserveScriptPubKeyHex: validateP2trScriptPubKeyHex(custody.taprootScriptPubKeyHex, "frostCustody.taprootScriptPubKeyHex"),
+    authorizedOperations,
+  });
+  const coordinator = createLocalFrostTaprootSigningCoordinator({ plan, frostCustody: custody, signerPolicy });
+  const frostResults = prepared.map((entry) => coordinator.signAutomatically(entry.signingIntent));
+  const resultByInput = new Map();
+  for (const [index, result] of frostResults.entries()) {
+    if (result.state !== "SIGNED") {
+      throw new Error("LocalReserveSweepFrostSigningIncomplete");
+    }
+    const signingInputIndex = prepared[index].signingIntent.signingInputIndex;
+    if (resultByInput.has(signingInputIndex)) {
+      throw new Error("LocalReserveSweepDuplicateFrostInputSignature");
+    }
+    if (result.messageHex !== prepared[index].signingIntent.taprootSighashHex) {
+      throw new Error("LocalReserveSweepFrostMessageMismatch");
+    }
+    resultByInput.set(signingInputIndex, result);
+  }
+  const parsed = parseNativeTransactionHex(reserveSweepDraft.unsignedNativeTransactionHex);
+  const signatures = parsed.inputs.map((_, signingInputIndex) => {
+    const result = resultByInput.get(signingInputIndex);
+    if (result === undefined) {
+      throw new Error("LocalReserveSweepMissingFrostInputSignature");
+    }
+    return result.signatureHex;
+  });
+  const witnessAttachment = attachKeyPathTaprootWitnesses({
+    unsignedNativeTransactionHex: reserveSweepDraft.unsignedNativeTransactionHex,
+    signatures,
+  });
+  if (witnessAttachment.txidHex !== reserveSweepDraft.unsignedNativeTransactionId) {
+    throw new Error("LocalReserveSweepSignedTxidMismatch");
+  }
+
+  return Object.freeze({
+    protocol: LOCAL_NATIVE_RESERVE_SWEEP_FROST_SIGNATURES_PROTOCOL,
+    state: "SIGNED_WITNESS_ATTACHED",
+    productionReady: false,
+    mainnetActivation: "DISABLED",
+    localOnly: true,
+    operationIdHex: normalizedOperationId,
+    nativeSweepTxidHex: witnessAttachment.txidHex,
+    nativeSweepWtxidHex: witnessAttachment.wtxidHex,
+    signedNativeTransactionHex: witnessAttachment.rawSignedTransactionHex,
+    signedNativeTransactionFingerprintHex: sha256Hex(Buffer.from(witnessAttachment.rawSignedTransactionHex, "hex")),
+    witnessInputCount: witnessAttachment.witnessInputCount,
+    signingIntents: Object.freeze(
+      prepared.map((entry) =>
+        Object.freeze({
+          protocol: entry.protocol,
+          state: entry.state,
+          signingInputIndex: entry.signingIntent.signingInputIndex,
+          signingRequestId: entry.signingIntent.signingRequestId,
+          signingIntentDigestHex: entry.signingIntentDigestHex,
+          signerPolicyDecision: entry.signerPolicyDecision,
+        }),
+      ),
+    ),
+    frostResults: Object.freeze(
+      frostResults.map((result) =>
+        Object.freeze({
+          state: result.state,
+          requestId: result.requestId,
+          epoch: result.epoch,
+          sessionId: result.sessionId,
+          intentDigest: result.intentDigest,
+          messageHex: result.messageHex,
+          signatureHex: result.signatureHex,
+          aggregateTweakedXOnlyPublicKey: result.aggregateTweakedXOnlyPublicKey,
+          signerIds: Object.freeze([...result.signerIds]),
+        }),
+      ),
+    ),
+  });
+}
+
+function createLocalFrostTaprootSigningCoordinator({ plan, frostCustody, signerPolicy }) {
+  const repoRoot = path.resolve(plan.repoRoot);
+  const stateRoots = requireObject(frostCustody.signerStateRoots, "frostCustody.signerStateRoots");
+  const publicPackage = requireObject(frostCustody.publicPackage, "frostCustody.publicPackage");
+  const signerA = new NativeFrostSigner({
+    signerId: REQUIRED_FROST_SIGNERS[0],
+    index: 0,
+    policy: signerPolicy,
+    stateStore: new FileBackedFrostStateStore({
+      signerId: REQUIRED_FROST_SIGNERS[0],
+      root: requireNonEmptyText(stateRoots.frostA, "frostCustody.signerStateRoots.frostA"),
+      repoRoot,
+    }),
+  });
+  const signerB = new NativeFrostSigner({
+    signerId: REQUIRED_FROST_SIGNERS[1],
+    index: 1,
+    policy: signerPolicy,
+    stateStore: new FileBackedFrostStateStore({
+      signerId: REQUIRED_FROST_SIGNERS[1],
+      root: requireNonEmptyText(stateRoots.frostB, "frostCustody.signerStateRoots.frostB"),
+      repoRoot,
+    }),
+  });
+  return new NativeFrostCoordinator({
+    signers: [signerA, signerB],
+    publicPackage,
+    aggregateTweakedXOnlyPublicKey: frostCustody.aggregateTweakedXOnlyPublicKey,
   });
 }
 
@@ -689,6 +928,12 @@ export async function createLocalFrostTaprootCustodyContext({ plan, flowConfig }
     keyEpoch,
     signerIds: Object.freeze([...REQUIRED_FROST_SIGNERS]),
     aggregateTweakedXOnlyPublicKey: xOnly,
+    publicPackage: epoch.publicPackage,
+    publicPackageHash: epoch.publicPackageHash,
+    signerStateRoots: Object.freeze({
+      frostA: path.join(frostRoot, "frost-a"),
+      frostB: path.join(frostRoot, "frost-b"),
+    }),
     taprootScriptPubKeyHex: p2trScriptPubKeyHex(xOnly),
     taprootAddress: taprootAddressFromXOnlyPublicKey(xOnly, config.nativeBech32Hrp),
   });
@@ -923,6 +1168,17 @@ function normalizeRawTransactionHex(value, label) {
   return normalized;
 }
 
+function normalizeSolanaProgramIdHex(value, label) {
+  if (typeof value === "string" && /^(?:[0-9a-f][0-9a-f]){32}$/iu.test(value)) {
+    return normalizeHash32(value, label);
+  }
+  const decoded = Buffer.from(base58Decode(String(value ?? ""), label));
+  if (decoded.length !== 32) {
+    throw new Error(`${label}:Expected32ByteSolanaProgramId`);
+  }
+  return decoded.toString("hex");
+}
+
 function normalizeHash32(value, label) {
   const normalized = normalizeHexText(String(value ?? "").trim(), label);
   if (normalized.length !== 64) {
@@ -949,6 +1205,13 @@ function normalizeNonEmptyHexText(value, label) {
 function requireNonEmptyText(value, label) {
   if (typeof value !== "string" || value.length === 0) {
     throw new Error(`${label}:ExpectedNonEmptyText`);
+  }
+  return value;
+}
+
+function requireNonEmptyArray(value, label) {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error(`${label}:ExpectedNonEmptyArray`);
   }
   return value;
 }

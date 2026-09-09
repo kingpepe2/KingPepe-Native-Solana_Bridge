@@ -4,10 +4,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { schnorr } from "@noble/curves/secp256k1.js";
 import {
   LOCAL_NATIVE_TO_SOLANA_BLOCKED,
   LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL,
-  LOCAL_NATIVE_TO_SOLANA_TAPROOT_SIGHASHES_VALIDATED,
+  LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_SIGNED,
   LOCAL_NATIVE_TO_SOLANA_WAITING_FOR_DEPENDENCY,
   createLocalFrostTaprootCustodyContext,
   createNativeToSolanaFlowConfig,
@@ -15,6 +16,7 @@ import {
   executeNativeDepositObservationFlow,
   findDepositOutput,
   p2trScriptPubKeyHex,
+  signLocalReserveSweepWithFrost,
   taprootAddressFromXOnlyPublicKey,
   validateLocalNativeSourceSnapshot,
   validateRawDepositTransaction,
@@ -23,6 +25,11 @@ import {
 } from "../local-e2e-native-to-solana.mjs";
 import { createLocalE2ePlan } from "../local-e2e-orchestrator.mjs";
 import { REQUIRED_LOCAL_E2E_EXECUTABLES } from "../local-e2e-readiness.mjs";
+import {
+  attachKeyPathTaprootWitnesses,
+  createLocalTaprootSighashEvidences,
+  parseNativeTransactionHex,
+} from "../../native/node/native-taproot-transaction.mjs";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../..");
 const DEPOSIT_TXID = h("phase08-real-daemon-deposit-txid");
@@ -64,6 +71,7 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
       programArtifactExists: () => true,
       healthAttempts: 1,
       custodyFactory: fakeCustodyFactory,
+      reserveSweepSigner: fakeReserveSweepSigner,
       flowConfig: {
         runId: "test-run",
         amountNative: "1.00000000",
@@ -71,9 +79,9 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
     });
 
     assert.equal(result.state, LOCAL_NATIVE_TO_SOLANA_WAITING_FOR_DEPENDENCY);
-    assert.equal(result.reason, "FROST_RESERVE_SWEEP_SIGNATURES_PENDING");
-    assert.equal(result.fullNativeToSolanaE2e, "NOT_RUN_FULL_FLOW_NATIVE_RESERVE_SWEEP_PENDING");
-    assert.equal(result.nativeToSolanaE2e.completedStage, LOCAL_NATIVE_TO_SOLANA_TAPROOT_SIGHASHES_VALIDATED);
+    assert.equal(result.reason, "RESERVE_SWEEP_BROADCAST_PENDING");
+    assert.equal(result.fullNativeToSolanaE2e, "NOT_RUN_FULL_FLOW_NATIVE_BROADCAST_PENDING");
+    assert.equal(result.nativeToSolanaE2e.completedStage, LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_SIGNED);
     assert.equal(result.nativeToSolanaE2e.noPerTransferKingPepeTeamApprovalState, true);
     assert.equal(result.nativeToSolanaE2e.deposit.txidHex, DEPOSIT_TXID);
     assert.equal(result.nativeToSolanaE2e.deposit.vout, 1);
@@ -91,16 +99,24 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
     assert.equal(result.nativeToSolanaE2e.frostCustody.depositAddress, FROST_TAPROOT_ADDRESS);
     assert.equal(result.nativeToSolanaE2e.frostCustody.canonicalReserveAddress, FROST_TAPROOT_ADDRESS);
     assert.equal(result.nativeToSolanaE2e.nativeSource.trust, "RPC_OBSERVATION");
-    assert.equal(result.nativeToSolanaE2e.reserveSweep.state, "UNSIGNED_DRAFT_ONLY");
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.state, "SIGNED_WITNESS_ATTACHED");
     assert.equal(result.nativeToSolanaE2e.reserveSweep.reserveAmountAtomic, "100000000");
     assert.equal(result.nativeToSolanaE2e.reserveSweep.nativeMinerFeeAtomic, "1000");
     assert.equal(result.nativeToSolanaE2e.reserveSweep.reserveAmountNative, "1.00000000");
     assert.deepEqual(result.nativeToSolanaE2e.reserveSweep.feeFundingOutpoints, [`${FEE_FUNDING_TXID}:0`]);
-    assert.equal(result.nativeToSolanaE2e.reserveSweep.signed, false);
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.signed, true);
     assert.equal(result.nativeToSolanaE2e.reserveSweep.broadcast, false);
     assert.equal(result.nativeToSolanaE2e.reserveSweep.unsignedNativeTransactionHex, UNSIGNED_SWEEP_HEX);
     assert.match(result.nativeToSolanaE2e.reserveSweep.unsignedNativeTransactionFingerprintHex, /^[0-9a-f]{64}$/u);
     assert.match(result.nativeToSolanaE2e.reserveSweep.unsignedNativeTransactionId, /^[0-9a-f]{64}$/u);
+    assert.match(result.nativeToSolanaE2e.reserveSweep.operationIdHex, /^[0-9a-f]{64}$/u);
+    assert.match(result.nativeToSolanaE2e.reserveSweep.signedNativeTransactionHex, /^[0-9a-f]+$/u);
+    assert.match(result.nativeToSolanaE2e.reserveSweep.signedNativeTransactionFingerprintHex, /^[0-9a-f]{64}$/u);
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.nativeSweepTxidHex, result.nativeToSolanaE2e.reserveSweep.unsignedNativeTransactionId);
+    assert.match(result.nativeToSolanaE2e.reserveSweep.nativeSweepWtxidHex, /^[0-9a-f]{64}$/u);
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.witnessInputCount, 2);
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.signingIntents.length, 2);
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.frostResults.length, 2);
     assert.equal(result.nativeToSolanaE2e.reserveSweep.taprootSighashEvidences.length, 2);
     assert.deepEqual(
       result.nativeToSolanaE2e.reserveSweep.taprootSighashEvidences.map((entry) => entry.signingInputIndex),
@@ -121,9 +137,23 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
     assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_CREATE_FROST_TAPROOT_DEPOSIT_INTENT"));
     assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_SELECT_FROST_CANONICAL_RESERVE"));
     assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_COMPUTE_VALIDATED_TAPROOT_SIGHASHES"));
+    assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_SIGN_RESERVE_SWEEP_WITH_FROST_A_B"));
+    assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_ATTACH_FROST_TAPROOT_WITNESSES"));
     assert.equal(
       result.nativeToSolanaE2e.nextRequiredImplementation.includes(
         "COMPUTE_VALIDATED_TAPROOT_SIGHASHES_FOR_EACH_FROST_CONTROLLED_INPUT",
+      ),
+      false,
+    );
+    assert.equal(
+      result.nativeToSolanaE2e.nextRequiredImplementation.includes(
+        "SIGN_EACH_RESERVE_SWEEP_INPUT_WITH_REAL_NATIVE_COMPATIBLE_FROST_A_B",
+      ),
+      false,
+    );
+    assert.equal(
+      result.nativeToSolanaE2e.nextRequiredImplementation.includes(
+        "ATTACH_FROST_SIGNATURE_WITNESSES_TO_NATIVE_TRANSACTION",
       ),
       false,
     );
@@ -180,6 +210,113 @@ test("local FROST Taproot custody context derives disposable rkpepe P2TR custody
     assert.equal(custody.taprootScriptPubKeyHex, p2trScriptPubKeyHex(custody.aggregateTweakedXOnlyPublicKey));
     assert.match(custody.taprootAddress, /^rkpepe1p[ac-hj-np-z02-9]+$/u);
     assert.equal(custody.taprootAddress.includes(String(REPO_ROOT)), false);
+  } finally {
+    rmSync(runRoot, { recursive: true, force: true });
+  }
+});
+
+test("local reserve sweep signer uses real A+B FROST signatures and attaches Taproot witnesses", async () => {
+  const runRoot = mkdtempSync(path.join(os.tmpdir(), "kingpepe-native-to-solana-frost-signing-"));
+  try {
+    const plan = readyPlan(runRoot);
+    const config = createNativeToSolanaFlowConfig({
+      plan,
+      repoRoot: REPO_ROOT,
+      runId: "frost-signing",
+      amountNative: "1.00000000",
+    });
+    const custody = await createLocalFrostTaprootCustodyContext({
+      plan,
+      flowConfig: config,
+    });
+    const unsignedSweepHex = buildUnsignedTransactionHex({
+      inputs: [
+        { txid: DEPOSIT_TXID, vout: 1 },
+        { txid: FEE_FUNDING_TXID, vout: 0 },
+      ],
+      outputs: [{ amountAtomic: "100000000", scriptPubKeyHex: custody.taprootScriptPubKeyHex }],
+    });
+    const proofFingerprintHex = h("real-frost-local-proof-fingerprint");
+    const reserveSweepDraft = await draftLocalReserveSweep({
+      cli: async () => unsignedSweepHex,
+      depositTxidHex: DEPOSIT_TXID,
+      depositVout: 1,
+      depositAmountAtomic: "100000000",
+      nativeMinerFeeAtomic: "1000",
+      nativeDecimals: 8,
+      canonicalReserveAddress: custody.taprootAddress,
+      feeFundingInputs: [{ txidHex: FEE_FUNDING_TXID, vout: 0 }],
+      proofFingerprintHex,
+    });
+    const taprootSighashEvidences = createLocalTaprootSighashEvidences({
+      unsignedNativeTransactionHex: reserveSweepDraft.unsignedNativeTransactionHex,
+      spentOutputs: [
+        {
+          amountAtomic: "100000000",
+          scriptPubKeyHex: custody.taprootScriptPubKeyHex,
+        },
+        {
+          amountAtomic: "1000",
+          scriptPubKeyHex: custody.taprootScriptPubKeyHex,
+        },
+      ],
+      proofFingerprintHex,
+      reserveAmountAtomic: "100000000",
+      nativeMinerFeeAtomic: "1000",
+      expectedRecipientScriptPubKeyHex: custody.taprootScriptPubKeyHex,
+      expectedChangeScriptPubKeyHex: custody.taprootScriptPubKeyHex,
+    });
+
+    const signed = signLocalReserveSweepWithFrost({
+      plan,
+      flowConfig: config,
+      frostCustody: custody,
+      nativeSource: {
+        nativeNetwork: "regtest",
+        nativeGenesisHash: REGTEST_GENESIS_HASH,
+      },
+      deposit: {
+        depositOutpoint: `${DEPOSIT_TXID}:1`,
+        amountAtomic: "100000000",
+        proofFingerprintHex,
+        finalitySatisfied: true,
+        utxoUnspent: true,
+        noPriorConsumption: true,
+      },
+      reserveSweepDraft,
+      taprootSighashEvidences,
+      operationIdHex: h("real-frost-local-reserve-sweep-operation"),
+    });
+
+    assert.equal(signed.state, "SIGNED_WITNESS_ATTACHED");
+    assert.equal(signed.localOnly, true);
+    assert.equal(signed.productionReady, false);
+    assert.equal(signed.mainnetActivation, "DISABLED");
+    assert.equal(signed.nativeSweepTxidHex, reserveSweepDraft.unsignedNativeTransactionId);
+    assert.equal(signed.witnessInputCount, 2);
+    assert.equal(signed.signingIntents.length, 2);
+    assert.equal(signed.frostResults.length, 2);
+    assert.deepEqual(
+      signed.signingIntents.map((entry) => entry.signingInputIndex),
+      [0, 1],
+    );
+    const parsedSigned = parseNativeTransactionHex(signed.signedNativeTransactionHex);
+    assert.equal(parsedSigned.hasWitness, true);
+    assert.equal(parsedSigned.txidHex, reserveSweepDraft.unsignedNativeTransactionId);
+    assert.notEqual(parsedSigned.wtxidHex, reserveSweepDraft.unsignedNativeTransactionId);
+    assert.equal(parsedSigned.inputs[0].witness.length, 1);
+    assert.equal(parsedSigned.inputs[1].witness.length, 1);
+    for (const result of signed.frostResults) {
+      assert.deepEqual(result.signerIds, ["KINGPEPE_FROST_A", "KINGPEPE_FROST_B"]);
+      assert.equal(
+        schnorr.verify(
+          Uint8Array.from(Buffer.from(result.signatureHex, "hex")),
+          Uint8Array.from(Buffer.from(result.messageHex, "hex")),
+          Uint8Array.from(Buffer.from(custody.aggregateTweakedXOnlyPublicKey, "hex")),
+        ),
+        true,
+      );
+    }
   } finally {
     rmSync(runRoot, { recursive: true, force: true });
   }
@@ -548,6 +685,44 @@ async function fakeCustodyFactory() {
     aggregateTweakedXOnlyPublicKey: FROST_AGGREGATE_XONLY_HEX,
     taprootScriptPubKeyHex: SCRIPT_HEX,
     taprootAddress: FROST_TAPROOT_ADDRESS,
+  };
+}
+
+function fakeReserveSweepSigner({ reserveSweepDraft, taprootSighashEvidences, operationIdHex }) {
+  const signatures = taprootSighashEvidences.map((_, index) => h(`fake-local-taproot-signature-${index}`) + h(`fake-local-taproot-tail-${index}`));
+  const attached = attachKeyPathTaprootWitnesses({
+    unsignedNativeTransactionHex: reserveSweepDraft.unsignedNativeTransactionHex,
+    signatures,
+  });
+  return {
+    state: "SIGNED_WITNESS_ATTACHED",
+    localOnly: true,
+    productionReady: false,
+    mainnetActivation: "DISABLED",
+    operationIdHex,
+    nativeSweepTxidHex: attached.txidHex,
+    nativeSweepWtxidHex: attached.wtxidHex,
+    signedNativeTransactionHex: attached.rawSignedTransactionHex,
+    signedNativeTransactionFingerprintHex: h(attached.rawSignedTransactionHex),
+    witnessInputCount: attached.witnessInputCount,
+    signingIntents: taprootSighashEvidences.map((evidence, index) => ({
+      state: "VERIFIED_READY",
+      signingInputIndex: evidence.signingInputIndex,
+      signingRequestId: h(`fake-local-signing-request-${index}`),
+      signingIntentDigestHex: h(`fake-local-signing-intent-${index}`),
+      signerPolicyDecision: { result: "APPROVED" },
+    })),
+    frostResults: taprootSighashEvidences.map((evidence, index) => ({
+      state: "SIGNED",
+      requestId: h(`fake-local-signing-request-${index}`),
+      epoch: 1,
+      sessionId: h(`fake-local-frost-session-${index}`),
+      intentDigest: h(`fake-local-signing-intent-${index}`),
+      messageHex: evidence.taprootSighashHex,
+      signatureHex: signatures[index],
+      aggregateTweakedXOnlyPublicKey: FROST_AGGREGATE_XONLY_HEX,
+      signerIds: ["KINGPEPE_FROST_A", "KINGPEPE_FROST_B"],
+    })),
   };
 }
 
