@@ -1529,3 +1529,57 @@ OPEN BLOCKERS:
 
 NEXT PHASE:
 Continue Phase 08. Do not start Phase 09 until the real daemon-backed Native-to-Solana local E2E flow passes.
+
+## Phase 08 report - Localnet Solana setup transaction plan
+
+PHASE:
+`PHASE 08 - Automatic Native to Solana local end-to-end`
+
+COMMIT SHA:
+`37d02cb7646ec5af53751be598d3974408a0662e`
+
+COMMIT MESSAGE:
+`feat(phase-08): add localnet solana setup plan`
+
+PUSH RESULT:
+Pushed to private GitHub repository `kingpepe2/KingPepe-Native-Solana_Bridge` on branch `main`.
+
+CI RUN URL:
+`https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34370095662`
+
+CI STATUS:
+PASS.
+
+TESTS PASS/FAIL/SKIP/NOT_RUN:
+- `node --check services/bridge-validator/localnet-solana-setup-plan.mjs`: PASS.
+- `node --check services/bridge-validator/tests/localnet-solana-setup-plan.test.mjs`: PASS.
+- `node --test services/bridge-validator/tests/localnet-solana-setup-plan.test.mjs`: PASS, 5 tests.
+- `node --test services/bridge-validator/tests/*.test.mjs`: PASS, 52 tests.
+- `npm test`: PASS, 2 protocol vectors plus 113 Node tests.
+- `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
+- `python .github/scripts/guardrails.py`: PASS.
+- JSON manifest parse checks: PASS.
+- WSL Solana Rust workspace tests: PASS, 53 Rust tests/doc-tests.
+- WSL Native FROST Rust tests: PASS, 7 tests.
+- WSL Native proof Rust tests: PASS, 8 tests.
+- WSL Native reserve Rust tests: PASS, 4 tests.
+- WSL Native recovery Rust tests: PASS, 3 tests.
+- `npm run local:e2e:native-to-solana`: `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
+- Real daemon-backed Native-to-Solana local E2E: `BLOCKED / NOT_RUN`.
+- Staged/outgoing secret scans: PASS.
+- Push: PASS to private repository.
+- CI: PASS for exact source SHA `37d02cb7646ec5af53751be598d3974408a0662e`.
+
+WHAT CHANGED:
+- Added a localnet-only Solana setup transaction planner that creates a disposable zero-supply KPEPE SPL Mint, recipient SPL token account, transceiver config PDA, and bridge state PDA.
+- Encoded SPL Token `InitializeMint2` with PDA mint authority and no freeze authority.
+- Required explicit rent lamports and injected runtime signers for the local fee payer, mint, and recipient token account.
+- Kept setup scoped to localnet with Mainnet activation disabled and no generated keypair files or operational state in the repository.
+
+OPEN BLOCKERS:
+- Missing local `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor` executables prevent real daemon-backed Native-to-Solana local E2E.
+- The localnet setup transaction has not been submitted to a real Solana local validator.
+- Finalized Solana mint observation and reconciliation remain `BLOCKED / NOT_RUN`.
+
+NEXT PHASE:
+Continue Phase 08. Do not start Phase 09 until the real daemon-backed Native-to-Solana local E2E flow passes.

@@ -1134,7 +1134,8 @@
 
 ## Phase 08 localnet Solana setup transaction plan
 
-- Source status: implemented locally; CI verification pending for this source increment.
+- Source status: implemented, pushed, and CI verified for source commit `37d02cb7646ec5af53751be598d3974408a0662e`.
+- CI evidence: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34370095662`, PASS.
 - What changed:
   - Added a localnet-only Solana setup transaction planner that creates a disposable KPEPE SPL Mint with zero initial supply, PDA mint authority, and no freeze authority.
   - Added localnet recipient SPL token-account creation/initialization so the deposit-claim mint path has a real target token account during local E2E execution.
@@ -1143,6 +1144,11 @@
 - Local tests run so far:
   - `node --check services/bridge-validator/localnet-solana-setup-plan.mjs`: PASS.
   - `node --test services/bridge-validator/tests/localnet-solana-setup-plan.test.mjs`: PASS, 5 tests.
+  - `node --test services/bridge-validator/tests/*.test.mjs`: PASS, 52 tests.
+  - `npm test`: PASS, 2 protocol vectors plus 113 Node tests.
+  - `python .github/scripts/guardrails.py`: PASS.
+  - WSL Solana Rust workspace tests: PASS, 53 Rust tests/doc-tests.
+  - Native Rust crate tests: PASS, 22 tests across FROST, proof, reserve, and recovery.
 - Current blocker:
   - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
   - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.

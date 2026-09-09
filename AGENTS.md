@@ -387,7 +387,11 @@
   Mint, a disposable recipient SPL token account, the transceiver config PDA,
   and the bridge state PDA. It requires injected runtime signers and explicit
   rent lamports, keeps Mainnet disabled, and does not generate or store keypair
-  files in the repository. CI verification is pending for this increment.
+  files in the repository. Source commit
+  `37d02cb7646ec5af53751be598d3974408a0662e` passed CI run
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34370095662`.
+  This is source-level implementation only until local Solana validator
+  infrastructure is available and exercised.
 - Phase 08 Solana deposit-claim transaction plan commit:
   `42a5cdb3bcc60e0be7fb5d2395503f148b6d632f`
 - Phase 08 Solana deposit-claim transaction plan CI:
