@@ -36,6 +36,10 @@
     "localE2eReadinessGateImplemented": true,
     "localE2eReadinessGateTestsPassed": true,
     "localE2eReadinessGateCiVerified": true,
+    "localnetProgramIdsConfigured": true,
+    "phase08SolanaEntrypointShellsImplemented": true,
+    "phase08SolanaEntrypointShellsCiVerified": true,
+    "solanaEconomicInstructionAbiReady": false,
     "phase08LocalE2eBlocked": true
   },
   "readinessGates": {
@@ -53,7 +57,7 @@
     "LICENSE_PROVENANCE_PASS": "IMPLEMENTED_AND_TESTED_LOCALLY",
     "REPRODUCIBLE_BUILD_PASS": "NOT_RUN_FULL_REPRODUCIBLE_BUILD",
     "PRODUCTION_CONFIGURATION_VALIDATED": "NOT_CONFIGURED",
-    "PROGRAM_IDENTITIES_VERIFIED": "IMPLEMENTED_AND_TESTED_LOCALLY_PHASE07_NOT_PRODUCTION",
+    "PROGRAM_IDENTITIES_VERIFIED": "IMPLEMENTED_AND_TESTED_LOCALLY_PHASE08_LOCALNET_ONLY_NOT_PRODUCTION",
     "MINT_AUTHORITY_VERIFIED": "IMPLEMENTED_AND_TESTED_LOCALLY_PHASE07_NOT_PRODUCTION",
     "FREEZE_AUTHORITY_NONE_VERIFIED": "IMPLEMENTED_AND_TESTED_LOCALLY_PHASE07_NOT_PRODUCTION",
     "NATIVE_RESERVE_IDENTITY_VERIFIED": "NOT_CONFIGURED",
