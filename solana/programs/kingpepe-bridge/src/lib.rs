@@ -15,9 +15,16 @@ use bridge_messages::{
 };
 use kingpepe_transceiver::{TransceiverError, TransceiverProgram, VerifiedMessageReceipt};
 use solana_program::{
-    account_info::AccountInfo, declare_id, entrypoint::ProgramResult, program::invoke,
-    program::invoke_signed, program_error::ProgramError, program_option::COption,
-    program_pack::Pack, pubkey::Pubkey, system_instruction, system_program,
+    account_info::AccountInfo,
+    declare_id,
+    entrypoint::ProgramResult,
+    program::invoke,
+    program::invoke_signed,
+    program_error::ProgramError,
+    program_option::COption,
+    program_pack::Pack,
+    pubkey::Pubkey,
+    system_instruction, system_program,
     sysvar::{rent::Rent, Sysvar},
 };
 use spl_token::state::{Account as TokenAccount, Mint as TokenMint};
@@ -992,13 +999,7 @@ where
 
 fn optional_payer_and_system<'a, 'b, I>(
     accounts: &mut I,
-) -> Result<
-    (
-        Option<&'a AccountInfo<'b>>,
-        Option<&'a AccountInfo<'b>>,
-    ),
-    EntrypointError,
->
+) -> Result<(Option<&'a AccountInfo<'b>>, Option<&'a AccountInfo<'b>>), EntrypointError>
 where
     'b: 'a,
     I: Iterator<Item = &'a AccountInfo<'b>>,
@@ -1048,7 +1049,8 @@ fn ensure_program_pda_account<'a>(
     }
     require_account_owner(account, &system_program::id())?;
     let payer = payer.ok_or(EntrypointError::NotEnoughAccounts)?;
-    let system_program_account = system_program_account.ok_or(EntrypointError::NotEnoughAccounts)?;
+    let system_program_account =
+        system_program_account.ok_or(EntrypointError::NotEnoughAccounts)?;
     require_signer(payer)?;
     require_writable(payer)?;
     if system_program_account.key != &system_program::id() {
