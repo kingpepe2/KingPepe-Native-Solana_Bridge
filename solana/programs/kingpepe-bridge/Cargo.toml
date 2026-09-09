@@ -15,5 +15,6 @@ no-entrypoint = []
 bridge-messages = { path = "../../modules/bridge-messages" }
 kingpepe-transceiver = { path = "../kingpepe-transceiver", features = ["no-entrypoint"] }
 solana-program = "=1.18.26"
+spl-token = { version = "=4.0.0", features = ["no-entrypoint"] }
 thiserror = "1.0.69"
 zeroize_derive = "=1.4.2"
