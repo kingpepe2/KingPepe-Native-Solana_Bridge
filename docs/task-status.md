@@ -1583,3 +1583,70 @@ OPEN BLOCKERS:
 
 NEXT PHASE:
 Continue Phase 08. Do not start Phase 09 until the real daemon-backed Native-to-Solana local E2E flow passes.
+
+## Phase 08 report - Localnet Solana setup submitter and runner handoff
+
+PHASE:
+Phase 08 - Automatic Native to Solana local end-to-end.
+
+COMMIT SHA:
+`da3696023be06776ccad7435af4fb8c08df90145`
+
+COMMIT MESSAGE:
+`feat(phase-08): submit localnet solana setup`
+
+PUSH RESULT:
+Pushed to private `kingpepe2/KingPepe-Native-Solana_Bridge` `main`.
+
+CI RUN URL:
+`https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34374335134`
+
+CI STATUS:
+PASS.
+
+TESTS PASS/FAIL/SKIP/NOT_RUN:
+
+- PASS: `node --check services\bridge-validator\localnet-solana-setup-submitter.mjs`.
+- PASS: `node --check services\bridge-validator\solana-deposit-claim-submitter.mjs`.
+- PASS: `node --check scripts\local-e2e-native-to-solana.mjs`.
+- PASS: `node --check scripts\tests\local-e2e-native-to-solana.test.mjs`.
+- PASS: `node --test services\bridge-validator\tests\localnet-solana-setup-submitter.test.mjs` (5 tests).
+- PASS: `node --test scripts\tests\local-e2e-native-to-solana.test.mjs` (13 tests).
+- PASS: `node --test services\bridge-validator\tests\*.test.mjs` (57 tests).
+- PASS: `npm test` (2 protocol vectors plus 119 Node tests).
+- PASS: WSL Solana Rust workspace tests (53 Rust tests/doc-tests).
+- PASS: WSL Native Rust crate tests (22 tests across FROST, proof, reserve, and recovery).
+- PASS: `npm audit --audit-level=low` (0 vulnerabilities).
+- PASS: repository guardrails and targeted staged/outgoing secret scans.
+- PASS: JSON manifest parse checks and `git diff --check`.
+- NOT_RUN/BLOCKED: real daemon-backed `npm run local:e2e:native-to-solana`
+  remains `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`; required localnet
+  executables are missing and no localnet commands were started.
+
+WHAT CHANGED:
+
+- Added a localnet-only Solana setup submitter that queries rent exemption,
+  requests disposable local-validator airdrop funding, submits the signed setup
+  transaction, waits for finalized signatures, and verifies Mint/token/PDA
+  accounts.
+- Extended the loopback-only Solana RPC helper with setup-required methods
+  while retaining method allowlisting.
+- Wired the Native-to-Solana local runner so disposable local Solana setup
+  identities are created before Native FROST signing and the FROST policy binds
+  to the exact local KPEPE Mint for that run.
+- Sanitized setup results so runtime signer handles are not included in public
+  reports.
+- The runner now advances to finalized local Solana setup and then stops
+  honestly at `SOLANA_DEPOSIT_CLAIM_PENDING`.
+
+OPEN BLOCKERS:
+
+- `LOCAL_E2E_INFRASTRUCTURE_MISSING`: `kingpeped`, `kingpepe-cli`,
+  `solana`, `solana-test-validator`, and `anchor` are not available in this
+  local environment.
+- Real local-validator account creation/finality, deposit-claim submission,
+  finalized mint observation, and reconciliation remain `BLOCKED / NOT_RUN`.
+
+NEXT PHASE:
+Continue Phase 08. Do not start Phase 09 until the real daemon-backed
+Native-to-Solana local E2E flow passes or a non-bypassable blocker is reported.

@@ -1156,7 +1156,11 @@
 
 ## Phase 08 localnet Solana setup submitter and runner handoff
 
-- Source status: implemented locally; push and CI verification pending.
+- Source status: implemented, pushed, and CI verified for source commit
+  `da3696023be06776ccad7435af4fb8c08df90145`.
+- CI evidence:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34374335134`,
+  PASS.
 - What changed:
   - Added a localnet-only Solana setup submitter that queries rent exemption,
     requests disposable local-validator airdrop funding, submits the signed

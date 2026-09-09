@@ -404,9 +404,10 @@
   (5 tests), `node --test scripts\tests\local-e2e-native-to-solana.test.mjs`
   (13 tests), `node --test services\bridge-validator\tests\*.test.mjs` (57
   tests), and `npm test` (2 protocol vectors plus 119 Node tests). CI is
-  pending for this source increment until pushed and verified. This still stops
-  at `SOLANA_DEPOSIT_CLAIM_PENDING`; it does not claim a complete daemon-backed
-  Native-to-Solana local E2E pass.
+  verified for source SHA `da3696023be06776ccad7435af4fb8c08df90145` at
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34374335134`.
+  This still stops at `SOLANA_DEPOSIT_CLAIM_PENDING`; it does not claim a
+  complete daemon-backed Native-to-Solana local E2E pass.
 - Phase 08 Solana deposit-claim transaction plan commit:
   `42a5cdb3bcc60e0be7fb5d2395503f148b6d632f`
 - Phase 08 Solana deposit-claim transaction plan CI:
