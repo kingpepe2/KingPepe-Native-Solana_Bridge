@@ -24,6 +24,10 @@ The pipeline:
 - returns `COMPLETED` only when all required checks pass;
 - has no per-transfer KingPepe Team approval state.
 
+The pipeline exposes synchronous and asynchronous processing entrypoints. The
+asynchronous entrypoint is for promise-returning local RPC adapters and keeps
+the same validation, FROST, attestation, replay, and accounting checks.
+
 `solana-deposit-claim-submitter.mjs` implements the localnet Solana deposit
 claim submission boundary used after A+B attestation. It accepts prebuilt
 transaction bytes from the local harness/SDK layer, verifies the canonical

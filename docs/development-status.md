@@ -68,7 +68,7 @@
 - Phase 07 CI: PASS for `d17ba8fe61d20a88d4206f72d68a010a2d146524`
 - Phase 08 `Get-Command kingpeped kingpepe-cli solana solana-test-validator anchor`: NOT_FOUND on Windows
 - Phase 08 `command -v kingpeped kingpepe-cli solana-test-validator solana anchor`: NOT_FOUND under WSL
-- Phase 08 `npm run test:bridge-validator`: PASS, 13 bridge-validator tests (automatic deposit pipeline plus Solana deposit claim submitter)
+- Phase 08 `npm run test:bridge-validator`: PASS, 14 bridge-validator tests (automatic deposit pipeline, async adapter path, and Solana deposit claim submitter)
 - Phase 08 `npm run test:native-node`: PASS, 7 Native REGTEST RPC adapter tests
 - Phase 08 `npm run test:local-e2e-readiness`: PASS, 8 readiness/orchestration tests
 - Phase 08 `npm run doctor:local-e2e`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING; missing localnet executables; both Solana programs report `READY` at the source/readiness-gate level after account-execution wiring
@@ -85,6 +85,7 @@
 - Phase 08 local E2E bootstrap runner: PASS for `d392403733bbfb92fcfd2d50a1d3879d63f0e3bb`
 - Phase 08 Native REGTEST RPC adapter: PASS for `845dfc4a86a1ef87f15e3d5ec2ca4ad91fd8fe8d`
 - Phase 08 Solana deposit claim submitter: PASS for `905a45b4c79d879e6ae27a05b3c7a39fed0a30f6`
+- Phase 08 async deposit pipeline entrypoint: local tests PASS; CI pending for the next pushed source SHA
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 52 Rust tests after account-execution update
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
@@ -326,6 +327,19 @@
   - CI Linux format, clippy, workspace, Node, and native crate tests (PASS)
   - CI Windows workspace, Node, and native crate tests (PASS)
   - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
+
+## Phase 08 async deposit pipeline entrypoint
+
+- Added `processDepositAsync` to
+  `services/bridge-validator/automatic-deposit-pipeline.mjs`.
+- The async path awaits promise-returning Native relayer, reserve verifier, and
+  Solana bridge adapters while preserving the same Native evidence validation,
+  FROST A+B signing, reserve finality, two-attester threshold, idempotency, and
+  exact-accounting behavior as the synchronous path.
+- Added bridge-validator coverage using promise-returning adapters.
+- Local test status:
+  - `npm run test:bridge-validator` (pass, 14 bridge-validator tests)
+  - real Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
 
 ## Phase 08 mint-authority real Solana PDA correction
 

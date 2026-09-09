@@ -473,7 +473,7 @@
     {
       "path": "services/bridge-validator/automatic-deposit-pipeline.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 automatic Native-to-Solana deposit orchestration boundary using existing FROST, attestation, adapter, and exact-accounting checks."
+      "notes": "Phase 08 automatic Native-to-Solana deposit orchestration boundary using existing FROST, attestation, adapter, and exact-accounting checks, with synchronous and asynchronous local adapter entrypoints."
     },
     {
       "path": "services/bridge-validator/index.mjs",
@@ -488,7 +488,7 @@
     {
       "path": "services/bridge-validator/tests/automatic-deposit-pipeline.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 deposit pipeline tests using temporary in-memory keys and temp-directory FROST state outside the repository."
+      "notes": "Phase 08 deposit pipeline tests using temporary in-memory keys and temp-directory FROST state outside the repository, including promise-returning adapter coverage."
     },
     {
       "path": "services/bridge-validator/tests/solana-deposit-claim-submitter.test.mjs",

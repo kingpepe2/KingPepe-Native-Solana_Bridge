@@ -235,7 +235,7 @@ function createPipeline(overrides = {}) {
     secretKey: keyB.secretKey,
     policy: attesterPolicy(config, "ATTESTER_B", keyB),
   });
-  const nativeRelayer = overrides.nativeRelayer ?? {
+  let nativeRelayer = overrides.nativeRelayer ?? {
     broadcasts: [],
     broadcastReserveSweep(request) {
       this.broadcasts.push(request);
@@ -254,7 +254,7 @@ function createPipeline(overrides = {}) {
       };
     },
   };
-  const reserveVerifier = overrides.reserveVerifier ?? {
+  let reserveVerifier = overrides.reserveVerifier ?? {
     verifyFinalizedReserveSweep(request) {
       return {
         trust: "LOCALLY_VALIDATED_CHAIN_STATE",
@@ -276,7 +276,7 @@ function createPipeline(overrides = {}) {
       };
     },
   };
-  const solanaBridge = overrides.solanaBridge ?? {
+  let solanaBridge = overrides.solanaBridge ?? {
     submissions: [],
     submitDepositClaim(request) {
       this.submissions.push(request);
@@ -289,6 +289,31 @@ function createPipeline(overrides = {}) {
       };
     },
   };
+  if (overrides.asyncAdapters === true) {
+    const syncNativeRelayer = nativeRelayer;
+    nativeRelayer = {
+      broadcasts: syncNativeRelayer.broadcasts,
+      async broadcastReserveSweep(request) {
+        await Promise.resolve();
+        return syncNativeRelayer.broadcastReserveSweep(request);
+      },
+    };
+    const syncReserveVerifier = reserveVerifier;
+    reserveVerifier = {
+      async verifyFinalizedReserveSweep(request) {
+        await Promise.resolve();
+        return syncReserveVerifier.verifyFinalizedReserveSweep(request);
+      },
+    };
+    const syncSolanaBridge = solanaBridge;
+    solanaBridge = {
+      submissions: syncSolanaBridge.submissions,
+      async submitDepositClaim(request) {
+        await Promise.resolve();
+        return syncSolanaBridge.submitDepositClaim(request);
+      },
+    };
+  }
   const pipeline = new AutomaticNativeToSolanaDepositPipeline({
     config,
     frostCoordinator: frost.coordinator,
@@ -299,6 +324,21 @@ function createPipeline(overrides = {}) {
   });
   return { config, operation, frost, nativeRelayer, reserveVerifier, solanaBridge, pipeline };
 }
+
+test("async Native to Solana pipeline awaits promise-based adapters without a per-transfer approval state", async () => {
+  const runtime = createPipeline({ asyncAdapters: true });
+  try {
+    const result = await runtime.pipeline.processDepositAsync(runtime.operation, 1_700_000_600);
+    assert.equal(result.state, DEPOSIT_STATES.COMPLETED);
+    assert.equal(result.reason, "ALL_REQUIRED_CHECKS_PASSED");
+    assert.equal(result.threshold, 2);
+    assert.deepEqual(result.signerIds, REQUIRED_FROST_SIGNERS);
+    assert.equal(runtime.nativeRelayer.broadcasts.length, 1);
+    assert.equal(runtime.solanaBridge.submissions.length, 1);
+  } finally {
+    runtime.frost.cleanup();
+  }
+});
 
 test("automatic Native to Solana pipeline completes without a per-transfer KingPepe Team approval state", () => {
   const runtime = createPipeline();

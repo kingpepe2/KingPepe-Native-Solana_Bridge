@@ -181,6 +181,132 @@ export class AutomaticNativeToSolanaDepositPipeline {
       }),
     );
   }
+
+  async processDepositAsync(operation, nowUnix = undefined) {
+    const normalized = normalizeDepositOperation(operation);
+    const { encodedMessageHex, decodedMessage, evidenceDigestHex } = buildDepositClaimMessage(this.#config, normalized);
+    const replay = this.#journal.completed(decodedMessage.operationIdHex);
+    if (replay !== undefined) {
+      this.#journal.assertSameCompleted(decodedMessage.operationIdHex, encodedMessageHex);
+      return structuredClone(replay);
+    }
+    this.#journal.reserveOperation(decodedMessage.operationIdHex, decodedMessage.depositOutpointText, encodedMessageHex);
+
+    const observed = validateObservedDeposit(this.#config, normalized, decodedMessage);
+    this.#journal.record(decodedMessage.operationIdHex, DEPOSIT_STATES.OBSERVED, observed.reason);
+    if (observed.state !== DEPOSIT_STATES.VERIFIED_READY) {
+      return this.#journal.finish(decodedMessage.operationIdHex, observed);
+    }
+
+    const preparedSweep = validatePreparedReserveSweep(normalized, decodedMessage);
+    this.#journal.record(decodedMessage.operationIdHex, DEPOSIT_STATES.SIGNING, "FROST_A_B_AUTOMATIC_RESERVE_SWEEP");
+    const frostResult = this.#frostCoordinator.signAutomatically(preparedSweep.signingIntent);
+    if (frostResult.state !== "SIGNED") {
+      return this.#journal.finish(
+        decodedMessage.operationIdHex,
+        flowDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "FROST_A_B_NOT_AVAILABLE", decodedMessage, {
+          frostState: frostResult.state,
+        }),
+      );
+    }
+
+    this.#journal.record(decodedMessage.operationIdHex, DEPOSIT_STATES.BROADCAST, "PERSISTED_BEFORE_NATIVE_BROADCAST");
+    const broadcast = requireMethodResult(
+      await this.#nativeRelayer.broadcastReserveSweep({
+        operationIdHex: decodedMessage.operationIdHex,
+        encodedMessageHex,
+        signingIntent: preparedSweep.signingIntent,
+        frostResult,
+      }),
+      "nativeRelayer.broadcastReserveSweep",
+    );
+    if (broadcast.state !== DEPOSIT_STATES.BROADCAST && broadcast.state !== DEPOSIT_STATES.COMPLETED) {
+      return this.#journal.finish(
+        decodedMessage.operationIdHex,
+        flowDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "NATIVE_SWEEP_BROADCAST_NOT_CONFIRMED", decodedMessage, {
+          nativeBroadcastState: broadcast.state,
+        }),
+      );
+    }
+
+    this.#journal.record(decodedMessage.operationIdHex, DEPOSIT_STATES.WAITING_SETTLEMENT, "WAITING_FOR_SWEEP_FINALITY");
+    const reserveEvidence = requireMethodResult(
+      await this.#reserveVerifier.verifyFinalizedReserveSweep({
+        operationIdHex: decodedMessage.operationIdHex,
+        encodedMessageHex,
+        evidenceDigestHex,
+        deposit: normalized.deposit,
+        reserveSweep: normalized.reserveSweep,
+        broadcast,
+      }),
+      "reserveVerifier.verifyFinalizedReserveSweep",
+    );
+    const reserveResult = validateFinalReserveEvidence(this.#config, normalized, decodedMessage, reserveEvidence);
+    if (reserveResult.state !== DEPOSIT_STATES.VERIFIED_READY) {
+      return this.#journal.finish(decodedMessage.operationIdHex, reserveResult);
+    }
+
+    const attestationRequest = {
+      encodedMessageHex,
+      messageDigestHex: decodedMessage.messageDigestHex,
+      evidence: reserveResult.attestationEvidence,
+    };
+    const attestations = this.#attesters.map((attester) => attester.signDepositCredit(attestationRequest, nowUnix));
+    const combinedAttestation = combineProjectAttestations({
+      attestations,
+      encodedMessageHex,
+      authorizedAttesterPublicKeys: this.#config.authorizedAttesterPublicKeys,
+    });
+    if (combinedAttestation.state !== VERIFIED_READY) {
+      return this.#journal.finish(
+        decodedMessage.operationIdHex,
+        flowDecision(DEPOSIT_STATES.REJECTED, "PROJECT_ATTESTATION_THRESHOLD_NOT_MET", decodedMessage),
+      );
+    }
+
+    this.#ledger.recordValidatedDeposit(decodedMessage.amountAtomic, decodedMessage.feeAtomic);
+    const minted = requireMethodResult(
+      await this.#solanaBridge.submitDepositClaim({
+        operationIdHex: decodedMessage.operationIdHex,
+        encodedMessageHex,
+        messageDigestHex: decodedMessage.messageDigestHex,
+        amountAtomic: decodedMessage.amountAtomic.toString(),
+        solanaRecipientHex: decodedMessage.destinationHex,
+        attestations,
+        combinedAttestation,
+      }),
+      "solanaBridge.submitDepositClaim",
+    );
+    if (minted.state !== DEPOSIT_STATES.COMPLETED) {
+      return this.#journal.finish(
+        decodedMessage.operationIdHex,
+        flowDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "SOLANA_MINT_NOT_COMPLETED", decodedMessage, {
+          solanaState: minted.state,
+        }),
+      );
+    }
+    if (BigInt(minted.mintedAmountAtomic) !== decodedMessage.amountAtomic) {
+      return this.#journal.finish(
+        decodedMessage.operationIdHex,
+        flowDecision(DEPOSIT_STATES.HARD_STOP, "SOLANA_MINT_AMOUNT_MISMATCH", decodedMessage),
+      );
+    }
+    this.#ledger.recordMint(decodedMessage.amountAtomic, decodedMessage.feeAtomic);
+
+    return this.#journal.finish(
+      decodedMessage.operationIdHex,
+      flowDecision(DEPOSIT_STATES.COMPLETED, "ALL_REQUIRED_CHECKS_PASSED", decodedMessage, {
+        attestationMode: combinedAttestation.mode,
+        threshold: combinedAttestation.threshold,
+        signerIds: frostResult.signerIds,
+        nativeSweepTxidHex: broadcast.nativeSweepTxidHex,
+        reserveAllocationIdHex: reserveEvidence.reserveAllocationIdHex,
+        solanaSignature: minted.solanaSignature,
+        mintedAmountAtomic: minted.mintedAmountAtomic,
+        ledger: this.#ledger.snapshot(),
+      }),
+    );
+  }
 }
 
 export class InMemoryDepositJournal {

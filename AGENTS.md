@@ -121,6 +121,8 @@
 - The pipeline uses existing real FROST A+B signing, project attestation,
   canonical messages, adapter boundaries, replay checks, and exact BigInt
   accounting. It has no per-transfer KingPepe Team approval state.
+- The pipeline exposes `processDepositAsync` for promise-returning local RPC
+  adapters while preserving the same validation and accounting checks.
 - Required local executables were not available in the checked environment:
   `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
 - Current Solana crates include deterministic non-production localnet Program
@@ -132,8 +134,8 @@
   deposit flow without per-transfer KingPepe Team approval.
 - Current local source-boundary check:
   - `npm run test:bridge-validator`
-  - This covers the automatic deposit pipeline and the Solana deposit claim
-    submitter source-boundary tests.
+  - This covers the automatic deposit pipeline, async adapter path, and the
+    Solana deposit claim submitter source-boundary tests.
 - Current Native RPC adapter check:
   - `npm run test:native-node`
 - Current local E2E readiness check:

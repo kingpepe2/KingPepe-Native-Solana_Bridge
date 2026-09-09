@@ -457,6 +457,29 @@
     not proceed to Phase 09 until the Native-to-Solana local E2E gate actually
     passes.
 
+## Phase 08 async deposit pipeline entrypoint
+
+- PHASE: `08`
+- source commit: pending until this source increment is committed and pushed
+- CI status: pending
+- tests:
+  - `npm run test:bridge-validator` (pass, 14 bridge-validator tests)
+  - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
+- changed:
+  - Added `processDepositAsync` for promise-returning local Native relayer,
+    reserve verifier, and Solana bridge adapters.
+  - Added test coverage proving the async path completes with automatic FROST
+    A+B, two project attestations, one Native broadcast, one Solana submission,
+    and no per-transfer KingPepe Team approval state.
+- blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`,
+    `solana-test-validator`, and `anchor`.
+- next:
+  - Push this source increment and verify CI, then continue Phase 08 only if a
+    further source increment is possible without claiming the daemon-backed E2E
+    pass.
+
 ## Phase 08 Solana account-state codec implementation
 
 - PHASE: `08`
