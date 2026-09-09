@@ -76,7 +76,7 @@
 - Phase 08 fail-closed Solana entrypoint shell CI: PASS for `7eafd8a38d346dcb018005a7357a0012a84b0e0c`
 - Phase 08 validate-only Solana ABI CI: PASS for `201c5bdc2a2fb65601331b58115e0a7543179e12`
 - Phase 08 mint-authority real Solana PDA correction CI: PASS for `94da519e7a50ea6692c445cfd307beb0fa491347`
-- Phase 08 Solana account-state codecs: local tests PASS; CI pending publication
+- Phase 08 Solana account-state codecs: PASS for `804e03d4909ad002c0cf97798bd30cda56a7d4be`
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 47 Rust tests after account-codec update
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
@@ -164,9 +164,16 @@
   versions, truncated account data, overlong destinations, and alternate
   padding.
 - Account execution and SPL Token CPI remain disabled and fail-closed.
-- Source commit: pending publication
-- CI URL: pending
-- CI status: pending
+- Implementation commit:
+  `16dec337ba321b4f37f6dd1dfb13cf5a221db3eb`
+- Corrective format commit / tested source SHA:
+  `804e03d4909ad002c0cf97798bd30cda56a7d4be`
+- CI URL:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34301859073`
+- CI status: `PASS`
+- Superseded CI failure:
+  `16dec337ba321b4f37f6dd1dfb13cf5a221db3eb` failed Linux rustfmt and was
+  corrected by `804e03d4909ad002c0cf97798bd30cda56a7d4be`.
 - Real daemon-backed Native-to-Solana E2E: `BLOCKED / NOT_RUN`
 
 ## Phase 08 mint-authority real Solana PDA correction

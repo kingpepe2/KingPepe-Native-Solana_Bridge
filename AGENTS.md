@@ -166,5 +166,7 @@
 - Phase 08 Solana account-codec status:
   fixed binary account codecs exist for bridge state, deposit claims,
   withdrawal records, transceiver config, and verified receipts. Account
-  execution and SPL CPI are still disabled; source publication/CI verification
-  is pending for this increment.
+  execution and SPL CPI are still disabled. Implementation commit
+  `16dec337ba321b4f37f6dd1dfb13cf5a221db3eb` failed Linux rustfmt in CI;
+  corrective commit `804e03d4909ad002c0cf97798bd30cda56a7d4be` passed CI run
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34301859073`.
