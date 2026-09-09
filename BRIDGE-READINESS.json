@@ -74,7 +74,7 @@
     "phase08DepositPipelineFileJournalCiVerified": true,
     "phase08SolanaDepositClaimObserverImplemented": true,
     "phase08SolanaDepositClaimObserverLocalTestsPassed": true,
-    "phase08SolanaDepositClaimObserverCiVerified": false,
+    "phase08SolanaDepositClaimObserverCiVerified": true,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true
