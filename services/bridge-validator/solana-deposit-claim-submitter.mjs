@@ -262,6 +262,15 @@ export class SolanaLocalRpcClient {
   async getBlockHeight() {
     return BigInt(await this.call("getBlockHeight", [{ commitment: "finalized" }]));
   }
+
+  async getLatestBlockhash() {
+    const result = await this.call("getLatestBlockhash", [{ commitment: "finalized" }]);
+    const value = requireObject(result?.value, "latestBlockhash.value");
+    return Object.freeze({
+      blockhash: normalizeBase58Like(value.blockhash, "latestBlockhash.blockhash"),
+      lastValidBlockHeight: canonicalUintDecimalLike(value.lastValidBlockHeight, "latestBlockhash.lastValidBlockHeight"),
+    });
+  }
 }
 
 export class InMemorySolanaDepositClaimJournal {
@@ -729,6 +738,22 @@ function canonicalUintDecimal(value, label) {
     throw new Error(`${label}:ExpectedCanonicalUintDecimal`);
   }
   return value;
+}
+
+function canonicalUintDecimalLike(value, label) {
+  if (typeof value === "bigint") {
+    if (value < 0n) {
+      throw new Error(`${label}:ExpectedCanonicalUintDecimal`);
+    }
+    return value.toString();
+  }
+  if (typeof value === "number") {
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new Error(`${label}:ExpectedCanonicalUintDecimal`);
+    }
+    return String(value);
+  }
+  return canonicalUintDecimal(value, label);
 }
 
 function checkedSmallInteger(value, label) {
