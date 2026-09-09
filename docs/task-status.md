@@ -379,6 +379,45 @@
     Solana/Anchor executables are available. Do not proceed to Phase 09 until
     the Native-to-Solana local E2E gate actually passes.
 
+## Phase 08 Native REGTEST RPC adapter
+
+- PHASE: `08`
+- source commit: `845dfc4a86a1ef87f15e3d5ec2ca4ad91fd8fe8d`
+- push result: pushed to private GitHub repository
+- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34308850060`
+- CI status: `PASS`
+- tests:
+  - `npm run test:native-node` (pass, 7 Native REGTEST RPC adapter tests)
+  - `npm test` (pass, 2 protocol vectors plus 43 Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - `npm run doctor:local-e2e` (expected BLOCKED, exit 2)
+  - `npm run local:e2e:bootstrap` (expected BLOCKED, exit 2)
+  - CI Linux format, clippy, workspace, Node, and native crate tests (PASS)
+  - CI Windows workspace, Node, and native crate tests (PASS)
+  - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
+- changed:
+  - Added a loopback-first KingPepe JSON-RPC adapter for local REGTEST source
+    observation, source snapshots, UTXO checks, controlled local raw
+    transaction broadcast, and local daemon stop.
+  - Added endpoint/auth boundaries: credentials embedded in endpoint URLs are
+    rejected, and optional auth-cookie material must live outside the source
+    checkout.
+  - Added exact atomic amount parsing from raw JSON decimal text.
+  - Added tests with a disposable loopback HTTP RPC server and runtime-generated
+    auth-cookie fixture material outside the repository.
+  - Added Linux and Windows CI gates for the Native node adapter tests.
+  - Kept all adapter evidence classified as `RPC_OBSERVATION`, not independent
+    consensus validation.
+- blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
+- next:
+  - Continue Phase 08 by wiring the Native RPC adapter into the disposable
+    local E2E runner after required local executables are available. Do not
+    proceed to Phase 09 until the Native-to-Solana local E2E gate actually
+    passes.
+
 ## Phase 08 Solana account-state codec implementation
 
 - PHASE: `08`

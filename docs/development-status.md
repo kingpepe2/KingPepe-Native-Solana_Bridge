@@ -69,6 +69,7 @@
 - Phase 08 `Get-Command kingpeped kingpepe-cli solana solana-test-validator anchor`: NOT_FOUND on Windows
 - Phase 08 `command -v kingpeped kingpepe-cli solana-test-validator solana anchor`: NOT_FOUND under WSL
 - Phase 08 `npm run test:bridge-validator`: PASS, 6 automatic deposit pipeline tests
+- Phase 08 `npm run test:native-node`: PASS, 7 Native REGTEST RPC adapter tests
 - Phase 08 `npm run test:local-e2e-readiness`: PASS, 8 readiness/orchestration tests
 - Phase 08 `npm run doctor:local-e2e`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING; missing localnet executables; both Solana programs report `READY` at the source/readiness-gate level after account-execution wiring
 - Phase 08 `npm run local:e2e:plan`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING with redacted local paths and no production configuration
@@ -82,6 +83,7 @@
 - Phase 08 Solana account execution and SPL Token CPI source: PASS for `8309b3fc95bea4b84224852cb13e2f9b75099dfa`
 - Phase 08 local E2E orchestration plan: PASS for `7ffd331358146bb990f9830d4f39c0849cc0bdeb`
 - Phase 08 local E2E bootstrap runner: PASS for `d392403733bbfb92fcfd2d50a1d3879d63f0e3bb`
+- Phase 08 Native REGTEST RPC adapter: PASS for `845dfc4a86a1ef87f15e3d5ec2ca4ad91fd8fe8d`
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 52 Rust tests after account-execution update
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
@@ -251,6 +253,37 @@
   - `npm run local:e2e:bootstrap` (expected BLOCKED, exit 2)
   - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
   - `python .github/scripts/guardrails.py` (pass)
+  - CI Linux format, clippy, workspace, Node, and native crate tests (PASS)
+  - CI Windows workspace, Node, and native crate tests (PASS)
+  - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
+- Real daemon-backed Native-to-Solana E2E: `BLOCKED / NOT_RUN`
+
+## Phase 08 Native REGTEST RPC adapter
+
+- Added `native/node/native-rpc-client.mjs`.
+- Added `native/node/tests/native-rpc-client.test.mjs`.
+- Added `npm run test:native-node`.
+- Added Linux and Windows CI gates for the Native node adapter tests.
+- The adapter implements a loopback-first KingPepe JSON-RPC boundary for local
+  REGTEST source observation, source snapshots, UTXO checks, controlled local
+  raw transaction broadcast, and local daemon stop.
+- Endpoint URLs with embedded credentials are rejected.
+- Optional auth-cookie material must live outside the repository checkout.
+- UTXO values are converted from raw JSON decimal text into exact atomic units;
+  scientific notation and precision loss are rejected.
+- RPC results remain classified as `RPC_OBSERVATION`; this does not claim
+  independent consensus validation or production observer readiness.
+- Source commit: `845dfc4a86a1ef87f15e3d5ec2ca4ad91fd8fe8d`
+- CI URL:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34308850060`
+- CI status: `PASS`
+- Tests:
+  - `npm run test:native-node` (pass, 7 Native RPC adapter tests)
+  - `npm test` (pass, 2 protocol vectors plus 43 Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - `npm run doctor:local-e2e` (expected BLOCKED, exit 2)
+  - `npm run local:e2e:bootstrap` (expected BLOCKED, exit 2)
   - CI Linux format, clippy, workspace, Node, and native crate tests (PASS)
   - CI Windows workspace, Node, and native crate tests (PASS)
   - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)

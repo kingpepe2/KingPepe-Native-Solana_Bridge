@@ -132,6 +132,8 @@
   deposit flow without per-transfer KingPepe Team approval.
 - Current local source-boundary check:
   - `npm run test:bridge-validator`
+- Current Native RPC adapter check:
+  - `npm run test:native-node`
 - Current local E2E readiness check:
   - `npm run test:local-e2e-readiness`
   - `npm run local:e2e:plan`
@@ -204,5 +206,14 @@
   `d392403733bbfb92fcfd2d50a1d3879d63f0e3bb`
 - Phase 08 local E2E bootstrap runner CI:
   `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34307355800` PASS.
+- Phase 08 Native REGTEST RPC adapter:
+  `native/node/native-rpc-client.mjs` provides loopback-first KingPepe JSON-RPC
+  observation/broadcast boundaries for local REGTEST only. It returns
+  `RPC_OBSERVATION` evidence and does not claim independent consensus
+  validation.
+- Phase 08 Native REGTEST RPC adapter commit:
+  `845dfc4a86a1ef87f15e3d5ec2ca4ad91fd8fe8d`
+- Phase 08 Native REGTEST RPC adapter CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34308850060` PASS.
 - Real local E2E is still blocked by missing `kingpeped`, `kingpepe-cli`,
   `solana`, `solana-test-validator`, and `anchor`.
