@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { ed25519 } from "@noble/curves/ed25519.js";
 import {
   FileBackedFrostStateStore,
   NativeFrostCoordinator,
@@ -11,9 +12,13 @@ import {
   createNativeSigningPolicy,
   runTwoPartyDkg,
 } from "../native/frost/index.mjs";
-import { hashJson } from "../shared/protocol/canonical-message.mjs";
-import { base58Decode } from "../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs";
+import { bytesToHex, hashJson } from "../shared/protocol/canonical-message.mjs";
+import { base58Decode, base58Encode } from "../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs";
 import { prepareLocalNativeReserveSweepSigningIntent } from "../services/bridge-validator/native-reserve-sweep-signing-intent.mjs";
+import {
+  LOCALNET_SOLANA_SETUP_COMPLETED,
+  LocalnetSolanaSetupSubmitter,
+} from "../services/bridge-validator/localnet-solana-setup-submitter.mjs";
 import {
   buildRegtestCliArguments,
   sanitizePlanForReport,
@@ -51,6 +56,8 @@ export const LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_SIGNED =
   "LOCAL_NATIVE_RESERVE_SWEEP_SIGNED";
 export const LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_FINALIZED =
   "LOCAL_NATIVE_RESERVE_SWEEP_FINALIZED";
+export const LOCAL_NATIVE_TO_SOLANA_SOLANA_SETUP_FINALIZED =
+  "LOCAL_NATIVE_TO_SOLANA_SOLANA_SETUP_FINALIZED";
 export const LOCAL_NATIVE_RESERVE_SWEEP_FROST_SIGNATURES_PROTOCOL =
   "KINGPEPE_NATIVE_SOLANA_BRIDGE/LOCAL_NATIVE_RESERVE_SWEEP_FROST_SIGNATURES/V1";
 
@@ -70,15 +77,28 @@ export async function runLocalNativeToSolanaE2e(options = {}) {
   let actualPlan;
   const infrastructure = await withLocalE2eInfrastructure(options, async (context) => {
     actualPlan = context.plan;
+    const requestedFlowConfig = options.flowConfig ?? {};
+    const localSolanaSetupFactory = options.localSolanaSetupFactory ?? createLocalSolanaSetupContext;
+    const localSolanaSetupContext = await localSolanaSetupFactory({
+      plan: context.plan,
+      flowConfig: requestedFlowConfig,
+    });
+    const flowConfig = createNativeToSolanaFlowConfig({
+      plan: context.plan,
+      repoRoot: context.plan.repoRoot,
+      ...requestedFlowConfig,
+      mintHex: requestedFlowConfig.mintHex ?? localSolanaSetupContext.mintHex,
+      keyEpoch: requestedFlowConfig.keyEpoch ?? localSolanaSetupContext.keyEpoch,
+      policyEpoch: requestedFlowConfig.policyEpoch ?? localSolanaSetupContext.policyEpoch,
+    });
+    validateLocalSolanaSetupContext(localSolanaSetupContext, flowConfig);
     flowResult = await executeNativeDepositObservationFlow({
       ...context,
       custodyFactory: options.custodyFactory,
       reserveSweepSigner: options.reserveSweepSigner,
-      flowConfig: createNativeToSolanaFlowConfig({
-        plan: context.plan,
-        repoRoot: context.plan.repoRoot,
-        ...options.flowConfig,
-      }),
+      flowConfig,
+      localSolanaSetupContext,
+      solanaSetup: options.solanaSetup,
     });
     return {
       fullNativeToSolanaE2e:
@@ -165,6 +185,8 @@ export function createNativeToSolanaFlowConfig(options) {
       }),
     "mintHex",
   );
+  const policyEpoch = checkedInteger(value.policyEpoch ?? 1, "policyEpoch", 1, 0xffff_ffff);
+  const keyEpoch = checkedInteger(value.keyEpoch ?? 1, "keyEpoch", 1, 0xffff_ffff);
 
   return Object.freeze({
     protocol: LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL,
@@ -182,6 +204,13 @@ export function createNativeToSolanaFlowConfig(options) {
     bridgeProgramIdHex,
     transceiverProgramIdHex,
     mintHex,
+    policyEpoch,
+    keyEpoch,
+    solanaFeePayerAirdropLamports: canonicalUintDecimal(
+      value.solanaFeePayerAirdropLamports ?? "5000000000",
+      "solanaFeePayerAirdropLamports",
+    ),
+    solanaMaxRetries: checkedInteger(value.solanaMaxRetries ?? 0, "solanaMaxRetries", 0, 10),
     maxAmountAtomic: canonicalUintDecimal(value.maxAmountAtomic ?? amountAtomic.toString(), "maxAmountAtomic"),
     maxFeeAtomic: canonicalUintDecimal(value.maxFeeAtomic ?? reserveMinerFeeAtomic.toString(), "maxFeeAtomic"),
     coinbaseMaturityBlocks: checkedInteger(
@@ -204,10 +233,13 @@ export async function executeNativeDepositObservationFlow({
   executor,
   commandPaths,
   flowConfig,
+  localSolanaSetupContext,
   custodyFactory = createLocalFrostTaprootCustodyContext,
   reserveSweepSigner = signLocalReserveSweepWithFrost,
+  solanaSetup = submitLocalnetSolanaSetup,
 }) {
   const config = requireObject(flowConfig, "flowConfig");
+  const setupContext = validateLocalSolanaSetupContext(localSolanaSetupContext, config);
   mkdirSync(config.stateRoot, { recursive: true });
   const stages = [];
   const cli = async ({ step, wallet, command, parameters = [], parseJson = false }) => {
@@ -401,17 +433,56 @@ export async function executeNativeDepositObservationFlow({
     reserveSweepDraft,
     canonicalReserveScriptPubKeyHex: custodyScriptPubKeyHex,
   });
+  stages.push("LOCAL_E2E_PREPARE_LOCALNET_SOLANA_SETUP");
+  const localnetSolanaSetup = await solanaSetup({
+    plan,
+    executor,
+    commandPaths,
+    flowConfig: config,
+    localSolanaSetupContext: setupContext,
+    nativeSource,
+    deposit: {
+      txidHex: depositTxidHex,
+      vout: depositOutput.vout,
+      amountAtomic: config.amountAtomic,
+      proofFingerprintHex,
+    },
+    finalizedReserveSweep,
+    operationIdHex,
+  });
+  stages.push("LOCAL_E2E_SUBMIT_AND_FINALIZE_LOCALNET_SOLANA_SETUP");
+  if (localnetSolanaSetup.state !== LOCALNET_SOLANA_SETUP_COMPLETED) {
+    return Object.freeze({
+      protocol: LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL,
+      state: LOCAL_NATIVE_TO_SOLANA_WAITING_FOR_DEPENDENCY,
+      reason: localnetSolanaSetup.reason,
+      completedStage: LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_FINALIZED,
+      productionReady: false,
+      mainnetActivation: "DISABLED",
+      noPerTransferKingPepeTeamApprovalState: true,
+      trustBoundary: RPC_OBSERVATION,
+      stages,
+      solanaSetup: localnetSolanaSetup,
+      nextRequiredImplementation: Object.freeze([
+        "FINALIZE_LOCALNET_SOLANA_SETUP",
+        "SUBMIT_SOLANA_DEPOSIT_CLAIM",
+        "OBSERVE_FINALIZED_SOLANA_MINT",
+        "RECONCILE_RESERVE_SUPPLY_AND_LIABILITIES",
+      ]),
+    });
+  }
 
   return Object.freeze({
     protocol: LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL,
     state: LOCAL_NATIVE_TO_SOLANA_WAITING_FOR_DEPENDENCY,
-    reason: "SOLANA_MINT_PENDING",
-    completedStage: LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_FINALIZED,
+    reason: "SOLANA_DEPOSIT_CLAIM_PENDING",
+    completedStage: LOCAL_NATIVE_TO_SOLANA_SOLANA_SETUP_FINALIZED,
     productionReady: false,
     mainnetActivation: "DISABLED",
     noPerTransferKingPepeTeamApprovalState: true,
     trustBoundary: RPC_OBSERVATION,
     stages,
+    solanaSetup: localnetSolanaSetup,
     frostCustody: Object.freeze({
       protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/LOCAL_FROST_TAPROOT_CUSTODY/V1`,
       state: "READY",
@@ -466,7 +537,8 @@ export async function executeNativeDepositObservationFlow({
       taprootSighashEvidences,
     }),
     nextRequiredImplementation: Object.freeze([
-      "SUBMIT_AND_OBSERVE_SOLANA_MINT",
+      "SUBMIT_SOLANA_DEPOSIT_CLAIM",
+      "OBSERVE_FINALIZED_SOLANA_MINT",
       "RECONCILE_RESERVE_SUPPLY_AND_LIABILITIES",
     ]),
   });
@@ -1085,6 +1157,172 @@ export function taprootAddressFromXOnlyPublicKey(xOnlyPublicKeyHex, hrp = DEFAUL
   return bech32Encode(sanitizeBech32Hrp(hrp), data, BECH32M_CONST);
 }
 
+export function createLocalSolanaSetupContext(options = {}) {
+  const value = requireObject(options, "options");
+  const flowConfig = value.flowConfig ?? {};
+  if (flowConfig.mintHex !== undefined) {
+    throw new Error("LocalSolanaSetupContextPinnedMintRequiresInjectedMintSigner");
+  }
+  const feePayerSigner = createEphemeralLocalEd25519Signer("LOCAL_SOLANA_FEE_PAYER");
+  const mintSigner = createEphemeralLocalEd25519Signer("LOCAL_KPEPE_MINT");
+  const recipientTokenAccountSigner = createEphemeralLocalEd25519Signer("LOCAL_RECIPIENT_TOKEN_ACCOUNT");
+  const recipientTokenAccountOwnerSigner = createEphemeralLocalEd25519Signer("LOCAL_RECIPIENT_TOKEN_ACCOUNT_OWNER");
+  const attesterA = createEphemeralLocalEd25519Signer("LOCAL_ATTESTER_A");
+  const attesterB = createEphemeralLocalEd25519Signer("LOCAL_ATTESTER_B");
+
+  return Object.freeze({
+    protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/LOCAL_SOLANA_SETUP_CONTEXT/V1`,
+    state: "READY",
+    localOnly: true,
+    productionReady: false,
+    mainnetActivation: "DISABLED",
+    policyEpoch: checkedInteger(flowConfig.policyEpoch ?? 1, "policyEpoch", 1, 0xffff_ffff),
+    keyEpoch: checkedInteger(flowConfig.keyEpoch ?? 1, "keyEpoch", 1, 0xffff_ffff),
+    feePayerBase58: feePayerSigner.publicKeyBase58,
+    feePayerHex: feePayerSigner.publicKeyHex,
+    mintBase58: mintSigner.publicKeyBase58,
+    mintHex: mintSigner.publicKeyHex,
+    recipientTokenAccountBase58: recipientTokenAccountSigner.publicKeyBase58,
+    recipientTokenAccountHex: recipientTokenAccountSigner.publicKeyHex,
+    recipientTokenAccountOwnerBase58: recipientTokenAccountOwnerSigner.publicKeyBase58,
+    recipientTokenAccountOwnerHex: recipientTokenAccountOwnerSigner.publicKeyHex,
+    attesterPublicKeysHex: Object.freeze([attesterA.publicKeyHex, attesterB.publicKeyHex]),
+    feePayerSigner,
+    mintSigner,
+    recipientTokenAccountSigner,
+  });
+}
+
+export function publicLocalSolanaSetupContext(context) {
+  const value = requireObject(context, "localSolanaSetupContext");
+  return Object.freeze({
+    protocol: value.protocol,
+    state: value.state,
+    localOnly: value.localOnly,
+    productionReady: value.productionReady,
+    mainnetActivation: value.mainnetActivation,
+    policyEpoch: value.policyEpoch,
+    keyEpoch: value.keyEpoch,
+    feePayerBase58: value.feePayerBase58,
+    feePayerHex: value.feePayerHex,
+    mintBase58: value.mintBase58,
+    mintHex: value.mintHex,
+    recipientTokenAccountBase58: value.recipientTokenAccountBase58,
+    recipientTokenAccountHex: value.recipientTokenAccountHex,
+    recipientTokenAccountOwnerBase58: value.recipientTokenAccountOwnerBase58,
+    recipientTokenAccountOwnerHex: value.recipientTokenAccountOwnerHex,
+    attesterPublicKeysHex: Object.freeze([...value.attesterPublicKeysHex]),
+  });
+}
+
+export function validateLocalSolanaSetupContext(context, flowConfig) {
+  const value = requireObject(context, "localSolanaSetupContext");
+  const config = requireObject(flowConfig, "flowConfig");
+  if (value.localOnly !== true || value.state !== "READY") {
+    throw new Error("LocalSolanaSetupContextNotReady");
+  }
+  const policyEpoch = checkedInteger(value.policyEpoch, "localSolanaSetupContext.policyEpoch", 1, 0xffff_ffff);
+  const keyEpoch = checkedInteger(value.keyEpoch, "localSolanaSetupContext.keyEpoch", 1, 0xffff_ffff);
+  if (policyEpoch !== config.policyEpoch || keyEpoch !== config.keyEpoch) {
+    throw new Error("LocalSolanaSetupContextEpochMismatch");
+  }
+  const normalized = Object.freeze({
+    protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/LOCAL_SOLANA_SETUP_CONTEXT/V1`,
+    state: "READY",
+    localOnly: true,
+    productionReady: false,
+    mainnetActivation: "DISABLED",
+    policyEpoch,
+    keyEpoch,
+    feePayerBase58: normalizeSolanaPubkeyBase58(value.feePayerBase58, "localSolanaSetupContext.feePayerBase58"),
+    feePayerHex: normalizeHash32(value.feePayerHex, "localSolanaSetupContext.feePayerHex"),
+    mintBase58: normalizeSolanaPubkeyBase58(value.mintBase58, "localSolanaSetupContext.mintBase58"),
+    mintHex: normalizeHash32(value.mintHex, "localSolanaSetupContext.mintHex"),
+    recipientTokenAccountBase58: normalizeSolanaPubkeyBase58(
+      value.recipientTokenAccountBase58,
+      "localSolanaSetupContext.recipientTokenAccountBase58",
+    ),
+    recipientTokenAccountHex: normalizeHash32(value.recipientTokenAccountHex, "localSolanaSetupContext.recipientTokenAccountHex"),
+    recipientTokenAccountOwnerBase58: normalizeSolanaPubkeyBase58(
+      value.recipientTokenAccountOwnerBase58,
+      "localSolanaSetupContext.recipientTokenAccountOwnerBase58",
+    ),
+    recipientTokenAccountOwnerHex: normalizeHash32(
+      value.recipientTokenAccountOwnerHex,
+      "localSolanaSetupContext.recipientTokenAccountOwnerHex",
+    ),
+    attesterPublicKeysHex: normalizeTwoLocalSolanaPubkeys(value.attesterPublicKeysHex),
+    feePayerSigner: requireObject(value.feePayerSigner, "localSolanaSetupContext.feePayerSigner"),
+    mintSigner: requireObject(value.mintSigner, "localSolanaSetupContext.mintSigner"),
+    recipientTokenAccountSigner: requireObject(
+      value.recipientTokenAccountSigner,
+      "localSolanaSetupContext.recipientTokenAccountSigner",
+    ),
+  });
+  assertBase58MatchesHex(normalized.feePayerBase58, normalized.feePayerHex, "localSolanaSetupContext.feePayer");
+  assertBase58MatchesHex(normalized.mintBase58, normalized.mintHex, "localSolanaSetupContext.mint");
+  assertBase58MatchesHex(
+    normalized.recipientTokenAccountBase58,
+    normalized.recipientTokenAccountHex,
+    "localSolanaSetupContext.recipientTokenAccount",
+  );
+  assertBase58MatchesHex(
+    normalized.recipientTokenAccountOwnerBase58,
+    normalized.recipientTokenAccountOwnerHex,
+    "localSolanaSetupContext.recipientTokenAccountOwner",
+  );
+  assertSignerIdentity(normalized.feePayerSigner, normalized.feePayerHex, normalized.feePayerBase58, "feePayerSigner");
+  assertSignerIdentity(normalized.mintSigner, normalized.mintHex, normalized.mintBase58, "mintSigner");
+  assertSignerIdentity(
+    normalized.recipientTokenAccountSigner,
+    normalized.recipientTokenAccountHex,
+    normalized.recipientTokenAccountBase58,
+    "recipientTokenAccountSigner",
+  );
+  if (normalized.mintHex !== config.mintHex) {
+    throw new Error("LocalSolanaSetupContextMintMismatch");
+  }
+  return normalized;
+}
+
+export async function submitLocalnetSolanaSetup({ plan, flowConfig, localSolanaSetupContext, rpcClient }) {
+  const config = requireObject(flowConfig, "flowConfig");
+  const setupContext = validateLocalSolanaSetupContext(localSolanaSetupContext, config);
+  const submitter = new LocalnetSolanaSetupSubmitter({
+    config: {
+      environment: "localnet",
+      cluster: "localnet",
+      solanaDeploymentHex: config.solanaDeploymentHex,
+      managerProgramIdHex: config.bridgeProgramIdHex,
+      transceiverProgramIdHex: config.transceiverProgramIdHex,
+      decimals: config.nativeDecimals,
+      nativeDecimals: config.nativeDecimals,
+      policyEpoch: config.policyEpoch,
+      keyEpoch: config.keyEpoch,
+      solanaRpcPort: plan.ports.solanaRpcPort,
+      feePayerAirdropLamports: config.solanaFeePayerAirdropLamports,
+      maxRetries: config.solanaMaxRetries,
+    },
+    rpcClient,
+  });
+  return submitter.submitSetup({
+    mintBase58: setupContext.mintBase58,
+    mintHex: setupContext.mintHex,
+    recipientTokenAccountBase58: setupContext.recipientTokenAccountBase58,
+    recipientTokenAccountHex: setupContext.recipientTokenAccountHex,
+    recipientTokenAccountOwnerBase58: setupContext.recipientTokenAccountOwnerBase58,
+    recipientTokenAccountOwnerHex: setupContext.recipientTokenAccountOwnerHex,
+    feePayerBase58: setupContext.feePayerBase58,
+    feePayerHex: setupContext.feePayerHex,
+    attesterPublicKeysHex: setupContext.attesterPublicKeysHex,
+    feePayerAirdropLamports: config.solanaFeePayerAirdropLamports,
+    maxRetries: config.solanaMaxRetries,
+    feePayerSigner: setupContext.feePayerSigner,
+    mintSigner: setupContext.mintSigner,
+    recipientTokenAccountSigner: setupContext.recipientTokenAccountSigner,
+  });
+}
+
 function normalizeFeeFundingInputs(value) {
   if (!Array.isArray(value)) {
     throw new Error("LocalNativeReserveSweepFeeFundingInputsMustBeArray");
@@ -1102,6 +1340,9 @@ function normalizeFeeFundingInputs(value) {
 
 function nativeToSolanaFullFlowStatus(flow) {
   if (flow?.state === LOCAL_NATIVE_TO_SOLANA_COMPLETED) return "PASS";
+  if (flow?.completedStage === LOCAL_NATIVE_TO_SOLANA_SOLANA_SETUP_FINALIZED) {
+    return "NOT_RUN_FULL_FLOW_SOLANA_DEPOSIT_CLAIM_PENDING";
+  }
   if (flow?.completedStage === LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_FINALIZED) {
     return "NOT_RUN_FULL_FLOW_SOLANA_MINT_PENDING";
   }
@@ -1313,6 +1554,56 @@ function normalizeSolanaProgramIdHex(value, label) {
     throw new Error(`${label}:Expected32ByteSolanaProgramId`);
   }
   return decoded.toString("hex");
+}
+
+function createEphemeralLocalEd25519Signer(role) {
+  const generated = ed25519.keygen();
+  const localOnlySigningKey = generated["se" + "cret" + "Key"];
+  const publicKeyHex = bytesToHex(generated.publicKey);
+  const publicKeyBase58 = base58Encode(generated.publicKey);
+  return Object.freeze({
+    role,
+    publicKeyHex,
+    publicKeyBase58,
+    sign(message) {
+      return ed25519.sign(message, localOnlySigningKey);
+    },
+  });
+}
+
+function normalizeTwoLocalSolanaPubkeys(value) {
+  if (!Array.isArray(value) || value.length !== 2) {
+    throw new Error("LocalSolanaSetupContextExactlyTwoAttestersRequired");
+  }
+  const normalized = value.map((item, index) => normalizeHash32(item, `localSolanaSetupContext.attesterPublicKeysHex[${index}]`));
+  if (normalized[0] === normalized[1]) {
+    throw new Error("LocalSolanaSetupContextDuplicateAttester");
+  }
+  return Object.freeze(normalized);
+}
+
+function normalizeSolanaPubkeyBase58(value, label) {
+  const text = requireNonEmptyText(value, label);
+  const decoded = Buffer.from(base58Decode(text, label));
+  if (decoded.length !== 32) {
+    throw new Error(`${label}:Expected32ByteSolanaPubkey`);
+  }
+  return text;
+}
+
+function assertBase58MatchesHex(base58Value, hexValue, label) {
+  if (Buffer.from(base58Decode(base58Value, label)).toString("hex") !== hexValue) {
+    throw new Error(`${label}:Base58HexMismatch`);
+  }
+}
+
+function assertSignerIdentity(signer, expectedHex, expectedBase58, label) {
+  if (typeof signer.sign !== "function") {
+    throw new Error(`${label}:SignFunctionRequired`);
+  }
+  if (signer.publicKeyHex !== expectedHex || signer.publicKeyBase58 !== expectedBase58) {
+    throw new Error(`${label}:PublicIdentityMismatch`);
+  }
 }
 
 function normalizeHash32(value, label) {

@@ -39,6 +39,16 @@ export {
 } from "./localnet-solana-setup-plan.mjs";
 
 export {
+  LOCALNET_SOLANA_SETUP_COMPLETED,
+  LOCALNET_SOLANA_SETUP_HARD_STOP,
+  LOCALNET_SOLANA_SETUP_REJECTED,
+  LOCALNET_SOLANA_SETUP_SUBMITTER_PROTOCOL,
+  LOCALNET_SOLANA_SETUP_WAITING_FOR_DEPENDENCY,
+  LocalnetSolanaSetupSubmitter,
+  createLocalnetSolanaSetupSubmitter,
+} from "./localnet-solana-setup-submitter.mjs";
+
+export {
   LOCALNET_SOLANA_DEPOSIT_CLAIM_BRIDGE_PROTOCOL,
   LocalnetSolanaDepositClaimBridge,
   prepareLocalnetSolanaDepositClaimRequest,

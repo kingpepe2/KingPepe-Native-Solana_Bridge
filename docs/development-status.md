@@ -1153,3 +1153,47 @@
   - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
   - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
   - The planner has not been submitted to a real Solana local validator yet.
+
+## Phase 08 localnet Solana setup submitter and runner handoff
+
+- Source status: implemented locally; push and CI verification pending.
+- What changed:
+  - Added a localnet-only Solana setup submitter that queries rent exemption,
+    requests disposable local-validator airdrop funding, submits the signed
+    setup transaction, waits for finalized signatures, and verifies Mint,
+    recipient token account, bridge state PDA, and transceiver config PDA
+    account ownership/allocation.
+  - Extended the loopback-only Solana RPC boundary with setup-specific
+    `getAccountInfo`, `getMinimumBalanceForRentExemption`, and `requestAirdrop`
+    helpers while retaining method allowlisting.
+  - Wired the local Native-to-Solana runner to create disposable Solana setup
+    identities before Native FROST signing, so signer policy binds to the exact
+    local KPEPE Mint for that run.
+  - The runner now advances from finalized Native reserve sweep to finalized
+    local Solana setup, then stops honestly at `SOLANA_DEPOSIT_CLAIM_PENDING`.
+    It does not claim complete local E2E success.
+- Local tests run so far:
+  - `node --check services\bridge-validator\localnet-solana-setup-submitter.mjs`: PASS.
+  - `node --check services\bridge-validator\solana-deposit-claim-submitter.mjs`: PASS.
+  - `node --check scripts\local-e2e-native-to-solana.mjs`: PASS.
+  - `node --check scripts\tests\local-e2e-native-to-solana.test.mjs`: PASS.
+  - `node --test services\bridge-validator\tests\localnet-solana-setup-submitter.test.mjs`: PASS, 5 tests.
+  - `node --test scripts\tests\local-e2e-native-to-solana.test.mjs`: PASS, 13 tests.
+  - `node --test services\bridge-validator\tests\*.test.mjs`: PASS, 57 tests.
+  - `npm test`: PASS, 2 protocol vectors plus 119 Node tests.
+  - WSL Solana Rust workspace tests: PASS, 53 Rust tests/doc-tests.
+  - WSL Native Rust crate tests: PASS, 22 tests across FROST, proof, reserve,
+    and recovery.
+  - `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
+  - `python .github\scripts\guardrails.py`: PASS.
+  - JSON manifest parse checks: PASS.
+  - `git diff --check`: PASS.
+  - `npm run local:e2e:native-to-solana`: expected
+    `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`; no localnet commands started.
+- Current blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`,
+    `solana-test-validator`, and `anchor`.
+  - Real local-validator account creation/finality, Solana deposit-claim
+    submission, finalized mint observation, and reconciliation remain
+    `BLOCKED / NOT_RUN`.

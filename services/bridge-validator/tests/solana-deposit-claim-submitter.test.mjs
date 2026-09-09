@@ -422,6 +422,12 @@ test("Solana local RPC client uses loopback JSON-RPC and rejects unsafe endpoint
           ? 44
           : envelope.method === "getLatestBlockhash"
             ? { value: { blockhash: "H".repeat(44), lastValidBlockHeight: 1234 } }
+          : envelope.method === "getMinimumBalanceForRentExemption"
+            ? 1_461_600
+          : envelope.method === "requestAirdrop"
+            ? signature("airdrop")
+          : envelope.method === "getAccountInfo"
+            ? { value: { owner: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", data: ["", "base64"] } }
           : envelope.method === "sendTransaction"
             ? signature("rpc-client")
             : { value: [{ slot: 9, confirmationStatus: "finalized", err: null }] };
@@ -439,14 +445,28 @@ test("Solana local RPC client uses loopback JSON-RPC and rejects unsafe endpoint
       blockhash: "H".repeat(44),
       lastValidBlockHeight: "1234",
     });
+    assert.equal(await client.getMinimumBalanceForRentExemption(82), 1_461_600n);
+    assert.equal(await client.requestAirdrop("A".repeat(32), "5000000000"), signature("airdrop"));
+    assert.deepEqual(await client.getAccountInfo("A".repeat(32)), {
+      owner: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      data: ["", "base64"],
+    });
     assert.equal(await client.sendTransaction(Buffer.from("tx").toString("base64")), signature("rpc-client"));
     assert.deepEqual(await client.getSignatureStatus(signature("rpc-client")), {
       slot: 9,
       confirmationStatus: "finalized",
       err: null,
     });
-    await assert.rejects(() => client.call("requestAirdrop"), /SolanaRpcMethodNotAllowed:requestAirdrop/u);
-    assert.deepEqual(observedMethods, ["getBlockHeight", "getLatestBlockhash", "sendTransaction", "getSignatureStatuses"]);
+    await assert.rejects(() => client.call("getEpochInfo"), /SolanaRpcMethodNotAllowed:getEpochInfo/u);
+    assert.deepEqual(observedMethods, [
+      "getBlockHeight",
+      "getLatestBlockhash",
+      "getMinimumBalanceForRentExemption",
+      "requestAirdrop",
+      "getAccountInfo",
+      "sendTransaction",
+      "getSignatureStatuses",
+    ]);
     assert.throws(() => normalizeSolanaRpcEndpoint("https://127.0.0.1:8899"), /SolanaRpcEndpointProtocolRejected/u);
     const credentialedEndpoint = `http://${["test-user", "test-pass"].join(":")}@127.0.0.1:8899`;
     assert.throws(

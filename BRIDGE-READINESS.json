@@ -141,6 +141,12 @@
     "phase08LocalnetSolanaSetupPlanImplemented": true,
     "phase08LocalnetSolanaSetupPlanLocalTestsPassed": true,
     "phase08LocalnetSolanaSetupPlanCiVerified": true,
+    "phase08LocalnetSolanaSetupSubmitterImplemented": true,
+    "phase08LocalnetSolanaSetupSubmitterLocalTestsPassed": true,
+    "phase08LocalnetSolanaSetupSubmitterCiVerified": false,
+    "phase08NativeToSolanaLocalE2eRunnerSolanaSetupIntegrated": true,
+    "phase08NativeToSolanaLocalE2eRunnerSolanaSetupLocalTestsPassed": true,
+    "phase08NativeToSolanaLocalE2eRunnerSolanaSetupCiVerified": false,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true

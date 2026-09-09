@@ -443,7 +443,7 @@
     {
       "path": "scripts/local-e2e-native-to-solana.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 local-only Native-to-Solana E2E command runner that composes the bootstrap harness with daemon deposit observation, disposable FROST aggregate Taproot deposit/fee/reserve intent generation using KingPepe REGTEST Bech32m HRP rkpepe and coinbase maturity 20 from read-only recovery network config, local Native source/genesis/txid validation, non-secret proof fingerprinting, explicit local fee-funding inputs for nonzero reserve-sweep miner fees, credited deposit preservation as the canonical reserve allocation, BIP-341 key-path SIGHASH_DEFAULT evidence for each FROST-controlled input, localnet-only input-specific FROST signing intents, disposable software FROST A+B signatures, Taproot key-path witness attachment, local signed reserve-sweep broadcast/finality validation, runtime state under the local E2E run root outside the repository, and fail-closed blocking before Solana mint/reconciliation without claiming a full E2E pass."
+      "notes": "Phase 08 local-only Native-to-Solana E2E command runner that composes the bootstrap harness with daemon deposit observation, disposable FROST aggregate Taproot deposit/fee/reserve intent generation using KingPepe REGTEST Bech32m HRP rkpepe and coinbase maturity 20 from read-only recovery network config, local Native source/genesis/txid validation, non-secret proof fingerprinting, explicit local fee-funding inputs for nonzero reserve-sweep miner fees, credited deposit preservation as the canonical reserve allocation, BIP-341 key-path SIGHASH_DEFAULT evidence for each FROST-controlled input, localnet-only input-specific FROST signing intents, disposable software FROST A+B signatures, Taproot key-path witness attachment, local signed reserve-sweep broadcast/finality validation, disposable local Solana setup identity generation and setup-submitter handoff bound to the exact local KPEPE Mint, runtime state under the local E2E run root outside the repository, and fail-closed blocking before Solana deposit-claim submission/reconciliation without claiming a full E2E pass."
     },
     {
       "path": "scripts/tests/local-e2e-readiness.test.mjs",
@@ -463,7 +463,7 @@
     {
       "path": "scripts/tests/local-e2e-native-to-solana.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 local Native-to-Solana command runner tests using injected fake executors, temporary run roots outside the repository, disposable FROST Taproot custody generation, wrong-source and wrong-txid rejection fixtures, explicit fee-funding, full credited-reserve allocation checks, per-input Taproot sighash evidence checks, real disposable A+B FROST reserve-sweep signature and witness-attachment coverage, local reserve-sweep broadcast/finality validation fixtures, and no operational secrets."
+      "notes": "Phase 08 local Native-to-Solana command runner tests using injected fake executors, temporary run roots outside the repository, disposable FROST Taproot custody generation, wrong-source and wrong-txid rejection fixtures, explicit fee-funding, full credited-reserve allocation checks, per-input Taproot sighash evidence checks, real disposable A+B FROST reserve-sweep signature and witness-attachment coverage, local reserve-sweep broadcast/finality validation fixtures, local Solana setup context sanitization, setup-finalized handoff coverage, and no operational secrets."
     },
     {
       "path": "services/attesters/README.md",
@@ -498,12 +498,17 @@
     {
       "path": "services/bridge-validator/index.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Bridge validator service export surface, including Phase 08 deposit pipeline, reserve-sweep, Solana submitter, transaction-plan, and localnet setup-plan boundaries."
+      "notes": "Bridge validator service export surface, including Phase 08 deposit pipeline, reserve-sweep, Solana submitter, transaction-plan, localnet setup-plan, and localnet setup-submitter boundaries."
     },
     {
       "path": "services/bridge-validator/localnet-solana-setup-plan.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Phase 08 localnet-only Solana setup transaction planner for zero-supply KPEPE Mint, recipient SPL token account, transceiver config PDA, and bridge state PDA initialization with injected runtime signers."
+    },
+    {
+      "path": "services/bridge-validator/localnet-solana-setup-submitter.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 localnet-only Solana setup submitter that queries local rent exemption, requests disposable local-validator airdrop funding, sends the signed setup transaction, verifies Mint/token/PDA account ownership and allocation, sanitizes runtime signer handles from reports, and never stores keypair files."
     },
     {
       "path": "services/bridge-validator/native-reserve-sweep-adapters.mjs",
@@ -523,7 +528,7 @@
     {
       "path": "services/bridge-validator/solana-deposit-claim-submitter.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 localnet Solana deposit claim submission boundary with canonical-message, attestation-threshold, persist-before-broadcast, status retry, per-operation observer account binding, and finalized claim-observation checks."
+      "notes": "Phase 08 localnet Solana deposit claim submission boundary with canonical-message, attestation-threshold, persist-before-broadcast, status retry, per-operation observer account binding, finalized claim-observation checks, and loopback-only RPC helpers for setup account reads, rent queries, and local-validator airdrops."
     },
     {
       "path": "services/bridge-validator/solana-deposit-claim-transaction-plan.mjs",
@@ -554,6 +559,11 @@
       "path": "services/bridge-validator/tests/localnet-solana-setup-plan.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Phase 08 tests for localnet Solana setup transaction planning, SPL Token initialize instruction encoding, PDA initialization account ordering, and injected runtime signer validation."
+    },
+    {
+      "path": "services/bridge-validator/tests/localnet-solana-setup-submitter.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 tests for localnet Solana setup submission, account verification, idempotent already-present setup, partial/conflicting account hard stops, dependency waits, and sanitized result boundaries using fake local RPC only."
     },
     {
       "path": "services/bridge-validator/tests/solana-deposit-claim-submitter.test.mjs",
