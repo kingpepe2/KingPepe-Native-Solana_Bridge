@@ -512,9 +512,10 @@
   `services/bridge-validator/tests/localnet-solana-deposit-claim-bridge.test.mjs`
   with a real `SolanaDepositClaimObserver` fixture proving the localnet bridge
   observes the derived per-operation accounts.
-- Source commit: `PENDING`
-- CI URL: `PENDING`
-- CI status: `PENDING`
+- Source commit: `dab03e8696267fa98488f312e1f2158df51dc815`
+- CI URL:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34322782563`
+- CI status: `PASS`
 - Local test status:
   - `npm run test:bridge-validator` (pass, 36 tests)
   - `npm test` (pass, 2 protocol vectors plus 80 Node tests)

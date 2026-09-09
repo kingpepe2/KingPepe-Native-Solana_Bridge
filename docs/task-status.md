@@ -652,6 +652,47 @@
     not proceed to Phase 09 until the Native-to-Solana local E2E gate actually
     passes.
 
+## Phase 08 Solana deposit-claim observer account pass-through
+
+- PHASE: `08`
+- source commit: `dab03e8696267fa98488f312e1f2158df51dc815`
+- commit message:
+  `feat(phase-08): pass solana claim accounts to observer`
+- push result: pushed to private GitHub repository
+- CI URL:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34322782563`
+- CI status: `PASS`
+- tests:
+  - `npm run test:bridge-validator` (pass, 36 bridge-validator tests)
+  - `npm test` (pass, 2 protocol vectors plus 80 Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - JSON manifest parse checks (pass)
+  - staged and outgoing-range secret-pattern scans (pass)
+  - `npm run doctor:local-e2e` (`BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`)
+  - CI Linux format, clippy, workspace, Node, and native crate tests (PASS)
+  - CI Windows workspace, Node, and native crate tests (PASS)
+  - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
+- changed:
+  - Persisted per-operation deposit-claim PDA and Mint account bindings in the
+    Solana deposit-claim submitter prepared journal entries.
+  - Passed those account bindings into the real finalized deposit-claim
+    observer.
+  - Updated the localnet Solana deposit-claim bridge to forward the derived
+    claim PDA and configured Mint from the transaction plan.
+  - Added a regression test using the real deposit-claim observer with a fake
+    loopback RPC fixture proving the derived per-operation accounts are
+    observed.
+- blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`,
+    `solana-test-validator`, and `anchor`.
+- next:
+  - Continue Phase 08 only if another meaningful source increment can be
+    implemented without falsely reporting a daemon-backed local E2E pass. Do
+    not proceed to Phase 09 until the Native-to-Solana local E2E gate actually
+    passes.
+
 ## Phase 08 Solana account-state codec implementation
 
 - PHASE: `08`
