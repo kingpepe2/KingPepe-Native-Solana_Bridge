@@ -50,6 +50,7 @@
     "phase08SolanaAccountCodecsCiVerified": true,
     "phase08SolanaAccountExecutionImplemented": true,
     "phase08SolanaAccountExecutionLocalTestsPassed": true,
+    "phase08SolanaAccountExecutionCiVerified": true,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true
