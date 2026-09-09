@@ -423,7 +423,7 @@
     {
       "path": "scripts/local-e2e-orchestrator.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 local-only Native REGTEST and Solana local-validator orchestration plan. Generic REGTEST command safety conventions were reviewed from the read-only legacy KingPepe repository; TON-specific flow was excluded. The REGTEST allowlist includes createrawtransaction for unsigned local reserve-sweep drafting only."
+      "notes": "Phase 08 local-only Native REGTEST and Solana local-validator orchestration plan. Generic REGTEST command safety conventions were reviewed from the read-only legacy KingPepe repository; TON-specific flow was excluded. The REGTEST allowlist includes createrawtransaction for unsigned local reserve-sweep drafting only and rejects wallet raw-signing RPC shortcuts."
     },
     {
       "path": "scripts/local-e2e-bootstrap.mjs",

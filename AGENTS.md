@@ -234,6 +234,10 @@
   `e836719e920f12dff33bab2a7a546435c26d7739`.
 - Phase 08 Native-to-Solana unsigned reserve-sweep draft CI:
   `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34337778598` PASS.
+- Phase 08 local E2E Native wallet raw-signing boundary status:
+  implemented locally; source commit and CI verification pending. The local
+  REGTEST CLI allowlist rejects `signrawtransactionwithwallet`; Native raw
+  broadcast remains available only for already FROST-signed transactions.
 - Phase 08 Native-to-Solana deposit evidence validation status:
   implemented and CI verified for source commit
   `48a3bae917b6ddc80dcbd0a8d1e45b28fc1eff49`.

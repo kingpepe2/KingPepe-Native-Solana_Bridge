@@ -97,6 +97,24 @@
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 52 Rust tests after account-execution update
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
 
+## Phase 08 local E2E Native wallet raw-signing boundary
+
+- Source status: implemented locally; source commit and CI verification pending.
+- Local tests:
+  - `npm run test:local-e2e-readiness`: PASS, 23 readiness/orchestration/bootstrap/runner tests.
+  - `npm run test:bridge-validator`: PASS, 39 bridge-validator tests.
+- What changed:
+  - The local REGTEST CLI allowlist no longer permits
+    `signrawtransactionwithwallet`.
+  - `sendrawtransaction` remains allowlisted for already FROST-signed Native
+    transactions.
+  - Added a regression that rejects wallet raw-signing while preserving the
+    FROST-signed broadcast boundary.
+- Current blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
+  - Real daemon-backed Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
+
 ## Phase 03 local implementation
 
 - Replaced the phase-02 message scaffold with a fixed-length 514-byte canonical binary protocol message.
