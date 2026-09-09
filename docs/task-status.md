@@ -345,6 +345,35 @@
 - next:
   - Continue Phase 08 only if another meaningful source increment is possible without falsely reporting daemon-backed local E2E success. Do not proceed to Phase 09 until the Native-to-Solana local E2E gate actually passes.
 
+## Phase 08 localnet Solana deposit-claim bridge adapter
+
+- PHASE: `08`
+- source commit: `0a4c39a146d150b5291935fb2ce800100accc898`
+- commit message: `feat(phase-08): add localnet solana claim bridge`
+- push result: pushed to private GitHub repository
+- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34320747968`
+- CI status: `PASS`
+- tests:
+  - `npm run test:bridge-validator` (pass, 35 tests)
+  - `npm test` (pass, 2 protocol vectors plus 79 Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - current-content and added-line secret-pattern scans (pass)
+  - `npm run doctor:local-e2e` (`BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`)
+  - CI Linux format, clippy, workspace, Node, and native crate tests (PASS)
+  - CI Windows workspace, Node, and native crate tests (PASS)
+  - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
+- changed:
+  - Added a localnet Solana deposit-claim bridge adapter that connects signed transaction planning to durable Solana submission.
+  - Added localnet latest-blockhash handling through `SolanaLocalRpcClient.getLatestBlockhash()`.
+  - Prepared signed transaction bytes only through an injected fee-payer signer; no key files or production identities are loaded.
+  - Verified automatic submit/observe completion, prepared-request submission, retry without a second broadcast, missing blockhash dependency, unsafe domain rejection, and signer mismatch rejection.
+- blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
+- next:
+  - Continue Phase 08 only if another meaningful source increment is possible without falsely reporting daemon-backed local E2E success. Do not proceed to Phase 09 until the Native-to-Solana local E2E gate actually passes.
+
 ## Phase 08 Solana account execution and SPL Token CPI source implementation
 
 - PHASE: `08`

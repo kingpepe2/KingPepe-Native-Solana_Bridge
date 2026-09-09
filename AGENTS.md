@@ -281,7 +281,9 @@
   fetches or accepts a localnet blockhash, signs only through an injected
   fee-payer signer, submits through the existing localnet RPC boundary, and
   does not load or store key files.
-- Phase 08 localnet Solana deposit-claim bridge adapter commit/CI:
-  pending source commit and CI verification.
+- Phase 08 localnet Solana deposit-claim bridge adapter commit:
+  `0a4c39a146d150b5291935fb2ce800100accc898`
+- Phase 08 localnet Solana deposit-claim bridge adapter CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34320747968` PASS.
 - Real local E2E is still blocked by missing `kingpeped`, `kingpepe-cli`,
   `solana`, `solana-test-validator`, and `anchor`.

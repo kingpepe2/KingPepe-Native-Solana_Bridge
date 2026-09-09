@@ -80,7 +80,7 @@
     "phase08SolanaDepositClaimTransactionPlanCiVerified": true,
     "phase08LocalnetSolanaDepositClaimBridgeImplemented": true,
     "phase08LocalnetSolanaDepositClaimBridgeLocalTestsPassed": true,
-    "phase08LocalnetSolanaDepositClaimBridgeCiVerified": false,
+    "phase08LocalnetSolanaDepositClaimBridgeCiVerified": true,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true

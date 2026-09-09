@@ -91,7 +91,7 @@
 - Phase 08 deposit pipeline file-backed journal: PASS for `73df9906998f9783c309a0671739d19cfc6b589f`
 - Phase 08 Solana deposit-claim observer: PASS for `df49793f0595bb501e83405b79d21215283a1d0a`
 - Phase 08 Solana deposit-claim transaction plan: PASS for `42a5cdb3bcc60e0be7fb5d2395503f148b6d632f`
-- Phase 08 localnet Solana deposit-claim bridge adapter: local tests PASS, CI pending
+- Phase 08 localnet Solana deposit-claim bridge adapter: PASS for `0a4c39a146d150b5291935fb2ce800100accc898`
 - Phase 08 current `npm test`: PASS, 2 protocol vectors plus 79 Node tests
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 52 Rust tests after account-execution update
@@ -485,9 +485,10 @@
   disk, or stored.
 - It remains localnet-only and returns `WAITING_FOR_DEPENDENCY` when the
   latest blockhash dependency is unavailable.
-- Source commit: pending
-- CI URL: pending
-- CI status: pending
+- Source commit: `0a4c39a146d150b5291935fb2ce800100accc898`
+- CI URL:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34320747968`
+- CI status: `PASS`
 - Local test status:
   - `npm run test:bridge-validator` (pass, 35 tests)
   - `npm test` (pass, 2 protocol vectors plus 79 Node tests)
