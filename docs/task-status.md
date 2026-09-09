@@ -1059,6 +1059,61 @@ OPEN BLOCKERS:
 NEXT PHASE:
 Continue Phase 08. Do not start Phase 09 until the real daemon-backed Native-to-Solana local E2E flow passes.
 
+## Phase 08 report - Local FROST Taproot deposit, fee, and reserve intent
+
+PHASE:
+`PHASE 08 - Automatic Native to Solana local end-to-end`
+
+COMMIT SHA:
+`5e98101e1b47380ade3d5fa00c445b24f37efd70`
+
+COMMIT MESSAGE:
+`feat(phase-08): use local frost taproot deposit intents`
+
+PUSH RESULT:
+Pushed to private `kingpepe2/KingPepe-Native-Solana_Bridge` on `main`.
+
+CI RUN URL:
+`https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34349340644`
+
+CI STATUS:
+`PASS`
+
+TESTS PASS/FAIL/SKIP/NOT_RUN:
+- `node --check scripts/local-e2e-native-to-solana.mjs`: PASS.
+- `node --check scripts/tests/local-e2e-native-to-solana.test.mjs`: PASS.
+- `node --test scripts/tests/local-e2e-native-to-solana.test.mjs`: PASS, 10 tests.
+- `npm test`: PASS, 2 protocol vectors plus 99 Node tests.
+- `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
+- `python .github/scripts/guardrails.py`: PASS.
+- JSON manifest parse checks: PASS.
+- `git diff --check`: PASS.
+- WSL `solana` Rust workspace tests: PASS, 52 tests.
+- WSL Native FROST Rust tests: PASS, 7 tests.
+- WSL Native proof Rust tests: PASS, 8 tests.
+- WSL Native reserve Rust tests: PASS, 4 tests.
+- WSL Native recovery Rust tests: PASS, 3 tests.
+- Modified, staged, and outgoing-range secret-pattern scans: PASS.
+- CI Linux formatting, clippy, Rust/Node tests, guardrails, and audit: PASS.
+- CI Windows portable checks: PASS.
+- `npm run local:e2e:native-to-solana`: `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
+- Real daemon-backed Native-to-Solana local E2E: `BLOCKED / NOT_RUN`.
+
+WHAT CHANGED:
+- The local Native-to-Solana runner now derives disposable software FROST A+B aggregate Taproot custody under the local E2E run root outside the repository.
+- Local REGTEST deposit, reserve-sweep fee-funding, and canonical reserve outputs now bind to the same FROST-controlled P2TR script instead of wallet-owned local deposit/reserve addresses.
+- The runner uses recovered KingPepe REGTEST facts for this local path: 8 atomic decimals, coinbase maturity `20`, Taproot active, and Bech32m HRP `rkpepe`.
+- Deposit observation now requires both the expected address and exact P2TR script before producing the proof fingerprint.
+- Added a BIP-350 Taproot address vector check for the Bech32m helper.
+- Updated provenance, upstream references, Native validation documentation, readiness, and script documentation without adding operational secrets or real private paths.
+
+OPEN BLOCKERS:
+- Missing local `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor` executables prevent real daemon-backed Native-to-Solana local E2E.
+- Real daemon-backed Taproot sighash computation, FROST witness attachment, Native broadcast/finality, Solana mint submission, and reconciliation remain `BLOCKED / NOT_RUN`.
+
+NEXT PHASE:
+Continue Phase 08. Do not start Phase 09 until the real daemon-backed Native-to-Solana local E2E flow passes.
+
 ## Phase 08 report - Local E2E Native wallet raw-signing boundary
 
 PHASE:

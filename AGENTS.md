@@ -263,8 +263,10 @@
   Native miner fees require exact separate fee-funding inputs and reject
   missing, duplicate, aliasing, not-spent, or wrong-amount fee evidence.
 - Phase 08 local FROST Taproot deposit/fee/reserve intent source update:
-  implemented and locally tested; CI verification is pending for the source
-  commit. The local Native-to-Solana runner now derives a disposable
+  implemented and CI verified for source commit
+  `5e98101e1b47380ade3d5fa00c445b24f37efd70`. CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34349340644`
+  PASS. The local Native-to-Solana runner now derives a disposable
   FROST aggregate Taproot address under the local E2E run root outside the
   repository, uses the recovered KingPepe REGTEST Bech32m HRP `rkpepe` and
   coinbase maturity `20`, sends the deposit and separate fee-funding output to

@@ -92,6 +92,8 @@
 - Phase 08 Solana deposit-claim observer: PASS for `df49793f0595bb501e83405b79d21215283a1d0a`
 - Phase 08 Solana deposit-claim transaction plan: PASS for `42a5cdb3bcc60e0be7fb5d2395503f148b6d632f`
 - Phase 08 localnet Solana deposit-claim bridge adapter: PASS for `0a4c39a146d150b5291935fb2ce800100accc898`
+- Phase 08 local FROST Taproot deposit/fee/reserve intent: PASS for
+  `5e98101e1b47380ade3d5fa00c445b24f37efd70`
 - Phase 08 current `npm test`: PASS, 2 protocol vectors plus 99 Node tests
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 52 Rust tests after account-execution update
@@ -224,8 +226,11 @@
 
 ## Phase 08 local FROST Taproot deposit, fee, and reserve intent
 
-- Source status: implemented and locally tested; CI verification pending for
-  this source commit.
+- Source status: implemented and CI verified.
+- Source commit:
+  `5e98101e1b47380ade3d5fa00c445b24f37efd70`
+- CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34349340644` PASS.
 - What changed:
   - The local Native-to-Solana runner now derives a disposable software
     FROST A+B aggregate Taproot custody address under the local E2E run root
@@ -245,6 +250,9 @@
   - `npm test`: PASS, 2 protocol vectors plus 99 Node tests.
   - `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
   - `python .github/scripts/guardrails.py`: PASS.
+  - WSL Rust regression gates: PASS, 52 Solana Rust tests, 7 Native FROST
+    Rust tests, 8 Native proof Rust tests, 4 Native reserve Rust tests, and 3
+    Native recovery Rust tests.
   - `npm run local:e2e:native-to-solana`: `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
 - Current blocker:
   - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
