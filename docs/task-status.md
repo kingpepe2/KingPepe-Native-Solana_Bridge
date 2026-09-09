@@ -1102,3 +1102,48 @@ OPEN BLOCKERS:
 
 NEXT PHASE:
 Continue Phase 08. Do not start Phase 09 until the real daemon-backed Native-to-Solana local E2E flow passes.
+
+## Phase 08 report - Native reserve-sweep signing-intent boundary
+
+PHASE:
+`PHASE 08 - Automatic Native to Solana local end-to-end`
+
+COMMIT SHA:
+`3c473d75891707950a4bfefd889e95b6649a43b7`
+
+COMMIT MESSAGE:
+`feat(phase-08): prepare reserve sweep signing intent`
+
+PUSH RESULT:
+Pushed to private `kingpepe2/KingPepe-Native-Solana_Bridge` on `main`.
+
+CI RUN URL:
+`https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34342995604`
+
+CI STATUS:
+`PASS`
+
+TESTS PASS/FAIL/SKIP/NOT_RUN:
+- `npm run test:bridge-validator`: PASS, 43 bridge-validator tests.
+- `npm run test:local-e2e-readiness`: PASS, 23 local readiness/orchestration/bootstrap/runner tests.
+- `npm test`: PASS, 2 protocol vectors plus 97 Node tests.
+- `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
+- `python .github/scripts/guardrails.py`: PASS.
+- JSON manifest parse checks: PASS.
+- Staged and outgoing-range secret-pattern scans: PASS.
+- `npm run local:e2e:native-to-solana`: `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
+- Real daemon-backed Native-to-Solana local E2E: `BLOCKED / NOT_RUN`.
+
+WHAT CHANGED:
+- Added a localnet-only bridge-validator boundary that prepares a Native-compatible FROST reserve-sweep signing intent only after validated Native Taproot sighash evidence is supplied.
+- Bound operation ID, deposit outpoint, unsigned transaction fingerprint, proof fingerprint, canonical reserve allocation, Native fee, reserve script, transaction commitment, Taproot sighash, key epoch, and Solana deployment domain into the signing intent and signer-policy authorization.
+- Corrected the local unsigned reserve-sweep draft path to preserve the credited deposit amount as canonical reserve output and require explicit local fee-funding inputs for nonzero Native miner fees.
+- Exported the boundary and FROST signing-intent validator.
+- Added fail-closed tests for missing, RPC-only, or altered sighash evidence and non-localnet/non-regtest use.
+
+OPEN BLOCKERS:
+- Missing local `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor` executables prevent real daemon-backed Native-to-Solana local E2E.
+- The new boundary does not compute a real Native sighash; real reserve-sweep signing/broadcast still requires actual local Native transaction/sighash verification from the missing local daemon/toolchain.
+
+NEXT PHASE:
+Continue Phase 08. Do not start Phase 09 until the real daemon-backed Native-to-Solana local E2E flow passes.

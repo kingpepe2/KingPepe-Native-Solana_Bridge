@@ -125,7 +125,11 @@
 
 ## Phase 08 Native reserve-sweep signing-intent boundary
 
-- Source status: implemented locally; source commit and CI verification pending.
+- Source status: implemented and CI verified.
+- Source commit:
+  `3c473d75891707950a4bfefd889e95b6649a43b7`
+- CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34342995604` PASS.
 - Local tests:
   - `npm run test:bridge-validator`: PASS, 43 bridge-validator tests.
   - `npm run test:local-e2e-readiness`: PASS, 23 local readiness/orchestration/bootstrap/runner tests.

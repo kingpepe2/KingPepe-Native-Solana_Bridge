@@ -242,16 +242,18 @@
 - Phase 08 local E2E Native wallet raw-signing boundary CI:
   `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34339945822` PASS.
 - Phase 08 local reserve-sweep fee-funding source status:
-  implemented locally; source commit and CI verification pending. The local
-  unsigned reserve-sweep draft preserves the credited deposit amount as the
-  canonical reserve output and requires explicit local fee-funding inputs for
-  nonzero Native miner fees.
+  implemented and CI verified for source commit
+  `3c473d75891707950a4bfefd889e95b6649a43b7`. CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34342995604` PASS. The local unsigned reserve-sweep draft preserves the
+  credited deposit amount as the canonical reserve output and requires explicit
+  local fee-funding inputs for nonzero Native miner fees.
 - Phase 08 Native reserve-sweep signing-intent boundary status:
-  implemented locally; source commit and CI verification pending. It requires
-  validated local Native Taproot sighash evidence before preparing a FROST
-  reserve-sweep signing intent and signer-policy authorization. The credited
-  deposit amount must reach canonical reserve; Native miner fees are separately
-  bound and require local fee-funding evidence.
+  implemented and CI verified for source commit
+  `3c473d75891707950a4bfefd889e95b6649a43b7`. CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34342995604` PASS. It requires validated local Native Taproot sighash evidence
+  before preparing a FROST reserve-sweep signing intent and signer-policy
+  authorization. The credited deposit amount must reach canonical reserve;
+  Native miner fees are separately bound and require local fee-funding evidence.
 - Phase 08 Native-to-Solana deposit evidence validation status:
   implemented and CI verified for source commit
   `48a3bae917b6ddc80dcbd0a8d1e45b28fc1eff49`.

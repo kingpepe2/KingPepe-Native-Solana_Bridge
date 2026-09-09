@@ -110,10 +110,10 @@
     "phase08LocalE2eWalletRawSigningBlockedCiVerified": true,
     "phase08LocalReserveSweepFeeFundingInputsImplemented": true,
     "phase08LocalReserveSweepFeeFundingInputsLocalTestsPassed": true,
-    "phase08LocalReserveSweepFeeFundingInputsCiVerified": false,
+    "phase08LocalReserveSweepFeeFundingInputsCiVerified": true,
     "phase08NativeReserveSweepSigningIntentBoundaryImplemented": true,
     "phase08NativeReserveSweepSigningIntentBoundaryLocalTestsPassed": true,
-    "phase08NativeReserveSweepSigningIntentBoundaryCiVerified": false,
+    "phase08NativeReserveSweepSigningIntentBoundaryCiVerified": true,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true
