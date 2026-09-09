@@ -50,6 +50,28 @@ test("regtest command builders stay loopback-only and allowlist CLI commands", (
       }),
     /allowlisted/u,
   );
+  assert.throws(
+    () =>
+      buildRegtestCliArguments({
+        datadir,
+        rpcPort: 18_443,
+        command: "signrawtransactionwithwallet",
+      }),
+    /allowlisted/u,
+  );
+  const broadcastArgs = buildRegtestCliArguments({
+    datadir,
+    rpcPort: 18_443,
+    command: "sendrawtransaction",
+    parameters: ["00"],
+  });
+  assert.deepEqual(broadcastArgs, [
+    "-regtest=1",
+    `-datadir=${path.resolve(datadir)}`,
+    "-rpcport=18443",
+    "sendrawtransaction",
+    "00",
+  ]);
 });
 
 test("orchestrator refuses runtime roots inside the source repository", () => {
