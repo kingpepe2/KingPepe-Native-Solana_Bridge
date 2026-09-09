@@ -7,6 +7,7 @@ export {
   evaluateNativeSigningPolicy,
   nativeSigningIntentDigest,
   sha256Canonical,
+  validateNativeSigningIntent,
 } from "./policy/native-signing-policy.mjs";
 
 export { FileBackedFrostStateStore } from "./state/file-state-store.mjs";

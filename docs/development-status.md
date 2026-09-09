@@ -123,6 +123,40 @@
   - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
   - Real daemon-backed Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
 
+## Phase 08 Native reserve-sweep signing-intent boundary
+
+- Source status: implemented locally; source commit and CI verification pending.
+- Local tests:
+  - `npm run test:bridge-validator`: PASS, 43 bridge-validator tests.
+  - `npm run test:local-e2e-readiness`: PASS, 23 local readiness/orchestration/bootstrap/runner tests.
+  - `npm test`: PASS, 2 protocol vectors plus 97 Node tests.
+  - `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
+  - `python .github/scripts/guardrails.py`: PASS.
+  - JSON manifest parse checks: PASS.
+  - `npm run local:e2e:native-to-solana`: expected `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
+- What changed:
+  - Added a localnet-only bridge-validator boundary that prepares a
+    Native-compatible FROST reserve-sweep signing intent only after receiving
+    validated Native Taproot sighash evidence.
+  - The boundary binds the operation ID, deposit outpoint, unsigned transaction
+    fingerprint, proof fingerprint, canonical reserve allocation, Native fee,
+    reserve script, transaction commitment, Taproot sighash, key epoch, and
+    Solana deployment domain into the FROST signing intent and signer-policy
+    authorization.
+  - The credited deposit amount must reach canonical reserve; Native miner fees
+    are bound separately and require local fee-funding evidence instead of
+    silently reducing the user's reserve allocation.
+  - Corrected the local unsigned reserve-sweep draft path to create an explicit
+    local fee-funding UTXO for nonzero miner fees and to preserve the credited
+    deposit amount as the canonical reserve output.
+  - Missing, RPC-only, or altered sighash evidence is rejected before FROST can
+    sign.
+- Current blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
+  - The new boundary does not compute a real Native sighash; real daemon-backed
+    E2E still requires actual local Native transaction/sighash verification.
+
 ## Phase 03 local implementation
 
 - Replaced the phase-02 message scaffold with a fixed-length 514-byte canonical binary protocol message.

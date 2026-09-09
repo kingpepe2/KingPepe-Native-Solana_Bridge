@@ -119,6 +119,7 @@ export function createNativeToSolanaFlowConfig(options) {
     userWalletName: sanitizeWalletName(value.userWalletName ?? `kingpepe-e2e-user-${runId}`),
     depositWalletName: sanitizeWalletName(value.depositWalletName ?? `kingpepe-e2e-deposit-${runId}`),
     reserveWalletName: sanitizeWalletName(value.reserveWalletName ?? `kingpepe-e2e-reserve-${runId}`),
+    reserveFeeWalletName: sanitizeWalletName(value.reserveFeeWalletName ?? `kingpepe-e2e-reserve-fee-${runId}`),
     amountNative,
     amountAtomic: amountAtomic.toString(),
     nativeDecimals,
@@ -276,6 +277,11 @@ export async function executeNativeDepositObservationFlow({
     }),
     "canonicalReserveAddress",
   );
+  const feeFundingInputs = await prepareLocalReserveSweepFeeFundingInputs({
+    cli,
+    config,
+    miningAddress,
+  });
   const reserveSweepDraft = await draftLocalReserveSweep({
     cli,
     depositTxidHex,
@@ -284,6 +290,7 @@ export async function executeNativeDepositObservationFlow({
     nativeMinerFeeAtomic: config.reserveMinerFeeAtomic,
     nativeDecimals: config.nativeDecimals,
     canonicalReserveAddress,
+    feeFundingInputs,
     proofFingerprintHex,
   });
 
@@ -466,24 +473,34 @@ export async function draftLocalReserveSweep({
   nativeMinerFeeAtomic,
   nativeDecimals,
   canonicalReserveAddress,
+  feeFundingInputs = [],
   proofFingerprintHex,
 }) {
   const txid = normalizeHash32(depositTxidHex, "depositTxidHex");
   const vout = checkedInteger(depositVout, "depositVout", 0, 10_000_000);
   const amount = canonicalUintDecimal(depositAmountAtomic, "depositAmountAtomic");
   const fee = canonicalUintDecimal(nativeMinerFeeAtomic, "nativeMinerFeeAtomic");
-  const reserveAmountAtomic = checkedAtomicSubtract(amount, fee, "LocalNativeReserveSweepFeeExceedsDeposit");
-  if (reserveAmountAtomic === "0") {
+  if (BigInt(amount) === 0n) {
     throw new Error("LocalNativeReserveSweepReserveAmountMustBePositive");
   }
+  const normalizedFeeFundingInputs = normalizeFeeFundingInputs(feeFundingInputs);
+  if (BigInt(fee) > 0n && normalizedFeeFundingInputs.length === 0) {
+    throw new Error("LocalNativeReserveSweepFeeFundingInputRequired");
+  }
+  const reserveAmountAtomic = amount;
   const reserveAmountNative = atomicToFixedDecimalCoins(reserveAmountAtomic, nativeDecimals);
   const reserveAddress = requireNonEmptyText(canonicalReserveAddress, "canonicalReserveAddress");
+  const inputOutpoints = [`${txid}:${vout}`, ...normalizedFeeFundingInputs.map((input) => `${input.txidHex}:${input.vout}`)];
+  if (new Set(inputOutpoints).size !== inputOutpoints.length) {
+    throw new Error("LocalNativeReserveSweepDuplicateInputOutpoint");
+  }
+  const transactionInputs = [{ txid, vout }, ...normalizedFeeFundingInputs.map((input) => ({ txid: input.txidHex, vout: input.vout }))];
   const unsignedNativeTransactionHex = normalizeRawTransactionHex(
     await cli({
       step: "LOCAL_E2E_CREATE_UNSIGNED_NATIVE_RESERVE_SWEEP",
       command: "createrawtransaction",
       parameters: [
-        JSON.stringify([{ txid, vout }]),
+        JSON.stringify(transactionInputs),
         JSON.stringify({ [reserveAddress]: reserveAmountNative }),
       ],
     }),
@@ -494,6 +511,7 @@ export async function draftLocalReserveSweep({
     protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/UNSIGNED_RESERVE_SWEEP_DRAFT`,
     state: "UNSIGNED_DRAFT_ONLY",
     depositOutpoint: `${txid}:${vout}`,
+    feeFundingOutpoints: Object.freeze(inputOutpoints.slice(1)),
     reserveAmountAtomic,
     nativeMinerFeeAtomic: fee,
     reserveAmountNative,
@@ -502,6 +520,79 @@ export async function draftLocalReserveSweep({
     signed: false,
     broadcast: false,
   });
+}
+
+async function prepareLocalReserveSweepFeeFundingInputs({ cli, config, miningAddress }) {
+  if (BigInt(config.reserveMinerFeeAtomic) === 0n) return Object.freeze([]);
+  await cli({
+    step: "LOCAL_E2E_CREATE_RESERVE_SWEEP_FEE_WALLET",
+    command: "createwallet",
+    parameters: [config.reserveFeeWalletName],
+  });
+  const feeFundingAddress = requireNonEmptyText(
+    await cli({
+      step: "LOCAL_E2E_GET_RESERVE_SWEEP_FEE_ADDRESS",
+      wallet: config.reserveFeeWalletName,
+      command: "getnewaddress",
+    }),
+    "feeFundingAddress",
+  );
+  const feeFundingTxidHex = normalizeHash32(
+    await cli({
+      step: "LOCAL_E2E_FUND_RESERVE_SWEEP_FEE_INPUT",
+      wallet: config.userWalletName,
+      command: "sendtoaddress",
+      parameters: [feeFundingAddress, config.reserveMinerFeeNative],
+    }),
+    "feeFundingTxidHex",
+  );
+  await cli({
+    step: "LOCAL_E2E_MINE_RESERVE_SWEEP_FEE_FUNDING_FINALITY",
+    wallet: config.userWalletName,
+    command: "generatetoaddress",
+    parameters: [String(config.depositFinalityBlocks), miningAddress],
+  });
+  const rawFundingTransaction = await cli({
+    step: "LOCAL_E2E_OBSERVE_RESERVE_SWEEP_FEE_FUNDING_TRANSACTION",
+    command: "getrawtransaction",
+    parameters: [feeFundingTxidHex, "true"],
+    parseJson: true,
+  });
+  validateRawDepositTransaction({ rawTransaction: rawFundingTransaction, expectedTxidHex: feeFundingTxidHex });
+  const feeOutput = findDepositOutput({
+    rawTransaction: rawFundingTransaction,
+    depositAddress: feeFundingAddress,
+    amountAtomic: config.reserveMinerFeeAtomic,
+    nativeDecimals: config.nativeDecimals,
+  });
+  const feeUtxo = await cli({
+    step: "LOCAL_E2E_VERIFY_RESERVE_SWEEP_FEE_UTXO_UNSPENT",
+    command: "gettxout",
+    parameters: [feeFundingTxidHex, String(feeOutput.vout), "false"],
+    parseJson: true,
+  });
+  validateDepositUtxo({
+    utxo: feeUtxo,
+    output: feeOutput,
+    expectedConfirmations: config.depositFinalityBlocks,
+    nativeDecimals: config.nativeDecimals,
+  });
+  return Object.freeze([{ txidHex: feeFundingTxidHex, vout: feeOutput.vout }]);
+}
+
+function normalizeFeeFundingInputs(value) {
+  if (!Array.isArray(value)) {
+    throw new Error("LocalNativeReserveSweepFeeFundingInputsMustBeArray");
+  }
+  return Object.freeze(
+    value.map((input, index) => {
+      const entry = requireObject(input, `feeFundingInputs[${index}]`);
+      return Object.freeze({
+        txidHex: normalizeHash32(entry.txidHex ?? entry.txid, `feeFundingInputs[${index}].txidHex`),
+        vout: checkedInteger(entry.vout, `feeFundingInputs[${index}].vout`, 0, 10_000_000),
+      });
+    }),
+  );
 }
 
 function localE2eResult(state, reason, extra = {}) {
@@ -616,15 +707,6 @@ function canonicalUintDecimal(value, label) {
     throw new Error(`${label}:ExpectedCanonicalUintDecimal`);
   }
   return value;
-}
-
-function checkedAtomicSubtract(left, right, errorCode) {
-  const leftValue = BigInt(canonicalUintDecimal(left, "leftAtomic"));
-  const rightValue = BigInt(canonicalUintDecimal(right, "rightAtomic"));
-  if (rightValue > leftValue) {
-    throw new Error(errorCode);
-  }
-  return (leftValue - rightValue).toString();
 }
 
 function atomicToFixedDecimalCoins(value, nativeDecimals) {
