@@ -87,6 +87,9 @@
     "phase08AutomaticDepositPipelineLocalnetSolanaBridgeIntegrationImplemented": true,
     "phase08AutomaticDepositPipelineLocalnetSolanaBridgeIntegrationLocalTestsPassed": true,
     "phase08AutomaticDepositPipelineLocalnetSolanaBridgeIntegrationCiVerified": true,
+    "phase08AutomaticDepositPipelineNativeAndSolanaAdapterIntegrationImplemented": true,
+    "phase08AutomaticDepositPipelineNativeAndSolanaAdapterIntegrationLocalTestsPassed": true,
+    "phase08AutomaticDepositPipelineNativeAndSolanaAdapterIntegrationCiVerified": false,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true
