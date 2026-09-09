@@ -4,10 +4,13 @@ import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { ed25519 } from "@noble/curves/ed25519.js";
 import { schnorr } from "@noble/curves/secp256k1.js";
 import {
+  LOCAL_NATIVE_TO_SOLANA_COMPLETED,
   LOCAL_NATIVE_TO_SOLANA_BLOCKED,
   LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL,
+  LOCAL_NATIVE_TO_SOLANA_RECONCILED,
   LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_FINALIZED,
   LOCAL_NATIVE_TO_SOLANA_SOLANA_SETUP_FINALIZED,
   LOCAL_NATIVE_TO_SOLANA_WAITING_FOR_DEPENDENCY,
@@ -80,22 +83,48 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
       reserveSweepSigner: fakeReserveSweepSigner,
       localSolanaSetupFactory: fakeLocalSolanaSetupFactory,
       solanaSetup: fakeSolanaSetup,
+      solanaDepositClaim: fakeSolanaDepositClaim,
       flowConfig: {
         runId: "test-run",
         amountNative: "1.00000000",
       },
     });
 
-    assert.equal(result.state, LOCAL_NATIVE_TO_SOLANA_WAITING_FOR_DEPENDENCY);
-    assert.equal(result.reason, "SOLANA_DEPOSIT_CLAIM_PENDING");
-    assert.equal(result.fullNativeToSolanaE2e, "NOT_RUN_FULL_FLOW_SOLANA_DEPOSIT_CLAIM_PENDING");
-    assert.equal(result.nativeToSolanaE2e.completedStage, LOCAL_NATIVE_TO_SOLANA_SOLANA_SETUP_FINALIZED);
+    assert.equal(
+      result.state,
+      LOCAL_NATIVE_TO_SOLANA_COMPLETED,
+      JSON.stringify({
+        state: result.state,
+        reason: result.reason,
+        bootstrapError: result.infrastructure?.error,
+        flowReason: result.nativeToSolanaE2e?.reason,
+      }),
+    );
+    assert.equal(result.reason, "ALL_REQUIRED_CHECKS_PASSED");
+    assert.equal(result.fullNativeToSolanaE2e, "PASS");
+    assert.equal(result.nativeToSolanaE2e.completedStage, LOCAL_NATIVE_TO_SOLANA_RECONCILED);
     assert.equal(result.nativeToSolanaE2e.noPerTransferKingPepeTeamApprovalState, true);
     assert.equal(result.nativeToSolanaE2e.solanaSetup.state, "COMPLETED");
     assert.equal(result.nativeToSolanaE2e.solanaSetup.reason, "LOCALNET_SOLANA_SETUP_FINALIZED");
     assert.equal(result.nativeToSolanaE2e.solanaSetup.transactionPlan.initialSupplyAtomic, "0");
     assert.equal(result.nativeToSolanaE2e.solanaSetup.transactionPlan.freezeAuthority, null);
     assert.equal(result.nativeToSolanaE2e.solanaSetup.request.mintHex, result.nativeToSolanaE2e.solanaSetup.transactionPlan.mintHex);
+    assert.equal(result.nativeToSolanaE2e.depositClaim.state, "VERIFIED_READY");
+    assert.equal(result.nativeToSolanaE2e.depositClaim.threshold, 2);
+    assert.equal(result.nativeToSolanaE2e.depositClaim.amountAtomic, "100000000");
+    assert.equal(result.nativeToSolanaE2e.depositClaim.solanaRecipientHex, result.nativeToSolanaE2e.solanaSetup.request.recipientTokenAccountHex);
+    assert.equal(result.nativeToSolanaE2e.depositClaim.sourceTrust, "RPC_OBSERVATION");
+    assert.match(result.nativeToSolanaE2e.depositClaim.messageDigestHex, /^[0-9a-f]{64}$/u);
+    assert.match(result.nativeToSolanaE2e.depositClaim.reserveAllocationIdHex, /^[0-9a-f]{64}$/u);
+    assert.equal(JSON.stringify(result.nativeToSolanaE2e.depositClaim).includes("sign"), false);
+    assert.equal(result.nativeToSolanaE2e.solanaDepositClaim.state, "COMPLETED");
+    assert.equal(result.nativeToSolanaE2e.solanaDepositClaim.reason, "SOLANA_DEPOSIT_CLAIM_FINALIZED");
+    assert.equal(result.nativeToSolanaE2e.solanaDepositClaim.mintedAmountAtomic, "100000000");
+    assert.equal(result.nativeToSolanaE2e.reconciliation.state, "RECONCILED");
+    assert.equal(result.nativeToSolanaE2e.reconciliation.canonicalReserve, "100000000");
+    assert.equal(result.nativeToSolanaE2e.reconciliation.mintedSupply, "100000000");
+    assert.equal(result.nativeToSolanaE2e.reconciliation.coverageRequired, "100000000");
+    assert.equal(result.nativeToSolanaE2e.reconciliation.surplus, "0");
     assert.equal(result.nativeToSolanaE2e.deposit.txidHex, DEPOSIT_TXID);
     assert.equal(result.nativeToSolanaE2e.deposit.vout, 1);
     assert.equal(result.nativeToSolanaE2e.deposit.amountAtomic, "100000000");
@@ -167,6 +196,10 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
     assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_OBSERVE_FINALIZED_RESERVE_SWEEP"));
     assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_PREPARE_LOCALNET_SOLANA_SETUP"));
     assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_SUBMIT_AND_FINALIZE_LOCALNET_SOLANA_SETUP"));
+    assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_PREPARE_SOLANA_DEPOSIT_CLAIM"));
+    assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_SUBMIT_SOLANA_DEPOSIT_CLAIM"));
+    assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_OBSERVE_FINALIZED_SOLANA_MINT"));
+    assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_RECONCILE_RESERVE_SUPPLY_AND_LIABILITIES"));
     assert.equal(
       result.nativeToSolanaE2e.nextRequiredImplementation.includes(
         "COMPUTE_VALIDATED_TAPROOT_SIGHASHES_FOR_EACH_FROST_CONTROLLED_INPUT",
@@ -191,7 +224,7 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
     );
     assert.equal(
       result.nativeToSolanaE2e.nextRequiredImplementation.includes("SUBMIT_SOLANA_DEPOSIT_CLAIM"),
-      true,
+      false,
     );
     const prohibitedApprovalState = "WAITING_FOR_" + "ADMIN_APPROVAL";
     assert.equal(JSON.stringify(result).includes(prohibitedApprovalState), false);
@@ -471,9 +504,13 @@ test("local Solana setup context creates disposable localnet identities without 
   assert.match(context.feePayerBase58, /^[1-9A-HJ-NP-Za-km-z]{32,64}$/u);
   assert.notEqual(context.attesterPublicKeysHex[0], context.attesterPublicKeysHex[1]);
   assert.equal(typeof context.feePayerSigner.sign, "function");
+  assert.equal(typeof context.attesterASigner.sign, "function");
+  assert.equal(typeof context.attesterBSigner.sign, "function");
   assert.equal(publicContext.feePayerSigner, undefined);
   assert.equal(publicContext.mintSigner, undefined);
   assert.equal(publicContext.recipientTokenAccountSigner, undefined);
+  assert.equal(publicContext.attesterASigner, undefined);
+  assert.equal(publicContext.attesterBSigner, undefined);
   assert.equal(JSON.stringify(publicContext).includes("sign"), false);
   assert.throws(
     () =>
@@ -834,12 +871,12 @@ async function fakeLocalSolanaSetupFactory() {
 }
 
 function fakeLocalSolanaSetupContext() {
-  const feePayer = fakeSolanaSigner("local-solana-fee-payer");
-  const mint = fakeSolanaSigner("local-kpepe-mint");
-  const recipientTokenAccount = fakeSolanaSigner("local-recipient-token-account");
+  const feePayer = fakeEd25519Signer("local-solana-fee-payer");
+  const mint = fakeEd25519Signer("local-kpepe-mint");
+  const recipientTokenAccount = fakeEd25519Signer("local-recipient-token-account");
   const recipientTokenAccountOwner = fakeSolanaPubkey("local-recipient-token-account-owner");
-  const attesterA = fakeSolanaPubkey("local-attester-a");
-  const attesterB = fakeSolanaPubkey("local-attester-b");
+  const attesterA = fakeEd25519Signer("local-attester-a");
+  const attesterB = fakeEd25519Signer("local-attester-b");
   return {
     protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/LOCAL_SOLANA_SETUP_CONTEXT/V1`,
     state: "READY",
@@ -856,10 +893,12 @@ function fakeLocalSolanaSetupContext() {
     recipientTokenAccountHex: recipientTokenAccount.publicKeyHex,
     recipientTokenAccountOwnerBase58: recipientTokenAccountOwner.base58,
     recipientTokenAccountOwnerHex: recipientTokenAccountOwner.hex,
-    attesterPublicKeysHex: [attesterA.hex, attesterB.hex],
+    attesterPublicKeysHex: [attesterA.publicKeyHex, attesterB.publicKeyHex],
     feePayerSigner: feePayer,
     mintSigner: mint,
     recipientTokenAccountSigner: recipientTokenAccount,
+    attesterASigner: attesterA,
+    attesterBSigner: attesterB,
   };
 }
 
@@ -877,6 +916,7 @@ async function fakeSolanaSetup({ flowConfig, localSolanaSetupContext, operationI
       mintHex: localSolanaSetupContext.mintHex,
       feePayerBase58: localSolanaSetupContext.feePayerBase58,
       recipientTokenAccountBase58: localSolanaSetupContext.recipientTokenAccountBase58,
+      recipientTokenAccountHex: localSolanaSetupContext.recipientTokenAccountHex,
       recipientTokenAccountOwnerBase58: localSolanaSetupContext.recipientTokenAccountOwnerBase58,
       attesterPublicKeysHex: localSolanaSetupContext.attesterPublicKeysHex,
     },
@@ -898,15 +938,51 @@ async function fakeSolanaSetup({ flowConfig, localSolanaSetupContext, operationI
   };
 }
 
-function fakeSolanaSigner(label) {
-  const identity = fakeSolanaPubkey(label);
+async function fakeSolanaDepositClaim({ flowConfig, localSolanaSetupContext, depositClaimRequest, operationIdHex }) {
+  assert.equal(depositClaimRequest.operationIdHex, operationIdHex);
+  assert.equal(depositClaimRequest.request.operationIdHex, operationIdHex);
+  assert.equal(depositClaimRequest.request.amountAtomic, flowConfig.amountAtomic);
+  assert.equal(depositClaimRequest.request.solanaRecipientHex, localSolanaSetupContext.recipientTokenAccountHex);
+  assert.equal(depositClaimRequest.request.attestations.length, 2);
+  assert.notEqual(
+    depositClaimRequest.request.attestations[0].attesterPublicKeyHex,
+    depositClaimRequest.request.attestations[1].attesterPublicKeyHex,
+  );
+  assert.equal(depositClaimRequest.request.combinedAttestation.threshold, 2);
+  assert.deepEqual(
+    depositClaimRequest.request.combinedAttestation.attesterPublicKeys,
+    [...localSolanaSetupContext.attesterPublicKeysHex].sort(),
+  );
+  assert.equal(JSON.stringify(depositClaimRequest.publicRequest).includes("sign"), false);
   return {
-    publicKeyHex: identity.hex,
-    publicKeyBase58: identity.base58,
+    state: "COMPLETED",
+    reason: "SOLANA_DEPOSIT_CLAIM_FINALIZED",
+    operationIdHex,
+    messageDigestHex: depositClaimRequest.messageDigestHex,
+    solanaSignature: fakeSolanaSignature("local-e2e-solana-deposit-claim"),
+    mintedAmountAtomic: flowConfig.amountAtomic,
+    slot: "88",
+    sourceBoundary: "LOCAL_VALIDATION",
+  };
+}
+
+function fakeEd25519Signer(label) {
+  const signingKey = createHash("sha256").update(label).digest();
+  const publicKey = ed25519.getPublicKey(signingKey);
+  return {
+    publicKeyHex: Buffer.from(publicKey).toString("hex"),
+    publicKeyBase58: base58Encode(publicKey),
     sign(message) {
-      return Buffer.concat([createHash("sha256").update(label).update(message).digest(), createHash("sha256").update("tail").update(message).digest()]);
+      return ed25519.sign(message, signingKey);
     },
   };
+}
+
+function fakeSolanaSignature(label) {
+  return base58Encode(Buffer.concat([
+    createHash("sha256").update(label).digest(),
+    createHash("sha256").update("tail").update(label).digest(),
+  ]));
 }
 
 function fakeSolanaPubkey(label) {
