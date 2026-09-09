@@ -1077,7 +1077,10 @@
 
 ## Phase 08 localnet Solana deposit-claim bundle plan
 
-- Source status: implemented locally; exact source SHA and CI will be recorded after push.
+- Source status: implemented and CI verified for source SHA
+  `b4154371514cb542a847c777a1608907f1b77e46`; CI run
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34362568530`
+  PASS.
 - What changed:
   - Added an additive bundled localnet deposit-claim transaction planner that places both Ed25519 attestation verifier instructions, the `kingpepe-transceiver` receipt-verification instruction, and the `kingpepe-bridge` claim/mint instruction in one signed Solana transaction message.
   - The localnet bridge adapter now uses the bundled plan for actual `submitDepositClaim` calls, so real submission no longer depends on a pre-existing verified receipt account.

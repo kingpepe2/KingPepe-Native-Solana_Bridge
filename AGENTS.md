@@ -363,15 +363,20 @@
   derives localnet bridge state, deposit claim, mint-authority, and
   transceiver receipt PDAs, builds exact `AcceptDepositClaim` instruction
   data, serializes a Solana legacy transaction message, and signs only through
-  an injected local fee-payer signer. The current source edit adds an
-  additive bundled localnet transaction path that includes both Ed25519
+  an injected local fee-payer signer. Source commit
+  `b4154371514cb542a847c777a1608907f1b77e46` adds an additive bundled
+  localnet transaction path that includes both Ed25519
   verifier instructions, the transceiver receipt verification instruction, and
   the bridge claim/mint instruction in one signed transaction. It does not load
   or store key files.
 - Phase 08 Solana deposit-claim transaction plan commit:
   `42a5cdb3bcc60e0be7fb5d2395503f148b6d632f`
 - Phase 08 Solana deposit-claim transaction plan CI:
-  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34318547667` PASS.
+  prior one-instruction planner:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34318547667`
+  PASS. Bundled transceiver-receipt planner:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34362568530`
+  PASS.
 - Phase 08 localnet Solana deposit-claim bridge adapter:
   `services/bridge-validator/localnet-solana-deposit-claim-bridge.mjs`
   connects the transaction-plan builder to the durable Solana submitter. It
@@ -384,7 +389,11 @@
 - Phase 08 localnet Solana deposit-claim bridge adapter commit:
   `0a4c39a146d150b5291935fb2ce800100accc898`
 - Phase 08 localnet Solana deposit-claim bridge adapter CI:
-  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34320747968` PASS.
+  prior pre-bundle adapter:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34320747968`
+  PASS. Bundled submission path:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34362568530`
+  PASS.
 - Phase 08 Solana deposit-claim observer account pass-through:
   source commit `dab03e8696267fa98488f312e1f2158df51dc815`, CI
   `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34322782563`
