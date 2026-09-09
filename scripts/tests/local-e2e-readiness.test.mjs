@@ -13,7 +13,7 @@ import {
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../..");
 
-test("current repository readiness gate refuses to treat boundary models as real local E2E", () => {
+test("current repository readiness gate refuses to treat fail-closed entrypoint shells as real local E2E", () => {
   const result = evaluateLocalE2eReadiness({
     repoRoot: REPO_ROOT,
     envPath: "",
@@ -24,9 +24,8 @@ test("current repository readiness gate refuses to treat boundary models as real
   for (const command of REQUIRED_LOCAL_E2E_EXECUTABLES) {
     assert(result.blockers.includes(`MISSING_EXECUTABLE:${command}`));
   }
-  assert(result.blockers.includes("SOLANA_PROGRAM_NOT_DEPLOYABLE:kingpepe-bridge"));
-  assert(result.blockers.includes("SOLANA_PROGRAM_NOT_DEPLOYABLE:kingpepe-transceiver"));
-  assert(result.blockers.includes("ANCHOR_CONFIG_NOT_READY:LOCALNET_PROGRAM_IDS_PLACEHOLDER"));
+  assert(result.blockers.includes("SOLANA_PROGRAM_ABI_NOT_READY:kingpepe-bridge"));
+  assert(result.blockers.includes("SOLANA_PROGRAM_ABI_NOT_READY:kingpepe-transceiver"));
 });
 
 test("executable discovery is path-delimited and does not inspect unrelated environment data", () => {
