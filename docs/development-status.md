@@ -71,7 +71,7 @@
 - Phase 08 `npm run test:bridge-validator`: PASS, 39 bridge-validator tests (automatic deposit pipeline, file-backed deposit journal, async adapter path, Native reserve-sweep adapters, adapter-journal restart retry, Solana deposit claim submitter, Solana transaction-plan builder, and localnet Solana deposit-claim bridge adapter)
 - Phase 08 `npm run test:native-node`: PASS, 7 Native REGTEST RPC adapter tests
 - Phase 08 `npm run test:solana-observer`: PASS, 14 Solana observer tests including the localnet deposit-claim observer
-- Phase 08 `npm run test:local-e2e-readiness`: PASS, 22 readiness/orchestration/bootstrap/runner tests
+- Phase 08 `npm run test:local-e2e-readiness`: PASS, 23 readiness/orchestration/bootstrap/runner tests
 - Phase 08 `npm run doctor:local-e2e`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING; missing localnet executables; both Solana programs report `READY` at the source/readiness-gate level after account-execution wiring
 - Phase 08 `npm run local:e2e:plan`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING with redacted local paths and no production configuration
 - Phase 08 `npm run local:e2e:bootstrap`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING before command execution; missing localnet executables
@@ -92,7 +92,7 @@
 - Phase 08 Solana deposit-claim observer: PASS for `df49793f0595bb501e83405b79d21215283a1d0a`
 - Phase 08 Solana deposit-claim transaction plan: PASS for `42a5cdb3bcc60e0be7fb5d2395503f148b6d632f`
 - Phase 08 localnet Solana deposit-claim bridge adapter: PASS for `0a4c39a146d150b5291935fb2ce800100accc898`
-- Phase 08 current `npm test`: PASS, 2 protocol vectors plus 92 Node tests
+- Phase 08 current `npm test`: PASS, 2 protocol vectors plus 93 Node tests
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 52 Rust tests after account-execution update
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
@@ -798,6 +798,29 @@
     deposit output, and UTXO observation.
   - It rejects wrong local Native networks and raw transaction txid mismatch
     before reserve-sweep construction.
+- Current blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
+  - Real daemon-backed Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
+
+## Phase 08 Native-to-Solana unsigned reserve-sweep draft
+
+- Source status: implemented locally; source commit and CI verification pending.
+- Local tests:
+  - `npm run test:local-e2e-readiness`: PASS, 23 readiness/orchestration/bootstrap/runner tests.
+  - `npm test`: PASS, 2 protocol vectors plus 93 Node tests.
+  - `npm run local:e2e:native-to-solana`: expected `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING` in the current environment.
+- What changed:
+  - The local REGTEST command allowlist now includes `createrawtransaction`.
+  - The local Native-to-Solana runner creates a disposable local reserve wallet,
+    obtains a local REGTEST reserve address, calculates the exact miner fee and
+    canonical reserve amount using integer atomic units, and drafts an unsigned
+    reserve sweep.
+  - The runner reports `FROST_RESERVE_SWEEP_SIGNING_PENDING` after the unsigned
+    draft and does not call `signrawtransactionwithwallet`,
+    `sendrawtransaction`, or any per-transfer KingPepe Team approval state.
+  - The unsigned transaction is represented in reports by a non-secret
+    fingerprint, not by operational signing state.
 - Current blocker:
   - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
   - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.

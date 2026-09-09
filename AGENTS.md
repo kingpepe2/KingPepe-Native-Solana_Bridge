@@ -222,12 +222,15 @@
   `scripts/local-e2e-native-to-solana.mjs` composes the bootstrap harness with
   local REGTEST deposit funding and observation. It validates the local Native
   source snapshot, genesis hash, raw deposit txid, deposit output, UTXO
-  finality, and a deterministic non-secret proof fingerprint before any reserve
-  sweep can be attempted. It keeps runtime state under the local E2E run root
-  outside the source repository, includes no per-transfer KingPepe Team approval
-  state, and reports the full flow as not run until reserve-sweep construction,
-  FROST-backed reserve broadcast, Solana mint submission, and reconciliation
-  are completed against real local daemons.
+  finality, and a deterministic non-secret proof fingerprint, then drafts an
+  unsigned local REGTEST reserve sweep with exact BigInt miner-fee accounting.
+  It keeps runtime state under the local E2E run root outside the source
+  repository, includes no per-transfer KingPepe Team approval state, and reports
+  the full flow as not run until real FROST-backed reserve signing/broadcast,
+  Solana mint submission, and reconciliation are completed against real local
+  daemons.
+- Phase 08 Native-to-Solana unsigned reserve-sweep draft status:
+  implemented locally; source commit and CI verification pending.
 - Phase 08 Native-to-Solana deposit evidence validation status:
   implemented and CI verified for source commit
   `48a3bae917b6ddc80dcbd0a8d1e45b28fc1eff49`.

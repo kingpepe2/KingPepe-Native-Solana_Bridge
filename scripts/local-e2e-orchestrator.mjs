@@ -14,6 +14,7 @@ export const REQUIRED_KINGPEPE_REGTEST_VERSION = "v31.1.0";
 export const ALLOWED_REGTEST_CLI_COMMANDS = Object.freeze(
   new Set([
     "createwallet",
+    "createrawtransaction",
     "generatetoaddress",
     "getblock",
     "getblockchaininfo",

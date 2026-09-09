@@ -423,7 +423,7 @@
     {
       "path": "scripts/local-e2e-orchestrator.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 local-only Native REGTEST and Solana local-validator orchestration plan. Generic REGTEST command safety conventions were reviewed from the read-only legacy KingPepe repository; TON-specific flow was excluded."
+      "notes": "Phase 08 local-only Native REGTEST and Solana local-validator orchestration plan. Generic REGTEST command safety conventions were reviewed from the read-only legacy KingPepe repository; TON-specific flow was excluded. The REGTEST allowlist includes createrawtransaction for unsigned local reserve-sweep drafting only."
     },
     {
       "path": "scripts/local-e2e-bootstrap.mjs",
@@ -433,7 +433,7 @@
     {
       "path": "scripts/local-e2e-native-to-solana.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 local-only Native-to-Solana E2E command runner that composes the bootstrap harness with daemon deposit observation, local Native source/genesis/txid validation, non-secret proof fingerprinting, runtime state under the local E2E run root outside the repository, and fail-closed blocking before unimplemented reserve-sweep completion without claiming a full E2E pass."
+      "notes": "Phase 08 local-only Native-to-Solana E2E command runner that composes the bootstrap harness with daemon deposit observation, local Native source/genesis/txid validation, non-secret proof fingerprinting, unsigned reserve-sweep drafting, runtime state under the local E2E run root outside the repository, and fail-closed blocking before FROST reserve-sweep signing/broadcast without claiming a full E2E pass."
     },
     {
       "path": "scripts/tests/local-e2e-readiness.test.mjs",
@@ -453,7 +453,7 @@
     {
       "path": "scripts/tests/local-e2e-native-to-solana.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 local Native-to-Solana command runner tests using injected fake executors, temporary run roots outside the repository, wrong-source and wrong-txid rejection fixtures, and no operational secrets."
+      "notes": "Phase 08 local Native-to-Solana command runner tests using injected fake executors, temporary run roots outside the repository, wrong-source and wrong-txid rejection fixtures, unsigned reserve-sweep fee-accounting checks, and no operational secrets."
     },
     {
       "path": "services/attesters/README.md",
