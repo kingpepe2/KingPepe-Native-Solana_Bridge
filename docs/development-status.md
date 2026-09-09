@@ -609,9 +609,10 @@
 
 ## Phase 08 reusable local E2E infrastructure harness
 
-- Source commit: `PENDING_SOURCE_COMMIT`
-- CI URL: `PENDING_CI`
-- CI status: `PENDING`
+- Source commit: `f4372d9276946ebe7a8dad1d2903f60821dcaae8`
+- CI URL:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34330731668`
+- CI status: `PASS`
 - Refactored `scripts/local-e2e-bootstrap.mjs` so the local-only bootstrap
   path exposes a reusable harness for the future real Native-to-Solana daemon
   flow.

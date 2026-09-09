@@ -218,6 +218,10 @@
   keeps the disposable local services active for an injected Native-to-Solana
   flow, stops them afterward, and reports callback failure without claiming a
   local E2E pass.
+- Phase 08 reusable local E2E infrastructure harness commit:
+  `f4372d9276946ebe7a8dad1d2903f60821dcaae8`
+- Phase 08 reusable local E2E infrastructure harness CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34330731668` PASS.
 - Phase 08 local E2E bootstrap runner commit:
   `d392403733bbfb92fcfd2d50a1d3879d63f0e3bb`
 - Phase 08 local E2E bootstrap runner CI:

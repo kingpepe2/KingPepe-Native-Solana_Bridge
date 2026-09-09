@@ -855,3 +855,55 @@ OPEN BLOCKERS:
 NEXT PHASE:
 Continue Phase 08. Do not start Phase 09 until the real daemon-backed
 Native-to-Solana local E2E flow passes.
+
+## Phase 08 report - reusable local E2E infrastructure harness
+
+PHASE:
+`PHASE 08 - Automatic Native to Solana local end-to-end`
+
+COMMIT SHA:
+`f4372d9276946ebe7a8dad1d2903f60821dcaae8`
+
+COMMIT MESSAGE:
+`feat(phase-08): expose local e2e infrastructure harness`
+
+PUSH RESULT:
+Pushed to private `kingpepe2/KingPepe-Native-Solana_Bridge` on `main`.
+
+CI RUN URL:
+`https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34330731668`
+
+CI STATUS:
+`PASS`
+
+TESTS PASS/FAIL/SKIP/NOT_RUN:
+- `npm run test:local-e2e-readiness`: PASS, 15 readiness/orchestration/bootstrap/harness tests.
+- `npm test`: PASS, 2 protocol vectors plus 85 Node tests.
+- `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
+- `python .github/scripts/guardrails.py`: PASS.
+- JSON manifest parse checks: PASS.
+- Staged and outgoing-range secret-pattern scans: PASS.
+- `npm run local:e2e:plan`: `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
+- `npm run local:e2e:bootstrap`: `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
+- `npm run doctor:local-e2e`: `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
+- Real daemon-backed Native-to-Solana local E2E: `BLOCKED / NOT_RUN`.
+
+WHAT CHANGED:
+- Refactored the local-only E2E bootstrap runner into a reusable harness for
+  the future real Native-to-Solana local daemon flow.
+- The harness starts the disposable Solana local-validator and KingPepe REGTEST
+  services, runs health checks, keeps services active while an injected flow
+  callback runs, and stops services afterward.
+- Callback failure is classified as `LOCAL_E2E_FLOW_FAILED` and does not report
+  a local E2E pass.
+- Existing bootstrap behavior remains a bootstrap-only command and still does
+  not claim full economic E2E execution.
+
+OPEN BLOCKERS:
+- Missing local `kingpeped`, `kingpepe-cli`, `solana`,
+  `solana-test-validator`, and `anchor` executables prevent real
+  daemon-backed Native-to-Solana local E2E.
+
+NEXT PHASE:
+Continue Phase 08. Do not start Phase 09 until the real daemon-backed
+Native-to-Solana local E2E flow passes.
