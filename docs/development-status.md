@@ -71,7 +71,7 @@
 - Phase 08 `npm run test:bridge-validator`: PASS, 39 bridge-validator tests (automatic deposit pipeline, file-backed deposit journal, async adapter path, Native reserve-sweep adapters, adapter-journal restart retry, Solana deposit claim submitter, Solana transaction-plan builder, and localnet Solana deposit-claim bridge adapter)
 - Phase 08 `npm run test:native-node`: PASS, 7 Native REGTEST RPC adapter tests
 - Phase 08 `npm run test:solana-observer`: PASS, 14 Solana observer tests including the localnet deposit-claim observer
-- Phase 08 `npm run test:local-e2e-readiness`: PASS, 15 readiness/orchestration/bootstrap/harness tests
+- Phase 08 `npm run test:local-e2e-readiness`: PASS, 22 readiness/orchestration/bootstrap/runner tests
 - Phase 08 `npm run doctor:local-e2e`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING; missing localnet executables; both Solana programs report `READY` at the source/readiness-gate level after account-execution wiring
 - Phase 08 `npm run local:e2e:plan`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING with redacted local paths and no production configuration
 - Phase 08 `npm run local:e2e:bootstrap`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING before command execution; missing localnet executables
@@ -92,7 +92,7 @@
 - Phase 08 Solana deposit-claim observer: PASS for `df49793f0595bb501e83405b79d21215283a1d0a`
 - Phase 08 Solana deposit-claim transaction plan: PASS for `42a5cdb3bcc60e0be7fb5d2395503f148b6d632f`
 - Phase 08 localnet Solana deposit-claim bridge adapter: PASS for `0a4c39a146d150b5291935fb2ce800100accc898`
-- Phase 08 current `npm test`: PASS, 2 protocol vectors plus 85 Node tests
+- Phase 08 current `npm test`: PASS, 2 protocol vectors plus 92 Node tests
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 52 Rust tests after account-execution update
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
@@ -771,6 +771,29 @@
   - Runtime state is constrained to the local E2E run root outside the repository.
   - The runner has no `WAITING_FOR_ADMIN_APPROVAL` state and keeps Mainnet disabled.
   - The runner reports `NOT_RUN_FULL_FLOW_NATIVE_RESERVE_SWEEP_PENDING` until reserve-sweep construction, FROST-backed reserve broadcast, Solana mint submission, and reconciliation are exercised against real local daemons.
+- Current blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
+  - Real daemon-backed Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
+
+## Phase 08 Native-to-Solana deposit evidence validation
+
+- Source status: implemented locally; source commit and CI verification pending.
+- Local tests:
+  - `npm run test:local-e2e-readiness`: PASS, 22 readiness/orchestration/bootstrap/runner tests.
+  - `npm test`: PASS, 2 protocol vectors plus 92 Node tests.
+  - `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
+  - `python .github/scripts/guardrails.py`: PASS.
+- What changed:
+  - The local Native-to-Solana runner now validates the local Native source
+    snapshot from `getblockchaininfo`.
+  - It binds the deposit observation to `getblockhash 0`, the expected REGTEST
+    chain name, raw transaction `txid`, exact output, UTXO script, and UTXO
+    finality.
+  - It computes a deterministic non-secret proof fingerprint from the source,
+    deposit output, and UTXO observation.
+  - It rejects wrong local Native networks and raw transaction txid mismatch
+    before reserve-sweep construction.
 - Current blocker:
   - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
   - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
