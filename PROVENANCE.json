@@ -293,7 +293,7 @@
     {
       "path": "native/node/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Native node observation boundary notes updated for the Phase 08 local REGTEST RPC adapter."
+      "notes": "Native node observation boundary notes updated for the Phase 08 local REGTEST RPC adapter and local Taproot transaction/sighash evidence helper."
     },
     {
       "path": "native/node/native-rpc-client.mjs",
@@ -301,9 +301,19 @@
       "notes": "Phase 08 loopback-first KingPepe JSON-RPC adapter for local REGTEST observation, UTXO checks, controlled local broadcast, endpoint/auth boundary enforcement, and exact atomic amount parsing."
     },
     {
+      "path": "native/node/native-taproot-transaction.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 local Native transaction parser/serializer, BIP-341 key-path SIGHASH_DEFAULT evidence helper, and Taproot witness attachment boundary. It is KingPepe-specific source informed by public BIP-341 Taproot rules and does not contain keys, signing material, or operational state."
+    },
+    {
       "path": "native/node/tests/native-rpc-client.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Phase 08 Native RPC adapter tests using a disposable loopback HTTP server and temporary non-production auth cookie outside the repository."
+    },
+    {
+      "path": "native/node/tests/native-taproot-transaction.test.mjs",
+      "classification": "DERIVED_FROM_THIRD_PARTY",
+      "notes": "Phase 08 local Taproot transaction tests. The BIP-341 wallet test vector values are selected public bitcoin/bips vector data under BSD-3-Clause; the surrounding KingPepe-specific tests and assertions are original project test code."
     },
     {
       "path": "native/proof/Cargo.lock",
@@ -433,7 +443,7 @@
     {
       "path": "scripts/local-e2e-native-to-solana.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 local-only Native-to-Solana E2E command runner that composes the bootstrap harness with daemon deposit observation, disposable FROST aggregate Taproot deposit/fee/reserve intent generation using KingPepe REGTEST Bech32m HRP rkpepe and coinbase maturity 20 from read-only recovery network config, local Native source/genesis/txid validation, non-secret proof fingerprinting, explicit local fee-funding inputs for nonzero reserve-sweep miner fees, credited deposit preservation as the canonical reserve allocation, runtime state under the local E2E run root outside the repository, and fail-closed blocking before validated sighash/FROST reserve-sweep signing/broadcast without claiming a full E2E pass."
+      "notes": "Phase 08 local-only Native-to-Solana E2E command runner that composes the bootstrap harness with daemon deposit observation, disposable FROST aggregate Taproot deposit/fee/reserve intent generation using KingPepe REGTEST Bech32m HRP rkpepe and coinbase maturity 20 from read-only recovery network config, local Native source/genesis/txid validation, non-secret proof fingerprinting, explicit local fee-funding inputs for nonzero reserve-sweep miner fees, credited deposit preservation as the canonical reserve allocation, BIP-341 key-path SIGHASH_DEFAULT evidence for each FROST-controlled input, runtime state under the local E2E run root outside the repository, and fail-closed blocking before FROST reserve-sweep signature aggregation/witness broadcast without claiming a full E2E pass."
     },
     {
       "path": "scripts/tests/local-e2e-readiness.test.mjs",
@@ -453,7 +463,7 @@
     {
       "path": "scripts/tests/local-e2e-native-to-solana.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 local Native-to-Solana command runner tests using injected fake executors, temporary run roots outside the repository, disposable FROST Taproot custody generation, wrong-source and wrong-txid rejection fixtures, explicit fee-funding and full credited-reserve allocation checks, and no operational secrets."
+      "notes": "Phase 08 local Native-to-Solana command runner tests using injected fake executors, temporary run roots outside the repository, disposable FROST Taproot custody generation, wrong-source and wrong-txid rejection fixtures, explicit fee-funding, full credited-reserve allocation checks, per-input Taproot sighash evidence checks, and no operational secrets."
     },
     {
       "path": "services/attesters/README.md",

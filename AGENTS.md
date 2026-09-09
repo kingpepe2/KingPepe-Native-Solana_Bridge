@@ -274,6 +274,15 @@
   local canonical reserve address. It still stops before real sighash
   computation, FROST witness attachment, Native broadcast, Solana mint, and
   reconciliation.
+- Phase 08 Taproot sighash evidence source update:
+  implemented and locally tested; CI verification is pending for the next
+  source push. The local Native-to-Solana runner now parses the unsigned
+  reserve-sweep transaction, verifies the expected input outpoints, computes
+  BIP-341 key-path `SIGHASH_DEFAULT` evidence for each FROST-controlled input,
+  binds the exact reserve output and separate Native miner fee, and stops
+  before FROST signature aggregation, witness attachment, Native broadcast,
+  Solana mint, and reconciliation. The helper contains no keys or runtime
+  secret state.
 - Phase 08 Native-to-Solana deposit evidence validation status:
   implemented and CI verified for source commit
   `48a3bae917b6ddc80dcbd0a8d1e45b28fc1eff49`.

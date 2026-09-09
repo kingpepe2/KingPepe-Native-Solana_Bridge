@@ -38,7 +38,7 @@
 
 - Phase 08 is blocked because the local environment does not provide `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, or `anchor`.
 - Current Solana crates have deterministic non-production localnet Program IDs, economic ABI decoding, source-level account execution, SPL Token CPI construction, a localnet-only deposit-claim observer, a localnet transaction-plan builder, and a localnet adapter that connects signed transaction planning to durable submission. Real local-validator execution remains untested because required localnet executables are missing.
-- Full Native transaction construction, Native node acceptance, local end-to-end flows, Devnet, production configuration, external review, and activation remain later phases.
+- Full Native FROST signature aggregation, witness broadcast, Native node acceptance, local end-to-end flows, Devnet, production configuration, external review, and activation remain later phases.
 
 ## Latest local validation
 
@@ -69,7 +69,7 @@
 - Phase 08 `Get-Command kingpeped kingpepe-cli solana solana-test-validator anchor`: NOT_FOUND on Windows
 - Phase 08 `command -v kingpeped kingpepe-cli solana-test-validator solana anchor`: NOT_FOUND under WSL
 - Phase 08 `npm run test:bridge-validator`: PASS, 43 bridge-validator tests (automatic deposit pipeline, file-backed deposit journal, async adapter path, Native reserve-sweep adapters, adapter-journal restart retry, signing-intent boundary, Solana deposit claim submitter, Solana transaction-plan builder, and localnet Solana deposit-claim bridge adapter)
-- Phase 08 `npm run test:native-node`: PASS, 7 Native REGTEST RPC adapter tests
+- Phase 08 `npm run test:native-node`: PASS, 10 Native REGTEST RPC adapter and Taproot transaction tests
 - Phase 08 `npm run test:solana-observer`: PASS, 14 Solana observer tests including the localnet deposit-claim observer
 - Phase 08 `npm run test:local-e2e-readiness`: PASS, 25 readiness/orchestration/bootstrap/runner tests
 - Phase 08 `npm run doctor:local-e2e`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING; missing localnet executables; both Solana programs report `READY` at the source/readiness-gate level after account-execution wiring
@@ -94,7 +94,7 @@
 - Phase 08 localnet Solana deposit-claim bridge adapter: PASS for `0a4c39a146d150b5291935fb2ce800100accc898`
 - Phase 08 local FROST Taproot deposit/fee/reserve intent: PASS for
   `5e98101e1b47380ade3d5fa00c445b24f37efd70`
-- Phase 08 current `npm test`: PASS, 2 protocol vectors plus 99 Node tests
+- Phase 08 current `npm test`: PASS, 2 protocol vectors plus 102 Node tests
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 52 Rust tests after account-execution update
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
@@ -254,6 +254,38 @@
     Rust tests, 8 Native proof Rust tests, 4 Native reserve Rust tests, and 3
     Native recovery Rust tests.
   - `npm run local:e2e:native-to-solana`: `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
+- Current blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`,
+    `solana-test-validator`, and `anchor`.
+  - Real daemon-backed Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
+
+## Phase 08 local Taproot sighash evidence
+
+- Source status: implemented and locally tested; CI verification pending for
+  the next source commit.
+- What changed:
+  - Added `native/node/native-taproot-transaction.mjs`.
+  - Added `native/node/tests/native-taproot-transaction.test.mjs`.
+  - The helper parses and serializes Bitcoin-style Native transactions, computes
+    BIP-341 key-path `SIGHASH_DEFAULT` evidence from unsigned transactions and
+    public spent-output data, verifies the exact reserve output and separate
+    Native miner fee, and attaches key-path Taproot witnesses after signatures
+    are supplied.
+  - The local Native-to-Solana runner now verifies the unsigned reserve-sweep
+    input outpoints and computes per-input sighash evidence for the deposit and
+    fee-funding P2TR inputs.
+  - The runner now stops at `LOCAL_NATIVE_TAPROOT_SIGHASHES_VALIDATED` with
+    `FROST_RESERVE_SWEEP_SIGNATURES_PENDING`; it still does not claim a real
+    daemon-backed reserve broadcast, Solana mint, or reconciliation pass.
+- Local tests:
+  - `node --test native/node/tests/native-taproot-transaction.test.mjs`: PASS,
+    3 tests.
+  - `node --test scripts/tests/local-e2e-native-to-solana.test.mjs`: PASS, 10
+    tests.
+  - `npm test`: PASS, 2 protocol vectors plus 102 Node tests.
+  - `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
+  - `python .github/scripts/guardrails.py`: PASS.
 - Current blocker:
   - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
   - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`,

@@ -24,6 +24,10 @@ import {
   RPC_OBSERVATION,
   decimalCoinsToAtomic,
 } from "../native/node/native-rpc-client.mjs";
+import {
+  createLocalTaprootSighashEvidences,
+  parseNativeTransactionHex,
+} from "../native/node/native-taproot-transaction.mjs";
 
 export const LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL =
   "KINGPEPE_NATIVE_SOLANA_BRIDGE/LOCAL_NATIVE_TO_SOLANA_E2E/V1";
@@ -36,6 +40,8 @@ export const LOCAL_NATIVE_TO_SOLANA_DEPOSIT_EVIDENCE_VALIDATED =
   "LOCAL_NATIVE_DEPOSIT_EVIDENCE_VALIDATED";
 export const LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_DRAFTED =
   "LOCAL_NATIVE_RESERVE_SWEEP_DRAFTED";
+export const LOCAL_NATIVE_TO_SOLANA_TAPROOT_SIGHASHES_VALIDATED =
+  "LOCAL_NATIVE_TAPROOT_SIGHASHES_VALIDATED";
 
 const DEFAULT_AMOUNT_NATIVE = "1.00000000";
 const DEFAULT_NATIVE_DECIMALS = 8;
@@ -293,12 +299,31 @@ export async function executeNativeDepositObservationFlow({
     feeFundingInputs,
     proofFingerprintHex,
   });
+  const taprootSighashEvidences = createLocalTaprootSighashEvidences({
+    unsignedNativeTransactionHex: reserveSweepDraft.unsignedNativeTransactionHex,
+    spentOutputs: [
+      {
+        amountAtomic: config.amountAtomic,
+        scriptPubKeyHex: custodyScriptPubKeyHex,
+      },
+      ...feeFundingInputs.map((input) => ({
+        amountAtomic: input.amountAtomic,
+        scriptPubKeyHex: input.scriptPubKeyHex,
+      })),
+    ],
+    proofFingerprintHex,
+    reserveAmountAtomic: config.amountAtomic,
+    nativeMinerFeeAtomic: config.reserveMinerFeeAtomic,
+    expectedRecipientScriptPubKeyHex: custodyScriptPubKeyHex,
+    expectedChangeScriptPubKeyHex: custodyScriptPubKeyHex,
+  });
+  stages.push("LOCAL_E2E_COMPUTE_VALIDATED_TAPROOT_SIGHASHES");
 
   return Object.freeze({
     protocol: LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL,
     state: LOCAL_NATIVE_TO_SOLANA_WAITING_FOR_DEPENDENCY,
-    reason: "FROST_RESERVE_SWEEP_SIGNING_PENDING",
-    completedStage: LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_DRAFTED,
+    reason: "FROST_RESERVE_SWEEP_SIGNATURES_PENDING",
+    completedStage: LOCAL_NATIVE_TO_SOLANA_TAPROOT_SIGHASHES_VALIDATED,
     productionReady: false,
     mainnetActivation: "DISABLED",
     noPerTransferKingPepeTeamApprovalState: true,
@@ -338,9 +363,11 @@ export async function executeNativeDepositObservationFlow({
       sourceBestHeight: nativeSource.bestHeight,
       proofFingerprintHex,
     }),
-    reserveSweep: reserveSweepDraft,
+    reserveSweep: Object.freeze({
+      ...reserveSweepDraft,
+      taprootSighashEvidences,
+    }),
     nextRequiredImplementation: Object.freeze([
-      "COMPUTE_VALIDATED_TAPROOT_SIGHASHES_FOR_EACH_FROST_CONTROLLED_INPUT",
       "SIGN_EACH_RESERVE_SWEEP_INPUT_WITH_REAL_NATIVE_COMPATIBLE_FROST_A_B",
       "ATTACH_FROST_SIGNATURE_WITNESSES_TO_NATIVE_TRANSACTION",
       "BROADCAST_AND_FINALIZE_RESERVE_SWEEP",
@@ -537,6 +564,14 @@ export async function draftLocalReserveSweep({
     }),
     "unsignedNativeTransactionHex",
   );
+  const parsedUnsignedTransaction = parseNativeTransactionHex(unsignedNativeTransactionHex);
+  const parsedInputOutpoints = parsedUnsignedTransaction.inputs.map((input) => input.outpoint);
+  if (
+    parsedInputOutpoints.length !== inputOutpoints.length ||
+    parsedInputOutpoints.some((outpoint, index) => outpoint !== inputOutpoints[index])
+  ) {
+    throw new Error("LocalNativeReserveSweepUnsignedTransactionInputMismatch");
+  }
 
   return Object.freeze({
     protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/UNSIGNED_RESERVE_SWEEP_DRAFT`,
@@ -546,7 +581,9 @@ export async function draftLocalReserveSweep({
     reserveAmountAtomic,
     nativeMinerFeeAtomic: fee,
     reserveAmountNative,
+    unsignedNativeTransactionHex,
     unsignedNativeTransactionFingerprintHex: sha256Hex(Buffer.from(unsignedNativeTransactionHex, "hex")),
+    unsignedNativeTransactionId: parsedUnsignedTransaction.txidHex,
     proofFingerprintHex: normalizeHash32(proofFingerprintHex, "proofFingerprintHex"),
     signed: false,
     broadcast: false,
@@ -604,7 +641,14 @@ async function prepareLocalReserveSweepFeeFundingInputs({
     expectedConfirmations: config.depositFinalityBlocks,
     nativeDecimals: config.nativeDecimals,
   });
-  return Object.freeze([{ txidHex: feeFundingTxidHex, vout: feeOutput.vout }]);
+  return Object.freeze([
+    {
+      txidHex: feeFundingTxidHex,
+      vout: feeOutput.vout,
+      amountAtomic: config.reserveMinerFeeAtomic,
+      scriptPubKeyHex,
+    },
+  ]);
 }
 
 export async function createLocalFrostTaprootCustodyContext({ plan, flowConfig }) {

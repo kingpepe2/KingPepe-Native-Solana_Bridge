@@ -7,6 +7,14 @@ This repository tracks selected upstream references for architectural guidance.
   - Reference commit: `250d810d42b005526e4fb7e3aea75d2d2ab8fdbb`
   - Use: technical comparison only in the current source tree
 
+- `bitcoin/bips`
+  - License: BSD-3-Clause
+  - References: BIP-341 Taproot specification and selected wallet test vector
+    values from `bip-0341/wallet-test-vectors.json`
+  - Use: reference-only Taproot key-path `SIGHASH_DEFAULT` implementation
+    guidance and public test-vector verification in
+    `native/node/tests/native-taproot-transaction.test.mjs`
+
 - `@noble/curves` `2.3.0`
   - License: MIT
   - Copyright: Copyright (c) 2022 Paul Miller
