@@ -45,3 +45,9 @@ export {
   NativeReserveSweepRelayer,
   NativeReserveSweepVerifier,
 } from "./native-reserve-sweep-adapters.mjs";
+
+export {
+  LOCAL_NATIVE_RESERVE_SWEEP_SIGNING_INTENT_PROTOCOL,
+  LOCAL_NATIVE_TAPROOT_SIGHASH_EVIDENCE_PROTOCOL,
+  prepareLocalNativeReserveSweepSigningIntent,
+} from "./native-reserve-sweep-signing-intent.mjs";

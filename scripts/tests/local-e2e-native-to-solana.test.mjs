@@ -23,7 +23,9 @@ import { REQUIRED_LOCAL_E2E_EXECUTABLES } from "../local-e2e-readiness.mjs";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../..");
 const DEPOSIT_TXID = h("phase08-real-daemon-deposit-txid");
+const FEE_FUNDING_TXID = h("phase08-reserve-sweep-fee-funding-txid");
 const SCRIPT_HEX = `5120${h("phase08-local-deposit-script")}`;
+const FEE_FUNDING_SCRIPT_HEX = `5120${h("phase08-local-fee-funding-script")}`;
 const REGTEST_GENESIS_HASH = h("kingpepe-regtest-genesis");
 const REGTEST_BEST_BLOCK_HASH = h("kingpepe-regtest-best-block");
 const UNSIGNED_SWEEP_HEX = "0200000001";
@@ -77,9 +79,10 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
     assert.match(result.nativeToSolanaE2e.deposit.proofFingerprintHex, /^[0-9a-f]{64}$/u);
     assert.equal(result.nativeToSolanaE2e.nativeSource.trust, "RPC_OBSERVATION");
     assert.equal(result.nativeToSolanaE2e.reserveSweep.state, "UNSIGNED_DRAFT_ONLY");
-    assert.equal(result.nativeToSolanaE2e.reserveSweep.reserveAmountAtomic, "99999000");
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.reserveAmountAtomic, "100000000");
     assert.equal(result.nativeToSolanaE2e.reserveSweep.nativeMinerFeeAtomic, "1000");
-    assert.equal(result.nativeToSolanaE2e.reserveSweep.reserveAmountNative, "0.99999000");
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.reserveAmountNative, "1.00000000");
+    assert.deepEqual(result.nativeToSolanaE2e.reserveSweep.feeFundingOutpoints, [`${FEE_FUNDING_TXID}:0`]);
     assert.equal(result.nativeToSolanaE2e.reserveSweep.signed, false);
     assert.equal(result.nativeToSolanaE2e.reserveSweep.broadcast, false);
     assert.match(result.nativeToSolanaE2e.reserveSweep.unsignedNativeTransactionFingerprintHex, /^[0-9a-f]{64}$/u);
@@ -102,6 +105,12 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
         "LOCAL_E2E_VERIFY_DEPOSIT_UTXO_UNSPENT",
         "LOCAL_E2E_CREATE_RESERVE_WALLET",
         "LOCAL_E2E_GET_CANONICAL_RESERVE_ADDRESS",
+        "LOCAL_E2E_CREATE_RESERVE_SWEEP_FEE_WALLET",
+        "LOCAL_E2E_GET_RESERVE_SWEEP_FEE_ADDRESS",
+        "LOCAL_E2E_FUND_RESERVE_SWEEP_FEE_INPUT",
+        "LOCAL_E2E_MINE_RESERVE_SWEEP_FEE_FUNDING_FINALITY",
+        "LOCAL_E2E_OBSERVE_RESERVE_SWEEP_FEE_FUNDING_TRANSACTION",
+        "LOCAL_E2E_VERIFY_RESERVE_SWEEP_FEE_UTXO_UNSPENT",
         "LOCAL_E2E_CREATE_UNSIGNED_NATIVE_RESERVE_SWEEP",
       ],
     );
@@ -213,7 +222,7 @@ test("deposit output and UTXO validation reject ambiguous or unsafe observations
   );
 });
 
-test("unsigned reserve sweep draft uses exact integer fee accounting and rejects fee overrun", async () => {
+test("unsigned reserve sweep draft preserves credited reserve and requires explicit fee funding", async () => {
   const calls = [];
   const draft = await draftLocalReserveSweep({
     cli: async (request) => {
@@ -226,21 +235,26 @@ test("unsigned reserve sweep draft uses exact integer fee accounting and rejects
     nativeMinerFeeAtomic: "1000",
     nativeDecimals: 8,
     canonicalReserveAddress: "bcrt1qkingpepereserveaddress",
+    feeFundingInputs: [{ txidHex: FEE_FUNDING_TXID, vout: 0 }],
     proofFingerprintHex: h("proof-fingerprint"),
   });
 
   assert.equal(draft.depositOutpoint, `${DEPOSIT_TXID}:1`);
-  assert.equal(draft.reserveAmountAtomic, "99999000");
+  assert.equal(draft.reserveAmountAtomic, "100000000");
   assert.equal(draft.nativeMinerFeeAtomic, "1000");
-  assert.equal(draft.reserveAmountNative, "0.99999000");
+  assert.equal(draft.reserveAmountNative, "1.00000000");
+  assert.deepEqual(draft.feeFundingOutpoints, [`${FEE_FUNDING_TXID}:0`]);
   assert.equal(draft.signed, false);
   assert.equal(draft.broadcast, false);
   assert.deepEqual(calls[0], {
     step: "LOCAL_E2E_CREATE_UNSIGNED_NATIVE_RESERVE_SWEEP",
     command: "createrawtransaction",
     parameters: [
-      JSON.stringify([{ txid: DEPOSIT_TXID, vout: 1 }]),
-      JSON.stringify({ bcrt1qkingpepereserveaddress: "0.99999000" }),
+      JSON.stringify([
+        { txid: DEPOSIT_TXID, vout: 1 },
+        { txid: FEE_FUNDING_TXID, vout: 0 },
+      ]),
+      JSON.stringify({ bcrt1qkingpepereserveaddress: "1.00000000" }),
     ],
   });
 
@@ -251,12 +265,12 @@ test("unsigned reserve sweep draft uses exact integer fee accounting and rejects
         depositTxidHex: DEPOSIT_TXID,
         depositVout: 1,
         depositAmountAtomic: "1000",
-        nativeMinerFeeAtomic: "1001",
+        nativeMinerFeeAtomic: "1000",
         nativeDecimals: 8,
         canonicalReserveAddress: "bcrt1qkingpepereserveaddress",
         proofFingerprintHex: h("proof-fingerprint"),
       }),
-    /LocalNativeReserveSweepFeeExceedsDeposit/u,
+    /LocalNativeReserveSweepFeeFundingInputRequired/u,
   );
 });
 
@@ -445,7 +459,9 @@ function defaultOutput(step) {
   if (step === "LOCAL_E2E_GET_USER_MINING_ADDRESS") return "bcrt1qkingpepeminingaddress";
   if (step === "LOCAL_E2E_CREATE_NATIVE_DEPOSIT_INTENT") return "bcrt1qkingpepedepositaddress";
   if (step === "LOCAL_E2E_GET_CANONICAL_RESERVE_ADDRESS") return "bcrt1qkingpepereserveaddress";
+  if (step === "LOCAL_E2E_GET_RESERVE_SWEEP_FEE_ADDRESS") return "bcrt1qkingpepefeefundingaddress";
   if (step === "LOCAL_E2E_SEND_NATIVE_DEPOSIT") return DEPOSIT_TXID;
+  if (step === "LOCAL_E2E_FUND_RESERVE_SWEEP_FEE_INPUT") return FEE_FUNDING_TXID;
   if (step === "LOCAL_E2E_CREATE_UNSIGNED_NATIVE_RESERVE_SWEEP") return UNSIGNED_SWEEP_HEX;
   if (step === "LOCAL_E2E_OBSERVE_NATIVE_SOURCE_SNAPSHOT") {
     return JSON.stringify({
@@ -478,10 +494,34 @@ function defaultOutput(step) {
       ],
     });
   }
+  if (step === "LOCAL_E2E_OBSERVE_RESERVE_SWEEP_FEE_FUNDING_TRANSACTION") {
+    return JSON.stringify({
+      txid: FEE_FUNDING_TXID,
+      vout: [
+        {
+          n: 0,
+          value: "0.00001000",
+          scriptPubKey: {
+            hex: FEE_FUNDING_SCRIPT_HEX,
+            address: "bcrt1qkingpepefeefundingaddress",
+          },
+        },
+      ],
+    });
+  }
   if (step === "LOCAL_E2E_VERIFY_DEPOSIT_UTXO_UNSPENT") {
     return JSON.stringify({
       value: "1.00000000",
       scriptPubKey: { hex: SCRIPT_HEX },
+      bestblock: REGTEST_BEST_BLOCK_HASH,
+      confirmations: 6,
+      coinbase: false,
+    });
+  }
+  if (step === "LOCAL_E2E_VERIFY_RESERVE_SWEEP_FEE_UTXO_UNSPENT") {
+    return JSON.stringify({
+      value: "0.00001000",
+      scriptPubKey: { hex: FEE_FUNDING_SCRIPT_HEX },
       bestblock: REGTEST_BEST_BLOCK_HASH,
       confirmations: 6,
       coinbase: false,
