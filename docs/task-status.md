@@ -460,10 +460,19 @@
 ## Phase 08 async deposit pipeline entrypoint
 
 - PHASE: `08`
-- source commit: pending until this source increment is committed and pushed
-- CI status: pending
+- source commit: `024c0019745bc4671299af135740aa9d29963116`
+- push result: pushed to private GitHub repository
+- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34312011059`
+- CI status: `PASS`
 - tests:
   - `npm run test:bridge-validator` (pass, 14 bridge-validator tests)
+  - `npm test` (pass, 2 protocol vectors plus 51 Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - `npm run doctor:local-e2e` (expected BLOCKED, exit 2)
+  - `npm run local:e2e:bootstrap` (expected BLOCKED, exit 2)
+  - CI Linux format, clippy, workspace, Node, and native crate tests (PASS)
+  - CI Windows workspace, Node, and native crate tests (PASS)
   - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
 - changed:
   - Added `processDepositAsync` for promise-returning local Native relayer,
