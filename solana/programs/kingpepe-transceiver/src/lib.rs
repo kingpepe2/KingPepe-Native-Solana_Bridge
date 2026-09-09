@@ -14,7 +14,10 @@ use bridge_messages::{
 };
 use solana_program::{
     account_info::AccountInfo,
-    declare_id, entrypoint::ProgramResult, program_error::ProgramError, pubkey::Pubkey,
+    declare_id,
+    entrypoint::ProgramResult,
+    program_error::ProgramError,
+    pubkey::Pubkey,
     sysvar::instructions::{load_instruction_at_checked, ID as INSTRUCTIONS_SYSVAR_ID},
 };
 use thiserror::Error;
@@ -464,14 +467,10 @@ fn process_verify_message_accounts(
     )?;
     require_account_len(receipt_account, VERIFIED_RECEIPT_ACCOUNT_LENGTH)?;
 
-    let first_instruction = load_ed25519_instruction(
-        instructions_sysvar,
-        ed25519_instruction_indexes[0],
-    )?;
-    let second_instruction = load_ed25519_instruction(
-        instructions_sysvar,
-        ed25519_instruction_indexes[1],
-    )?;
+    let first_instruction =
+        load_ed25519_instruction(instructions_sysvar, ed25519_instruction_indexes[0])?;
+    let second_instruction =
+        load_ed25519_instruction(instructions_sysvar, ed25519_instruction_indexes[1])?;
 
     let mut transceiver = TransceiverProgram::initialize(config)?;
     if !account_data_is_zero(receipt_account)? {
@@ -479,7 +478,9 @@ fn process_verify_message_accounts(
         if existing.consumed {
             return Err(TransceiverError::ReceiptAlreadyConsumed.into());
         }
-        transceiver.receipts.insert(existing.message_digest, existing);
+        transceiver
+            .receipts
+            .insert(existing.message_digest, existing);
     }
 
     let verified_digest = transceiver.verify_message_from_ed25519_instructions(
@@ -565,7 +566,10 @@ fn require_account_owner(account: &AccountInfo, expected: &Pubkey) -> Result<(),
     }
 }
 
-fn require_account_key(account: &AccountInfo, expected: &PubkeyBytes) -> Result<(), EntrypointError> {
+fn require_account_key(
+    account: &AccountInfo,
+    expected: &PubkeyBytes,
+) -> Result<(), EntrypointError> {
     if account.key.to_bytes() == *expected {
         Ok(())
     } else {
@@ -1251,10 +1255,7 @@ mod tests {
             decode_transceiver_instruction(&verify_bytes).unwrap(),
             verify
         );
-        assert_eq!(
-            process_instruction_boundary(&verify_bytes),
-            Ok(())
-        );
+        assert_eq!(process_instruction_boundary(&verify_bytes), Ok(()));
 
         let duplicate = TransceiverInstruction::VerifyMessageFromEd25519 {
             message: Box::new(message),
@@ -1348,7 +1349,9 @@ mod tests {
             .unwrap();
         process_instruction_accounts(&id(), &[config_account.clone()], &initialize).unwrap();
         assert_eq!(
-            read_transceiver_config_account(&config_account).unwrap().config,
+            read_transceiver_config_account(&config_account)
+                .unwrap()
+                .config,
             config
         );
         assert_eq!(
