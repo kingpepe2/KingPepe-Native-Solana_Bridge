@@ -48,7 +48,9 @@
     "phase08SolanaAccountCodecsImplemented": true,
     "phase08SolanaAccountCodecsLocalTestsPassed": true,
     "phase08SolanaAccountCodecsCiVerified": true,
-    "solanaEconomicInstructionAbiReady": false,
+    "phase08SolanaAccountExecutionImplemented": true,
+    "phase08SolanaAccountExecutionLocalTestsPassed": true,
+    "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true
   },

@@ -70,15 +70,16 @@
 - Phase 08 `command -v kingpeped kingpepe-cli solana-test-validator solana anchor`: NOT_FOUND under WSL
 - Phase 08 `npm run test:bridge-validator`: PASS, 6 automatic deposit pipeline tests
 - Phase 08 `npm run test:local-e2e-readiness`: PASS, 3 readiness-gate tests
-- Phase 08 `npm run doctor:local-e2e`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING; missing localnet executables and reports `SOLANA_PROGRAM_EXECUTION_NOT_READY` for both Solana programs
+- Phase 08 `npm run doctor:local-e2e`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING; missing localnet executables; both Solana programs report `READY` at the source/readiness-gate level after account-execution wiring
 - Phase 08 source-boundary CI: PASS for `09e42e6856312a0c617eb9c14a0312012263722a`
 - Phase 08 local E2E readiness gate CI: PASS for `6f22309770f3a2f85c96093bcf8af10b47065f31`
 - Phase 08 fail-closed Solana entrypoint shell CI: PASS for `7eafd8a38d346dcb018005a7357a0012a84b0e0c`
 - Phase 08 validate-only Solana ABI CI: PASS for `201c5bdc2a2fb65601331b58115e0a7543179e12`
 - Phase 08 mint-authority real Solana PDA correction CI: PASS for `94da519e7a50ea6692c445cfd307beb0fa491347`
 - Phase 08 Solana account-state codecs: PASS for `804e03d4909ad002c0cf97798bd30cda56a7d4be`
+- Phase 08 Solana account execution and SPL Token CPI source: local tests PASS; CI pending publication
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
-- Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 47 Rust tests after account-codec update
+- Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 52 Rust tests after account-execution update
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
 
 ## Phase 03 local implementation
@@ -174,6 +175,27 @@
 - Superseded CI failure:
   `16dec337ba321b4f37f6dd1dfb13cf5a221db3eb` failed Linux rustfmt and was
   corrected by `804e03d4909ad002c0cf97798bd30cda56a7d4be`.
+- Real daemon-backed Native-to-Solana E2E: `BLOCKED / NOT_RUN`
+
+## Phase 08 Solana account execution and SPL Token CPI source implementation
+
+- Added economic account execution entrypoints for the bridge manager and
+  transceiver while preserving Mainnet-disabled configuration policy.
+- Bridge manager account execution now validates program-owned bridge state,
+  deposit claim, and withdrawal record PDA accounts; verifies the SPL Mint and
+  standard Token Program binding; writes fixed account records; constructs
+  `mint_to_checked` and `burn_checked` SPL Token CPIs; and keeps withdrawal
+  burn plus record creation atomic inside one program instruction.
+- Transceiver account execution now validates program-owned config and receipt
+  PDA accounts, loads referenced Ed25519 verifier instructions from the Solana
+  instructions sysvar, and writes verified-message receipt accounts.
+- Local unit tests cover initialization, PDA mismatches, receipt writes,
+  deposit-claim recording/mint CPI planning, and withdrawal burn/record CPI
+  planning. Unit tests skip actual Token Program CPI invocation only because
+  no local validator is available in this environment.
+- Source commit: pending publication
+- CI URL: pending
+- CI status: pending
 - Real daemon-backed Native-to-Solana E2E: `BLOCKED / NOT_RUN`
 
 ## Phase 08 mint-authority real Solana PDA correction

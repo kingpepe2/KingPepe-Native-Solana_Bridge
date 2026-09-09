@@ -548,12 +548,12 @@
     {
       "path": "solana/programs/kingpepe-bridge/Cargo.toml",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Bridge manager program manifest with cdylib/lib crate types, solana-program dependency, and no-entrypoint test feature; direct sha2 dependency removed after moving mint authority derivation to real Solana PDA primitives."
+      "notes": "Bridge manager program manifest with cdylib/lib crate types, pinned solana-program and spl-token no-entrypoint dependencies, and no-entrypoint test feature; direct sha2 dependency removed after moving mint authority derivation to real Solana PDA primitives."
     },
     {
       "path": "solana/programs/kingpepe-bridge/src/lib.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Bridge manager implementation with Phase 08 validate-only economic instruction ABI decoding, real Solana PDA mint-authority derivation, and fixed binary account-state codecs; account execution and SPL CPI remain disabled."
+      "notes": "Bridge manager implementation with Phase 08 economic instruction ABI decoding, real Solana PDA mint-authority derivation, fixed binary account-state codecs, account execution, SPL Token mint_to_checked and burn_checked CPI construction, and localnet-only activation."
     },
     {
       "path": "solana/programs/kingpepe-bridge/tests/bridge_smoke.rs",
@@ -568,7 +568,7 @@
     {
       "path": "solana/programs/kingpepe-transceiver/src/lib.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Transceiver implementation, receipt validation, Phase 07 Ed25519 instruction binding, Phase 08 validate-only economic instruction ABI decoding, and fixed binary config/receipt account codecs."
+      "notes": "Transceiver implementation, receipt validation, Phase 07 Ed25519 instruction binding, Phase 08 economic instruction ABI decoding, fixed binary config/receipt account codecs, instructions-sysvar Ed25519 loading, and receipt account execution."
     },
     {
       "path": "solana/programs/kingpepe-transceiver/tests/transceiver_smoke.rs",

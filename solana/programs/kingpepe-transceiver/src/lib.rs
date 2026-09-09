@@ -13,8 +13,9 @@ use bridge_messages::{
     BridgeAction, BridgeDirection, CanonicalBridgeMessage, Hash32, PubkeyBytes, MESSAGE_LENGTH,
 };
 use solana_program::{
-    account_info::AccountInfo, declare_id, entrypoint::ProgramResult, program_error::ProgramError,
-    pubkey::Pubkey,
+    account_info::AccountInfo,
+    declare_id, entrypoint::ProgramResult, program_error::ProgramError, pubkey::Pubkey,
+    sysvar::instructions::{load_instruction_at_checked, ID as INSTRUCTIONS_SYSVAR_ID},
 };
 use thiserror::Error;
 
@@ -25,10 +26,12 @@ solana_program::entrypoint!(process_instruction);
 
 pub const PROGRAM_NAME: &str = "kingpepe_transceiver";
 pub const LOCALNET_PROGRAM_ID_BASE58: &str = "AkqLGFTy43D9cLjHRTQGpRGb2uWA8nuVyGb2bJYHKCrN";
-pub const PROGRAM_ABI_STATUS: &str = "ECONOMIC_ABI_VALIDATE_ONLY";
+pub const PROGRAM_ABI_STATUS: &str = "ECONOMIC_ABI_ENABLED";
 pub const TRANSCEIVER_INSTRUCTION_INITIALIZE: u8 = 1;
 pub const TRANSCEIVER_INSTRUCTION_VERIFY_MESSAGE_FROM_ED25519: u8 = 2;
 pub const TRANSCEIVER_CONFIG_INSTRUCTION_LENGTH: usize = 197;
+pub const TRANSCEIVER_CONFIG_PDA_SEED_PREFIX: &[u8] = b"kingpepe-transceiver-config";
+pub const TRANSCEIVER_RECEIPT_PDA_SEED_PREFIX: &[u8] = b"kingpepe-transceiver-receipt";
 pub const TRANSCEIVER_ACCOUNT_VERSION: u8 = 1;
 pub const TRANSCEIVER_CONFIG_ACCOUNT_MAGIC: [u8; 8] = *b"KPTCFG01";
 pub const TRANSCEIVER_RECEIPT_ACCOUNT_MAGIC: [u8; 8] = *b"KPTRCPT1";
@@ -43,16 +46,37 @@ pub const ED25519_PUBLIC_KEY_LENGTH: usize = 32;
 pub const ED25519_INSTRUCTION_HEADER_LENGTH: usize = 16;
 
 pub fn process_instruction(
-    _program_id: &Pubkey,
-    _accounts: &[AccountInfo],
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
-    process_instruction_boundary(instruction_data).map_err(|_| ProgramError::InvalidInstructionData)
+    process_instruction_accounts(program_id, accounts, instruction_data).map_err(ProgramError::from)
 }
 
 pub fn process_instruction_boundary(instruction_data: &[u8]) -> Result<(), EntrypointError> {
     let _instruction = decode_transceiver_instruction(instruction_data)?;
-    Err(EntrypointError::InstructionExecutionDisabled)
+    Ok(())
+}
+
+pub fn process_instruction_accounts(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    instruction_data: &[u8],
+) -> Result<(), EntrypointError> {
+    match decode_transceiver_instruction(instruction_data)? {
+        TransceiverInstruction::Initialize(config) => {
+            process_initialize_accounts(program_id, accounts, config)
+        }
+        TransceiverInstruction::VerifyMessageFromEd25519 {
+            message,
+            ed25519_instruction_indexes,
+        } => process_verify_message_accounts(
+            program_id,
+            accounts,
+            *message,
+            ed25519_instruction_indexes,
+        ),
+    }
 }
 
 pub fn decode_transceiver_instruction(
@@ -350,6 +374,235 @@ impl TransceiverProgram {
         sorted.sort();
         Ok([sorted[0], sorted[1]])
     }
+}
+
+pub fn derive_transceiver_config_pda(
+    transceiver_program_id: &PubkeyBytes,
+    mint: &PubkeyBytes,
+) -> PubkeyBytes {
+    let transceiver_program_id = Pubkey::new_from_array(*transceiver_program_id);
+    let mint = Pubkey::new_from_array(*mint);
+    Pubkey::find_program_address(
+        &[TRANSCEIVER_CONFIG_PDA_SEED_PREFIX, mint.as_ref()],
+        &transceiver_program_id,
+    )
+    .0
+    .to_bytes()
+}
+
+pub fn derive_verified_receipt_pda(
+    transceiver_program_id: &PubkeyBytes,
+    message_digest: &Hash32,
+) -> PubkeyBytes {
+    let transceiver_program_id = Pubkey::new_from_array(*transceiver_program_id);
+    Pubkey::find_program_address(
+        &[TRANSCEIVER_RECEIPT_PDA_SEED_PREFIX, message_digest],
+        &transceiver_program_id,
+    )
+    .0
+    .to_bytes()
+}
+
+fn process_initialize_accounts(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    config: TransceiverConfig,
+) -> Result<(), EntrypointError> {
+    config.validate()?;
+    if config.transceiver_program_id != program_id.to_bytes() {
+        return Err(EntrypointError::AccountKeyMismatch);
+    }
+
+    let mut account_iter = accounts.iter();
+    let config_account = next_required_account(&mut account_iter)?;
+    require_no_extra_accounts(&mut account_iter)?;
+    require_writable(config_account)?;
+    require_account_owner(config_account, program_id)?;
+    require_account_key(
+        config_account,
+        &derive_transceiver_config_pda(&config.transceiver_program_id, &config.mint),
+    )?;
+    require_account_len(config_account, TRANSCEIVER_CONFIG_ACCOUNT_LENGTH)?;
+    require_zeroed_account(config_account)?;
+
+    write_account_data(config_account, &encode_transceiver_config_account(&config))?;
+    Ok(())
+}
+
+fn process_verify_message_accounts(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    message: CanonicalBridgeMessage,
+    ed25519_instruction_indexes: [u16; 2],
+) -> Result<(), EntrypointError> {
+    let mut account_iter = accounts.iter();
+    let config_account = next_required_account(&mut account_iter)?;
+    let receipt_account = next_required_account(&mut account_iter)?;
+    let instructions_sysvar = next_required_account(&mut account_iter)?;
+    require_no_extra_accounts(&mut account_iter)?;
+
+    require_account_owner(config_account, program_id)?;
+    require_account_owner(receipt_account, program_id)?;
+    require_writable(receipt_account)?;
+    require_account_key(instructions_sysvar, &INSTRUCTIONS_SYSVAR_ID.to_bytes())?;
+
+    let config = read_transceiver_config_account(config_account)?.config;
+    if config.transceiver_program_id != program_id.to_bytes() {
+        return Err(EntrypointError::AccountKeyMismatch);
+    }
+    require_account_key(
+        config_account,
+        &derive_transceiver_config_pda(&config.transceiver_program_id, &config.mint),
+    )?;
+
+    let digest = message
+        .message_digest()
+        .map_err(|_| TransceiverError::InvalidMessage)?;
+    require_account_key(
+        receipt_account,
+        &derive_verified_receipt_pda(&config.transceiver_program_id, &digest),
+    )?;
+    require_account_len(receipt_account, VERIFIED_RECEIPT_ACCOUNT_LENGTH)?;
+
+    let first_instruction = load_ed25519_instruction(
+        instructions_sysvar,
+        ed25519_instruction_indexes[0],
+    )?;
+    let second_instruction = load_ed25519_instruction(
+        instructions_sysvar,
+        ed25519_instruction_indexes[1],
+    )?;
+
+    let mut transceiver = TransceiverProgram::initialize(config)?;
+    if !account_data_is_zero(receipt_account)? {
+        let existing = read_verified_receipt_account(receipt_account)?.receipt;
+        if existing.consumed {
+            return Err(TransceiverError::ReceiptAlreadyConsumed.into());
+        }
+        transceiver.receipts.insert(existing.message_digest, existing);
+    }
+
+    let verified_digest = transceiver.verify_message_from_ed25519_instructions(
+        &message,
+        &[first_instruction, second_instruction],
+    )?;
+    let receipt = transceiver
+        .receipt(&verified_digest)
+        .ok_or(TransceiverError::UnknownReceipt)?
+        .clone();
+    write_account_data(receipt_account, &encode_verified_receipt_account(&receipt))?;
+    Ok(())
+}
+
+fn load_ed25519_instruction(
+    instructions_sysvar: &AccountInfo,
+    instruction_index: u16,
+) -> Result<SolanaInstructionView, EntrypointError> {
+    let instruction = load_instruction_at_checked(instruction_index as usize, instructions_sysvar)
+        .map_err(|_| EntrypointError::InvalidInstructionsSysvar)?;
+    Ok(SolanaInstructionView {
+        program_id: instruction.program_id.to_bytes(),
+        instruction_index,
+        data: instruction.data,
+    })
+}
+
+fn read_transceiver_config_account(
+    account: &AccountInfo,
+) -> Result<TransceiverConfigAccount, EntrypointError> {
+    require_account_len(account, TRANSCEIVER_CONFIG_ACCOUNT_LENGTH)?;
+    let data = account
+        .try_borrow_data()
+        .map_err(|_| EntrypointError::AccountBorrowFailed)?;
+    Ok(decode_transceiver_config_account(&data)?)
+}
+
+fn read_verified_receipt_account(
+    account: &AccountInfo,
+) -> Result<VerifiedReceiptAccount, EntrypointError> {
+    require_account_len(account, VERIFIED_RECEIPT_ACCOUNT_LENGTH)?;
+    let data = account
+        .try_borrow_data()
+        .map_err(|_| EntrypointError::AccountBorrowFailed)?;
+    Ok(decode_verified_receipt_account(&data)?)
+}
+
+fn next_required_account<'a, 'b, I>(
+    accounts: &mut I,
+) -> Result<&'a AccountInfo<'b>, EntrypointError>
+where
+    'b: 'a,
+    I: Iterator<Item = &'a AccountInfo<'b>>,
+{
+    accounts.next().ok_or(EntrypointError::NotEnoughAccounts)
+}
+
+fn require_no_extra_accounts<'a, 'b, I>(accounts: &mut I) -> Result<(), EntrypointError>
+where
+    'b: 'a,
+    I: Iterator<Item = &'a AccountInfo<'b>>,
+{
+    if accounts.next().is_some() {
+        Err(EntrypointError::UnexpectedAdditionalAccounts)
+    } else {
+        Ok(())
+    }
+}
+
+fn require_writable(account: &AccountInfo) -> Result<(), EntrypointError> {
+    if account.is_writable {
+        Ok(())
+    } else {
+        Err(EntrypointError::AccountNotWritable)
+    }
+}
+
+fn require_account_owner(account: &AccountInfo, expected: &Pubkey) -> Result<(), EntrypointError> {
+    if account.owner == expected {
+        Ok(())
+    } else {
+        Err(EntrypointError::AccountOwnerMismatch)
+    }
+}
+
+fn require_account_key(account: &AccountInfo, expected: &PubkeyBytes) -> Result<(), EntrypointError> {
+    if account.key.to_bytes() == *expected {
+        Ok(())
+    } else {
+        Err(EntrypointError::AccountKeyMismatch)
+    }
+}
+
+fn require_account_len(account: &AccountInfo, expected: usize) -> Result<(), EntrypointError> {
+    if account.data_len() == expected {
+        Ok(())
+    } else {
+        Err(EntrypointError::InvalidAccountData)
+    }
+}
+
+fn require_zeroed_account(account: &AccountInfo) -> Result<(), EntrypointError> {
+    if account_data_is_zero(account)? {
+        Ok(())
+    } else {
+        Err(EntrypointError::AccountAlreadyInitialized)
+    }
+}
+
+fn account_data_is_zero(account: &AccountInfo) -> Result<bool, EntrypointError> {
+    let data = account
+        .try_borrow_data()
+        .map_err(|_| EntrypointError::AccountBorrowFailed)?;
+    Ok(data.iter().all(|byte| *byte == 0))
+}
+
+fn write_account_data(account: &AccountInfo, encoded: &[u8]) -> Result<(), EntrypointError> {
+    require_account_len(account, encoded.len())?;
+    let mut data = account
+        .try_borrow_mut_data()
+        .map_err(|_| EntrypointError::AccountBorrowFailed)?;
+    data.copy_from_slice(encoded);
+    Ok(())
 }
 
 fn encode_transceiver_config(config: &TransceiverConfig, out: &mut Vec<u8>) {
@@ -695,8 +948,6 @@ impl<'a> InstructionCursor<'a> {
 pub enum EntrypointError {
     #[error("Solana instruction data is empty")]
     EmptyInstruction,
-    #[error("Solana economic instruction execution is not enabled yet")]
-    InstructionExecutionDisabled,
     #[error("Solana instruction length mismatch, expected {expected}, found {found}")]
     InvalidInstructionLength { expected: usize, found: usize },
     #[error("Solana instruction encoding is invalid")]
@@ -705,6 +956,51 @@ pub enum EntrypointError {
     InvalidCanonicalMessage,
     #[error("unsupported Solana instruction tag {0}")]
     UnsupportedInstructionTag(u8),
+    #[error("not enough Solana accounts")]
+    NotEnoughAccounts,
+    #[error("unexpected additional Solana accounts")]
+    UnexpectedAdditionalAccounts,
+    #[error("Solana account is not writable")]
+    AccountNotWritable,
+    #[error("Solana account owner mismatch")]
+    AccountOwnerMismatch,
+    #[error("Solana account key mismatch")]
+    AccountKeyMismatch,
+    #[error("Solana account is already initialized")]
+    AccountAlreadyInitialized,
+    #[error("Solana account data is invalid")]
+    InvalidAccountData,
+    #[error("Solana account data borrow failed")]
+    AccountBorrowFailed,
+    #[error("Solana instructions sysvar is invalid")]
+    InvalidInstructionsSysvar,
+    #[error("transceiver account codec error: {0}")]
+    AccountCodec(#[from] AccountCodecError),
+    #[error("transceiver error: {0}")]
+    Transceiver(#[from] TransceiverError),
+}
+
+impl From<EntrypointError> for ProgramError {
+    fn from(value: EntrypointError) -> Self {
+        match value {
+            EntrypointError::EmptyInstruction
+            | EntrypointError::InvalidInstructionLength { .. }
+            | EntrypointError::InvalidInstructionEncoding
+            | EntrypointError::InvalidCanonicalMessage
+            | EntrypointError::UnsupportedInstructionTag(_) => ProgramError::InvalidInstructionData,
+            EntrypointError::NotEnoughAccounts => ProgramError::NotEnoughAccountKeys,
+            EntrypointError::AccountOwnerMismatch => ProgramError::IllegalOwner,
+            EntrypointError::AccountNotWritable
+            | EntrypointError::AccountKeyMismatch
+            | EntrypointError::AccountAlreadyInitialized
+            | EntrypointError::InvalidAccountData
+            | EntrypointError::AccountBorrowFailed
+            | EntrypointError::InvalidInstructionsSysvar
+            | EntrypointError::UnexpectedAdditionalAccounts
+            | EntrypointError::AccountCodec(_)
+            | EntrypointError::Transceiver(_) => ProgramError::InvalidAccountData,
+        }
+    }
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -763,6 +1059,7 @@ mod tests {
     use bridge_messages::{
         DeploymentIdentity, DepositClaimFields, MessageEpochs, NativeOutpoint, ValidityWindow,
     };
+    use solana_program::sysvar::instructions::{construct_instructions_data, BorrowedInstruction};
 
     fn h(byte: u8) -> [u8; 32] {
         [byte; 32]
@@ -778,6 +1075,12 @@ mod tests {
             active: true,
             key_epoch: 9,
         }
+    }
+
+    fn account_execution_config() -> TransceiverConfig {
+        let mut config = config();
+        config.transceiver_program_id = id().to_bytes();
+        config
     }
 
     fn message(config: &TransceiverConfig) -> CanonicalBridgeMessage {
@@ -854,6 +1157,52 @@ mod tests {
         }
     }
 
+    fn test_account(
+        key: Pubkey,
+        account_owner: Pubkey,
+        data: Vec<u8>,
+        is_signer: bool,
+        is_writable: bool,
+    ) -> AccountInfo<'static> {
+        let key = Box::leak(Box::new(key));
+        let account_owner = Box::leak(Box::new(account_owner));
+        let lamports = Box::leak(Box::new(1u64));
+        let data = Box::leak(data.into_boxed_slice());
+        AccountInfo::new(
+            key,
+            is_signer,
+            is_writable,
+            lamports,
+            data,
+            account_owner,
+            false,
+            0,
+        )
+    }
+
+    fn instructions_sysvar_account(instructions: &[SolanaInstructionView]) -> AccountInfo<'static> {
+        let program_ids = instructions
+            .iter()
+            .map(|instruction| Pubkey::new_from_array(instruction.program_id))
+            .collect::<Vec<_>>();
+        let borrowed = instructions
+            .iter()
+            .zip(program_ids.iter())
+            .map(|(instruction, program_id)| BorrowedInstruction {
+                program_id,
+                accounts: Vec::new(),
+                data: &instruction.data,
+            })
+            .collect::<Vec<_>>();
+        test_account(
+            INSTRUCTIONS_SYSVAR_ID,
+            solana_program::sysvar::id(),
+            construct_instructions_data(&borrowed),
+            false,
+            false,
+        )
+    }
+
     #[test]
     fn transceiver_default_has_no_verifications() {
         let program = TransceiverProgram::initialize(config()).unwrap();
@@ -863,7 +1212,7 @@ mod tests {
     #[test]
     fn solana_entrypoint_identity_is_localnet_only_and_validate_only() {
         assert_eq!(id().to_string(), LOCALNET_PROGRAM_ID_BASE58);
-        assert_eq!(PROGRAM_ABI_STATUS, "ECONOMIC_ABI_VALIDATE_ONLY");
+        assert_eq!(PROGRAM_ABI_STATUS, "ECONOMIC_ABI_ENABLED");
         assert_eq!(
             process_instruction_boundary(&[]),
             Err(EntrypointError::EmptyInstruction)
@@ -904,7 +1253,7 @@ mod tests {
         );
         assert_eq!(
             process_instruction_boundary(&verify_bytes),
-            Err(EntrypointError::InstructionExecutionDisabled)
+            Ok(())
         );
 
         let duplicate = TransceiverInstruction::VerifyMessageFromEd25519 {
@@ -977,6 +1326,117 @@ mod tests {
                 expected: VERIFIED_RECEIPT_ACCOUNT_LENGTH,
                 found: VERIFIED_RECEIPT_ACCOUNT_LENGTH - 1,
             })
+        );
+    }
+
+    #[test]
+    fn transceiver_account_execution_initializes_config_and_writes_receipt() {
+        let config = account_execution_config();
+        let config_key = Pubkey::new_from_array(derive_transceiver_config_pda(
+            &config.transceiver_program_id,
+            &config.mint,
+        ));
+        let config_account = test_account(
+            config_key,
+            id(),
+            vec![0; TRANSCEIVER_CONFIG_ACCOUNT_LENGTH],
+            false,
+            true,
+        );
+        let initialize = TransceiverInstruction::Initialize(config.clone())
+            .encode()
+            .unwrap();
+        process_instruction_accounts(&id(), &[config_account.clone()], &initialize).unwrap();
+        assert_eq!(
+            read_transceiver_config_account(&config_account).unwrap().config,
+            config
+        );
+        assert_eq!(
+            process_instruction_accounts(&id(), &[config_account.clone()], &initialize),
+            Err(EntrypointError::AccountAlreadyInitialized)
+        );
+
+        let message = message(&config);
+        let digest = message.message_digest().unwrap();
+        let first = ed25519_instruction(config.authorized_attesters[0], &message, 0);
+        let second = ed25519_instruction(config.authorized_attesters[1], &message, 1);
+        let instructions_sysvar = instructions_sysvar_account(&[first, second]);
+        let receipt_key = Pubkey::new_from_array(derive_verified_receipt_pda(
+            &config.transceiver_program_id,
+            &digest,
+        ));
+        let receipt_account = test_account(
+            receipt_key,
+            id(),
+            vec![0; VERIFIED_RECEIPT_ACCOUNT_LENGTH],
+            false,
+            true,
+        );
+        let verify = TransceiverInstruction::VerifyMessageFromEd25519 {
+            message: Box::new(message.clone()),
+            ed25519_instruction_indexes: [0, 1],
+        }
+        .encode()
+        .unwrap();
+
+        process_instruction_accounts(
+            &id(),
+            &[
+                config_account.clone(),
+                receipt_account.clone(),
+                instructions_sysvar,
+            ],
+            &verify,
+        )
+        .unwrap();
+        let receipt = read_verified_receipt_account(&receipt_account)
+            .unwrap()
+            .receipt;
+        assert_eq!(receipt.message_digest, digest);
+        assert_eq!(receipt.operation_id, message.operation_id);
+        assert_eq!(receipt.attesters, config.authorized_attesters);
+        assert!(!receipt.consumed);
+    }
+
+    #[test]
+    fn transceiver_account_execution_rejects_wrong_receipt_pda() {
+        let config = account_execution_config();
+        let config_key = Pubkey::new_from_array(derive_transceiver_config_pda(
+            &config.transceiver_program_id,
+            &config.mint,
+        ));
+        let config_account = test_account(
+            config_key,
+            id(),
+            encode_transceiver_config_account(&config),
+            false,
+            false,
+        );
+        let message = message(&config);
+        let first = ed25519_instruction(config.authorized_attesters[0], &message, 0);
+        let second = ed25519_instruction(config.authorized_attesters[1], &message, 1);
+        let instructions_sysvar = instructions_sysvar_account(&[first, second]);
+        let wrong_receipt = test_account(
+            Pubkey::new_unique(),
+            id(),
+            vec![0; VERIFIED_RECEIPT_ACCOUNT_LENGTH],
+            false,
+            true,
+        );
+        let verify = TransceiverInstruction::VerifyMessageFromEd25519 {
+            message: Box::new(message),
+            ed25519_instruction_indexes: [0, 1],
+        }
+        .encode()
+        .unwrap();
+
+        assert_eq!(
+            process_instruction_accounts(
+                &id(),
+                &[config_account, wrong_receipt, instructions_sysvar],
+                &verify,
+            ),
+            Err(EntrypointError::AccountKeyMismatch)
         );
     }
 

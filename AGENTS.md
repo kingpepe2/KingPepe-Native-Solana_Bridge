@@ -166,7 +166,15 @@
 - Phase 08 Solana account-codec status:
   fixed binary account codecs exist for bridge state, deposit claims,
   withdrawal records, transceiver config, and verified receipts. Account
-  execution and SPL CPI are still disabled. Implementation commit
+  execution and SPL CPI were still disabled at that increment. Implementation commit
   `16dec337ba321b4f37f6dd1dfb13cf5a221db3eb` failed Linux rustfmt in CI;
   corrective commit `804e03d4909ad002c0cf97798bd30cda56a7d4be` passed CI run
   `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34301859073`.
+- Phase 08 Solana account-execution status:
+  bridge manager and transceiver source now expose economic account execution
+  entrypoints, program-owned PDA checks, fixed account writes, instructions
+  sysvar Ed25519 loading, and SPL Token `mint_to_checked` / `burn_checked`
+  CPI construction. Local unit tests pass; publication and CI verification are
+  pending for this increment. Real local E2E is still blocked by missing
+  `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and
+  `anchor`.

@@ -17,7 +17,7 @@ fn bridge_program_can_initialize() {
         solana_deployment: h(4),
         mint_binding: MintBinding {
             mint,
-            token_program_id: h(5),
+            token_program_id: spl_token::id().to_bytes(),
             mint_authority_pda: derive_mint_authority_pda(&manager_program_id, &mint),
             decimals: 8,
             native_decimals: 8,

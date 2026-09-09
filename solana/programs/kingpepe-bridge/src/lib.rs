@@ -15,9 +15,11 @@ use bridge_messages::{
 };
 use kingpepe_transceiver::{TransceiverError, TransceiverProgram, VerifiedMessageReceipt};
 use solana_program::{
-    account_info::AccountInfo, declare_id, entrypoint::ProgramResult, program_error::ProgramError,
-    pubkey::Pubkey,
+    account_info::AccountInfo,
+    declare_id, entrypoint::ProgramResult, program::invoke, program::invoke_signed,
+    program_error::ProgramError, program_option::COption, program_pack::Pack, pubkey::Pubkey,
 };
+use spl_token::state::{Account as TokenAccount, Mint as TokenMint};
 use thiserror::Error;
 
 declare_id!("EfoRF4BDDspsi53XYL62mCyhCtf3FceV5LpRkRdwYqKM");
@@ -27,13 +29,16 @@ solana_program::entrypoint!(process_instruction);
 
 pub const PROGRAM_NAME: &str = "kingpepe_bridge";
 pub const LOCALNET_PROGRAM_ID_BASE58: &str = "EfoRF4BDDspsi53XYL62mCyhCtf3FceV5LpRkRdwYqKM";
-pub const PROGRAM_ABI_STATUS: &str = "ECONOMIC_ABI_VALIDATE_ONLY";
+pub const PROGRAM_ABI_STATUS: &str = "ECONOMIC_ABI_ENABLED";
 pub const BRIDGE_INSTRUCTION_INITIALIZE: u8 = 1;
 pub const BRIDGE_INSTRUCTION_ACCEPT_DEPOSIT_CLAIM: u8 = 2;
 pub const BRIDGE_INSTRUCTION_RECORD_WITHDRAWAL_REQUEST: u8 = 3;
 pub const BRIDGE_CONFIG_INSTRUCTION_LENGTH: usize = 256;
 pub const BURN_CHECKED_INSTRUCTION_LENGTH: usize = 105;
+pub const BRIDGE_STATE_PDA_SEED_PREFIX: &[u8] = b"kingpepe-bridge-state";
+pub const DEPOSIT_CLAIM_PDA_SEED_PREFIX: &[u8] = b"kingpepe-deposit-claim";
 pub const MINT_AUTHORITY_PDA_SEED_PREFIX: &[u8] = b"kingpepe-mint-authority";
+pub const WITHDRAWAL_RECORD_PDA_SEED_PREFIX: &[u8] = b"kingpepe-withdrawal-record";
 pub const BRIDGE_ACCOUNT_VERSION: u8 = 1;
 pub const BRIDGE_STATE_ACCOUNT_MAGIC: [u8; 8] = *b"KPBSTAT1";
 pub const DEPOSIT_CLAIM_ACCOUNT_MAGIC: [u8; 8] = *b"KPBCLM01";
@@ -49,16 +54,29 @@ pub const EXPECTED_INITIAL_SUPPLY: u128 = 0;
 pub const PROJECT_BRIDGE_FEE_ATOMIC: u64 = 0;
 
 pub fn process_instruction(
-    _program_id: &Pubkey,
-    _accounts: &[AccountInfo],
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
-    process_instruction_boundary(instruction_data).map_err(|_| ProgramError::InvalidInstructionData)
+    process_instruction_accounts(program_id, accounts, instruction_data).map_err(ProgramError::from)
 }
 
 pub fn process_instruction_boundary(instruction_data: &[u8]) -> Result<(), EntrypointError> {
     let _instruction = decode_bridge_instruction(instruction_data)?;
-    Err(EntrypointError::InstructionExecutionDisabled)
+    Ok(())
+}
+
+pub fn process_instruction_accounts(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    instruction_data: &[u8],
+) -> Result<(), EntrypointError> {
+    process_instruction_accounts_with_token_cpi(
+        program_id,
+        accounts,
+        instruction_data,
+        TokenCpiMode::Invoke,
+    )
 }
 
 pub fn decode_bridge_instruction(
@@ -538,6 +556,267 @@ impl BridgeProgram {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TokenCpiMode {
+    Invoke,
+    SkipForTest,
+}
+
+fn process_instruction_accounts_with_token_cpi(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    instruction_data: &[u8],
+    token_cpi_mode: TokenCpiMode,
+) -> Result<(), EntrypointError> {
+    match decode_bridge_instruction(instruction_data)? {
+        BridgeInstruction::Initialize(config) => {
+            process_initialize_accounts(program_id, accounts, config)
+        }
+        BridgeInstruction::AcceptDepositClaim(message) => {
+            process_accept_deposit_claim_accounts(program_id, accounts, *message, token_cpi_mode)
+        }
+        BridgeInstruction::RecordWithdrawalRequest { message, burn } => {
+            process_record_withdrawal_accounts(program_id, accounts, *message, burn, token_cpi_mode)
+        }
+    }
+}
+
+fn process_initialize_accounts(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    config: BridgeConfig,
+) -> Result<(), EntrypointError> {
+    validate_config(&config)?;
+    if config.manager_program_id != program_id.to_bytes() {
+        return Err(EntrypointError::AccountKeyMismatch);
+    }
+
+    let mut account_iter = accounts.iter();
+    let bridge_state = next_required_account(&mut account_iter)?;
+    let mint = next_required_account(&mut account_iter)?;
+    let token_program = next_required_account(&mut account_iter)?;
+    require_no_extra_accounts(&mut account_iter)?;
+
+    require_writable(bridge_state)?;
+    require_account_owner(bridge_state, program_id)?;
+    require_account_key(
+        bridge_state,
+        &derive_bridge_state_pda(&config.manager_program_id, &config.mint_binding.mint),
+    )?;
+    require_account_len(bridge_state, BRIDGE_STATE_ACCOUNT_LENGTH)?;
+    require_zeroed_account(bridge_state)?;
+    require_account_key(mint, &config.mint_binding.mint)?;
+    require_account_key(token_program, &config.mint_binding.token_program_id)?;
+    validate_mint_account(mint, &config)?;
+
+    let mut bridge = BridgeProgram::new();
+    bridge.initialize(config.clone())?;
+    let state = BridgeStateAccount {
+        state: bridge.state().clone(),
+        config,
+        minted_supply: bridge.minted_supply(),
+        burned_unpaid_withdrawals: bridge.burned_unpaid_withdrawals(),
+    };
+    write_account_data(bridge_state, &encode_bridge_state_account(&state)?)?;
+    Ok(())
+}
+
+fn process_accept_deposit_claim_accounts(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    message: CanonicalBridgeMessage,
+    token_cpi_mode: TokenCpiMode,
+) -> Result<(), EntrypointError> {
+    let mut account_iter = accounts.iter();
+    let bridge_state = next_required_account(&mut account_iter)?;
+    let deposit_claim = next_required_account(&mut account_iter)?;
+    let receipt_account = next_required_account(&mut account_iter)?;
+    let mint = next_required_account(&mut account_iter)?;
+    let recipient_token_account = next_required_account(&mut account_iter)?;
+    let mint_authority_pda = next_required_account(&mut account_iter)?;
+    let token_program = next_required_account(&mut account_iter)?;
+    let transceiver_program = next_required_account(&mut account_iter)?;
+    require_no_extra_accounts(&mut account_iter)?;
+
+    require_writable(bridge_state)?;
+    require_writable(deposit_claim)?;
+    require_writable(mint)?;
+    require_writable(recipient_token_account)?;
+    require_account_owner(bridge_state, program_id)?;
+    require_account_owner(deposit_claim, program_id)?;
+    require_account_len(bridge_state, BRIDGE_STATE_ACCOUNT_LENGTH)?;
+    require_account_len(deposit_claim, DEPOSIT_CLAIM_ACCOUNT_LENGTH)?;
+    require_zeroed_account(deposit_claim)?;
+
+    let mut state = read_bridge_state_account(bridge_state)?;
+    if state.config.manager_program_id != program_id.to_bytes() {
+        return Err(EntrypointError::AccountKeyMismatch);
+    }
+    let config = state.config.clone();
+    require_account_key(
+        bridge_state,
+        &derive_bridge_state_pda(&config.manager_program_id, &config.mint_binding.mint),
+    )?;
+    require_account_key(
+        deposit_claim,
+        &derive_deposit_claim_pda(&config.manager_program_id, &message.operation_id),
+    )?;
+    require_account_key(transceiver_program, &config.transceiver_program_id)?;
+    require_account_owner(
+        receipt_account,
+        &Pubkey::new_from_array(config.transceiver_program_id),
+    )?;
+    require_account_key(
+        receipt_account,
+        &kingpepe_transceiver::derive_verified_receipt_pda(
+            &config.transceiver_program_id,
+            &message
+                .message_digest()
+                .map_err(|_| BridgeError::InvalidMessage)?,
+        ),
+    )?;
+
+    let account_context = account_context_from_infos(
+        &config,
+        program_id,
+        mint,
+        mint_authority_pda.key.to_bytes(),
+        token_program,
+        &[bridge_state, deposit_claim, recipient_token_account],
+    )?;
+    validate_accounts(&config, &account_context)?;
+    validate_message_domain(&config, &message)?;
+    if message.direction != BridgeDirection::NativeToSolana
+        || message.action != BridgeAction::DepositClaim
+    {
+        return Err(BridgeError::WrongMessageKind.into());
+    }
+
+    let digest = message
+        .message_digest()
+        .map_err(|_| BridgeError::InvalidMessage)?;
+    let receipt = read_verified_receipt_account(receipt_account)?.receipt;
+    validate_receipt(&config, &receipt, &message, digest)?;
+    validate_recipient_token_account(recipient_token_account, mint.key)?;
+
+    invoke_mint_to_checked_if_enabled(
+        &config,
+        mint,
+        recipient_token_account,
+        mint_authority_pda,
+        token_program,
+        message.amount_atomic,
+        token_cpi_mode,
+    )?;
+
+    state.minted_supply = state
+        .minted_supply
+        .checked_add(message.amount_atomic as u128)
+        .ok_or(BridgeError::ArithmeticOverflow)?;
+    let record = DepositClaimRecord {
+        operation_id: message.operation_id,
+        message_digest: digest,
+        amount_atomic: message.amount_atomic,
+        recipient: message.destination,
+    };
+    write_account_data(deposit_claim, &encode_deposit_claim_account(&record)?)?;
+    write_account_data(bridge_state, &encode_bridge_state_account(&state)?)?;
+    Ok(())
+}
+
+fn process_record_withdrawal_accounts(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    message: CanonicalBridgeMessage,
+    burn: BurnChecked,
+    token_cpi_mode: TokenCpiMode,
+) -> Result<(), EntrypointError> {
+    let mut account_iter = accounts.iter();
+    let bridge_state = next_required_account(&mut account_iter)?;
+    let withdrawal_record = next_required_account(&mut account_iter)?;
+    let source_token_account = next_required_account(&mut account_iter)?;
+    let mint = next_required_account(&mut account_iter)?;
+    let burn_authority = next_required_account(&mut account_iter)?;
+    let token_program = next_required_account(&mut account_iter)?;
+    require_no_extra_accounts(&mut account_iter)?;
+
+    require_writable(bridge_state)?;
+    require_writable(withdrawal_record)?;
+    require_writable(source_token_account)?;
+    require_writable(mint)?;
+    require_signer(burn_authority)?;
+    require_account_owner(bridge_state, program_id)?;
+    require_account_owner(withdrawal_record, program_id)?;
+    require_account_len(bridge_state, BRIDGE_STATE_ACCOUNT_LENGTH)?;
+    require_account_len(withdrawal_record, WITHDRAWAL_RECORD_ACCOUNT_LENGTH)?;
+    require_zeroed_account(withdrawal_record)?;
+
+    let mut state = read_bridge_state_account(bridge_state)?;
+    if state.config.manager_program_id != program_id.to_bytes() {
+        return Err(EntrypointError::AccountKeyMismatch);
+    }
+    let config = state.config.clone();
+    require_account_key(
+        bridge_state,
+        &derive_bridge_state_pda(&config.manager_program_id, &config.mint_binding.mint),
+    )?;
+    require_account_key(
+        withdrawal_record,
+        &derive_withdrawal_record_pda(&config.manager_program_id, &message.withdrawal_id),
+    )?;
+    require_account_key(token_program, &config.mint_binding.token_program_id)?;
+    require_account_key(mint, &config.mint_binding.mint)?;
+    require_account_key(burn_authority, &burn.authority)?;
+
+    let account_context = account_context_from_infos(
+        &config,
+        program_id,
+        mint,
+        config.mint_binding.mint_authority_pda,
+        token_program,
+        &[bridge_state, withdrawal_record, source_token_account],
+    )?;
+    validate_accounts(&config, &account_context)?;
+    validate_message_domain(&config, &message)?;
+    if message.direction != BridgeDirection::SolanaToNative
+        || message.action != BridgeAction::WithdrawalRequest
+    {
+        return Err(BridgeError::WrongMessageKind.into());
+    }
+    validate_burn(&config, &message, &burn)?;
+    validate_source_token_account(source_token_account, mint.key, burn_authority.key, burn.amount_atomic)?;
+
+    invoke_burn_checked_if_enabled(
+        source_token_account,
+        mint,
+        burn_authority,
+        token_program,
+        burn.amount_atomic,
+        burn.decimals,
+        token_cpi_mode,
+    )?;
+
+    let digest = message
+        .message_digest()
+        .map_err(|_| BridgeError::InvalidMessage)?;
+    let record = WithdrawalRecord {
+        withdrawal_id: message.withdrawal_id,
+        operation_id: message.operation_id,
+        message_digest: digest,
+        gross_amount_atomic: message.amount_atomic,
+        fee_atomic: message.fee_atomic,
+        native_destination: message.destination,
+        burn_authority: burn.authority,
+    };
+    state.burned_unpaid_withdrawals = state
+        .burned_unpaid_withdrawals
+        .checked_add(message.amount_atomic as u128)
+        .ok_or(BridgeError::ArithmeticOverflow)?;
+    write_account_data(withdrawal_record, &encode_withdrawal_record_account(&record)?)?;
+    write_account_data(bridge_state, &encode_bridge_state_account(&state)?)?;
+    Ok(())
+}
+
 pub fn derive_mint_authority_pda(
     manager_program_id: &PubkeyBytes,
     mint: &PubkeyBytes,
@@ -558,6 +837,317 @@ pub fn derive_mint_authority_pda_with_bump(
     (pda.to_bytes(), bump)
 }
 
+pub fn derive_bridge_state_pda(manager_program_id: &PubkeyBytes, mint: &PubkeyBytes) -> PubkeyBytes {
+    let manager_program_id = Pubkey::new_from_array(*manager_program_id);
+    let mint = Pubkey::new_from_array(*mint);
+    Pubkey::find_program_address(
+        &[BRIDGE_STATE_PDA_SEED_PREFIX, mint.as_ref()],
+        &manager_program_id,
+    )
+    .0
+    .to_bytes()
+}
+
+pub fn derive_deposit_claim_pda(
+    manager_program_id: &PubkeyBytes,
+    operation_id: &Hash32,
+) -> PubkeyBytes {
+    let manager_program_id = Pubkey::new_from_array(*manager_program_id);
+    Pubkey::find_program_address(
+        &[DEPOSIT_CLAIM_PDA_SEED_PREFIX, operation_id],
+        &manager_program_id,
+    )
+    .0
+    .to_bytes()
+}
+
+pub fn derive_withdrawal_record_pda(
+    manager_program_id: &PubkeyBytes,
+    withdrawal_id: &Hash32,
+) -> PubkeyBytes {
+    let manager_program_id = Pubkey::new_from_array(*manager_program_id);
+    Pubkey::find_program_address(
+        &[WITHDRAWAL_RECORD_PDA_SEED_PREFIX, withdrawal_id],
+        &manager_program_id,
+    )
+    .0
+    .to_bytes()
+}
+
+fn account_context_from_infos(
+    config: &BridgeConfig,
+    program_id: &Pubkey,
+    mint: &AccountInfo,
+    mint_authority_pda: PubkeyBytes,
+    token_program: &AccountInfo,
+    writable_accounts: &[&AccountInfo],
+) -> Result<AccountContext, EntrypointError> {
+    let mint_state = unpack_mint(mint)?;
+    let freeze_authority = match mint_state.freeze_authority {
+        COption::Some(authority) => Some(authority.to_bytes()),
+        COption::None => None,
+    };
+    if mint_state.mint_authority != COption::Some(Pubkey::new_from_array(mint_authority_pda)) {
+        return Err(BridgeError::MintAuthorityMismatch.into());
+    }
+    if token_program.key.to_bytes() != config.mint_binding.token_program_id {
+        return Err(BridgeError::AccountMismatch.into());
+    }
+    Ok(AccountContext {
+        manager_program_id: program_id.to_bytes(),
+        transceiver_program_id: config.transceiver_program_id,
+        token_program_id: token_program.key.to_bytes(),
+        mint: mint.key.to_bytes(),
+        mint_authority_pda,
+        mint_decimals: mint_state.decimals,
+        freeze_authority,
+        writable_accounts: writable_accounts
+            .iter()
+            .map(|account| account.key.to_bytes())
+            .collect(),
+    })
+}
+
+fn read_bridge_state_account(account: &AccountInfo) -> Result<BridgeStateAccount, EntrypointError> {
+    require_account_len(account, BRIDGE_STATE_ACCOUNT_LENGTH)?;
+    let data = account
+        .try_borrow_data()
+        .map_err(|_| EntrypointError::AccountBorrowFailed)?;
+    Ok(decode_bridge_state_account(&data)?)
+}
+
+fn read_verified_receipt_account(
+    account: &AccountInfo,
+) -> Result<kingpepe_transceiver::VerifiedReceiptAccount, EntrypointError> {
+    let data = account
+        .try_borrow_data()
+        .map_err(|_| EntrypointError::AccountBorrowFailed)?;
+    Ok(kingpepe_transceiver::decode_verified_receipt_account(&data)?)
+}
+
+fn next_required_account<'a, 'b, I>(
+    accounts: &mut I,
+) -> Result<&'a AccountInfo<'b>, EntrypointError>
+where
+    'b: 'a,
+    I: Iterator<Item = &'a AccountInfo<'b>>,
+{
+    accounts.next().ok_or(EntrypointError::NotEnoughAccounts)
+}
+
+fn require_no_extra_accounts<'a, 'b, I>(accounts: &mut I) -> Result<(), EntrypointError>
+where
+    'b: 'a,
+    I: Iterator<Item = &'a AccountInfo<'b>>,
+{
+    if accounts.next().is_some() {
+        Err(EntrypointError::UnexpectedAdditionalAccounts)
+    } else {
+        Ok(())
+    }
+}
+
+fn require_writable(account: &AccountInfo) -> Result<(), EntrypointError> {
+    if account.is_writable {
+        Ok(())
+    } else {
+        Err(EntrypointError::AccountNotWritable)
+    }
+}
+
+fn require_signer(account: &AccountInfo) -> Result<(), EntrypointError> {
+    if account.is_signer {
+        Ok(())
+    } else {
+        Err(EntrypointError::MissingRequiredSignature)
+    }
+}
+
+fn require_account_owner(account: &AccountInfo, expected: &Pubkey) -> Result<(), EntrypointError> {
+    if account.owner == expected {
+        Ok(())
+    } else {
+        Err(EntrypointError::AccountOwnerMismatch)
+    }
+}
+
+fn require_account_key(account: &AccountInfo, expected: &PubkeyBytes) -> Result<(), EntrypointError> {
+    if account.key.to_bytes() == *expected {
+        Ok(())
+    } else {
+        Err(EntrypointError::AccountKeyMismatch)
+    }
+}
+
+fn require_account_len(account: &AccountInfo, expected: usize) -> Result<(), EntrypointError> {
+    if account.data_len() == expected {
+        Ok(())
+    } else {
+        Err(EntrypointError::InvalidAccountData)
+    }
+}
+
+fn require_zeroed_account(account: &AccountInfo) -> Result<(), EntrypointError> {
+    if account_data_is_zero(account)? {
+        Ok(())
+    } else {
+        Err(EntrypointError::AccountAlreadyInitialized)
+    }
+}
+
+fn account_data_is_zero(account: &AccountInfo) -> Result<bool, EntrypointError> {
+    let data = account
+        .try_borrow_data()
+        .map_err(|_| EntrypointError::AccountBorrowFailed)?;
+    Ok(data.iter().all(|byte| *byte == 0))
+}
+
+fn write_account_data(account: &AccountInfo, encoded: &[u8]) -> Result<(), EntrypointError> {
+    require_account_len(account, encoded.len())?;
+    let mut data = account
+        .try_borrow_mut_data()
+        .map_err(|_| EntrypointError::AccountBorrowFailed)?;
+    data.copy_from_slice(encoded);
+    Ok(())
+}
+
+fn validate_mint_account(mint: &AccountInfo, config: &BridgeConfig) -> Result<(), EntrypointError> {
+    require_account_owner(mint, &spl_token::id())?;
+    let mint_state = unpack_mint(mint)?;
+    if mint_state.supply != 0
+        || mint_state.decimals != config.mint_binding.decimals
+        || mint_state.freeze_authority != COption::None
+        || mint_state.mint_authority
+            != COption::Some(Pubkey::new_from_array(config.mint_binding.mint_authority_pda))
+    {
+        return Err(EntrypointError::InvalidAccountData);
+    }
+    Ok(())
+}
+
+fn validate_recipient_token_account(
+    token_account: &AccountInfo,
+    expected_mint: &Pubkey,
+) -> Result<(), EntrypointError> {
+    require_account_owner(token_account, &spl_token::id())?;
+    let token_state = unpack_token_account(token_account)?;
+    if token_state.mint != *expected_mint {
+        return Err(BridgeError::AccountMismatch.into());
+    }
+    Ok(())
+}
+
+fn validate_source_token_account(
+    token_account: &AccountInfo,
+    expected_mint: &Pubkey,
+    expected_authority: &Pubkey,
+    amount_atomic: u64,
+) -> Result<(), EntrypointError> {
+    require_account_owner(token_account, &spl_token::id())?;
+    let token_state = unpack_token_account(token_account)?;
+    if token_state.mint != *expected_mint
+        || token_state.owner != *expected_authority
+        || token_state.amount < amount_atomic
+    {
+        return Err(BridgeError::BurnMismatch.into());
+    }
+    Ok(())
+}
+
+fn unpack_mint(mint: &AccountInfo) -> Result<TokenMint, EntrypointError> {
+    let data = mint
+        .try_borrow_data()
+        .map_err(|_| EntrypointError::AccountBorrowFailed)?;
+    TokenMint::unpack(&data).map_err(|_| EntrypointError::InvalidAccountData)
+}
+
+fn unpack_token_account(token_account: &AccountInfo) -> Result<TokenAccount, EntrypointError> {
+    let data = token_account
+        .try_borrow_data()
+        .map_err(|_| EntrypointError::AccountBorrowFailed)?;
+    TokenAccount::unpack(&data).map_err(|_| EntrypointError::InvalidAccountData)
+}
+
+fn invoke_mint_to_checked_if_enabled<'a>(
+    config: &BridgeConfig,
+    mint: &AccountInfo<'a>,
+    recipient_token_account: &AccountInfo<'a>,
+    mint_authority_pda: &AccountInfo<'a>,
+    token_program: &AccountInfo<'a>,
+    amount_atomic: u64,
+    token_cpi_mode: TokenCpiMode,
+) -> Result<(), EntrypointError> {
+    require_account_key(mint, &config.mint_binding.mint)?;
+    require_account_key(mint_authority_pda, &config.mint_binding.mint_authority_pda)?;
+    require_account_key(token_program, &config.mint_binding.token_program_id)?;
+    if token_cpi_mode == TokenCpiMode::SkipForTest {
+        return Ok(());
+    }
+    let instruction = spl_token::instruction::mint_to_checked(
+        token_program.key,
+        mint.key,
+        recipient_token_account.key,
+        mint_authority_pda.key,
+        &[],
+        amount_atomic,
+        config.mint_binding.decimals,
+    )
+    .map_err(|_| EntrypointError::TokenCpiFailed)?;
+    let mint_pubkey = Pubkey::new_from_array(config.mint_binding.mint);
+    let (_pda, bump) =
+        derive_mint_authority_pda_with_bump(&config.manager_program_id, &config.mint_binding.mint);
+    let signer_seeds: &[&[u8]] = &[
+        MINT_AUTHORITY_PDA_SEED_PREFIX,
+        mint_pubkey.as_ref(),
+        &[bump],
+    ];
+    invoke_signed(
+        &instruction,
+        &[
+            mint.clone(),
+            recipient_token_account.clone(),
+            mint_authority_pda.clone(),
+            token_program.clone(),
+        ],
+        &[signer_seeds],
+    )
+    .map_err(|_| EntrypointError::TokenCpiFailed)
+}
+
+fn invoke_burn_checked_if_enabled<'a>(
+    source_token_account: &AccountInfo<'a>,
+    mint: &AccountInfo<'a>,
+    burn_authority: &AccountInfo<'a>,
+    token_program: &AccountInfo<'a>,
+    amount_atomic: u64,
+    decimals: u8,
+    token_cpi_mode: TokenCpiMode,
+) -> Result<(), EntrypointError> {
+    if token_cpi_mode == TokenCpiMode::SkipForTest {
+        return Ok(());
+    }
+    let instruction = spl_token::instruction::burn_checked(
+        token_program.key,
+        source_token_account.key,
+        mint.key,
+        burn_authority.key,
+        &[],
+        amount_atomic,
+        decimals,
+    )
+    .map_err(|_| EntrypointError::TokenCpiFailed)?;
+    invoke(
+        &instruction,
+        &[
+            source_token_account.clone(),
+            mint.clone(),
+            burn_authority.clone(),
+            token_program.clone(),
+        ],
+    )
+    .map_err(|_| EntrypointError::TokenCpiFailed)
+}
+
 fn validate_config(config: &BridgeConfig) -> Result<(), BridgeError> {
     if config.manager_program_id == [0u8; 32]
         || config.transceiver_program_id == [0u8; 32]
@@ -572,7 +1162,7 @@ fn validate_config(config: &BridgeConfig) -> Result<(), BridgeError> {
         return Err(BridgeError::MainnetActivationDisabled);
     }
     let mint = &config.mint_binding;
-    if mint.mint == [0u8; 32] || mint.token_program_id == [0u8; 32] {
+    if mint.mint == [0u8; 32] || mint.token_program_id != spl_token::id().to_bytes() {
         return Err(BridgeError::InvalidMintBinding);
     }
     if mint.initial_supply != EXPECTED_INITIAL_SUPPLY {
@@ -987,8 +1577,6 @@ impl<'a> InstructionCursor<'a> {
 pub enum EntrypointError {
     #[error("Solana instruction data is empty")]
     EmptyInstruction,
-    #[error("Solana economic instruction execution is not enabled yet")]
-    InstructionExecutionDisabled,
     #[error("Solana instruction length mismatch, expected {expected}, found {found}")]
     InvalidInstructionLength { expected: usize, found: usize },
     #[error("Solana instruction encoding is invalid")]
@@ -997,6 +1585,57 @@ pub enum EntrypointError {
     InvalidCanonicalMessage,
     #[error("unsupported Solana instruction tag {0}")]
     UnsupportedInstructionTag(u8),
+    #[error("not enough Solana accounts")]
+    NotEnoughAccounts,
+    #[error("unexpected additional Solana accounts")]
+    UnexpectedAdditionalAccounts,
+    #[error("Solana account is not writable")]
+    AccountNotWritable,
+    #[error("Solana required signer is missing")]
+    MissingRequiredSignature,
+    #[error("Solana account owner mismatch")]
+    AccountOwnerMismatch,
+    #[error("Solana account key mismatch")]
+    AccountKeyMismatch,
+    #[error("Solana account is already initialized")]
+    AccountAlreadyInitialized,
+    #[error("Solana account data is invalid")]
+    InvalidAccountData,
+    #[error("Solana account data borrow failed")]
+    AccountBorrowFailed,
+    #[error("SPL Token CPI failed")]
+    TokenCpiFailed,
+    #[error("bridge account codec error: {0}")]
+    AccountCodec(#[from] AccountCodecError),
+    #[error("bridge error: {0}")]
+    Bridge(#[from] BridgeError),
+    #[error("transceiver account codec error: {0}")]
+    TransceiverAccountCodec(#[from] kingpepe_transceiver::AccountCodecError),
+}
+
+impl From<EntrypointError> for ProgramError {
+    fn from(value: EntrypointError) -> Self {
+        match value {
+            EntrypointError::EmptyInstruction
+            | EntrypointError::InvalidInstructionLength { .. }
+            | EntrypointError::InvalidInstructionEncoding
+            | EntrypointError::InvalidCanonicalMessage
+            | EntrypointError::UnsupportedInstructionTag(_) => ProgramError::InvalidInstructionData,
+            EntrypointError::NotEnoughAccounts => ProgramError::NotEnoughAccountKeys,
+            EntrypointError::MissingRequiredSignature => ProgramError::MissingRequiredSignature,
+            EntrypointError::AccountOwnerMismatch => ProgramError::IllegalOwner,
+            EntrypointError::UnexpectedAdditionalAccounts
+            | EntrypointError::AccountNotWritable
+            | EntrypointError::AccountKeyMismatch
+            | EntrypointError::AccountAlreadyInitialized
+            | EntrypointError::InvalidAccountData
+            | EntrypointError::AccountBorrowFailed
+            | EntrypointError::TokenCpiFailed
+            | EntrypointError::AccountCodec(_)
+            | EntrypointError::Bridge(_)
+            | EntrypointError::TransceiverAccountCodec(_) => ProgramError::InvalidAccountData,
+        }
+    }
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -1069,6 +1708,7 @@ mod tests {
         WithdrawalRequestFields,
     };
     use kingpepe_transceiver::{AttestationObservation, TransceiverConfig};
+    use spl_token::state::AccountState;
 
     fn h(byte: u8) -> [u8; 32] {
         [byte; 32]
@@ -1084,7 +1724,7 @@ mod tests {
             solana_deployment: h(4),
             mint_binding: MintBinding {
                 mint,
-                token_program_id: h(5),
+                token_program_id: spl_token::id().to_bytes(),
                 mint_authority_pda: derive_mint_authority_pda(&manager_program_id, &mint),
                 decimals: 8,
                 native_decimals: 8,
@@ -1098,6 +1738,14 @@ mod tests {
             hard_stop: false,
             mainnet_activation_enabled: false,
         }
+    }
+
+    fn account_execution_config() -> BridgeConfig {
+        let mut config = base_config();
+        config.manager_program_id = id().to_bytes();
+        config.mint_binding.mint_authority_pda =
+            derive_mint_authority_pda(&config.manager_program_id, &config.mint_binding.mint);
+        config
     }
 
     fn accounts(config: &BridgeConfig) -> AccountContext {
@@ -1199,6 +1847,70 @@ mod tests {
         ]
     }
 
+    fn test_account(
+        key: Pubkey,
+        account_owner: Pubkey,
+        data: Vec<u8>,
+        is_signer: bool,
+        is_writable: bool,
+    ) -> AccountInfo<'static> {
+        let key = Box::leak(Box::new(key));
+        let account_owner = Box::leak(Box::new(account_owner));
+        let lamports = Box::leak(Box::new(1u64));
+        let data = Box::leak(data.into_boxed_slice());
+        AccountInfo::new(
+            key,
+            is_signer,
+            is_writable,
+            lamports,
+            data,
+            account_owner,
+            false,
+            0,
+        )
+    }
+
+    fn mint_account_data(config: &BridgeConfig, supply: u64) -> Vec<u8> {
+        let mut data = vec![0; TokenMint::LEN];
+        TokenMint {
+            mint_authority: COption::Some(Pubkey::new_from_array(
+                config.mint_binding.mint_authority_pda,
+            )),
+            supply,
+            decimals: config.mint_binding.decimals,
+            is_initialized: true,
+            freeze_authority: COption::None,
+        }
+        .pack_into_slice(&mut data);
+        data
+    }
+
+    fn token_account_data(mint: Pubkey, token_account_owner: Pubkey, amount: u64) -> Vec<u8> {
+        let mut data = vec![0; TokenAccount::LEN];
+        TokenAccount {
+            mint,
+            owner: token_account_owner,
+            amount,
+            delegate: COption::None,
+            state: AccountState::Initialized,
+            is_native: COption::None,
+            delegated_amount: 0,
+            close_authority: COption::None,
+        }
+        .pack_into_slice(&mut data);
+        data
+    }
+
+    fn encoded_state_account(config: &BridgeConfig) -> Vec<u8> {
+        encode_bridge_state_account(&BridgeStateAccount {
+            state: ProgramState::LocalnetTesting,
+            config: config.clone(),
+            minted_supply: 0,
+            burned_unpaid_withdrawals: 0,
+        })
+        .unwrap()
+    }
+
     #[test]
     fn bridge_starts_uninitialized() {
         let program = BridgeProgram::default();
@@ -1208,7 +1920,7 @@ mod tests {
     #[test]
     fn solana_entrypoint_identity_is_localnet_only_and_validate_only() {
         assert_eq!(id().to_string(), LOCALNET_PROGRAM_ID_BASE58);
-        assert_eq!(PROGRAM_ABI_STATUS, "ECONOMIC_ABI_VALIDATE_ONLY");
+        assert_eq!(PROGRAM_ABI_STATUS, "ECONOMIC_ABI_ENABLED");
         assert_eq!(
             process_instruction_boundary(&[]),
             Err(EntrypointError::EmptyInstruction)
@@ -1239,7 +1951,7 @@ mod tests {
         assert_eq!(decode_bridge_instruction(&deposit_bytes).unwrap(), deposit);
         assert_eq!(
             process_instruction_boundary(&deposit_bytes),
-            Err(EntrypointError::InstructionExecutionDisabled)
+            Ok(())
         );
 
         let withdrawal_message = withdrawal_message(&config);
@@ -1371,6 +2083,266 @@ mod tests {
                 found: WITHDRAWAL_RECORD_ACCOUNT_LENGTH - 1,
             })
         );
+    }
+
+    #[test]
+    fn bridge_account_execution_initializes_state_from_spl_mint() {
+        let config = account_execution_config();
+        let state_key = Pubkey::new_from_array(derive_bridge_state_pda(
+            &config.manager_program_id,
+            &config.mint_binding.mint,
+        ));
+        let state_account = test_account(
+            state_key,
+            id(),
+            vec![0; BRIDGE_STATE_ACCOUNT_LENGTH],
+            false,
+            true,
+        );
+        let mint_account = test_account(
+            Pubkey::new_from_array(config.mint_binding.mint),
+            spl_token::id(),
+            mint_account_data(&config, 0),
+            false,
+            false,
+        );
+        let token_program = test_account(
+            spl_token::id(),
+            Pubkey::new_unique(),
+            Vec::new(),
+            false,
+            false,
+        );
+        let initialize = BridgeInstruction::Initialize(config.clone())
+            .encode()
+            .unwrap();
+
+        process_instruction_accounts(
+            &id(),
+            &[state_account.clone(), mint_account, token_program],
+            &initialize,
+        )
+        .unwrap();
+        let state = read_bridge_state_account(&state_account).unwrap();
+        assert_eq!(state.state, ProgramState::LocalnetTesting);
+        assert_eq!(state.config, config);
+        assert_eq!(state.minted_supply, 0);
+        assert_eq!(state.burned_unpaid_withdrawals, 0);
+    }
+
+    #[test]
+    fn bridge_account_execution_mints_once_from_verified_receipt() {
+        let config = account_execution_config();
+        let message = deposit_message(&config);
+        let digest = message.message_digest().unwrap();
+        let receipt = VerifiedMessageReceipt {
+            message_digest: digest,
+            operation_id: message.operation_id,
+            transceiver_program_id: config.transceiver_program_id,
+            manager_program_id: config.manager_program_id,
+            mint: config.mint_binding.mint,
+            direction: message.direction,
+            action: message.action,
+            key_epoch: message.key_epoch,
+            attesters: [h(21), h(22)],
+            consumed: false,
+        };
+        let state_account = test_account(
+            Pubkey::new_from_array(derive_bridge_state_pda(
+                &config.manager_program_id,
+                &config.mint_binding.mint,
+            )),
+            id(),
+            encoded_state_account(&config),
+            false,
+            true,
+        );
+        let claim_account = test_account(
+            Pubkey::new_from_array(derive_deposit_claim_pda(
+                &config.manager_program_id,
+                &message.operation_id,
+            )),
+            id(),
+            vec![0; DEPOSIT_CLAIM_ACCOUNT_LENGTH],
+            false,
+            true,
+        );
+        let receipt_account = test_account(
+            Pubkey::new_from_array(kingpepe_transceiver::derive_verified_receipt_pda(
+                &config.transceiver_program_id,
+                &digest,
+            )),
+            Pubkey::new_from_array(config.transceiver_program_id),
+            kingpepe_transceiver::encode_verified_receipt_account(&receipt),
+            false,
+            false,
+        );
+        let mint_pubkey = Pubkey::new_from_array(config.mint_binding.mint);
+        let mint_account = test_account(
+            mint_pubkey,
+            spl_token::id(),
+            mint_account_data(&config, 0),
+            false,
+            true,
+        );
+        let recipient = test_account(
+            Pubkey::new_unique(),
+            spl_token::id(),
+            token_account_data(mint_pubkey, Pubkey::new_unique(), 0),
+            false,
+            true,
+        );
+        let mint_authority = test_account(
+            Pubkey::new_from_array(config.mint_binding.mint_authority_pda),
+            id(),
+            Vec::new(),
+            false,
+            false,
+        );
+        let token_program = test_account(
+            spl_token::id(),
+            Pubkey::new_unique(),
+            Vec::new(),
+            false,
+            false,
+        );
+        let transceiver_program = test_account(
+            Pubkey::new_from_array(config.transceiver_program_id),
+            Pubkey::new_unique(),
+            Vec::new(),
+            false,
+            false,
+        );
+        let deposit = BridgeInstruction::AcceptDepositClaim(Box::new(message.clone()))
+            .encode()
+            .unwrap();
+
+        process_instruction_accounts_with_token_cpi(
+            &id(),
+            &[
+                state_account.clone(),
+                claim_account.clone(),
+                receipt_account,
+                mint_account,
+                recipient,
+                mint_authority,
+                token_program,
+                transceiver_program,
+            ],
+            &deposit,
+            TokenCpiMode::SkipForTest,
+        )
+        .unwrap();
+        let state = read_bridge_state_account(&state_account).unwrap();
+        assert_eq!(state.minted_supply, message.amount_atomic as u128);
+        let claim = decode_deposit_claim_account(&claim_account.data.borrow()).unwrap();
+        assert_eq!(claim.record.operation_id, message.operation_id);
+        assert_eq!(claim.record.message_digest, digest);
+        assert_eq!(claim.record.amount_atomic, message.amount_atomic);
+
+        assert_eq!(
+            process_instruction_accounts_with_token_cpi(
+                &id(),
+                &[state_account, claim_account],
+                &deposit,
+                TokenCpiMode::SkipForTest,
+            ),
+            Err(EntrypointError::NotEnoughAccounts)
+        );
+    }
+
+    #[test]
+    fn bridge_account_execution_burns_and_records_withdrawal_atomically() {
+        let config = account_execution_config();
+        let message = withdrawal_message(&config);
+        let burn_authority_key = Pubkey::new_unique();
+        let burn = BurnChecked {
+            token_program_id: config.mint_binding.token_program_id,
+            mint: config.mint_binding.mint,
+            authority: burn_authority_key.to_bytes(),
+            amount_atomic: message.amount_atomic,
+            decimals: config.mint_binding.decimals,
+        };
+        let state_account = test_account(
+            Pubkey::new_from_array(derive_bridge_state_pda(
+                &config.manager_program_id,
+                &config.mint_binding.mint,
+            )),
+            id(),
+            encoded_state_account(&config),
+            false,
+            true,
+        );
+        let record_account = test_account(
+            Pubkey::new_from_array(derive_withdrawal_record_pda(
+                &config.manager_program_id,
+                &message.withdrawal_id,
+            )),
+            id(),
+            vec![0; WITHDRAWAL_RECORD_ACCOUNT_LENGTH],
+            false,
+            true,
+        );
+        let mint_pubkey = Pubkey::new_from_array(config.mint_binding.mint);
+        let source_token = test_account(
+            Pubkey::new_unique(),
+            spl_token::id(),
+            token_account_data(mint_pubkey, burn_authority_key, message.amount_atomic),
+            false,
+            true,
+        );
+        let mint_account = test_account(
+            mint_pubkey,
+            spl_token::id(),
+            mint_account_data(&config, message.amount_atomic),
+            false,
+            true,
+        );
+        let burn_authority = test_account(
+            burn_authority_key,
+            Pubkey::new_unique(),
+            Vec::new(),
+            true,
+            false,
+        );
+        let token_program = test_account(
+            spl_token::id(),
+            Pubkey::new_unique(),
+            Vec::new(),
+            false,
+            false,
+        );
+        let withdrawal = BridgeInstruction::RecordWithdrawalRequest {
+            message: Box::new(message.clone()),
+            burn,
+        }
+        .encode()
+        .unwrap();
+
+        process_instruction_accounts_with_token_cpi(
+            &id(),
+            &[
+                state_account.clone(),
+                record_account.clone(),
+                source_token,
+                mint_account,
+                burn_authority,
+                token_program,
+            ],
+            &withdrawal,
+            TokenCpiMode::SkipForTest,
+        )
+        .unwrap();
+        let state = read_bridge_state_account(&state_account).unwrap();
+        assert_eq!(
+            state.burned_unpaid_withdrawals,
+            message.amount_atomic as u128
+        );
+        let record = decode_withdrawal_record_account(&record_account.data.borrow()).unwrap();
+        assert_eq!(record.record.withdrawal_id, message.withdrawal_id);
+        assert_eq!(record.record.gross_amount_atomic, message.amount_atomic);
+        assert_eq!(record.record.fee_atomic, message.fee_atomic);
+        assert_eq!(record.record.native_destination, message.destination);
     }
 
     #[test]

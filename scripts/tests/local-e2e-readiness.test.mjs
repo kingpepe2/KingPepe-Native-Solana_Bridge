@@ -13,7 +13,7 @@ import {
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../..");
 
-test("current repository readiness gate refuses to treat validate-only ABI as real local E2E", () => {
+test("current repository readiness gate remains blocked without local E2E executables", () => {
   const result = evaluateLocalE2eReadiness({
     repoRoot: REPO_ROOT,
     envPath: "",
@@ -24,8 +24,8 @@ test("current repository readiness gate refuses to treat validate-only ABI as re
   for (const command of REQUIRED_LOCAL_E2E_EXECUTABLES) {
     assert(result.blockers.includes(`MISSING_EXECUTABLE:${command}`));
   }
-  assert(result.blockers.includes("SOLANA_PROGRAM_EXECUTION_NOT_READY:kingpepe-bridge"));
-  assert(result.blockers.includes("SOLANA_PROGRAM_EXECUTION_NOT_READY:kingpepe-transceiver"));
+  assert(!result.blockers.includes("SOLANA_PROGRAM_EXECUTION_NOT_READY:kingpepe-bridge"));
+  assert(!result.blockers.includes("SOLANA_PROGRAM_EXECUTION_NOT_READY:kingpepe-transceiver"));
 });
 
 test("executable discovery is path-delimited and does not inspect unrelated environment data", () => {

@@ -283,6 +283,34 @@
 - next:
   - Continue Phase 08 account execution and SPL Token CPI. Do not proceed to Phase 09 until the Native-to-Solana local E2E gate actually passes.
 
+## Phase 08 Solana account execution and SPL Token CPI source implementation
+
+- PHASE: `08`
+- source commit: pending publication
+- push result: pending
+- CI URL: pending
+- CI status: pending
+- tests:
+  - `cd solana && cargo check --locked --workspace --all-targets` (pass under WSL)
+  - `cd solana && cargo test --locked --workspace --all-targets` (pass under WSL, 52 Rust tests)
+  - `npm test` (pass, 2 vectors plus 26 Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - `npm run doctor:local-e2e` (expected BLOCKED, exit 2; Solana programs report READY; required local executables are missing)
+  - local `cargo fmt` / `cargo clippy`: NOT_RUN locally; this WSL Cargo installation has no `fmt` or `clippy` command
+  - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
+- changed:
+  - Enabled source-level bridge manager account execution with program-owned PDA account validation.
+  - Added SPL Token `mint_to_checked` CPI construction for verified deposit claims.
+  - Added SPL Token `burn_checked` CPI construction before durable withdrawal record writes.
+  - Enabled source-level transceiver account execution with config/receipt PDA validation and instructions-sysvar Ed25519 loading.
+  - Added account execution tests while keeping actual CPI invocation reserved for local-validator testing.
+- blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
+- next:
+  - Publish and verify this account-execution increment, then continue Phase 08 local validator/regtest wiring. Do not proceed to Phase 09 until the Native-to-Solana local E2E gate actually passes.
+
 ## Phase 08 Solana account-state codec implementation
 
 - PHASE: `08`
