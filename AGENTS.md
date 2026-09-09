@@ -224,5 +224,9 @@
   operation before broadcast, checks submitted signature status before retry,
   requires finalized claim observation before reporting completion, and does
   not create a production activation path.
+- Phase 08 Solana deposit claim submitter commit:
+  `905a45b4c79d879e6ae27a05b3c7a39fed0a30f6`
+- Phase 08 Solana deposit claim submitter CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34310531798` PASS.
 - Real local E2E is still blocked by missing `kingpeped`, `kingpepe-cli`,
   `solana`, `solana-test-validator`, and `anchor`.

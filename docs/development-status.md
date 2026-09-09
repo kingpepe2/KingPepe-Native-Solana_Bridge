@@ -84,7 +84,7 @@
 - Phase 08 local E2E orchestration plan: PASS for `7ffd331358146bb990f9830d4f39c0849cc0bdeb`
 - Phase 08 local E2E bootstrap runner: PASS for `d392403733bbfb92fcfd2d50a1d3879d63f0e3bb`
 - Phase 08 Native REGTEST RPC adapter: PASS for `845dfc4a86a1ef87f15e3d5ec2ca4ad91fd8fe8d`
-- Phase 08 Solana deposit claim submitter: local source-boundary tests PASS; SHA and CI evidence to be recorded after push verification.
+- Phase 08 Solana deposit claim submitter: PASS for `905a45b4c79d879e6ae27a05b3c7a39fed0a30f6`
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 52 Rust tests after account-execution update
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
@@ -312,8 +312,20 @@
 - Local test status:
   - `npm run test:bridge-validator` (pass, 13 tests)
   - real Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
-- Source commit and CI evidence will be recorded after publication and Actions
-  verification.
+- Source commit: `905a45b4c79d879e6ae27a05b3c7a39fed0a30f6`
+- CI URL:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34310531798`
+- CI status: `PASS`
+- Tests:
+  - `npm run test:bridge-validator` (pass, 13 bridge-validator tests)
+  - `npm test` (pass, 2 protocol vectors plus 50 Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - `npm run doctor:local-e2e` (expected BLOCKED, exit 2)
+  - `npm run local:e2e:bootstrap` (expected BLOCKED, exit 2)
+  - CI Linux format, clippy, workspace, Node, and native crate tests (PASS)
+  - CI Windows workspace, Node, and native crate tests (PASS)
+  - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
 
 ## Phase 08 mint-authority real Solana PDA correction
 

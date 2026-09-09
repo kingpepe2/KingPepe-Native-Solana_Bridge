@@ -421,12 +421,19 @@
 ## Phase 08 Solana deposit claim submitter
 
 - PHASE: `08`
-- source commit: to be recorded after commit and push
-- push result: pending
-- CI URL: pending
-- CI status: pending
+- source commit: `905a45b4c79d879e6ae27a05b3c7a39fed0a30f6`
+- push result: pushed to private GitHub repository
+- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34310531798`
+- CI status: `PASS`
 - tests:
   - `npm run test:bridge-validator` (pass, 13 bridge-validator tests)
+  - `npm test` (pass, 2 protocol vectors plus 50 Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - `npm run doctor:local-e2e` (expected BLOCKED, exit 2)
+  - `npm run local:e2e:bootstrap` (expected BLOCKED, exit 2)
+  - CI Linux format, clippy, workspace, Node, and native crate tests (PASS)
+  - CI Windows workspace, Node, and native crate tests (PASS)
   - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
 - changed:
   - Added a localnet-only Solana deposit claim submitter for the automated
@@ -445,9 +452,10 @@
   - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`,
     `solana-test-validator`, and `anchor`.
 - next:
-  - Commit, push, verify CI, and then continue Phase 08 only if another
-    meaningful source increment can be implemented without falsely reporting
-    a daemon-backed local E2E pass.
+  - Continue Phase 08 only if another meaningful source increment can be
+    implemented without falsely reporting a daemon-backed local E2E pass. Do
+    not proceed to Phase 09 until the Native-to-Solana local E2E gate actually
+    passes.
 
 ## Phase 08 Solana account-state codec implementation
 
