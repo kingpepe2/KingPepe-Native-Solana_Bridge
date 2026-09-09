@@ -66,6 +66,9 @@
     "phase08AsyncDepositPipelineImplemented": true,
     "phase08AsyncDepositPipelineLocalTestsPassed": true,
     "phase08AsyncDepositPipelineCiVerified": true,
+    "phase08NativeReserveSweepAdaptersImplemented": true,
+    "phase08NativeReserveSweepAdaptersLocalTestsPassed": true,
+    "phase08NativeReserveSweepAdaptersCiVerified": false,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true
