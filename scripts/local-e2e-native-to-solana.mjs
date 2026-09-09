@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -28,12 +28,16 @@ export const LOCAL_NATIVE_TO_SOLANA_FAILED = "LOCAL_NATIVE_TO_SOLANA_E2E_FAILED"
 export const LOCAL_NATIVE_TO_SOLANA_DEPOSIT_OBSERVED = "LOCAL_NATIVE_DEPOSIT_OBSERVED";
 export const LOCAL_NATIVE_TO_SOLANA_DEPOSIT_EVIDENCE_VALIDATED =
   "LOCAL_NATIVE_DEPOSIT_EVIDENCE_VALIDATED";
+export const LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_DRAFTED =
+  "LOCAL_NATIVE_RESERVE_SWEEP_DRAFTED";
 
 const DEFAULT_AMOUNT_NATIVE = "1.00000000";
 const DEFAULT_NATIVE_DECIMALS = 8;
 const DEFAULT_NATIVE_CHAIN_NAME = "regtest";
+const DEFAULT_RESERVE_MINER_FEE_NATIVE = "0.00001000";
 const DEFAULT_COINBASE_MATURITY_BLOCKS = 101;
 const DEFAULT_DEPOSIT_FINALITY_BLOCKS = 6;
+const MAX_UNSIGNED_SWEEP_BYTES = 400_000;
 
 export async function runLocalNativeToSolanaE2e(options = {}) {
   let flowResult;
@@ -103,6 +107,10 @@ export function createNativeToSolanaFlowConfig(options) {
   if (amountAtomic <= 0n) {
     throw new Error("LocalNativeToSolanaAmountMustBePositive");
   }
+  const reserveMinerFeeNative = validateNativeDecimal(
+    value.reserveMinerFeeNative ?? DEFAULT_RESERVE_MINER_FEE_NATIVE,
+    "reserveMinerFeeNative",
+  );
 
   return Object.freeze({
     protocol: LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL,
@@ -110,10 +118,13 @@ export function createNativeToSolanaFlowConfig(options) {
     stateRoot,
     userWalletName: sanitizeWalletName(value.userWalletName ?? `kingpepe-e2e-user-${runId}`),
     depositWalletName: sanitizeWalletName(value.depositWalletName ?? `kingpepe-e2e-deposit-${runId}`),
+    reserveWalletName: sanitizeWalletName(value.reserveWalletName ?? `kingpepe-e2e-reserve-${runId}`),
     amountNative,
     amountAtomic: amountAtomic.toString(),
     nativeDecimals,
     nativeChainName: sanitizeNetworkName(value.nativeChainName ?? DEFAULT_NATIVE_CHAIN_NAME),
+    reserveMinerFeeNative,
+    reserveMinerFeeAtomic: decimalCoinsToAtomic(reserveMinerFeeNative, nativeDecimals).toString(),
     coinbaseMaturityBlocks: checkedInteger(
       value.coinbaseMaturityBlocks ?? DEFAULT_COINBASE_MATURITY_BLOCKS,
       "coinbaseMaturityBlocks",
@@ -252,12 +263,35 @@ export async function executeNativeDepositObservationFlow({
     depositOutput,
     depositUtxo,
   });
+  await cli({
+    step: "LOCAL_E2E_CREATE_RESERVE_WALLET",
+    command: "createwallet",
+    parameters: [config.reserveWalletName],
+  });
+  const canonicalReserveAddress = requireNonEmptyText(
+    await cli({
+      step: "LOCAL_E2E_GET_CANONICAL_RESERVE_ADDRESS",
+      wallet: config.reserveWalletName,
+      command: "getnewaddress",
+    }),
+    "canonicalReserveAddress",
+  );
+  const reserveSweepDraft = await draftLocalReserveSweep({
+    cli,
+    depositTxidHex,
+    depositVout: depositOutput.vout,
+    depositAmountAtomic: config.amountAtomic,
+    nativeMinerFeeAtomic: config.reserveMinerFeeAtomic,
+    nativeDecimals: config.nativeDecimals,
+    canonicalReserveAddress,
+    proofFingerprintHex,
+  });
 
   return Object.freeze({
     protocol: LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL,
     state: LOCAL_NATIVE_TO_SOLANA_WAITING_FOR_DEPENDENCY,
-    reason: "NATIVE_RESERVE_SWEEP_CONSTRUCTION_PENDING",
-    completedStage: LOCAL_NATIVE_TO_SOLANA_DEPOSIT_EVIDENCE_VALIDATED,
+    reason: "FROST_RESERVE_SWEEP_SIGNING_PENDING",
+    completedStage: LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_DRAFTED,
     productionReady: false,
     mainnetActivation: "DISABLED",
     noPerTransferKingPepeTeamApprovalState: true,
@@ -279,8 +313,8 @@ export async function executeNativeDepositObservationFlow({
       sourceBestHeight: nativeSource.bestHeight,
       proofFingerprintHex,
     }),
+    reserveSweep: reserveSweepDraft,
     nextRequiredImplementation: Object.freeze([
-      "CONSTRUCT_CANONICAL_RESERVE_SWEEP_WITH_NATIVE_RULES",
       "SIGN_RESERVE_SWEEP_WITH_REAL_NATIVE_COMPATIBLE_FROST_A_B",
       "BROADCAST_AND_FINALIZE_RESERVE_SWEEP",
       "SUBMIT_AND_OBSERVE_SOLANA_MINT",
@@ -424,6 +458,52 @@ export function localDepositProofFingerprintHex({
   });
 }
 
+export async function draftLocalReserveSweep({
+  cli,
+  depositTxidHex,
+  depositVout,
+  depositAmountAtomic,
+  nativeMinerFeeAtomic,
+  nativeDecimals,
+  canonicalReserveAddress,
+  proofFingerprintHex,
+}) {
+  const txid = normalizeHash32(depositTxidHex, "depositTxidHex");
+  const vout = checkedInteger(depositVout, "depositVout", 0, 10_000_000);
+  const amount = canonicalUintDecimal(depositAmountAtomic, "depositAmountAtomic");
+  const fee = canonicalUintDecimal(nativeMinerFeeAtomic, "nativeMinerFeeAtomic");
+  const reserveAmountAtomic = checkedAtomicSubtract(amount, fee, "LocalNativeReserveSweepFeeExceedsDeposit");
+  if (reserveAmountAtomic === "0") {
+    throw new Error("LocalNativeReserveSweepReserveAmountMustBePositive");
+  }
+  const reserveAmountNative = atomicToFixedDecimalCoins(reserveAmountAtomic, nativeDecimals);
+  const reserveAddress = requireNonEmptyText(canonicalReserveAddress, "canonicalReserveAddress");
+  const unsignedNativeTransactionHex = normalizeRawTransactionHex(
+    await cli({
+      step: "LOCAL_E2E_CREATE_UNSIGNED_NATIVE_RESERVE_SWEEP",
+      command: "createrawtransaction",
+      parameters: [
+        JSON.stringify([{ txid, vout }]),
+        JSON.stringify({ [reserveAddress]: reserveAmountNative }),
+      ],
+    }),
+    "unsignedNativeTransactionHex",
+  );
+
+  return Object.freeze({
+    protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/UNSIGNED_RESERVE_SWEEP_DRAFT`,
+    state: "UNSIGNED_DRAFT_ONLY",
+    depositOutpoint: `${txid}:${vout}`,
+    reserveAmountAtomic,
+    nativeMinerFeeAtomic: fee,
+    reserveAmountNative,
+    unsignedNativeTransactionFingerprintHex: sha256Hex(Buffer.from(unsignedNativeTransactionHex, "hex")),
+    proofFingerprintHex: normalizeHash32(proofFingerprintHex, "proofFingerprintHex"),
+    signed: false,
+    broadcast: false,
+  });
+}
+
 function localE2eResult(state, reason, extra = {}) {
   return Object.freeze({
     protocol: LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL,
@@ -538,6 +618,33 @@ function canonicalUintDecimal(value, label) {
   return value;
 }
 
+function checkedAtomicSubtract(left, right, errorCode) {
+  const leftValue = BigInt(canonicalUintDecimal(left, "leftAtomic"));
+  const rightValue = BigInt(canonicalUintDecimal(right, "rightAtomic"));
+  if (rightValue > leftValue) {
+    throw new Error(errorCode);
+  }
+  return (leftValue - rightValue).toString();
+}
+
+function atomicToFixedDecimalCoins(value, nativeDecimals) {
+  const atomic = BigInt(canonicalUintDecimal(value, "atomicAmount"));
+  const decimals = checkedInteger(nativeDecimals, "nativeDecimals", 0, 18);
+  if (decimals === 0) return atomic.toString();
+  const scale = 10n ** BigInt(decimals);
+  const whole = atomic / scale;
+  const fraction = (atomic % scale).toString().padStart(decimals, "0");
+  return `${whole}.${fraction}`;
+}
+
+function normalizeRawTransactionHex(value, label) {
+  const normalized = normalizeNonEmptyHexText(String(value ?? "").trim(), label);
+  if (normalized.length > MAX_UNSIGNED_SWEEP_BYTES * 2) {
+    throw new Error(`${label}:TooLarge`);
+  }
+  return normalized;
+}
+
 function normalizeHash32(value, label) {
   const normalized = normalizeHexText(String(value ?? "").trim(), label);
   if (normalized.length !== 64) {
@@ -580,6 +687,10 @@ function requireObject(value, label) {
     throw new Error(`${label}:ExpectedObject`);
   }
   return value;
+}
+
+function sha256Hex(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
 }
 
 function isSameOrInside(parent, candidate) {

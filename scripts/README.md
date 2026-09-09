@@ -19,6 +19,8 @@ Current safe utilities:
   runner. It composes the bootstrap harness with local REGTEST wallet funding,
   deposit intent creation, local Native source/genesis validation, raw deposit
   transaction identity checks, UTXO/finality checks, and non-secret proof
-  fingerprinting. Until reserve-sweep construction, FROST-backed reserve
-  broadcast, Solana mint submission, and reconciliation are exercised against
-  real local daemons, it reports the full flow as not run rather than passed.
+  fingerprinting. It now drafts an unsigned local REGTEST reserve sweep with
+  exact integer miner-fee accounting, but does not wallet-sign, FROST-sign, or
+  broadcast that transaction. Until FROST-backed reserve broadcast, Solana mint
+  submission, and reconciliation are exercised against real local daemons, it
+  reports the full flow as not run rather than passed.

@@ -6,10 +6,11 @@ import path from "node:path";
 import { test } from "node:test";
 import {
   LOCAL_NATIVE_TO_SOLANA_BLOCKED,
-  LOCAL_NATIVE_TO_SOLANA_DEPOSIT_EVIDENCE_VALIDATED,
   LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL,
+  LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_DRAFTED,
   LOCAL_NATIVE_TO_SOLANA_WAITING_FOR_DEPENDENCY,
   createNativeToSolanaFlowConfig,
+  draftLocalReserveSweep,
   executeNativeDepositObservationFlow,
   findDepositOutput,
   validateLocalNativeSourceSnapshot,
@@ -25,6 +26,7 @@ const DEPOSIT_TXID = h("phase08-real-daemon-deposit-txid");
 const SCRIPT_HEX = `5120${h("phase08-local-deposit-script")}`;
 const REGTEST_GENESIS_HASH = h("kingpepe-regtest-genesis");
 const REGTEST_BEST_BLOCK_HASH = h("kingpepe-regtest-best-block");
+const UNSIGNED_SWEEP_HEX = "0200000001";
 
 test("native-to-solana runner blocks before executing deposit flow when local infrastructure is missing", async () => {
   const executor = new FakeExecutor();
@@ -61,9 +63,9 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
     });
 
     assert.equal(result.state, LOCAL_NATIVE_TO_SOLANA_WAITING_FOR_DEPENDENCY);
-    assert.equal(result.reason, "NATIVE_RESERVE_SWEEP_CONSTRUCTION_PENDING");
+    assert.equal(result.reason, "FROST_RESERVE_SWEEP_SIGNING_PENDING");
     assert.equal(result.fullNativeToSolanaE2e, "NOT_RUN_FULL_FLOW_NATIVE_RESERVE_SWEEP_PENDING");
-    assert.equal(result.nativeToSolanaE2e.completedStage, LOCAL_NATIVE_TO_SOLANA_DEPOSIT_EVIDENCE_VALIDATED);
+    assert.equal(result.nativeToSolanaE2e.completedStage, LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_DRAFTED);
     assert.equal(result.nativeToSolanaE2e.noPerTransferKingPepeTeamApprovalState, true);
     assert.equal(result.nativeToSolanaE2e.deposit.txidHex, DEPOSIT_TXID);
     assert.equal(result.nativeToSolanaE2e.deposit.vout, 1);
@@ -74,6 +76,13 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
     assert.equal(result.nativeToSolanaE2e.deposit.sourceBestHeight, 107);
     assert.match(result.nativeToSolanaE2e.deposit.proofFingerprintHex, /^[0-9a-f]{64}$/u);
     assert.equal(result.nativeToSolanaE2e.nativeSource.trust, "RPC_OBSERVATION");
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.state, "UNSIGNED_DRAFT_ONLY");
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.reserveAmountAtomic, "99999000");
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.nativeMinerFeeAtomic, "1000");
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.reserveAmountNative, "0.99999000");
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.signed, false);
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.broadcast, false);
+    assert.match(result.nativeToSolanaE2e.reserveSweep.unsignedNativeTransactionFingerprintHex, /^[0-9a-f]{64}$/u);
     assert.match(result.nativeToSolanaE2e.stateRoot, /^\$\{LOCAL_E2E_RUN_ROOT\}/u);
     assert.equal(result.nativeToSolanaE2e.stateRoot.includes(runRoot), false);
     assert.doesNotMatch(JSON.stringify(result), /WAITING_FOR_ADMIN_APPROVAL/u);
@@ -91,9 +100,15 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
         "LOCAL_E2E_OBSERVE_NATIVE_GENESIS_HASH",
         "LOCAL_E2E_OBSERVE_DEPOSIT_TRANSACTION",
         "LOCAL_E2E_VERIFY_DEPOSIT_UTXO_UNSPENT",
+        "LOCAL_E2E_CREATE_RESERVE_WALLET",
+        "LOCAL_E2E_GET_CANONICAL_RESERVE_ADDRESS",
+        "LOCAL_E2E_CREATE_UNSIGNED_NATIVE_RESERVE_SWEEP",
       ],
     );
     assert(executor.commandArgs.some((args) => args.includes("sendtoaddress")));
+    assert(executor.commandArgs.some((args) => args.includes("createrawtransaction")));
+    assert(!executor.commandArgs.some((args) => args.includes("signrawtransactionwithwallet")));
+    assert(!executor.commandArgs.some((args) => args.includes("sendrawtransaction")));
     assert.deepEqual(executor.stopped, ["START_KINGPEPE_REGTEST", "START_SOLANA_LOCAL_VALIDATOR"]);
   } finally {
     rmSync(runRoot, { recursive: true, force: true });
@@ -195,6 +210,53 @@ test("deposit output and UTXO validation reject ambiguous or unsafe observations
         expectedTxidHex: DEPOSIT_TXID,
       }),
     /LocalNativeDepositTxidMismatch/u,
+  );
+});
+
+test("unsigned reserve sweep draft uses exact integer fee accounting and rejects fee overrun", async () => {
+  const calls = [];
+  const draft = await draftLocalReserveSweep({
+    cli: async (request) => {
+      calls.push(request);
+      return UNSIGNED_SWEEP_HEX;
+    },
+    depositTxidHex: DEPOSIT_TXID,
+    depositVout: 1,
+    depositAmountAtomic: "100000000",
+    nativeMinerFeeAtomic: "1000",
+    nativeDecimals: 8,
+    canonicalReserveAddress: "bcrt1qkingpepereserveaddress",
+    proofFingerprintHex: h("proof-fingerprint"),
+  });
+
+  assert.equal(draft.depositOutpoint, `${DEPOSIT_TXID}:1`);
+  assert.equal(draft.reserveAmountAtomic, "99999000");
+  assert.equal(draft.nativeMinerFeeAtomic, "1000");
+  assert.equal(draft.reserveAmountNative, "0.99999000");
+  assert.equal(draft.signed, false);
+  assert.equal(draft.broadcast, false);
+  assert.deepEqual(calls[0], {
+    step: "LOCAL_E2E_CREATE_UNSIGNED_NATIVE_RESERVE_SWEEP",
+    command: "createrawtransaction",
+    parameters: [
+      JSON.stringify([{ txid: DEPOSIT_TXID, vout: 1 }]),
+      JSON.stringify({ bcrt1qkingpepereserveaddress: "0.99999000" }),
+    ],
+  });
+
+  await assert.rejects(
+    () =>
+      draftLocalReserveSweep({
+        cli: async () => UNSIGNED_SWEEP_HEX,
+        depositTxidHex: DEPOSIT_TXID,
+        depositVout: 1,
+        depositAmountAtomic: "1000",
+        nativeMinerFeeAtomic: "1001",
+        nativeDecimals: 8,
+        canonicalReserveAddress: "bcrt1qkingpepereserveaddress",
+        proofFingerprintHex: h("proof-fingerprint"),
+      }),
+    /LocalNativeReserveSweepFeeExceedsDeposit/u,
   );
 });
 
@@ -382,7 +444,9 @@ function defaultOutput(step) {
   }
   if (step === "LOCAL_E2E_GET_USER_MINING_ADDRESS") return "bcrt1qkingpepeminingaddress";
   if (step === "LOCAL_E2E_CREATE_NATIVE_DEPOSIT_INTENT") return "bcrt1qkingpepedepositaddress";
+  if (step === "LOCAL_E2E_GET_CANONICAL_RESERVE_ADDRESS") return "bcrt1qkingpepereserveaddress";
   if (step === "LOCAL_E2E_SEND_NATIVE_DEPOSIT") return DEPOSIT_TXID;
+  if (step === "LOCAL_E2E_CREATE_UNSIGNED_NATIVE_RESERVE_SWEEP") return UNSIGNED_SWEEP_HEX;
   if (step === "LOCAL_E2E_OBSERVE_NATIVE_SOURCE_SNAPSHOT") {
     return JSON.stringify({
       chain: "regtest",
