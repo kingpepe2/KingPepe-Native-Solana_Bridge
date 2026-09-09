@@ -20,6 +20,11 @@ import {
   LocalnetSolanaDepositClaimBridge,
   prepareLocalnetSolanaDepositClaimRequest,
 } from "../localnet-solana-deposit-claim-bridge.mjs";
+import {
+  InMemoryNativeReserveSweepJournal,
+  NativeReserveSweepRelayer,
+  NativeReserveSweepVerifier,
+} from "../native-reserve-sweep-adapters.mjs";
 import { InMemorySolanaDepositClaimJournal } from "../solana-deposit-claim-submitter.mjs";
 import { base58Encode } from "../solana-deposit-claim-transaction-plan.mjs";
 import { SolanaDepositClaimObserver } from "../../solana-observer/solana-deposit-claim-observer.mjs";
@@ -33,6 +38,7 @@ import {
   createNativeSigningPolicy,
   runTwoPartyDkg,
 } from "../../../native/frost/index.mjs";
+import { RPC_OBSERVATION, SOURCE_READY } from "../../../native/node/native-rpc-client.mjs";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
 const ZERO_HASH = "00".repeat(32);
@@ -484,6 +490,63 @@ class FakeIntegratedLocalnetSolanaRpc {
   }
 }
 
+class FakeIntegratedNativeReserveRpc {
+  constructor(operation, options = {}) {
+    this.operation = operation;
+    this.sendResults = options.sendResults ?? [operation.reserveSweep.nativeSweepTxidHex];
+    this.sourceState = options.sourceState ?? SOURCE_READY;
+    this.sourceTrust = options.sourceTrust ?? RPC_OBSERVATION;
+    this.confirmations = options.confirmations ?? 8;
+    this.reserveValueAtomic = options.reserveValueAtomic ?? operation.deposit.amountAtomic;
+    this.reserveScriptPubKeyHex = options.reserveScriptPubKeyHex ?? operation.reserveSweep.canonicalReserveScriptPubKeyHex;
+    this.includeDepositInput = options.includeDepositInput !== false;
+    this.sendCalls = [];
+    this.sourceSnapshotCalls = [];
+    this.rawTransactionCalls = [];
+  }
+
+  async sendRawTransaction(rawTransactionHex) {
+    this.sendCalls.push(rawTransactionHex);
+    assert.equal(rawTransactionHex, this.operation.reserveSweep.signedNativeTransactionHex);
+    return this.sendResults[Math.min(this.sendCalls.length - 1, this.sendResults.length - 1)];
+  }
+
+  async getSourceSnapshot(request) {
+    this.sourceSnapshotCalls.push(request);
+    return {
+      trust: this.sourceTrust,
+      state: this.sourceState,
+      network: "regtest",
+      genesisHash: this.operation.deposit.nativeGenesisHash,
+    };
+  }
+
+  async getRawTransaction(txid, verbose) {
+    this.rawTransactionCalls.push({ txid, verbose });
+    return {
+      txid,
+      confirmations: this.confirmations,
+      vin: this.includeDepositInput
+        ? [
+            {
+              txid: this.operation.deposit.depositOutpoint.txid,
+              vout: this.operation.deposit.depositOutpoint.vout,
+            },
+          ]
+        : [],
+      vout: [
+        {
+          n: 0,
+          valueAtomic: this.reserveValueAtomic,
+          scriptPubKey: {
+            hex: this.reserveScriptPubKeyHex,
+          },
+        },
+      ],
+    };
+  }
+}
+
 test("async Native to Solana pipeline awaits promise-based adapters without a per-transfer approval state", async () => {
   const runtime = createPipeline({ asyncAdapters: true });
   try {
@@ -556,6 +619,111 @@ test("automatic Native to Solana pipeline submits through localnet Solana bridge
     assert.deepEqual(rpc.statusCalls, [rpc.solanaSignature]);
     assert.deepEqual(rpc.transactionCalls, [rpc.solanaSignature]);
     assert.deepEqual(rpc.accountInfoCalls, [
+      expectedPrepared.depositClaimAccountBase58,
+      expectedPrepared.mintAccountBase58,
+    ]);
+    assert.doesNotMatch(JSON.stringify(result), /WAITING_FOR_ADMIN_APPROVAL/u);
+  } finally {
+    runtime.frost.cleanup();
+  }
+});
+
+test("automatic Native to Solana pipeline uses Native reserve sweep adapters and localnet Solana claim adapters", async () => {
+  const config = baseConfig();
+  const operation = operationWithComputedId(config);
+  const { encodedMessageHex, decodedMessage } = buildDepositClaimMessage(config, operation);
+  const nativeRpc = new FakeIntegratedNativeReserveRpc(operation);
+  const nativeRelayer = new NativeReserveSweepRelayer({
+    config: {
+      environment: "localnet",
+    },
+    rpcClient: nativeRpc,
+    journal: new InMemoryNativeReserveSweepJournal(),
+  });
+  const reserveVerifier = new NativeReserveSweepVerifier({
+    config: {
+      trust: "LOCALLY_VALIDATED_CHAIN_STATE",
+      expectedSourceNetwork: "regtest",
+      requiredConfirmations: 6,
+      nativeDecimals: 8,
+    },
+    rpcClient: nativeRpc,
+  });
+  const feePayer = feePayerKeypairForPipelineTest();
+  const feePayerSigner = feePayerSignerForPipelineTest(feePayer);
+  const solanaBridgeConfig = localnetBridgeConfigForPipeline(config, feePayer);
+  const solanaRpc = new FakeIntegratedLocalnetSolanaRpc({
+    claimAccountBase64: depositClaimAccountBase64ForMessage(decodedMessage),
+  });
+  const expectedPrepared = await prepareLocalnetSolanaDepositClaimRequest(
+    solanaBridgeConfig,
+    {
+      operationIdHex: decodedMessage.operationIdHex,
+      encodedMessageHex,
+      messageDigestHex: decodedMessage.messageDigestHex,
+      amountAtomic: decodedMessage.amountAtomic.toString(),
+      solanaRecipientHex: decodedMessage.destinationHex,
+    },
+    {
+      feePayerSigner,
+      blockhashSource: solanaRpc,
+    },
+  );
+  solanaRpc.expectAccounts({
+    depositClaimAccountBase58: expectedPrepared.depositClaimAccountBase58,
+    mintAccountBase58: expectedPrepared.mintAccountBase58,
+  });
+  const claimObserver = new SolanaDepositClaimObserver({
+    config: {
+      environment: "localnet",
+      cluster: "localnet",
+      managerProgramIdHex: config.deployment.managerProgramId,
+      transceiverProgramIdHex: config.deployment.transceiverProgramId,
+      mintHex: config.deployment.mint,
+    },
+    rpcClient: solanaRpc,
+  });
+  const solanaBridge = new LocalnetSolanaDepositClaimBridge({
+    config: solanaBridgeConfig,
+    feePayerSigner,
+    rpcClient: solanaRpc,
+    claimObserver,
+    journal: new InMemorySolanaDepositClaimJournal(),
+  });
+  const runtime = createPipeline({
+    nativeRelayer,
+    reserveVerifier,
+    solanaBridge,
+  });
+  try {
+    const result = await runtime.pipeline.processDepositAsync(runtime.operation, 1_700_000_600);
+    assert.equal(result.state, DEPOSIT_STATES.COMPLETED);
+    assert.equal(result.reason, "ALL_REQUIRED_CHECKS_PASSED");
+    assert.equal(result.threshold, 2);
+    assert.deepEqual(result.signerIds, REQUIRED_FROST_SIGNERS);
+    assert.equal(result.nativeSweepTxidHex, operation.reserveSweep.nativeSweepTxidHex);
+    assert.equal(result.reserveAllocationIdHex, operation.reserveSweep.reserveAllocationIdHex);
+    assert.equal(result.solanaSignature, solanaRpc.solanaSignature);
+    assert.equal(result.mintedAmountAtomic, operation.deposit.amountAtomic);
+    assert.equal(runtime.pipeline.ledgerSnapshot().canonicalReserve, operation.deposit.amountAtomic);
+    assert.equal(runtime.pipeline.ledgerSnapshot().mintedSupply, operation.deposit.amountAtomic);
+    assert.deepEqual(nativeRpc.sendCalls, [operation.reserveSweep.signedNativeTransactionHex]);
+    assert.deepEqual(nativeRpc.sourceSnapshotCalls, [
+      {
+        expectedNetwork: "regtest",
+        expectedGenesisHash: config.deployment.nativeGenesis,
+      },
+    ]);
+    assert.deepEqual(nativeRpc.rawTransactionCalls, [
+      {
+        txid: operation.reserveSweep.nativeSweepTxidHex,
+        verbose: true,
+      },
+    ]);
+    assert.equal(solanaRpc.sendCalls.length, 1);
+    assert.deepEqual(solanaRpc.statusCalls, [solanaRpc.solanaSignature]);
+    assert.deepEqual(solanaRpc.transactionCalls, [solanaRpc.solanaSignature]);
+    assert.deepEqual(solanaRpc.accountInfoCalls, [
       expectedPrepared.depositClaimAccountBase58,
       expectedPrepared.mintAccountBase58,
     ]);

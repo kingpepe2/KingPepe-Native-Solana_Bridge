@@ -32,6 +32,11 @@ deposit-claim bridge, durable submitter, and finalized claim observer through
 fake loopback RPC fixtures; this is not a substitute for daemon-backed local
 E2E validation.
 
+An additional Phase 08 integration test connects the same automatic pipeline to
+the real Native reserve-sweep relayer/verifier adapter classes and the localnet
+Solana claim bridge/observer adapter classes at the same time, still using fake
+loopback RPC fixtures because the required local daemons are unavailable.
+
 `FileBackedDepositJournal` persists completed deposit terminal results and
 deposit-outpoint reservations outside the source repository. It is used for
 local restart/retry safety so a completed deposit replay does not rebroadcast

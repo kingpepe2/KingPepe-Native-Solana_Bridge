@@ -553,6 +553,26 @@
     and `anchor`)
 - Real Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
 
+## Phase 08 automatic pipeline Native plus Solana adapter integration
+
+- Source commit: PENDING
+- CI URL: PENDING
+- CI status: PENDING
+- Added a source-level integration test that runs the automatic
+  Native-to-Solana deposit pipeline through:
+
+  - real Native reserve-sweep relayer and verifier adapter classes;
+  - real software FROST A+B signing runtime;
+  - real project attestation combination;
+  - real localnet Solana deposit-claim bridge, durable submitter, and finalized
+    claim observer classes.
+- The test uses fake loopback RPC fixtures for Native REGTEST and Solana
+  localnet because the required daemon/toolchain executables are not present in
+  the current environment.
+- Local test result so far: `npm run test:bridge-validator` passed with 38
+  tests.
+- Real daemon-backed Native-to-Solana E2E: `BLOCKED / NOT_RUN`
+
 ## Phase 08 mint-authority real Solana PDA correction
 
 - Replaced the bridge manager's prior SHA-256 mint-authority model with
