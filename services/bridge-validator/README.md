@@ -28,6 +28,12 @@ The pipeline exposes synchronous and asynchronous processing entrypoints. The
 asynchronous entrypoint is for promise-returning local RPC adapters and keeps
 the same validation, FROST, attestation, replay, and accounting checks.
 
+`FileBackedDepositJournal` persists completed deposit terminal results and
+deposit-outpoint reservations outside the source repository. It is used for
+local restart/retry safety so a completed deposit replay does not rebroadcast
+the Native reserve sweep or resubmit the Solana claim, and a conflicting
+operation cannot reuse an already-reserved deposit outpoint.
+
 `solana-deposit-claim-submitter.mjs` implements the localnet Solana deposit
 claim submission boundary used after A+B attestation. It accepts prebuilt
 transaction bytes from the local harness/SDK layer, verifies the canonical
