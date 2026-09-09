@@ -345,6 +345,40 @@
 - next:
   - Continue Phase 08 by integrating the actual disposable local E2E runner once the required executables are available. Do not proceed to Phase 09 until the Native-to-Solana local E2E gate actually passes.
 
+## Phase 08 local E2E bootstrap runner
+
+- PHASE: `08`
+- source commit: `d392403733bbfb92fcfd2d50a1d3879d63f0e3bb`
+- push result: pushed to private GitHub repository
+- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34307355800`
+- CI status: `PASS`
+- tests:
+  - `npm run test:local-e2e-readiness` (pass, 13 readiness/orchestration/bootstrap tests)
+  - `npm test` (pass, 2 protocol vectors plus 36 Node tests)
+  - `npm run local:e2e:bootstrap` (expected BLOCKED, exit 2)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - CI Linux format, clippy, workspace, Node, and native crate tests (PASS)
+  - CI Windows workspace, Node, and native crate tests (PASS)
+  - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
+- changed:
+  - Added a local-only bootstrap runner for executable version checks,
+    `anchor build`, disposable Solana local-validator startup, disposable
+    KingPepe REGTEST startup, health checks, and cleanup.
+  - Added tests that prove blocked readiness executes no commands, fake
+    complete infrastructure runs bootstrap steps, mismatched KingPepe REGTEST
+    versions block before service startup, missing build artifacts block before
+    validator startup, and health-check failure stops started services.
+  - Kept the runner honest: it does not claim that the full economic
+    Native-to-Solana local E2E flow passed.
+- blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
+- next:
+  - Continue Phase 08 only after the required disposable local KingPepe and
+    Solana/Anchor executables are available. Do not proceed to Phase 09 until
+    the Native-to-Solana local E2E gate actually passes.
+
 ## Phase 08 Solana account-state codec implementation
 
 - PHASE: `08`

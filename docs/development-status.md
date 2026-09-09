@@ -72,6 +72,7 @@
 - Phase 08 `npm run test:local-e2e-readiness`: PASS, 8 readiness/orchestration tests
 - Phase 08 `npm run doctor:local-e2e`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING; missing localnet executables; both Solana programs report `READY` at the source/readiness-gate level after account-execution wiring
 - Phase 08 `npm run local:e2e:plan`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING with redacted local paths and no production configuration
+- Phase 08 `npm run local:e2e:bootstrap`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING before command execution; missing localnet executables
 - Phase 08 source-boundary CI: PASS for `09e42e6856312a0c617eb9c14a0312012263722a`
 - Phase 08 local E2E readiness gate CI: PASS for `6f22309770f3a2f85c96093bcf8af10b47065f31`
 - Phase 08 fail-closed Solana entrypoint shell CI: PASS for `7eafd8a38d346dcb018005a7357a0012a84b0e0c`
@@ -80,6 +81,7 @@
 - Phase 08 Solana account-state codecs: PASS for `804e03d4909ad002c0cf97798bd30cda56a7d4be`
 - Phase 08 Solana account execution and SPL Token CPI source: PASS for `8309b3fc95bea4b84224852cb13e2f9b75099dfa`
 - Phase 08 local E2E orchestration plan: PASS for `7ffd331358146bb990f9830d4f39c0849cc0bdeb`
+- Phase 08 local E2E bootstrap runner: PASS for `d392403733bbfb92fcfd2d50a1d3879d63f0e3bb`
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 52 Rust tests after account-execution update
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
@@ -225,6 +227,33 @@
 - CI URL:
   `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34305873353`
 - CI status: `PASS`
+- Real daemon-backed Native-to-Solana E2E: `BLOCKED / NOT_RUN`
+
+## Phase 08 local E2E bootstrap runner
+
+- Added `scripts/local-e2e-bootstrap.mjs`.
+- Added `npm run local:e2e:bootstrap`.
+- Added bootstrap tests to `scripts/tests/local-e2e-bootstrap.test.mjs`.
+- The bootstrap runner performs executable version checks, `anchor build`,
+  Solana local-validator startup, KingPepe REGTEST startup, health checks, and
+  cleanup when the required local-only toolchain is present.
+- The runner exits blocked before command execution when required executables
+  are missing.
+- The runner explicitly reports that it does not run or prove the full
+  economic Native-to-Solana E2E flow.
+- Source commit: `d392403733bbfb92fcfd2d50a1d3879d63f0e3bb`
+- CI URL:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34307355800`
+- CI status: `PASS`
+- Tests:
+  - `npm run test:local-e2e-readiness` (pass, 13 readiness/orchestration/bootstrap tests)
+  - `npm test` (pass, 2 protocol vectors plus 36 Node tests)
+  - `npm run local:e2e:bootstrap` (expected BLOCKED, exit 2)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - CI Linux format, clippy, workspace, Node, and native crate tests (PASS)
+  - CI Windows workspace, Node, and native crate tests (PASS)
+  - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
 - Real daemon-backed Native-to-Solana E2E: `BLOCKED / NOT_RUN`
 
 ## Phase 08 mint-authority real Solana PDA correction
