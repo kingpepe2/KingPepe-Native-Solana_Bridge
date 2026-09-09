@@ -6,7 +6,13 @@ edition = "2021"
 [lib]
 name = "kingpepe_transceiver"
 path = "src/lib.rs"
+crate-type = ["cdylib", "lib"]
+
+[features]
+no-entrypoint = []
 
 [dependencies]
 bridge-messages = { path = "../../modules/bridge-messages" }
+solana-program = "=1.18.26"
 thiserror = "1.0.69"
+zeroize_derive = "=1.4.2"

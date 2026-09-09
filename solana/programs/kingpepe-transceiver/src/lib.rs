@@ -5,14 +5,27 @@
 //! and Solana Ed25519 instruction parsing. No caller-provided `proofVerified`
 //! style shortcut exists in this boundary.
 
+#![allow(unexpected_cfgs)]
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use bridge_messages::{
     BridgeAction, BridgeDirection, CanonicalBridgeMessage, Hash32, PubkeyBytes, MESSAGE_LENGTH,
 };
+use solana_program::{
+    account_info::AccountInfo, declare_id, entrypoint::ProgramResult, program_error::ProgramError,
+    pubkey::Pubkey,
+};
 use thiserror::Error;
 
+declare_id!("AkqLGFTy43D9cLjHRTQGpRGb2uWA8nuVyGb2bJYHKCrN");
+
+#[cfg(not(feature = "no-entrypoint"))]
+solana_program::entrypoint!(process_instruction);
+
 pub const PROGRAM_NAME: &str = "kingpepe_transceiver";
+pub const LOCALNET_PROGRAM_ID_BASE58: &str = "AkqLGFTy43D9cLjHRTQGpRGb2uWA8nuVyGb2bJYHKCrN";
+pub const PROGRAM_ABI_STATUS: &str = "ENTRYPOINT_FAIL_CLOSED";
 pub const ED25519_PROGRAM_ID: PubkeyBytes = [
     0x03, 0x7d, 0x46, 0xd6, 0x7c, 0x93, 0xfb, 0xbe, 0x12, 0xf9, 0x42, 0x8f, 0x83, 0x8d, 0x40, 0xff,
     0x05, 0x70, 0x74, 0x49, 0x27, 0xf4, 0x8a, 0x64, 0xfc, 0xca, 0x70, 0x44, 0x80, 0x00, 0x00, 0x00,
@@ -20,6 +33,25 @@ pub const ED25519_PROGRAM_ID: PubkeyBytes = [
 pub const ED25519_SIGNATURE_LENGTH: usize = 64;
 pub const ED25519_PUBLIC_KEY_LENGTH: usize = 32;
 pub const ED25519_INSTRUCTION_HEADER_LENGTH: usize = 16;
+
+pub fn process_instruction(
+    _program_id: &Pubkey,
+    _accounts: &[AccountInfo],
+    instruction_data: &[u8],
+) -> ProgramResult {
+    process_instruction_boundary(instruction_data)
+        .map_err(|_| ProgramError::InvalidInstructionData)
+}
+
+pub fn process_instruction_boundary(instruction_data: &[u8]) -> Result<(), EntrypointError> {
+    let Some(tag) = instruction_data.first().copied() else {
+        return Err(EntrypointError::EmptyInstruction);
+    };
+    match tag {
+        0 => Err(EntrypointError::InstructionAbiDisabled),
+        other => Err(EntrypointError::UnsupportedInstructionTag(other)),
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransceiverConfig {
@@ -326,6 +358,16 @@ fn ranges_overlap(a_start: usize, a_end: usize, b_start: usize, b_end: usize) ->
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
+pub enum EntrypointError {
+    #[error("Solana instruction data is empty")]
+    EmptyInstruction,
+    #[error("Solana economic instruction ABI is not enabled yet")]
+    InstructionAbiDisabled,
+    #[error("unsupported Solana instruction tag {0}")]
+    UnsupportedInstructionTag(u8),
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
 pub enum TransceiverError {
     #[error("transceiver configuration is invalid")]
     InvalidConfig,
@@ -462,6 +504,24 @@ mod tests {
     fn transceiver_default_has_no_verifications() {
         let program = TransceiverProgram::initialize(config()).unwrap();
         assert_eq!(program.verified_messages(), 0);
+    }
+
+    #[test]
+    fn solana_entrypoint_identity_is_localnet_only_and_fails_closed() {
+        assert_eq!(id().to_string(), LOCALNET_PROGRAM_ID_BASE58);
+        assert_eq!(PROGRAM_ABI_STATUS, "ENTRYPOINT_FAIL_CLOSED");
+        assert_eq!(
+            process_instruction_boundary(&[]),
+            Err(EntrypointError::EmptyInstruction)
+        );
+        assert_eq!(
+            process_instruction_boundary(&[0]),
+            Err(EntrypointError::InstructionAbiDisabled)
+        );
+        assert_eq!(
+            process_instruction_boundary(&[255]),
+            Err(EntrypointError::UnsupportedInstructionTag(255))
+        );
     }
 
     #[test]

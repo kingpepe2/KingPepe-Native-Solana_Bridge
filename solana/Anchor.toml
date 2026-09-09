@@ -3,9 +3,8 @@ cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [programs.localnet]
-kingpepe_bridge = "Gm4g..."  # placeholder; set by deployment tooling
-kingpepe_transceiver = "H2g4..."
+kingpepe_bridge = "EfoRF4BDDspsi53XYL62mCyhCtf3FceV5LpRkRdwYqKM"
+kingpepe_transceiver = "AkqLGFTy43D9cLjHRTQGpRGb2uWA8nuVyGb2bJYHKCrN"
 
 [workspace]
 types = "modules"
-

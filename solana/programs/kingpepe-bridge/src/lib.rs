@@ -5,18 +5,50 @@
 //! protection, and atomic burn plus withdrawal recording. Mainnet activation
 //! remains disabled.
 
+#![allow(unexpected_cfgs)]
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use bridge_messages::{BridgeAction, BridgeDirection, CanonicalBridgeMessage, Hash32, PubkeyBytes};
 use kingpepe_transceiver::{TransceiverError, TransceiverProgram, VerifiedMessageReceipt};
 use sha2::{Digest, Sha256};
+use solana_program::{
+    account_info::AccountInfo, declare_id, entrypoint::ProgramResult, program_error::ProgramError,
+    pubkey::Pubkey,
+};
 use thiserror::Error;
 
+declare_id!("EfoRF4BDDspsi53XYL62mCyhCtf3FceV5LpRkRdwYqKM");
+
+#[cfg(not(feature = "no-entrypoint"))]
+solana_program::entrypoint!(process_instruction);
+
 pub const PROGRAM_NAME: &str = "kingpepe_bridge";
+pub const LOCALNET_PROGRAM_ID_BASE58: &str = "EfoRF4BDDspsi53XYL62mCyhCtf3FceV5LpRkRdwYqKM";
+pub const PROGRAM_ABI_STATUS: &str = "ENTRYPOINT_FAIL_CLOSED";
 pub const KPEPE_SYMBOL: &str = "KPEPE";
 pub const KPEPE_NAME: &str = "KingPepe";
 pub const EXPECTED_INITIAL_SUPPLY: u128 = 0;
 pub const PROJECT_BRIDGE_FEE_ATOMIC: u64 = 0;
+
+pub fn process_instruction(
+    _program_id: &Pubkey,
+    _accounts: &[AccountInfo],
+    instruction_data: &[u8],
+) -> ProgramResult {
+    process_instruction_boundary(instruction_data)
+        .map_err(|_| ProgramError::InvalidInstructionData)
+}
+
+pub fn process_instruction_boundary(instruction_data: &[u8]) -> Result<(), EntrypointError> {
+    let Some(tag) = instruction_data.first().copied() else {
+        return Err(EntrypointError::EmptyInstruction);
+    };
+    match tag {
+        0 => Err(EntrypointError::InstructionAbiDisabled),
+        other => Err(EntrypointError::UnsupportedInstructionTag(other)),
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProgramState {
@@ -423,6 +455,16 @@ fn validate_burn(
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
+pub enum EntrypointError {
+    #[error("Solana instruction data is empty")]
+    EmptyInstruction,
+    #[error("Solana economic instruction ABI is not enabled yet")]
+    InstructionAbiDisabled,
+    #[error("unsupported Solana instruction tag {0}")]
+    UnsupportedInstructionTag(u8),
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
 pub enum BridgeError {
     #[error("bridge is uninitialized")]
     Uninitialized,
@@ -612,6 +654,24 @@ mod tests {
     fn bridge_starts_uninitialized() {
         let program = BridgeProgram::default();
         assert!(!program.is_operational());
+    }
+
+    #[test]
+    fn solana_entrypoint_identity_is_localnet_only_and_fails_closed() {
+        assert_eq!(id().to_string(), LOCALNET_PROGRAM_ID_BASE58);
+        assert_eq!(PROGRAM_ABI_STATUS, "ENTRYPOINT_FAIL_CLOSED");
+        assert_eq!(
+            process_instruction_boundary(&[]),
+            Err(EntrypointError::EmptyInstruction)
+        );
+        assert_eq!(
+            process_instruction_boundary(&[0]),
+            Err(EntrypointError::InstructionAbiDisabled)
+        );
+        assert_eq!(
+            process_instruction_boundary(&[255]),
+            Err(EntrypointError::UnsupportedInstructionTag(255))
+        );
     }
 
     #[test]

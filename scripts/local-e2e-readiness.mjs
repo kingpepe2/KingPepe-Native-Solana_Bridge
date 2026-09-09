@@ -27,10 +27,15 @@ export function evaluateLocalE2eReadiness(options = {}) {
   const solanaPrograms = REQUIRED_SOLANA_PROGRAMS.map((program) => inspectSolanaProgram(repoRoot, program));
   const anchorConfig = inspectAnchorConfig(repoRoot);
   const missingExecutables = commandResults.filter((entry) => entry.state !== "FOUND").map((entry) => entry.command);
-  const nonDeployablePrograms = solanaPrograms.filter((entry) => entry.state !== "DEPLOYABLE").map((entry) => entry.program);
   const blockers = [
     ...missingExecutables.map((command) => `MISSING_EXECUTABLE:${command}`),
-    ...nonDeployablePrograms.map((program) => `SOLANA_PROGRAM_NOT_DEPLOYABLE:${program}`),
+    ...solanaPrograms
+      .filter((entry) => entry.state !== "READY")
+      .map((entry) =>
+        entry.state === "ENTRYPOINT_SHELL_ONLY"
+          ? `SOLANA_PROGRAM_ABI_NOT_READY:${entry.program}`
+          : `SOLANA_PROGRAM_NOT_DEPLOYABLE:${entry.program}`,
+      ),
     ...(anchorConfig.state === "READY" ? [] : [`ANCHOR_CONFIG_NOT_READY:${anchorConfig.reason}`]),
   ];
 
@@ -90,13 +95,21 @@ export function inspectSolanaProgram(repoRoot, program) {
     hasSolanaProgramDependency: /^\s*solana-program\s*=/mu.test(manifest),
     hasEntrypoint: /entrypoint!\s*\(|process_instruction\s*\(/u.test(source),
     hasProgramIdDeclaration: /declare_id!\s*\(/u.test(source),
+    economicAbiEnabled: !/PROGRAM_ABI_STATUS\s*:\s*&str\s*=\s*"ENTRYPOINT_FAIL_CLOSED"/u.test(source),
   });
   const failed = Object.entries(checks)
     .filter(([, passed]) => passed !== true)
     .map(([name]) => name);
+  const deployabilityFailures = failed.filter((entry) => entry !== "economicAbiEnabled");
+  const state =
+    deployabilityFailures.length === 0 && checks.economicAbiEnabled
+      ? "READY"
+      : deployabilityFailures.length === 0
+        ? "ENTRYPOINT_SHELL_ONLY"
+        : "BOUNDARY_MODEL_ONLY";
   return Object.freeze({
     program,
-    state: failed.length === 0 ? "DEPLOYABLE" : "BOUNDARY_MODEL_ONLY",
+    state,
     checks,
     failed,
   });
