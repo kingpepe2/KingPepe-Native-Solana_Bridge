@@ -10,6 +10,7 @@
   },
   "scripts": {
     "doctor:local-e2e": "node scripts/local-e2e-readiness.mjs",
+    "local:e2e:plan": "node scripts/local-e2e-orchestrator.mjs plan",
     "test": "npm run test:protocol && npm run test:frost && npm run test:attesters && npm run test:solana-observer && npm run test:bridge-validator && npm run test:local-e2e-readiness",
     "test:attesters": "node --test services/attesters/tests/*.test.mjs",
     "test:bridge-validator": "node --test services/bridge-validator/tests/*.test.mjs",

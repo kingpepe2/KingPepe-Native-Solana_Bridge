@@ -1,7 +1,10 @@
-# Project scripts scaffold
+# Project scripts
 
-Planned content:
+Current safe utilities:
 
-- Environment validation wrappers.
-- Safe local bootstrap helpers.
-- Artifact checks and manifest validators.
+- `local-e2e-readiness.mjs` checks whether the disposable KingPepe REGTEST and
+  Solana local-validator prerequisites are available.
+- `local-e2e-orchestrator.mjs` builds a local-only execution plan for the
+  Native-to-Solana local E2E gate. It keeps Mainnet disabled, keeps runtime
+  state outside the repository, and exits blocked until required executables
+  are present.
