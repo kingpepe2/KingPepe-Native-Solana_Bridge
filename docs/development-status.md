@@ -71,7 +71,7 @@
 - Phase 08 `npm run test:bridge-validator`: PASS, 39 bridge-validator tests (automatic deposit pipeline, file-backed deposit journal, async adapter path, Native reserve-sweep adapters, adapter-journal restart retry, Solana deposit claim submitter, Solana transaction-plan builder, and localnet Solana deposit-claim bridge adapter)
 - Phase 08 `npm run test:native-node`: PASS, 7 Native REGTEST RPC adapter tests
 - Phase 08 `npm run test:solana-observer`: PASS, 14 Solana observer tests including the localnet deposit-claim observer
-- Phase 08 `npm run test:local-e2e-readiness`: PASS, 13 readiness/orchestration tests
+- Phase 08 `npm run test:local-e2e-readiness`: PASS, 15 readiness/orchestration/bootstrap/harness tests
 - Phase 08 `npm run doctor:local-e2e`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING; missing localnet executables; both Solana programs report `READY` at the source/readiness-gate level after account-execution wiring
 - Phase 08 `npm run local:e2e:plan`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING with redacted local paths and no production configuration
 - Phase 08 `npm run local:e2e:bootstrap`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING before command execution; missing localnet executables
@@ -92,7 +92,7 @@
 - Phase 08 Solana deposit-claim observer: PASS for `df49793f0595bb501e83405b79d21215283a1d0a`
 - Phase 08 Solana deposit-claim transaction plan: PASS for `42a5cdb3bcc60e0be7fb5d2395503f148b6d632f`
 - Phase 08 localnet Solana deposit-claim bridge adapter: PASS for `0a4c39a146d150b5291935fb2ce800100accc898`
-- Phase 08 current `npm test`: PASS, 2 protocol vectors plus 83 Node tests
+- Phase 08 current `npm test`: PASS, 2 protocol vectors plus 85 Node tests
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 52 Rust tests after account-execution update
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
@@ -599,6 +599,32 @@
 - Local test status:
   - `npm run test:bridge-validator` (pass, 39 bridge-validator tests)
   - `npm test` (pass, 2 protocol vectors plus 83 Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - JSON manifest parse checks (pass)
+  - staged and outgoing-range secret-pattern scans (pass)
+  - `npm run doctor:local-e2e` (`BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`;
+    missing localnet executables)
+  - real daemon-backed Native-to-Solana E2E remains `BLOCKED / NOT_RUN`.
+
+## Phase 08 reusable local E2E infrastructure harness
+
+- Source commit: `PENDING_SOURCE_COMMIT`
+- CI URL: `PENDING_CI`
+- CI status: `PENDING`
+- Refactored `scripts/local-e2e-bootstrap.mjs` so the local-only bootstrap
+  path exposes a reusable harness for the future real Native-to-Solana daemon
+  flow.
+- The harness performs the same readiness, version, Anchor build, disposable
+  Solana local-validator startup, disposable KingPepe REGTEST startup, and
+  health checks before calling an injected flow callback.
+- Services remain active while the callback runs and are stopped afterward.
+- Callback failure is reported as `LOCAL_E2E_FLOW_FAILED` and does not claim a
+  local E2E pass.
+- Local test status:
+  - `npm run test:local-e2e-readiness` (pass, 15
+    readiness/orchestration/bootstrap/harness tests)
+  - `npm test` (pass, 2 protocol vectors plus 85 Node tests)
   - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
   - `python .github/scripts/guardrails.py` (pass)
   - JSON manifest parse checks (pass)

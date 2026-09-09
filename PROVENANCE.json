@@ -428,7 +428,7 @@
     {
       "path": "scripts/local-e2e-bootstrap.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 local-only bootstrap runner for version checks, Anchor build, disposable validator startup, health checks, and cleanup without production secrets or full E2E success claims."
+      "notes": "Phase 08 local-only bootstrap runner and reusable infrastructure harness for version checks, Anchor build, disposable validator startup, health checks, injected Native-to-Solana flow execution, and cleanup without production secrets or unsupported E2E success claims."
     },
     {
       "path": "scripts/tests/local-e2e-readiness.test.mjs",
@@ -443,7 +443,7 @@
     {
       "path": "scripts/tests/local-e2e-bootstrap.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 local bootstrap runner tests using injected fake executor only."
+      "notes": "Phase 08 local bootstrap runner and reusable infrastructure harness tests using injected fake executor only."
     },
     {
       "path": "services/attesters/README.md",

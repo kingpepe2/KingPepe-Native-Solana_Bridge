@@ -213,6 +213,11 @@
   only: version checks, Anchor build, disposable Solana local-validator
   startup, disposable KingPepe REGTEST startup, health checks, and cleanup.
   It does not claim the full economic Native-to-Solana E2E flow passed.
+- Phase 08 reusable local E2E infrastructure harness:
+  `scripts/local-e2e-bootstrap.mjs` now exposes a tested callback boundary that
+  keeps the disposable local services active for an injected Native-to-Solana
+  flow, stops them afterward, and reports callback failure without claiming a
+  local E2E pass.
 - Phase 08 local E2E bootstrap runner commit:
   `d392403733bbfb92fcfd2d50a1d3879d63f0e3bb`
 - Phase 08 local E2E bootstrap runner CI:

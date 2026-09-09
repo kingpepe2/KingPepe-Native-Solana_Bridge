@@ -8,7 +8,9 @@ import {
   LOCAL_E2E_BOOTSTRAP_BLOCKED,
   LOCAL_E2E_BOOTSTRAP_FAILED,
   LOCAL_E2E_BOOTSTRAP_READY,
+  LOCAL_E2E_FLOW_FAILED,
   runLocalE2eBootstrap,
+  withLocalE2eInfrastructure,
 } from "../local-e2e-bootstrap.mjs";
 import { createLocalE2ePlan } from "../local-e2e-orchestrator.mjs";
 import { REQUIRED_LOCAL_E2E_EXECUTABLES } from "../local-e2e-readiness.mjs";
@@ -51,6 +53,61 @@ test("bootstrap runs build and service health checks with fake complete toolchai
   assert(executor.calls.includes("CHECK_KINGPEPE_REGTEST_HEALTH"));
   assert.equal(result.plan.repoRoot, "${REPO_ROOT}");
   assert.equal(result.plan.runRoot, "${LOCAL_E2E_RUN_ROOT}");
+});
+
+test("infrastructure harness keeps services active while an injected local E2E flow runs", async () => {
+  const executor = new FakeExecutor();
+  const result = await withLocalE2eInfrastructure(
+    {
+      plan: readyPlan(),
+      executor,
+      programArtifactExists: () => true,
+      healthAttempts: 1,
+    },
+    async ({ commandPaths, services }) => {
+      executor.calls.push("RUN_NATIVE_TO_SOLANA_FLOW");
+      assert.equal(commandPaths.get("kingpeped"), "/fake/bin/kingpeped");
+      assert.deepEqual(services.map((service) => service.step), [
+        "START_SOLANA_LOCAL_VALIDATOR",
+        "START_KINGPEPE_REGTEST",
+      ]);
+      return {
+        fullNativeToSolanaE2e: "FLOW_CALLBACK_EXECUTED_BY_TEST",
+        nativeToSolanaFlowState: "READY_FOR_REAL_DAEMON_FLOW",
+        state: "MUST_NOT_OVERRIDE_BOOTSTRAP_STATE",
+      };
+    },
+  );
+
+  assert.equal(result.state, LOCAL_E2E_BOOTSTRAP_READY);
+  assert.equal(result.reason, "LOCAL_INFRASTRUCTURE_BOOTSTRAPPED");
+  assert.equal(result.fullNativeToSolanaE2e, "FLOW_CALLBACK_EXECUTED_BY_TEST");
+  assert.equal(result.nativeToSolanaFlowState, "READY_FOR_REAL_DAEMON_FLOW");
+  assert.deepEqual(result.commandsStarted, ["START_SOLANA_LOCAL_VALIDATOR", "START_KINGPEPE_REGTEST"]);
+  assert.deepEqual(executor.stopped, ["START_KINGPEPE_REGTEST", "START_SOLANA_LOCAL_VALIDATOR"]);
+  assert(executor.calls.indexOf("CHECK_KINGPEPE_REGTEST_HEALTH") < executor.calls.indexOf("RUN_NATIVE_TO_SOLANA_FLOW"));
+});
+
+test("infrastructure harness stops services and does not report E2E pass when injected flow fails", async () => {
+  const executor = new FakeExecutor();
+  const result = await withLocalE2eInfrastructure(
+    {
+      plan: readyPlan(),
+      executor,
+      programArtifactExists: () => true,
+      healthAttempts: 1,
+    },
+    async () => {
+      throw new Error("synthetic Native to Solana flow failure");
+    },
+  );
+
+  assert.equal(result.state, LOCAL_E2E_BOOTSTRAP_FAILED);
+  assert.equal(result.reason, LOCAL_E2E_FLOW_FAILED);
+  assert.equal(result.fullNativeToSolanaE2e, "FAILED");
+  assert.match(result.error, /synthetic Native to Solana flow failure/u);
+  assert.deepEqual(result.commandsStarted, ["START_SOLANA_LOCAL_VALIDATOR", "START_KINGPEPE_REGTEST"]);
+  assert.deepEqual(executor.stopped, ["START_KINGPEPE_REGTEST", "START_SOLANA_LOCAL_VALIDATOR"]);
 });
 
 test("bootstrap blocks mismatched KingPepe REGTEST versions before starting services", async () => {
