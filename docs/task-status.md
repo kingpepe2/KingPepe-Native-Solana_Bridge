@@ -963,3 +963,55 @@ OPEN BLOCKERS:
 NEXT PHASE:
 Continue Phase 08. Do not start Phase 09 until the real daemon-backed
 Native-to-Solana local E2E flow passes.
+
+## Phase 08 report - Native-to-Solana deposit evidence validation
+
+PHASE:
+`PHASE 08 - Automatic Native to Solana local end-to-end`
+
+COMMIT SHA:
+`48a3bae917b6ddc80dcbd0a8d1e45b28fc1eff49`
+
+COMMIT MESSAGE:
+`feat(phase-08): validate native deposit source evidence`
+
+PUSH RESULT:
+Pushed to private `kingpepe2/KingPepe-Native-Solana_Bridge` on `main`.
+
+CI RUN URL:
+`https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34335394052`
+
+CI STATUS:
+`PASS`
+
+TESTS PASS/FAIL/SKIP/NOT_RUN:
+- `npm run test:local-e2e-readiness`: PASS, 22 readiness/orchestration/bootstrap/runner tests.
+- `npm test`: PASS, 2 protocol vectors plus 92 Node tests.
+- `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
+- `python .github/scripts/guardrails.py`: PASS.
+- JSON manifest parse checks: PASS.
+- Staged and outgoing-range secret-pattern scans: PASS.
+- `npm run local:e2e:native-to-solana`: `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
+- Real daemon-backed Native-to-Solana local E2E: `BLOCKED / NOT_RUN`.
+
+WHAT CHANGED:
+- The local Native-to-Solana runner now validates `getblockchaininfo`,
+  `getblockhash 0`, expected REGTEST chain identity, raw deposit transaction
+  identity, exact deposit output, UTXO script, and UTXO finality before reserve
+  sweep construction.
+- Added deterministic non-secret deposit proof fingerprinting from local source
+  and deposit evidence.
+- Added fail-closed tests for wrong local Native source and raw transaction
+  txid mismatch.
+
+OPEN BLOCKERS:
+- Missing local `kingpeped`, `kingpepe-cli`, `solana`,
+  `solana-test-validator`, and `anchor` executables prevent real
+  daemon-backed Native-to-Solana local E2E.
+- Reserve-sweep construction, FROST-backed reserve broadcast, Solana mint
+  submission, finalized mint observation, and reconciliation remain unexecuted
+  against real local daemons.
+
+NEXT PHASE:
+Continue Phase 08. Do not start Phase 09 until the real daemon-backed
+Native-to-Solana local E2E flow passes.

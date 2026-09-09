@@ -229,7 +229,10 @@
   FROST-backed reserve broadcast, Solana mint submission, and reconciliation
   are completed against real local daemons.
 - Phase 08 Native-to-Solana deposit evidence validation status:
-  implemented locally; source commit and CI verification pending.
+  implemented and CI verified for source commit
+  `48a3bae917b6ddc80dcbd0a8d1e45b28fc1eff49`.
+- Phase 08 Native-to-Solana deposit evidence validation CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34335394052` PASS.
 - Phase 08 Native-to-Solana local E2E command runner commit:
   `b30420dc11b3f6fe0e5e883b122dfc64c04ab871`
 - Phase 08 Native-to-Solana local E2E command runner CI:

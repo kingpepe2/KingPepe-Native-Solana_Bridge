@@ -778,7 +778,11 @@
 
 ## Phase 08 Native-to-Solana deposit evidence validation
 
-- Source status: implemented locally; source commit and CI verification pending.
+- Source status: implemented and CI verified.
+- Source commit:
+  `48a3bae917b6ddc80dcbd0a8d1e45b28fc1eff49`
+- CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34335394052` PASS.
 - Local tests:
   - `npm run test:local-e2e-readiness`: PASS, 22 readiness/orchestration/bootstrap/runner tests.
   - `npm test`: PASS, 2 protocol vectors plus 92 Node tests.
