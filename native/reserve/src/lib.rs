@@ -85,7 +85,9 @@ pub enum ReserveError {
     ReserveAmountMismatch,
     #[error("nonzero reserve sweep fee requires a separate fee-funding input")]
     FeeFundingInputMissing,
-    #[error("reserve sweep fee-funding input is missing, duplicated, or aliases the temporary deposit")]
+    #[error(
+        "reserve sweep fee-funding input is missing, duplicated, or aliases the temporary deposit"
+    )]
     FeeFundingInputMismatch,
     #[error("reserve sweep fee funding does not exactly match the recorded Native fee")]
     FeeFundingAmountMismatch,
