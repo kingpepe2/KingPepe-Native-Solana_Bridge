@@ -693,6 +693,46 @@
     not proceed to Phase 09 until the Native-to-Solana local E2E gate actually
     passes.
 
+## Phase 08 automatic pipeline to localnet Solana bridge/observer integration
+
+- PHASE: `08`
+- source commit: `3b5c0e873a37bafb24ac69dd1cadc1761d921d4f`
+- commit message:
+  `test(phase-08): connect deposit pipeline to solana claim bridge`
+- push result: pushed to private GitHub repository
+- CI URL:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34324525303`
+- CI status: `PASS`
+- tests:
+  - `npm run test:bridge-validator` (pass, 37 bridge-validator tests)
+  - `npm test` (pass, 2 protocol vectors plus 81 Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - JSON manifest parse checks (pass)
+  - staged and outgoing-range secret-pattern scans (pass)
+  - `npm run doctor:local-e2e` (`BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`)
+  - CI Linux format, clippy, workspace, Node, and native crate tests (PASS)
+  - CI Windows workspace, Node, and native crate tests (PASS)
+  - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
+- changed:
+  - Added a source-level integration test connecting the automatic
+    Native-to-Solana deposit pipeline to the real localnet Solana deposit-claim
+    bridge.
+  - Exercised the durable submitter and real finalized claim observer through
+    fake loopback Solana RPC fixtures.
+  - Verified one Solana submission, finalized claim observation, exact minted
+    amount, and ledger mint accounting without any per-transfer KingPepe Team
+    approval state.
+- blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`,
+    `solana-test-validator`, and `anchor`.
+- next:
+  - Continue Phase 08 only if another meaningful source increment can be
+    implemented without falsely reporting a daemon-backed local E2E pass. Do
+    not proceed to Phase 09 until the Native-to-Solana local E2E gate actually
+    passes.
+
 ## Phase 08 Solana account-state codec implementation
 
 - PHASE: `08`

@@ -538,9 +538,10 @@
 - It verifies automatic completion without a per-transfer KingPepe Team
   approval state, one Solana submission, finalized claim observation, exact
   minted amount, and ledger mint accounting.
-- Source commit: `PENDING`
-- CI URL: `PENDING`
-- CI status: `PENDING`
+- Source commit: `3b5c0e873a37bafb24ac69dd1cadc1761d921d4f`
+- CI URL:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34324525303`
+- CI status: `PASS`
 - Local test status:
   - `npm run test:bridge-validator` (pass, 37 tests)
   - `npm test` (pass, 2 protocol vectors plus 81 Node tests)
