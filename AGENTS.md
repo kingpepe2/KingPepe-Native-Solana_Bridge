@@ -285,5 +285,13 @@
   `0a4c39a146d150b5291935fb2ce800100accc898`
 - Phase 08 localnet Solana deposit-claim bridge adapter CI:
   `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34320747968` PASS.
+- Phase 08 Solana deposit-claim observer account pass-through:
+  source changes are pending commit/CI. The localnet bridge now passes the
+  derived deposit-claim PDA and configured Mint account into the real finalized
+  claim observer instead of relying on static observer defaults. Local tests
+  passed before commit: `npm run test:bridge-validator` (36 tests), `npm test`
+  (2 protocol vectors plus 80 Node tests), `npm audit --audit-level=low`,
+  guardrails, JSON parse checks, and `npm run doctor:local-e2e`
+  (`BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`).
 - Real local E2E is still blocked by missing `kingpeped`, `kingpepe-cli`,
   `solana`, `solana-test-validator`, and `anchor`.

@@ -499,6 +499,33 @@
     and `anchor`)
 - Real Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
 
+## Phase 08 Solana deposit-claim observer account pass-through
+
+- Updated `services/bridge-validator/localnet-solana-deposit-claim-bridge.mjs`
+  so the prepared localnet request includes the derived deposit-claim PDA and
+  Mint account used by the Solana transaction plan.
+- Updated `services/bridge-validator/solana-deposit-claim-submitter.mjs` so
+  those per-operation accounts are persisted in the prepared journal entry,
+  checked during retry conflict detection, and passed to the finalized claim
+  observer.
+- Extended
+  `services/bridge-validator/tests/localnet-solana-deposit-claim-bridge.test.mjs`
+  with a real `SolanaDepositClaimObserver` fixture proving the localnet bridge
+  observes the derived per-operation accounts.
+- Source commit: `PENDING`
+- CI URL: `PENDING`
+- CI status: `PENDING`
+- Local test status:
+  - `npm run test:bridge-validator` (pass, 36 tests)
+  - `npm test` (pass, 2 protocol vectors plus 80 Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - JSON manifest parse checks (pass)
+  - `npm run doctor:local-e2e` (`BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`;
+    missing `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`,
+    and `anchor`)
+- Real Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
+
 ## Phase 08 mint-authority real Solana PDA correction
 
 - Replaced the bridge manager's prior SHA-256 mint-authority model with

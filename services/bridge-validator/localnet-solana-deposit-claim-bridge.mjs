@@ -73,6 +73,8 @@ export class LocalnetSolanaDepositClaimBridge {
       preparedTransactionBase64: signedPlan.preparedTransactionBase64,
       recentBlockhash: signedPlan.recentBlockhashBase58,
       lastValidBlockHeight: signedPlan.lastValidBlockHeight,
+      depositClaimAccountBase58: signedPlan.pdas.depositClaim.addressBase58,
+      mintAccountBase58: signedPlan.mintBase58,
       maxRetries: normalized.maxRetries,
       transactionPlan: publicTransactionPlan(signedPlan),
     });
@@ -109,6 +111,8 @@ export async function prepareLocalnetSolanaDepositClaimRequest(config, request, 
     preparedTransactionBase64: signedPlan.preparedTransactionBase64,
     recentBlockhash: signedPlan.recentBlockhashBase58,
     lastValidBlockHeight: signedPlan.lastValidBlockHeight,
+    depositClaimAccountBase58: signedPlan.pdas.depositClaim.addressBase58,
+    mintAccountBase58: signedPlan.mintBase58,
     maxRetries: normalized.maxRetries,
     transactionPlan: publicTransactionPlan(signedPlan),
   });

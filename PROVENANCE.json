@@ -488,12 +488,12 @@
     {
       "path": "services/bridge-validator/localnet-solana-deposit-claim-bridge.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 localnet adapter connecting signed Solana deposit-claim transaction planning to the durable submitter boundary."
+      "notes": "Phase 08 localnet adapter connecting signed Solana deposit-claim transaction planning to the durable submitter boundary, including derived per-operation observer account pass-through."
     },
     {
       "path": "services/bridge-validator/solana-deposit-claim-submitter.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 localnet Solana deposit claim submission boundary with canonical-message, attestation-threshold, persist-before-broadcast, status retry, and finalized claim-observation checks."
+      "notes": "Phase 08 localnet Solana deposit claim submission boundary with canonical-message, attestation-threshold, persist-before-broadcast, status retry, per-operation observer account binding, and finalized claim-observation checks."
     },
     {
       "path": "services/bridge-validator/solana-deposit-claim-transaction-plan.mjs",
@@ -513,7 +513,7 @@
     {
       "path": "services/bridge-validator/tests/localnet-solana-deposit-claim-bridge.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 tests for localnet Solana deposit-claim bridge adapter transaction preparation, submission, retry, and dependency failure behavior."
+      "notes": "Phase 08 tests for localnet Solana deposit-claim bridge adapter transaction preparation, submission, retry, dependency failure behavior, and real observer per-operation account pass-through."
     },
     {
       "path": "services/bridge-validator/tests/solana-deposit-claim-submitter.test.mjs",

@@ -19,6 +19,7 @@ import {
 import { InMemorySolanaDepositClaimJournal, SolanaDepositClaimSubmitter } from "../solana-deposit-claim-submitter.mjs";
 import { base58Encode } from "../solana-deposit-claim-transaction-plan.mjs";
 import { bytesToHex, hexToBytes } from "../../../shared/protocol/canonical-message.mjs";
+import { SolanaDepositClaimObserver } from "../../solana-observer/solana-deposit-claim-observer.mjs";
 
 const ZERO_HASH = "00".repeat(32);
 
@@ -299,6 +300,77 @@ class FakeDepositClaimObserver {
   }
 }
 
+class FakeRealDepositClaimObserverRpc {
+  constructor(options) {
+    this.solanaSignature = options.solanaSignature;
+    this.expectedDepositClaimAccountBase58 = options.expectedDepositClaimAccountBase58;
+    this.expectedMintAccountBase58 = options.expectedMintAccountBase58;
+    this.claimAccountBase64 = options.claimAccountBase64;
+    this.mintAccountBase64 = options.mintAccountBase64;
+    this.transactionCalls = [];
+    this.accountInfoCalls = [];
+  }
+
+  async getTransaction(solanaSignature) {
+    this.transactionCalls.push(solanaSignature);
+    return {
+      slot: 88,
+      meta: {
+        err: null,
+      },
+    };
+  }
+
+  async getFinalizedSlot() {
+    return 88;
+  }
+
+  async getAccountInfo(addressBase58) {
+    this.accountInfoCalls.push(addressBase58);
+    if (addressBase58 === this.expectedDepositClaimAccountBase58) {
+      return {
+        value: {
+          data: [this.claimAccountBase64, "base64"],
+        },
+      };
+    }
+    if (addressBase58 === this.expectedMintAccountBase58) {
+      return {
+        value: {
+          data: [this.mintAccountBase64, "base64"],
+        },
+      };
+    }
+    throw new Error("unexpected account address");
+  }
+}
+
+function depositClaimAccountBase64(request) {
+  const destination = Buffer.from(request.solanaRecipientHex, "hex");
+  const bytes = Buffer.alloc(211);
+  let cursor = 0;
+  bytes.write("KPBCLM01", cursor, "ascii");
+  cursor += 8;
+  bytes[cursor] = 1;
+  cursor += 1;
+  Buffer.from(request.operationIdHex, "hex").copy(bytes, cursor);
+  cursor += 32;
+  Buffer.from(request.messageDigestHex, "hex").copy(bytes, cursor);
+  cursor += 32;
+  bytes.writeBigUInt64LE(BigInt(request.amountAtomic), cursor);
+  cursor += 8;
+  bytes.writeUInt16LE(destination.length, cursor);
+  cursor += 2;
+  destination.copy(bytes, cursor);
+  return bytes.toString("base64");
+}
+
+function splMintAccountBase64() {
+  const bytes = Buffer.alloc(82);
+  bytes.writeUInt32LE(0, 46);
+  return bytes.toString("base64");
+}
+
 test("localnet Solana deposit bridge prepares, submits, and verifies the finalized claim", async () => {
   const fixture = createRequest();
   const feePayer = feePayerKeypair();
@@ -339,6 +411,8 @@ test("localnet prepared deposit request can feed the submitter without key files
   assert.equal(prepared.recentBlockhash, rpc.latestBlockhash);
   assert.equal(prepared.lastValidBlockHeight, rpc.lastValidBlockHeight);
   assert.match(prepared.preparedTransactionBase64, /^[A-Za-z0-9+/]+={0,2}$/u);
+  assert.equal(prepared.depositClaimAccountBase58, prepared.transactionPlan.pdas.depositClaim.addressBase58);
+  assert.equal(prepared.mintAccountBase58, prepared.transactionPlan.mintBase58);
   assert.equal(JSON.stringify(prepared).includes("secret"), false);
   assert.equal(prepared.transactionPlan.operationIdHex, fixture.request.operationIdHex);
 
@@ -352,6 +426,52 @@ test("localnet prepared deposit request can feed the submitter without key files
   const result = await submitter.submitDepositClaim(prepared);
   assert.equal(result.state, DEPOSIT_STATES.COMPLETED);
   assert.equal(rpc.sendCalls.length, 1);
+});
+
+test("localnet Solana deposit bridge passes derived accounts to the real claim observer", async () => {
+  const fixture = createRequest();
+  const feePayer = feePayerKeypair();
+  const rpc = new FakeLocalnetSolanaRpc();
+  const config = bridgeConfig(fixture.config, feePayer);
+  const expectedPrepared = await prepareLocalnetSolanaDepositClaimRequest(config, fixture.request, {
+    feePayerSigner: feePayerSigner(feePayer),
+    blockhashSource: new FakeLocalnetSolanaRpc({
+      latestBlockhash: rpc.latestBlockhash,
+      lastValidBlockHeight: rpc.lastValidBlockHeight,
+    }),
+  });
+  const observerRpc = new FakeRealDepositClaimObserverRpc({
+    solanaSignature: rpc.solanaSignature,
+    expectedDepositClaimAccountBase58: expectedPrepared.depositClaimAccountBase58,
+    expectedMintAccountBase58: expectedPrepared.mintAccountBase58,
+    claimAccountBase64: depositClaimAccountBase64(fixture.request),
+    mintAccountBase64: splMintAccountBase64(),
+  });
+  const observer = new SolanaDepositClaimObserver({
+    config: {
+      environment: "localnet",
+      cluster: "localnet",
+      managerProgramIdHex: config.managerProgramIdHex,
+      transceiverProgramIdHex: config.transceiverProgramIdHex,
+      mintHex: config.mintHex,
+    },
+    rpcClient: observerRpc,
+  });
+  const bridge = new LocalnetSolanaDepositClaimBridge({
+    config,
+    feePayerSigner: feePayerSigner(feePayer),
+    rpcClient: rpc,
+    claimObserver: observer,
+    journal: new InMemorySolanaDepositClaimJournal(),
+  });
+
+  const result = await bridge.submitDepositClaim(fixture.request);
+  assert.equal(result.state, DEPOSIT_STATES.COMPLETED);
+  assert.deepEqual(observerRpc.transactionCalls, [rpc.solanaSignature]);
+  assert.deepEqual(observerRpc.accountInfoCalls, [
+    expectedPrepared.depositClaimAccountBase58,
+    expectedPrepared.mintAccountBase58,
+  ]);
 });
 
 test("completed localnet Solana deposit claim retry does not broadcast a second transaction", async () => {
