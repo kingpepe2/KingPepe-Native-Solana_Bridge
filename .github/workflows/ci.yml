@@ -66,6 +66,8 @@ jobs:
         run: node solana/ts/scripts/verify-vectors.mjs
       - name: Run Native FROST Node tests
         run: npm run test:frost
+      - name: Run Native node adapter tests
+        run: npm run test:native-node
       - name: Run project attester tests
         run: npm run test:attesters
       - name: Run Solana observer tests
@@ -122,6 +124,8 @@ jobs:
         run: node solana/ts/scripts/verify-vectors.mjs
       - name: Run Native FROST Node tests
         run: npm run test:frost
+      - name: Run Native node adapter tests
+        run: npm run test:native-node
       - name: Run project attester tests
         run: npm run test:attesters
       - name: Run Solana observer tests

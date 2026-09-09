@@ -9,7 +9,19 @@ The source distinguishes:
 - `LOCALLY_VALIDATED_CHAIN_STATE`
 - `PROJECT_ATTESTATION`
 
-RPC data alone is not treated as consensus proof. Live node transport, regtest
-startup, and production observer configuration remain later phases.
+RPC data alone is not treated as consensus proof. Live node transport through
+the Phase 08 local adapter is implemented for KingPepe REGTEST and remains a
+source of `RPC_OBSERVATION` evidence only.
 
-Node adapter and RPC abstraction layer will be implemented in this directory.
+Implemented source:
+
+- `native-rpc-client.mjs` provides a loopback-first KingPepe JSON-RPC client
+  for local REGTEST integration.
+- RPC methods are allowlisted for chain observation, UTXO checks, controlled
+  local broadcast, and local daemon shutdown.
+- Auth material is read only from an optional cookie file outside the source
+  checkout. Credentials embedded in endpoint URLs are rejected.
+- Amounts are converted from raw JSON decimal text into exact atomic units.
+
+This adapter does not make production source configuration ready and does not
+claim independent consensus validation.
