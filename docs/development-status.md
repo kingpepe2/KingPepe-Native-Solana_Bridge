@@ -805,7 +805,11 @@
 
 ## Phase 08 Native-to-Solana unsigned reserve-sweep draft
 
-- Source status: implemented locally; source commit and CI verification pending.
+- Source status: implemented and CI verified.
+- Source commit:
+  `e836719e920f12dff33bab2a7a546435c26d7739`.
+- CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34337778598` PASS.
 - Local tests:
   - `npm run test:local-e2e-readiness`: PASS, 23 readiness/orchestration/bootstrap/runner tests.
   - `npm test`: PASS, 2 protocol vectors plus 93 Node tests.

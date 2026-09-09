@@ -1015,3 +1015,46 @@ OPEN BLOCKERS:
 NEXT PHASE:
 Continue Phase 08. Do not start Phase 09 until the real daemon-backed
 Native-to-Solana local E2E flow passes.
+
+## Phase 08 report - Native-to-Solana unsigned reserve-sweep draft
+
+PHASE:
+`PHASE 08 - Automatic Native to Solana local end-to-end`
+
+COMMIT SHA:
+`e836719e920f12dff33bab2a7a546435c26d7739`
+
+COMMIT MESSAGE:
+`feat(phase-08): draft unsigned native reserve sweep`
+
+PUSH RESULT:
+Pushed to private `kingpepe2/KingPepe-Native-Solana_Bridge` on `main`.
+
+CI RUN URL:
+`https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34337778598`
+
+CI STATUS:
+`PASS`
+
+TESTS PASS/FAIL/SKIP/NOT_RUN:
+- `npm run test:local-e2e-readiness`: PASS, 23 readiness/orchestration/bootstrap/runner tests.
+- `npm test`: PASS, 2 protocol vectors plus 93 Node tests.
+- `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
+- `python .github/scripts/guardrails.py`: PASS.
+- JSON manifest parse checks: PASS.
+- Staged and outgoing-range secret-pattern scans: PASS.
+- `npm run local:e2e:native-to-solana`: `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
+- Real daemon-backed Native-to-Solana local E2E: `BLOCKED / NOT_RUN`.
+
+WHAT CHANGED:
+- Added `createrawtransaction` to the local REGTEST allowlist for unsigned reserve-sweep drafting.
+- The local runner now creates a disposable local reserve wallet/address after deposit evidence validation, calculates exact miner fee and reserve amount using integer atomic units, and drafts an unsigned reserve sweep.
+- The runner stops at `FROST_RESERVE_SWEEP_SIGNING_PENDING`, records only a non-secret unsigned transaction fingerprint, and does not call wallet signing, FROST signing, or Native broadcast.
+- Added tests for exact fee accounting, fee-overrun rejection, absence of `signrawtransactionwithwallet`/`sendrawtransaction`, and no per-transfer KingPepe Team approval state.
+
+OPEN BLOCKERS:
+- Missing local `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor` executables prevent real daemon-backed Native-to-Solana local E2E.
+- FROST-backed reserve sweep signing/broadcast, finalized sweep verification against real daemon data, Solana mint submission, finalized mint observation, and reconciliation remain unexecuted against real local daemons.
+
+NEXT PHASE:
+Continue Phase 08. Do not start Phase 09 until the real daemon-backed Native-to-Solana local E2E flow passes.

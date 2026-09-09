@@ -104,7 +104,7 @@
     "phase08NativeToSolanaDepositEvidenceValidationCiVerified": true,
     "phase08NativeToSolanaUnsignedReserveSweepDraftImplemented": true,
     "phase08NativeToSolanaUnsignedReserveSweepDraftLocalTestsPassed": true,
-    "phase08NativeToSolanaUnsignedReserveSweepDraftCiVerified": false,
+    "phase08NativeToSolanaUnsignedReserveSweepDraftCiVerified": true,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true
