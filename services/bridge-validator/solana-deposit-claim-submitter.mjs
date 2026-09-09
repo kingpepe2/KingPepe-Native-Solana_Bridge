@@ -25,10 +25,13 @@ const BASE64_TRANSACTION = /^[A-Za-z0-9+/]+={0,2}$/u;
 const BASE58_LIKE = /^[1-9A-HJ-NP-Za-km-z]{32,128}$/u;
 const JSON_RPC_VERSION = "2.0";
 const ALLOWED_SOLANA_RPC_METHODS = new Set([
+  "getAccountInfo",
   "getBlockHeight",
   "getHealth",
   "getLatestBlockhash",
+  "getMinimumBalanceForRentExemption",
   "getSignatureStatuses",
+  "requestAirdrop",
   "sendTransaction",
 ]);
 
@@ -274,6 +277,30 @@ export class SolanaLocalRpcClient {
       blockhash: normalizeBase58Like(value.blockhash, "latestBlockhash.blockhash"),
       lastValidBlockHeight: canonicalUintDecimalLike(value.lastValidBlockHeight, "latestBlockhash.lastValidBlockHeight"),
     });
+  }
+
+  async getMinimumBalanceForRentExemption(accountLength) {
+    return BigInt(await this.call("getMinimumBalanceForRentExemption", [
+      checkedAccountLength(accountLength, "accountLength"),
+      { commitment: "finalized" },
+    ]));
+  }
+
+  async requestAirdrop(addressBase58, lamports) {
+    return normalizeSolanaSignature(
+      await this.call("requestAirdrop", [
+        normalizeBase58Like(addressBase58, "airdropAddressBase58"),
+        checkedJsonSafeLamports(lamports, "airdropLamports"),
+      ]),
+    );
+  }
+
+  async getAccountInfo(addressBase58) {
+    const result = await this.call("getAccountInfo", [
+      normalizeBase58Like(addressBase58, "accountInfoAddressBase58"),
+      { commitment: "finalized", encoding: "base64" },
+    ]);
+    return result?.value ?? null;
   }
 }
 
@@ -779,6 +806,22 @@ function checkedSmallInteger(value, label) {
     throw new Error(`${label}:ExpectedSmallInteger`);
   }
   return value;
+}
+
+function checkedAccountLength(value, label) {
+  if (!Number.isSafeInteger(value) || value < 0 || value > 10_000_000) {
+    throw new Error(`${label}:ExpectedAccountLength`);
+  }
+  return value;
+}
+
+function checkedJsonSafeLamports(value, label) {
+  const normalized = canonicalUintDecimalLike(value, label);
+  const lamports = BigInt(normalized);
+  if (lamports <= 0n || lamports > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error(`${label}:ExpectedPositiveJsonSafeLamports`);
+  }
+  return Number(lamports);
 }
 
 function checkedU32(value, label) {
