@@ -12,6 +12,7 @@ import {
 import {
   AutomaticNativeToSolanaDepositPipeline,
   DEPOSIT_STATES,
+  FileBackedDepositJournal,
   buildDepositClaimMessage,
 } from "../automatic-deposit-pipeline.mjs";
 import {
@@ -324,6 +325,7 @@ function createPipeline(overrides = {}) {
     nativeRelayer,
     reserveVerifier,
     solanaBridge,
+    journal: overrides.journal,
   });
   return { config, operation, frost, nativeRelayer, reserveVerifier, solanaBridge, pipeline };
 }
@@ -375,6 +377,94 @@ test("completed deposit retry is idempotent and does not mint or broadcast twice
   } finally {
     runtime.frost.cleanup();
   }
+});
+
+test("file-backed deposit journal survives restart and does not rebroadcast completed deposits", () => {
+  const journalRoot = mkdtempSync(path.join(os.tmpdir(), "kingpepe-deposit-journal-"));
+  const first = createPipeline({
+    journal: new FileBackedDepositJournal({
+      root: journalRoot,
+      repoRoot: REPO_ROOT,
+    }),
+  });
+  let firstResult;
+  try {
+    firstResult = first.pipeline.processDeposit(first.operation, 1_700_000_600);
+    assert.equal(firstResult.state, DEPOSIT_STATES.COMPLETED);
+    assert.equal(first.nativeRelayer.broadcasts.length, 1);
+    assert.equal(first.solanaBridge.submissions.length, 1);
+  } finally {
+    first.frost.cleanup();
+  }
+
+  const restarted = createPipeline({
+    journal: new FileBackedDepositJournal({
+      root: journalRoot,
+      repoRoot: REPO_ROOT,
+    }),
+  });
+  try {
+    const replay = restarted.pipeline.processDeposit(restarted.operation, 1_700_000_700);
+    assert.deepEqual(replay, firstResult);
+    assert.equal(restarted.nativeRelayer.broadcasts.length, 0);
+    assert.equal(restarted.solanaBridge.submissions.length, 0);
+  } finally {
+    restarted.frost.cleanup();
+    rmSync(journalRoot, { recursive: true, force: true });
+  }
+});
+
+test("file-backed deposit journal persists outpoint reservations across restarts", () => {
+  const journalRoot = mkdtempSync(path.join(os.tmpdir(), "kingpepe-deposit-outpoint-journal-"));
+  const pending = createPipeline({
+    journal: new FileBackedDepositJournal({
+      root: journalRoot,
+      repoRoot: REPO_ROOT,
+    }),
+    operation: {
+      deposit: {
+        finalitySatisfied: false,
+      },
+    },
+  });
+  try {
+    const result = pending.pipeline.processDeposit(pending.operation, 1_700_000_600);
+    assert.equal(result.state, DEPOSIT_STATES.WAITING_FOR_FINALITY);
+  } finally {
+    pending.frost.cleanup();
+  }
+
+  const conflicting = createPipeline({
+    journal: new FileBackedDepositJournal({
+      root: journalRoot,
+      repoRoot: REPO_ROOT,
+    }),
+    operation: {
+      deposit: {
+        solanaRecipientHex: h("different-recipient"),
+      },
+    },
+  });
+  try {
+    assert.throws(
+      () => conflicting.pipeline.processDeposit(conflicting.operation, 1_700_000_700),
+      /DepositOutpointAlreadyReserved/u,
+    );
+  } finally {
+    conflicting.frost.cleanup();
+    rmSync(journalRoot, { recursive: true, force: true });
+  }
+});
+
+test("file-backed deposit journal rejects roots inside the source tree", () => {
+  assert.throws(
+    () =>
+      new FileBackedDepositJournal({
+        root: path.join(REPO_ROOT, "tmp-deposit-journal"),
+        repoRoot: REPO_ROOT,
+      }),
+    /InsideRepositoryRejected/u,
+  );
 });
 
 test("recoverable deposit observation cannot mint before canonical reserve transition finality", () => {

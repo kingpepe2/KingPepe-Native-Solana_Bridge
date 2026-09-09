@@ -127,6 +127,8 @@
   consistency, persist signed local REGTEST sweep transactions before
   broadcast, retry idempotently, and verify RPC-observed sweep evidence without
   claiming production consensus validation.
+- The automatic deposit pipeline now includes a file-backed local journal for
+  completed deposit replay and deposit-outpoint reservation across restarts.
 - Required local executables were not available in the checked environment:
   `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
 - Current Solana crates include deterministic non-production localnet Program
@@ -248,5 +250,7 @@
   `9af93d22b9af9c1278354a33e35db469311332d9`
 - Phase 08 Native reserve-sweep adapter CI:
   `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34313600140` PASS.
+- Phase 08 deposit pipeline file-backed journal:
+  local tests pass; source commit and CI are pending for this increment.
 - Real local E2E is still blocked by missing `kingpeped`, `kingpepe-cli`,
   `solana`, `solana-test-validator`, and `anchor`.

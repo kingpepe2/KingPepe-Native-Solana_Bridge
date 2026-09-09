@@ -68,7 +68,7 @@
 - Phase 07 CI: PASS for `d17ba8fe61d20a88d4206f72d68a010a2d146524`
 - Phase 08 `Get-Command kingpeped kingpepe-cli solana solana-test-validator anchor`: NOT_FOUND on Windows
 - Phase 08 `command -v kingpeped kingpepe-cli solana-test-validator solana anchor`: NOT_FOUND under WSL
-- Phase 08 `npm run test:bridge-validator`: PASS, 22 bridge-validator tests (automatic deposit pipeline, async adapter path, Native reserve-sweep adapters, and Solana deposit claim submitter)
+- Phase 08 `npm run test:bridge-validator`: PASS, 25 bridge-validator tests (automatic deposit pipeline, file-backed deposit journal, async adapter path, Native reserve-sweep adapters, and Solana deposit claim submitter)
 - Phase 08 `npm run test:native-node`: PASS, 7 Native REGTEST RPC adapter tests
 - Phase 08 `npm run test:local-e2e-readiness`: PASS, 8 readiness/orchestration tests
 - Phase 08 `npm run doctor:local-e2e`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING; missing localnet executables; both Solana programs report `READY` at the source/readiness-gate level after account-execution wiring
@@ -87,6 +87,7 @@
 - Phase 08 Solana deposit claim submitter: PASS for `905a45b4c79d879e6ae27a05b3c7a39fed0a30f6`
 - Phase 08 async deposit pipeline entrypoint: PASS for `024c0019745bc4671299af135740aa9d29963116`
 - Phase 08 Native reserve-sweep adapters: PASS for `9af93d22b9af9c1278354a33e35db469311332d9`
+- Phase 08 deposit pipeline file-backed journal: local tests PASS; CI pending for the next pushed source SHA
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 52 Rust tests after account-execution update
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
@@ -380,6 +381,29 @@
 - Source commit: `9af93d22b9af9c1278354a33e35db469311332d9`
 - CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34313600140`
 - CI status: `PASS`
+
+## Phase 08 deposit pipeline file-backed journal
+
+- Added `FileBackedDepositJournal` to the automatic Native-to-Solana deposit
+  pipeline.
+- The journal persists completed deposit results and deposit-outpoint
+  reservations outside the source tree.
+- Restart replay of a completed deposit returns the persisted terminal result
+  without rebroadcasting the Native reserve sweep or resubmitting the Solana
+  deposit claim.
+- Conflicting operation IDs for an already-reserved deposit outpoint are
+  rejected across restarts.
+- Source-tree journal roots are rejected.
+- Local test status:
+  - `npm run test:bridge-validator` (pass, 25 bridge-validator tests)
+  - `npm test` (pass, 2 protocol vectors plus 62 Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - `npm run doctor:local-e2e` (expected BLOCKED, exit 2)
+  - `npm run local:e2e:bootstrap` (expected BLOCKED, exit 2)
+  - real Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
+- Source commit: pending until this source increment is committed and pushed
+- CI status: pending
 
 ## Phase 08 mint-authority real Solana PDA correction
 

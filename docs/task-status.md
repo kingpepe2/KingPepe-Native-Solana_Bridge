@@ -526,6 +526,35 @@
     not proceed to Phase 09 until the Native-to-Solana local E2E gate actually
     passes.
 
+## Phase 08 deposit pipeline file-backed journal
+
+- PHASE: `08`
+- source commit: pending until this source increment is committed and pushed
+- CI status: pending
+- tests:
+  - `npm run test:bridge-validator` (pass, 25 bridge-validator tests)
+  - `npm test` (pass, 2 protocol vectors plus 62 Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - `npm run doctor:local-e2e` (expected BLOCKED, exit 2)
+  - `npm run local:e2e:bootstrap` (expected BLOCKED, exit 2)
+  - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
+- changed:
+  - Added a file-backed deposit journal for the automatic Native-to-Solana
+    pipeline.
+  - Persisted completed deposit terminal results and deposit-outpoint
+    reservations outside the source repository.
+  - Added restart replay coverage proving completed deposits are not
+    rebroadcast or resubmitted.
+  - Added persisted outpoint-conflict coverage and source-tree root rejection.
+- blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`,
+    `solana-test-validator`, and `anchor`.
+- next:
+  - Push this source increment and verify CI. Do not proceed to Phase 09 until
+    the Native-to-Solana local E2E gate actually passes.
+
 ## Phase 08 Solana account-state codec implementation
 
 - PHASE: `08`

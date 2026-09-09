@@ -1,3 +1,5 @@
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import {
   bytesToHex,
   decodeCanonicalBridgeMessage,
@@ -374,6 +376,135 @@ export class InMemoryDepositJournal {
   }
 }
 
+export class FileBackedDepositJournal {
+  #root;
+  #repoRoot;
+
+  constructor(options) {
+    const value = requireObject(options, "options");
+    this.#repoRoot = path.resolve(value.repoRoot);
+    this.#root = validateStateRootOutsideRepo(value.root, this.#repoRoot, "Deposit pipeline journal root");
+    mkdirSync(this.#root, { recursive: true });
+  }
+
+  completed(operationIdHex) {
+    const entry = this.get(operationIdHex);
+    return entry?.terminal?.state === DEPOSIT_STATES.COMPLETED
+      ? structuredClone(entry.terminal)
+      : undefined;
+  }
+
+  get(operationIdHex) {
+    const file = this.#entryPath(operationIdHex);
+    if (!existsSync(file)) return undefined;
+    return normalizeJournalEntry(JSON.parse(readFileSync(file, "utf8")));
+  }
+
+  reserveOperation(operationIdHex, depositOutpointText, encodedMessageHex) {
+    const operationId = normalizeHash32(operationIdHex, "operationIdHex");
+    const outpoint = normalizeDepositOutpointText(depositOutpointText);
+    const encoded = normalizeHexBytes(encodedMessageHex, "encodedMessageHex");
+    const existing = this.get(operationId);
+    if (existing !== undefined) {
+      assertSameJournalEntry(existing, operationId, outpoint, encoded);
+      return;
+    }
+
+    const index = this.#readOutpointIndex();
+    const existingOperation = index[outpoint];
+    if (existingOperation !== undefined && existingOperation !== operationId) {
+      throw new Error("DepositOutpointAlreadyReserved");
+    }
+
+    this.#writeEntry(operationId, {
+      protocol: DEPOSIT_PIPELINE_PROTOCOL,
+      operationIdHex: operationId,
+      depositOutpointText: outpoint,
+      encodedMessageHex: encoded,
+      events: [],
+      terminal: undefined,
+    });
+    index[outpoint] = operationId;
+    this.#writeOutpointIndex(index);
+  }
+
+  record(operationIdHex, state, reason) {
+    const entry = this.#requireEntry(operationIdHex);
+    entry.events.push({
+      state,
+      reason,
+      sequence: entry.events.length + 1,
+    });
+    this.#writeEntry(entry.operationIdHex, entry);
+  }
+
+  finish(operationIdHex, decision) {
+    const entry = this.#requireEntry(operationIdHex);
+    entry.terminal = structuredClone(decision);
+    entry.events.push({
+      state: decision.state,
+      reason: decision.reason,
+      sequence: entry.events.length + 1,
+    });
+    this.#writeEntry(entry.operationIdHex, entry);
+    return structuredClone(decision);
+  }
+
+  assertSameCompleted(operationIdHex, encodedMessageHex) {
+    const entry = this.#requireEntry(operationIdHex);
+    if (entry.encodedMessageHex !== normalizeHexBytes(encodedMessageHex, "encodedMessageHex")) {
+      throw new Error("CompletedDepositReplayAltered");
+    }
+  }
+
+  #requireEntry(operationIdHex) {
+    const entry = this.get(operationIdHex);
+    if (entry === undefined) throw new Error("UnknownDepositOperation");
+    return entry;
+  }
+
+  #entryPath(operationIdHex) {
+    return path.join(this.#root, `${normalizeHash32(operationIdHex, "operationIdHex")}.json`);
+  }
+
+  #outpointIndexPath() {
+    return path.join(this.#root, "deposit-outpoints.json");
+  }
+
+  #readOutpointIndex() {
+    const indexPath = this.#outpointIndexPath();
+    if (!existsSync(indexPath)) return {};
+    const parsed = JSON.parse(readFileSync(indexPath, "utf8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("DepositOutpointIndexMalformed");
+    }
+    return Object.fromEntries(
+      Object.entries(parsed).map(([outpoint, operationId]) => [
+        normalizeDepositOutpointText(outpoint),
+        normalizeHash32(operationId, "depositOutpointIndex.operationId"),
+      ]),
+    );
+  }
+
+  #writeOutpointIndex(index) {
+    this.#writeJson(this.#outpointIndexPath(), index);
+  }
+
+  #writeEntry(operationIdHex, entry) {
+    this.#writeJson(this.#entryPath(operationIdHex), normalizeJournalEntry(entry));
+  }
+
+  #writeJson(target, value) {
+    mkdirSync(this.#root, { recursive: true });
+    const temp = `${target}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`;
+    writeFileSync(temp, `${JSON.stringify(value, null, 2)}\n`, {
+      encoding: "utf8",
+      flag: "wx",
+    });
+    renameSync(temp, target);
+  }
+}
+
 export class ExactDepositLedger {
   #canonicalReserve = 0n;
   #mintedSupply = 0n;
@@ -712,6 +843,13 @@ function normalizeOutpointList(value) {
   return Object.freeze(normalized);
 }
 
+function normalizeDepositOutpointText(value) {
+  if (typeof value !== "string") throw new Error("DepositOutpointTextExpectedString");
+  const normalized = value.toLowerCase();
+  if (!/^[0-9a-f]{64}:[0-9]+$/u.test(normalized)) throw new Error("DepositOutpointTextInvalid");
+  return normalized;
+}
+
 function normalizeHashList(value, label) {
   if (!Array.isArray(value) || value.length === 0) throw new Error(`${label}:ExpectedNonEmptyArray`);
   return Object.freeze(value.map((entry, index) => normalizeHash32(entry, `${label}.${index}`)));
@@ -757,6 +895,54 @@ function requireObject(value, label) {
 function requireMethodResult(value, label) {
   if (!value || typeof value !== "object") throw new Error(`${label}:ExpectedObjectResult`);
   return value;
+}
+
+function normalizeJournalEntry(value) {
+  const entry = requireObject(value, "depositJournalEntry");
+  if (entry.protocol !== DEPOSIT_PIPELINE_PROTOCOL) throw new Error("DepositJournalProtocolMismatch");
+  return {
+    protocol: DEPOSIT_PIPELINE_PROTOCOL,
+    operationIdHex: normalizeHash32(entry.operationIdHex, "journal.operationIdHex"),
+    depositOutpointText: normalizeDepositOutpointText(entry.depositOutpointText),
+    encodedMessageHex: normalizeHexBytes(entry.encodedMessageHex, "journal.encodedMessageHex"),
+    events: normalizeJournalEvents(entry.events),
+    terminal: entry.terminal === undefined ? undefined : structuredClone(entry.terminal),
+  };
+}
+
+function normalizeJournalEvents(events) {
+  if (!Array.isArray(events)) throw new Error("DepositJournalEventsInvalid");
+  return events.map((event, index) => {
+    const value = requireObject(event, `depositJournalEvent.${index}`);
+    if (!Object.values(DEPOSIT_STATES).includes(value.state)) throw new Error("DepositJournalEventStateInvalid");
+    if (typeof value.reason !== "string" || value.reason.length === 0) throw new Error("DepositJournalEventReasonInvalid");
+    if (value.sequence !== index + 1) throw new Error("DepositJournalEventSequenceInvalid");
+    return {
+      state: value.state,
+      reason: value.reason,
+      sequence: value.sequence,
+    };
+  });
+}
+
+function assertSameJournalEntry(existing, operationIdHex, depositOutpointText, encodedMessageHex) {
+  if (
+    existing.operationIdHex !== operationIdHex ||
+    existing.depositOutpointText !== depositOutpointText ||
+    existing.encodedMessageHex !== encodedMessageHex
+  ) {
+    throw new Error("DepositOperationReplayAltered");
+  }
+}
+
+function validateStateRootOutsideRepo(root, repoRoot, label) {
+  if (typeof root !== "string" || root.length === 0) throw new Error(`${label}:Required`);
+  const resolved = path.resolve(root);
+  const relative = path.relative(path.resolve(repoRoot), resolved);
+  if (relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))) {
+    throw new Error(`${label}:InsideRepositoryRejected`);
+  }
+  return resolved;
 }
 
 function checkedAdd(left, right) {
