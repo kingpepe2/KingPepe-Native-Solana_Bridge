@@ -49,6 +49,8 @@ export const LOCAL_NATIVE_TO_SOLANA_TAPROOT_SIGHASHES_VALIDATED =
   "LOCAL_NATIVE_TAPROOT_SIGHASHES_VALIDATED";
 export const LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_SIGNED =
   "LOCAL_NATIVE_RESERVE_SWEEP_SIGNED";
+export const LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_FINALIZED =
+  "LOCAL_NATIVE_RESERVE_SWEEP_FINALIZED";
 export const LOCAL_NATIVE_RESERVE_SWEEP_FROST_SIGNATURES_PROTOCOL =
   "KINGPEPE_NATIVE_SOLANA_BRIDGE/LOCAL_NATIVE_RESERVE_SWEEP_FROST_SIGNATURES/V1";
 
@@ -80,9 +82,7 @@ export async function runLocalNativeToSolanaE2e(options = {}) {
     });
     return {
       fullNativeToSolanaE2e:
-        flowResult.state === LOCAL_NATIVE_TO_SOLANA_COMPLETED
-          ? "PASS"
-          : "NOT_RUN_FULL_FLOW_NATIVE_BROADCAST_PENDING",
+        nativeToSolanaFullFlowStatus(flowResult),
       nativeToSolanaE2e: sanitizeFlowForReport(flowResult, context.plan),
     };
   });
@@ -113,7 +113,7 @@ export async function runLocalNativeToSolanaE2e(options = {}) {
     infrastructure,
     nativeToSolanaE2e: sanitizeFlowForReport(flow, actualPlan ?? infrastructure.plan),
     fullNativeToSolanaE2e:
-      infrastructure.fullNativeToSolanaE2e ?? "NOT_RUN_FULL_FLOW_NATIVE_BROADCAST_PENDING",
+      infrastructure.fullNativeToSolanaE2e ?? nativeToSolanaFullFlowStatus(flow),
   });
 }
 
@@ -393,12 +393,20 @@ export async function executeNativeDepositObservationFlow({
   });
   stages.push("LOCAL_E2E_SIGN_RESERVE_SWEEP_WITH_FROST_A_B");
   stages.push("LOCAL_E2E_ATTACH_FROST_TAPROOT_WITNESSES");
+  const finalizedReserveSweep = await broadcastAndFinalizeLocalReserveSweep({
+    cli,
+    config,
+    miningAddress,
+    signedReserveSweep,
+    reserveSweepDraft,
+    canonicalReserveScriptPubKeyHex: custodyScriptPubKeyHex,
+  });
 
   return Object.freeze({
     protocol: LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL,
     state: LOCAL_NATIVE_TO_SOLANA_WAITING_FOR_DEPENDENCY,
-    reason: "RESERVE_SWEEP_BROADCAST_PENDING",
-    completedStage: LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_SIGNED,
+    reason: "SOLANA_MINT_PENDING",
+    completedStage: LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_FINALIZED,
     productionReady: false,
     mainnetActivation: "DISABLED",
     noPerTransferKingPepeTeamApprovalState: true,
@@ -440,13 +448,17 @@ export async function executeNativeDepositObservationFlow({
     }),
     reserveSweep: Object.freeze({
       ...reserveSweepDraft,
-      state: signedReserveSweep.state,
+      state: finalizedReserveSweep.state,
       operationIdHex,
       signed: true,
+      broadcast: true,
+      finalitySatisfied: true,
       signedNativeTransactionHex: signedReserveSweep.signedNativeTransactionHex,
       signedNativeTransactionFingerprintHex: signedReserveSweep.signedNativeTransactionFingerprintHex,
       nativeSweepTxidHex: signedReserveSweep.nativeSweepTxidHex,
       nativeSweepWtxidHex: signedReserveSweep.nativeSweepWtxidHex,
+      broadcastTxidHex: finalizedReserveSweep.nativeSweepTxidHex,
+      finalizedReserveSweep,
       frostSignatureState: signedReserveSweep.state,
       signingIntents: signedReserveSweep.signingIntents,
       frostResults: signedReserveSweep.frostResults,
@@ -454,10 +466,126 @@ export async function executeNativeDepositObservationFlow({
       taprootSighashEvidences,
     }),
     nextRequiredImplementation: Object.freeze([
-      "BROADCAST_AND_FINALIZE_RESERVE_SWEEP",
       "SUBMIT_AND_OBSERVE_SOLANA_MINT",
       "RECONCILE_RESERVE_SUPPLY_AND_LIABILITIES",
     ]),
+  });
+}
+
+export async function broadcastAndFinalizeLocalReserveSweep({
+  cli,
+  config,
+  miningAddress,
+  signedReserveSweep,
+  reserveSweepDraft,
+  canonicalReserveScriptPubKeyHex,
+}) {
+  const signed = requireObject(signedReserveSweep, "signedReserveSweep");
+  const draft = requireObject(reserveSweepDraft, "reserveSweepDraft");
+  const flowConfig = requireObject(config, "config");
+  const signedTxHex = normalizeRawTransactionHex(signed.signedNativeTransactionHex, "signedReserveSweep.signedNativeTransactionHex");
+  const expectedTxidHex = normalizeHash32(signed.nativeSweepTxidHex, "signedReserveSweep.nativeSweepTxidHex");
+  const expectedWtxidHex =
+    signed.nativeSweepWtxidHex === undefined
+      ? undefined
+      : normalizeHash32(signed.nativeSweepWtxidHex, "signedReserveSweep.nativeSweepWtxidHex");
+  const broadcastTxidHex = normalizeHash32(
+    await cli({
+      step: "LOCAL_E2E_BROADCAST_FROST_SIGNED_RESERVE_SWEEP",
+      command: "sendrawtransaction",
+      parameters: [signedTxHex],
+    }),
+    "broadcastNativeSweepTxidHex",
+  );
+  if (broadcastTxidHex !== expectedTxidHex) {
+    throw new Error("LocalNativeReserveSweepBroadcastTxidMismatch");
+  }
+  await cli({
+    step: "LOCAL_E2E_MINE_RESERVE_SWEEP_FINALITY",
+    wallet: flowConfig.userWalletName,
+    command: "generatetoaddress",
+    parameters: [String(flowConfig.depositFinalityBlocks), requireNonEmptyText(miningAddress, "miningAddress")],
+  });
+  const rawSweepTransaction = await cli({
+    step: "LOCAL_E2E_OBSERVE_FINALIZED_RESERVE_SWEEP",
+    command: "getrawtransaction",
+    parameters: [broadcastTxidHex, "true"],
+    parseJson: true,
+  });
+  return validateFinalizedLocalReserveSweep({
+    rawTransaction: rawSweepTransaction,
+    expectedTxidHex,
+    expectedWtxidHex,
+    expectedInputOutpoints: [draft.depositOutpoint, ...requireArray(draft.feeFundingOutpoints, "reserveSweepDraft.feeFundingOutpoints")],
+    reserveAmountAtomic: draft.reserveAmountAtomic,
+    canonicalReserveScriptPubKeyHex,
+    expectedConfirmations: flowConfig.depositFinalityBlocks,
+    nativeDecimals: flowConfig.nativeDecimals,
+  });
+}
+
+export function validateFinalizedLocalReserveSweep({
+  rawTransaction,
+  expectedTxidHex,
+  expectedWtxidHex,
+  expectedInputOutpoints,
+  reserveAmountAtomic,
+  canonicalReserveScriptPubKeyHex,
+  expectedConfirmations,
+  nativeDecimals,
+}) {
+  const tx = requireObject(rawTransaction, "rawTransaction");
+  const txidHex = normalizeHash32(tx.txid, "rawReserveSweep.txid");
+  const expectedTxid = normalizeHash32(expectedTxidHex, "expectedTxidHex");
+  if (txidHex !== expectedTxid) {
+    throw new Error("LocalNativeReserveSweepFinalizedTxidMismatch");
+  }
+  if (expectedWtxidHex !== undefined && tx.hash !== undefined) {
+    const wtxidHex = normalizeHash32(tx.hash, "rawReserveSweep.hash");
+    if (wtxidHex !== normalizeHash32(expectedWtxidHex, "expectedWtxidHex")) {
+      throw new Error("LocalNativeReserveSweepFinalizedWtxidMismatch");
+    }
+  }
+  const confirmations = checkedInteger(tx.confirmations, "rawReserveSweep.confirmations", 0, 10_000_000);
+  const requiredConfirmations = checkedInteger(expectedConfirmations, "expectedConfirmations", 1, 10_000_000);
+  if (confirmations < requiredConfirmations) {
+    throw new Error("LocalNativeReserveSweepFinalityInsufficient");
+  }
+  const expectedInputs = normalizeOutpointTexts(expectedInputOutpoints, "expectedInputOutpoints");
+  const actualInputs = normalizeVinOutpoints(tx.vin);
+  if (
+    actualInputs.length !== expectedInputs.length ||
+    actualInputs.some((outpoint, index) => outpoint !== expectedInputs[index])
+  ) {
+    throw new Error("LocalNativeReserveSweepFinalizedInputMismatch");
+  }
+  if (!Array.isArray(tx.vout)) {
+    throw new Error("LocalNativeReserveSweepFinalizedOutputsMissing");
+  }
+  const expectedAmount = canonicalUintDecimal(reserveAmountAtomic, "reserveAmountAtomic");
+  const expectedScript = validateP2trScriptPubKeyHex(canonicalReserveScriptPubKeyHex, "canonicalReserveScriptPubKeyHex");
+  const reserveOutputs = tx.vout
+    .map((output, index) => normalizeDepositOutput(output, index, nativeDecimals))
+    .filter((output) => output.amountAtomic === expectedAmount && output.scriptPubKeyHex === expectedScript);
+  if (reserveOutputs.length !== 1) {
+    throw new Error("LocalNativeReserveSweepFinalizedReserveOutputNotUnique");
+  }
+  return Object.freeze({
+    protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/FINALIZED_RESERVE_SWEEP`,
+    state: "FINALIZED_CANONICAL_RESERVE",
+    trust: RPC_OBSERVATION,
+    nativeSweepTxidHex: txidHex,
+    nativeSweepWtxidHex:
+      tx.hash === undefined ? undefined : normalizeHash32(tx.hash, "rawReserveSweep.hash"),
+    confirmations,
+    requiredConfirmations,
+    inputOutpoints: Object.freeze(expectedInputs),
+    reserveOutputVout: reserveOutputs[0].vout,
+    reserveAmountAtomic: expectedAmount,
+    canonicalReserveScriptPubKeyHex: expectedScript,
+    reserveTransitionState: "CANONICAL_RESERVE",
+    mintCreditState: "AUTHORIZED_UNCONSUMED",
+    finalitySatisfied: true,
   });
 }
 
@@ -972,6 +1100,14 @@ function normalizeFeeFundingInputs(value) {
   );
 }
 
+function nativeToSolanaFullFlowStatus(flow) {
+  if (flow?.state === LOCAL_NATIVE_TO_SOLANA_COMPLETED) return "PASS";
+  if (flow?.completedStage === LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_FINALIZED) {
+    return "NOT_RUN_FULL_FLOW_SOLANA_MINT_PENDING";
+  }
+  return "NOT_RUN_FULL_FLOW_NATIVE_BROADCAST_PENDING";
+}
+
 function localE2eResult(state, reason, extra = {}) {
   return Object.freeze({
     protocol: LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL,
@@ -1214,6 +1350,49 @@ function requireNonEmptyArray(value, label) {
     throw new Error(`${label}:ExpectedNonEmptyArray`);
   }
   return value;
+}
+
+function requireArray(value, label) {
+  if (!Array.isArray(value)) {
+    throw new Error(`${label}:ExpectedArray`);
+  }
+  return value;
+}
+
+function normalizeOutpointTexts(values, label) {
+  const input = requireArray(values, label);
+  if (input.length === 0) {
+    throw new Error(`${label}:ExpectedNonEmptyArray`);
+  }
+  return Object.freeze(input.map((value, index) => normalizeOutpointText(value, `${label}[${index}]`)));
+}
+
+function normalizeOutpointText(value, label) {
+  if (typeof value !== "string") {
+    throw new Error(`${label}:ExpectedOutpointText`);
+  }
+  const match = /^([0-9a-f]{64}):([0-9]+)$/iu.exec(value);
+  if (match === null) {
+    throw new Error(`${label}:ExpectedOutpointText`);
+  }
+  return `${match[1].toLowerCase()}:${checkedInteger(Number(match[2]), `${label}.vout`, 0, 0xffff_ffff)}`;
+}
+
+function normalizeVinOutpoints(vin) {
+  if (!Array.isArray(vin)) {
+    throw new Error("LocalNativeReserveSweepFinalizedInputsMissing");
+  }
+  return Object.freeze(
+    vin.map((input, index) => {
+      const value = requireObject(input, `rawReserveSweep.vin[${index}]`);
+      return `${normalizeHash32(value.txid, `rawReserveSweep.vin[${index}].txid`)}:${checkedInteger(
+        value.vout,
+        `rawReserveSweep.vin[${index}].vout`,
+        0,
+        0xffff_ffff,
+      )}`;
+    }),
+  );
 }
 
 function checkedInteger(value, label, min, max) {

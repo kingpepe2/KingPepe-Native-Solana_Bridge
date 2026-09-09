@@ -28,7 +28,9 @@ Current safe utilities:
   `SIGHASH_DEFAULT` evidence for each FROST-controlled input. It then prepares
   localnet-only per-input signing intents, signs each input with the disposable
   software FROST A+B runtime, and attaches key-path Taproot witnesses without
-  using wallet raw-signing RPC shortcuts. It does not broadcast the signed
-  reserve sweep yet. Until FROST-backed reserve broadcast, Solana mint
-  submission, and reconciliation are exercised against real local daemons, it
-  reports the full flow as not run rather than passed.
+  using wallet raw-signing RPC shortcuts. When the local daemons are available,
+  it broadcasts the signed reserve sweep with `sendrawtransaction`, mines local
+  finality, and validates the finalized reserve transaction before stopping at
+  the Solana mint boundary. Until Solana mint submission and reconciliation are
+  exercised against real local daemons, it reports the full flow as not run
+  rather than passed.

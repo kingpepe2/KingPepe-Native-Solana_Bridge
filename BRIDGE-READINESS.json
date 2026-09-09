@@ -126,6 +126,9 @@
     "phase08LocalFrostReserveSweepWitnessAttachmentImplemented": true,
     "phase08LocalFrostReserveSweepWitnessAttachmentLocalTestsPassed": true,
     "phase08LocalFrostReserveSweepWitnessAttachmentCiVerified": true,
+    "phase08LocalReserveSweepBroadcastFinalityImplemented": true,
+    "phase08LocalReserveSweepBroadcastFinalityLocalTestsPassed": true,
+    "phase08LocalReserveSweepBroadcastFinalityCiVerified": false,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true

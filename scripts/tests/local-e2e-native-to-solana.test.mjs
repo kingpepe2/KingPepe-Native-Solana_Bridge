@@ -8,7 +8,7 @@ import { schnorr } from "@noble/curves/secp256k1.js";
 import {
   LOCAL_NATIVE_TO_SOLANA_BLOCKED,
   LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL,
-  LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_SIGNED,
+  LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_FINALIZED,
   LOCAL_NATIVE_TO_SOLANA_WAITING_FOR_DEPENDENCY,
   createLocalFrostTaprootCustodyContext,
   createNativeToSolanaFlowConfig,
@@ -18,6 +18,7 @@ import {
   p2trScriptPubKeyHex,
   signLocalReserveSweepWithFrost,
   taprootAddressFromXOnlyPublicKey,
+  validateFinalizedLocalReserveSweep,
   validateLocalNativeSourceSnapshot,
   validateRawDepositTransaction,
   runLocalNativeToSolanaE2e,
@@ -41,6 +42,7 @@ const FROST_TAPROOT_ADDRESS = taprootAddressFromXOnlyPublicKey(FROST_AGGREGATE_X
 const REGTEST_GENESIS_HASH = h("kingpepe-regtest-genesis");
 const REGTEST_BEST_BLOCK_HASH = h("kingpepe-regtest-best-block");
 const UNSIGNED_SWEEP_HEX = buildUnsignedSweepHex();
+const UNSIGNED_SWEEP_TXID = parseNativeTransactionHex(UNSIGNED_SWEEP_HEX).txidHex;
 
 test("native-to-solana runner blocks before executing deposit flow when local infrastructure is missing", async () => {
   const executor = new FakeExecutor();
@@ -79,9 +81,9 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
     });
 
     assert.equal(result.state, LOCAL_NATIVE_TO_SOLANA_WAITING_FOR_DEPENDENCY);
-    assert.equal(result.reason, "RESERVE_SWEEP_BROADCAST_PENDING");
-    assert.equal(result.fullNativeToSolanaE2e, "NOT_RUN_FULL_FLOW_NATIVE_BROADCAST_PENDING");
-    assert.equal(result.nativeToSolanaE2e.completedStage, LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_SIGNED);
+    assert.equal(result.reason, "SOLANA_MINT_PENDING");
+    assert.equal(result.fullNativeToSolanaE2e, "NOT_RUN_FULL_FLOW_SOLANA_MINT_PENDING");
+    assert.equal(result.nativeToSolanaE2e.completedStage, LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_FINALIZED);
     assert.equal(result.nativeToSolanaE2e.noPerTransferKingPepeTeamApprovalState, true);
     assert.equal(result.nativeToSolanaE2e.deposit.txidHex, DEPOSIT_TXID);
     assert.equal(result.nativeToSolanaE2e.deposit.vout, 1);
@@ -99,22 +101,32 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
     assert.equal(result.nativeToSolanaE2e.frostCustody.depositAddress, FROST_TAPROOT_ADDRESS);
     assert.equal(result.nativeToSolanaE2e.frostCustody.canonicalReserveAddress, FROST_TAPROOT_ADDRESS);
     assert.equal(result.nativeToSolanaE2e.nativeSource.trust, "RPC_OBSERVATION");
-    assert.equal(result.nativeToSolanaE2e.reserveSweep.state, "SIGNED_WITNESS_ATTACHED");
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.state, "FINALIZED_CANONICAL_RESERVE");
     assert.equal(result.nativeToSolanaE2e.reserveSweep.reserveAmountAtomic, "100000000");
     assert.equal(result.nativeToSolanaE2e.reserveSweep.nativeMinerFeeAtomic, "1000");
     assert.equal(result.nativeToSolanaE2e.reserveSweep.reserveAmountNative, "1.00000000");
     assert.deepEqual(result.nativeToSolanaE2e.reserveSweep.feeFundingOutpoints, [`${FEE_FUNDING_TXID}:0`]);
     assert.equal(result.nativeToSolanaE2e.reserveSweep.signed, true);
-    assert.equal(result.nativeToSolanaE2e.reserveSweep.broadcast, false);
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.broadcast, true);
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.finalitySatisfied, true);
     assert.equal(result.nativeToSolanaE2e.reserveSweep.unsignedNativeTransactionHex, UNSIGNED_SWEEP_HEX);
     assert.match(result.nativeToSolanaE2e.reserveSweep.unsignedNativeTransactionFingerprintHex, /^[0-9a-f]{64}$/u);
-    assert.match(result.nativeToSolanaE2e.reserveSweep.unsignedNativeTransactionId, /^[0-9a-f]{64}$/u);
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.unsignedNativeTransactionId, UNSIGNED_SWEEP_TXID);
     assert.match(result.nativeToSolanaE2e.reserveSweep.operationIdHex, /^[0-9a-f]{64}$/u);
     assert.match(result.nativeToSolanaE2e.reserveSweep.signedNativeTransactionHex, /^[0-9a-f]+$/u);
     assert.match(result.nativeToSolanaE2e.reserveSweep.signedNativeTransactionFingerprintHex, /^[0-9a-f]{64}$/u);
-    assert.equal(result.nativeToSolanaE2e.reserveSweep.nativeSweepTxidHex, result.nativeToSolanaE2e.reserveSweep.unsignedNativeTransactionId);
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.nativeSweepTxidHex, UNSIGNED_SWEEP_TXID);
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.broadcastTxidHex, UNSIGNED_SWEEP_TXID);
     assert.match(result.nativeToSolanaE2e.reserveSweep.nativeSweepWtxidHex, /^[0-9a-f]{64}$/u);
     assert.equal(result.nativeToSolanaE2e.reserveSweep.witnessInputCount, 2);
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.finalizedReserveSweep.state, "FINALIZED_CANONICAL_RESERVE");
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.finalizedReserveSweep.finalitySatisfied, true);
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.finalizedReserveSweep.reserveTransitionState, "CANONICAL_RESERVE");
+    assert.equal(result.nativeToSolanaE2e.reserveSweep.finalizedReserveSweep.mintCreditState, "AUTHORIZED_UNCONSUMED");
+    assert.deepEqual(result.nativeToSolanaE2e.reserveSweep.finalizedReserveSweep.inputOutpoints, [
+      `${DEPOSIT_TXID}:1`,
+      `${FEE_FUNDING_TXID}:0`,
+    ]);
     assert.equal(result.nativeToSolanaE2e.reserveSweep.signingIntents.length, 2);
     assert.equal(result.nativeToSolanaE2e.reserveSweep.frostResults.length, 2);
     assert.equal(result.nativeToSolanaE2e.reserveSweep.taprootSighashEvidences.length, 2);
@@ -139,6 +151,9 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
     assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_COMPUTE_VALIDATED_TAPROOT_SIGHASHES"));
     assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_SIGN_RESERVE_SWEEP_WITH_FROST_A_B"));
     assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_ATTACH_FROST_TAPROOT_WITNESSES"));
+    assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_BROADCAST_FROST_SIGNED_RESERVE_SWEEP"));
+    assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_MINE_RESERVE_SWEEP_FINALITY"));
+    assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_OBSERVE_FINALIZED_RESERVE_SWEEP"));
     assert.equal(
       result.nativeToSolanaE2e.nextRequiredImplementation.includes(
         "COMPUTE_VALIDATED_TAPROOT_SIGHASHES_FOR_EACH_FROST_CONTROLLED_INPUT",
@@ -155,6 +170,10 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
       result.nativeToSolanaE2e.nextRequiredImplementation.includes(
         "ATTACH_FROST_SIGNATURE_WITNESSES_TO_NATIVE_TRANSACTION",
       ),
+      false,
+    );
+    assert.equal(
+      result.nativeToSolanaE2e.nextRequiredImplementation.includes("BROADCAST_AND_FINALIZE_RESERVE_SWEEP"),
       false,
     );
     const prohibitedApprovalState = "WAITING_FOR_" + "ADMIN_APPROVAL";
@@ -176,12 +195,15 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
         "LOCAL_E2E_OBSERVE_RESERVE_SWEEP_FEE_FUNDING_TRANSACTION",
         "LOCAL_E2E_VERIFY_RESERVE_SWEEP_FEE_UTXO_UNSPENT",
         "LOCAL_E2E_CREATE_UNSIGNED_NATIVE_RESERVE_SWEEP",
+        "LOCAL_E2E_BROADCAST_FROST_SIGNED_RESERVE_SWEEP",
+        "LOCAL_E2E_MINE_RESERVE_SWEEP_FINALITY",
+        "LOCAL_E2E_OBSERVE_FINALIZED_RESERVE_SWEEP",
       ],
     );
     assert(executor.commandArgs.some((args) => args.includes("sendtoaddress")));
     assert(executor.commandArgs.some((args) => args.includes("createrawtransaction")));
     assert(!executor.commandArgs.some((args) => args.includes("signrawtransactionwithwallet")));
-    assert(!executor.commandArgs.some((args) => args.includes("sendrawtransaction")));
+    assert(executor.commandArgs.some((args) => args.includes("sendrawtransaction")));
     assert.deepEqual(executor.stopped, ["START_KINGPEPE_REGTEST", "START_SOLANA_LOCAL_VALIDATOR"]);
   } finally {
     rmSync(runRoot, { recursive: true, force: true });
@@ -320,6 +342,62 @@ test("local reserve sweep signer uses real A+B FROST signatures and attaches Tap
   } finally {
     rmSync(runRoot, { recursive: true, force: true });
   }
+});
+
+test("finalized reserve sweep validation requires exact txid, inputs, output, and finality", () => {
+  const finalized = validateFinalizedLocalReserveSweep({
+    rawTransaction: finalizedReserveSweepFixture(),
+    expectedTxidHex: UNSIGNED_SWEEP_TXID,
+    expectedInputOutpoints: [`${DEPOSIT_TXID}:1`, `${FEE_FUNDING_TXID}:0`],
+    reserveAmountAtomic: "100000000",
+    canonicalReserveScriptPubKeyHex: SCRIPT_HEX,
+    expectedConfirmations: 6,
+    nativeDecimals: 8,
+  });
+  assert.equal(finalized.state, "FINALIZED_CANONICAL_RESERVE");
+  assert.equal(finalized.nativeSweepTxidHex, UNSIGNED_SWEEP_TXID);
+  assert.equal(finalized.reserveAmountAtomic, "100000000");
+  assert.equal(finalized.reserveOutputVout, 0);
+
+  assert.throws(
+    () =>
+      validateFinalizedLocalReserveSweep({
+        rawTransaction: { ...finalizedReserveSweepFixture(), txid: h("wrong-finalized-sweep-txid") },
+        expectedTxidHex: UNSIGNED_SWEEP_TXID,
+        expectedInputOutpoints: [`${DEPOSIT_TXID}:1`, `${FEE_FUNDING_TXID}:0`],
+        reserveAmountAtomic: "100000000",
+        canonicalReserveScriptPubKeyHex: SCRIPT_HEX,
+        expectedConfirmations: 6,
+        nativeDecimals: 8,
+      }),
+    /LocalNativeReserveSweepFinalizedTxidMismatch/u,
+  );
+  assert.throws(
+    () =>
+      validateFinalizedLocalReserveSweep({
+        rawTransaction: { ...finalizedReserveSweepFixture(), confirmations: 5 },
+        expectedTxidHex: UNSIGNED_SWEEP_TXID,
+        expectedInputOutpoints: [`${DEPOSIT_TXID}:1`, `${FEE_FUNDING_TXID}:0`],
+        reserveAmountAtomic: "100000000",
+        canonicalReserveScriptPubKeyHex: SCRIPT_HEX,
+        expectedConfirmations: 6,
+        nativeDecimals: 8,
+      }),
+    /LocalNativeReserveSweepFinalityInsufficient/u,
+  );
+  assert.throws(
+    () =>
+      validateFinalizedLocalReserveSweep({
+        rawTransaction: finalizedReserveSweepFixture({ reserveScriptPubKeyHex: `5120${h("wrong-reserve-script")}` }),
+        expectedTxidHex: UNSIGNED_SWEEP_TXID,
+        expectedInputOutpoints: [`${DEPOSIT_TXID}:1`, `${FEE_FUNDING_TXID}:0`],
+        reserveAmountAtomic: "100000000",
+        canonicalReserveScriptPubKeyHex: SCRIPT_HEX,
+        expectedConfirmations: 6,
+        nativeDecimals: 8,
+      }),
+    /LocalNativeReserveSweepFinalizedReserveOutputNotUnique/u,
+  );
 });
 
 test("Taproot address helper matches the BIP350 v1 witness address vector", () => {
@@ -767,6 +845,7 @@ function defaultOutput(step) {
   if (step === "LOCAL_E2E_SEND_NATIVE_DEPOSIT") return DEPOSIT_TXID;
   if (step === "LOCAL_E2E_FUND_RESERVE_SWEEP_FEE_INPUT") return FEE_FUNDING_TXID;
   if (step === "LOCAL_E2E_CREATE_UNSIGNED_NATIVE_RESERVE_SWEEP") return UNSIGNED_SWEEP_HEX;
+  if (step === "LOCAL_E2E_BROADCAST_FROST_SIGNED_RESERVE_SWEEP") return UNSIGNED_SWEEP_TXID;
   if (step === "LOCAL_E2E_OBSERVE_NATIVE_SOURCE_SNAPSHOT") {
     return JSON.stringify({
       chain: "regtest",
@@ -831,7 +910,32 @@ function defaultOutput(step) {
       coinbase: false,
     });
   }
+  if (step === "LOCAL_E2E_OBSERVE_FINALIZED_RESERVE_SWEEP") {
+    return JSON.stringify(finalizedReserveSweepFixture());
+  }
   return `${step} ok`;
+}
+
+function finalizedReserveSweepFixture(overrides = {}) {
+  const reserveScriptPubKeyHex = overrides.reserveScriptPubKeyHex ?? SCRIPT_HEX;
+  return {
+    txid: overrides.txid ?? UNSIGNED_SWEEP_TXID,
+    confirmations: overrides.confirmations ?? 6,
+    vin: overrides.vin ?? [
+      { txid: DEPOSIT_TXID, vout: 1 },
+      { txid: FEE_FUNDING_TXID, vout: 0 },
+    ],
+    vout: overrides.vout ?? [
+      {
+        n: 0,
+        value: "1.00000000",
+        scriptPubKey: {
+          hex: reserveScriptPubKeyHex,
+          address: FROST_TAPROOT_ADDRESS,
+        },
+      },
+    ],
+  };
 }
 
 function h(label) {
