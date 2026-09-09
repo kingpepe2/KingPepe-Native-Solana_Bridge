@@ -98,7 +98,7 @@
     "phase08LocalE2eReusableInfrastructureHarnessCiVerified": true,
     "phase08NativeToSolanaLocalE2eRunnerImplemented": true,
     "phase08NativeToSolanaLocalE2eRunnerLocalTestsPassed": true,
-    "phase08NativeToSolanaLocalE2eRunnerCiVerified": false,
+    "phase08NativeToSolanaLocalE2eRunnerCiVerified": true,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true

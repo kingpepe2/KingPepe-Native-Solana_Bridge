@@ -907,3 +907,59 @@ OPEN BLOCKERS:
 NEXT PHASE:
 Continue Phase 08. Do not start Phase 09 until the real daemon-backed
 Native-to-Solana local E2E flow passes.
+
+## Phase 08 report - Native-to-Solana local E2E command runner
+
+PHASE:
+`PHASE 08 - Automatic Native to Solana local end-to-end`
+
+COMMIT SHA:
+`b30420dc11b3f6fe0e5e883b122dfc64c04ab871`
+
+COMMIT MESSAGE:
+`feat(phase-08): add native to solana local e2e runner`
+
+PUSH RESULT:
+Pushed to private `kingpepe2/KingPepe-Native-Solana_Bridge` on `main`.
+
+CI RUN URL:
+`https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34333170011`
+
+CI STATUS:
+`PASS`
+
+TESTS PASS/FAIL/SKIP/NOT_RUN:
+- `npm run test:local-e2e-readiness`: PASS, 20 readiness/orchestration/bootstrap/runner tests.
+- `npm test`: PASS, 2 protocol vectors plus 90 Node tests.
+- `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
+- `python .github/scripts/guardrails.py`: PASS.
+- JSON manifest parse checks: PASS.
+- Staged and outgoing-range secret-pattern scans: PASS.
+- `npm run doctor:local-e2e`: `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
+- `npm run local:e2e:plan`: `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
+- `npm run local:e2e:bootstrap`: `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
+- `npm run local:e2e:native-to-solana`: `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
+- Real daemon-backed Native-to-Solana local E2E: `BLOCKED / NOT_RUN`.
+
+WHAT CHANGED:
+- Added `scripts/local-e2e-native-to-solana.mjs`, a local-only runner that
+  composes the reusable bootstrap harness with disposable REGTEST deposit
+  funding, deposit intent creation, transaction observation, output matching,
+  UTXO/finality checks, and fail-closed reporting.
+- Added Node tests covering missing-infrastructure blocking, no per-transfer
+  KingPepe Team approval state, sanitized state-root reporting, local-only
+  Mainnet-disabled metadata, and deterministic deposit observation with fake
+  local tools.
+- Added the `local:e2e:native-to-solana` package script.
+
+OPEN BLOCKERS:
+- Missing local `kingpeped`, `kingpepe-cli`, `solana`,
+  `solana-test-validator`, and `anchor` executables prevent real
+  daemon-backed Native-to-Solana local E2E.
+- Reserve-sweep construction, FROST-backed reserve broadcast, Solana mint
+  submission, finalized mint observation, and reconciliation remain unexecuted
+  against real local daemons.
+
+NEXT PHASE:
+Continue Phase 08. Do not start Phase 09 until the real daemon-backed
+Native-to-Solana local E2E flow passes.

@@ -757,7 +757,10 @@
 
 ## Phase 08 Native-to-Solana local E2E command runner
 
-- Source status: implemented in working tree pending source commit and CI.
+- Source status: implemented and CI verified.
+- Source commit: `b30420dc11b3f6fe0e5e883b122dfc64c04ab871`
+- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34333170011`
+- CI status: `PASS`
 - Local tests:
   - `npm run test:local-e2e-readiness`: PASS, 20 readiness/orchestration/bootstrap/runner tests.
   - `npm run local:e2e:native-to-solana`: expected `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING` in the current environment.
