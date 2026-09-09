@@ -7,17 +7,29 @@ import {
   isHash32Hex,
   normalizeHex,
 } from "../../shared/protocol/canonical-message.mjs";
+import {
+  ATTESTATION_MODE,
+  ATTESTATION_PROTOCOL,
+  verifyProjectAttestation,
+} from "../attesters/attestation-service.mjs";
 
 export const SOLANA_DEPOSIT_CLAIM_TRANSACTION_PLAN_PROTOCOL =
   "KINGPEPE_NATIVE_SOLANA_BRIDGE/SOLANA_DEPOSIT_CLAIM_TRANSACTION_PLAN/V1";
 
 export const BRIDGE_INSTRUCTION_ACCEPT_DEPOSIT_CLAIM = 2;
+export const TRANSCEIVER_INSTRUCTION_VERIFY_MESSAGE_FROM_ED25519 = 2;
 export const BRIDGE_STATE_PDA_SEED_PREFIX = "kingpepe-bridge-state";
 export const DEPOSIT_CLAIM_PDA_SEED_PREFIX = "kingpepe-deposit-claim";
 export const MINT_AUTHORITY_PDA_SEED_PREFIX = "kingpepe-mint-authority";
+export const TRANSCEIVER_CONFIG_PDA_SEED_PREFIX = "kingpepe-transceiver-config";
 export const TRANSCEIVER_RECEIPT_PDA_SEED_PREFIX = "kingpepe-transceiver-receipt";
 
 const LOCALNET = "localnet";
+const ED25519_PROGRAM_ID_HEX = "037d46d67c93fbbe12f9428f838d40ff0570744927f48a64fcca704480000000";
+const ED25519_INSTRUCTION_HEADER_LENGTH = 16;
+const ED25519_SIGNATURE_LENGTH = 64;
+const ED25519_PUBLIC_KEY_LENGTH = 32;
+const INSTRUCTIONS_SYSVAR_ID_BASE58 = "Sysvar1nstructions1111111111111111111111111";
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const BASE58_INDEX = new Map(Array.from(BASE58_ALPHABET, (character, index) => [character, index]));
 const BASE58_PATTERN = /^[1-9A-HJ-NP-Za-km-z]{32,128}$/u;
@@ -105,8 +117,192 @@ export function buildLocalnetSolanaDepositClaimTransactionPlan(config) {
   });
 }
 
+export function buildLocalnetSolanaDepositClaimBundleTransactionPlan(config) {
+  const normalized = normalizePlanConfig(config);
+  const decodedMessage = decodeCanonicalBridgeMessage(normalized.encodedMessageBytes);
+  validateDepositClaimMessageDomain(normalized, decodedMessage);
+  const attestations = normalizeBundleAttestations(config?.attestations, normalized.encodedMessageBytes, decodedMessage);
+
+  const bridgeState = findProgramAddress(
+    [utf8(BRIDGE_STATE_PDA_SEED_PREFIX), normalized.mint.bytes],
+    normalized.managerProgram.bytes,
+  );
+  const depositClaim = findProgramAddress(
+    [utf8(DEPOSIT_CLAIM_PDA_SEED_PREFIX), hexToBytes(decodedMessage.operationIdHex, "operationIdHex")],
+    normalized.managerProgram.bytes,
+  );
+  const mintAuthority = findProgramAddress(
+    [utf8(MINT_AUTHORITY_PDA_SEED_PREFIX), normalized.mint.bytes],
+    normalized.managerProgram.bytes,
+  );
+  const transceiverConfig = findProgramAddress(
+    [utf8(TRANSCEIVER_CONFIG_PDA_SEED_PREFIX), normalized.mint.bytes],
+    normalized.transceiverProgram.bytes,
+  );
+  const verifiedReceipt = findProgramAddress(
+    [utf8(TRANSCEIVER_RECEIPT_PDA_SEED_PREFIX), hexToBytes(decodedMessage.messageDigestHex, "messageDigestHex")],
+    normalized.transceiverProgram.bytes,
+  );
+  const instructionsSysvar = normalizePubkeyPair(
+    { instructionsSysvarBase58: INSTRUCTIONS_SYSVAR_ID_BASE58 },
+    "instructionsSysvarBase58",
+    "instructionsSysvarHex",
+  );
+  const ed25519Program = pubkeyFromBytes(hexToBytes(ED25519_PROGRAM_ID_HEX, "ed25519ProgramId"), "ed25519Program");
+
+  const accountKeys = [
+    accountMeta("feePayer", normalized.feePayer, true, true),
+    accountMeta("verifiedReceipt", verifiedReceipt, false, true),
+    accountMeta("bridgeState", bridgeState, false, true),
+    accountMeta("depositClaim", depositClaim, false, true),
+    accountMeta("mint", normalized.mint, false, true),
+    accountMeta("recipientTokenAccount", normalized.recipientTokenAccount, false, true),
+    accountMeta("transceiverConfig", transceiverConfig, false, false),
+    accountMeta("instructionsSysvar", instructionsSysvar, false, false),
+    accountMeta("mintAuthorityPda", mintAuthority, false, false),
+    accountMeta("tokenProgram", normalized.tokenProgram, false, false),
+    accountMeta("ed25519Program", ed25519Program, false, false),
+    accountMeta("transceiverProgram", normalized.transceiverProgram, false, false),
+    accountMeta("managerProgram", normalized.managerProgram, false, false),
+  ];
+  requireUniqueAccountKeys(accountKeys);
+
+  const attestationInstructions = attestations.map((attestation, index) =>
+    Object.freeze({
+      role: `ed25519Attestation${index + 1}`,
+      programIdIndex: 10,
+      accountIndexes: Object.freeze([]),
+      dataBase64: Buffer.from(
+        encodeEd25519VerifierInstruction({
+          instructionIndex: index,
+          signatureHex: attestation.signatureHex,
+          publicKeyHex: attestation.attesterPublicKeyHex,
+          messageBytes: normalized.encodedMessageBytes,
+        }),
+      ).toString("base64"),
+      dataHex: bytesToHex(
+        encodeEd25519VerifierInstruction({
+          instructionIndex: index,
+          signatureHex: attestation.signatureHex,
+          publicKeyHex: attestation.attesterPublicKeyHex,
+          messageBytes: normalized.encodedMessageBytes,
+        }),
+      ),
+      attesterPublicKeyHex: attestation.attesterPublicKeyHex,
+      instructionIndex: index,
+    }),
+  );
+  const transceiverInstructionData = concatBytes([
+    Uint8Array.of(TRANSCEIVER_INSTRUCTION_VERIFY_MESSAGE_FROM_ED25519),
+    normalized.encodedMessageBytes,
+    u16Le(0),
+    u16Le(1),
+  ]);
+  const transceiverInstruction = Object.freeze({
+    role: "transceiverVerifyMessageFromEd25519",
+    programIdIndex: 11,
+    accountIndexes: Object.freeze([6, 1, 7]),
+    dataBase64: Buffer.from(transceiverInstructionData).toString("base64"),
+    dataHex: bytesToHex(transceiverInstructionData),
+  });
+  const bridgeInstructionData = concatBytes([
+    Uint8Array.of(BRIDGE_INSTRUCTION_ACCEPT_DEPOSIT_CLAIM),
+    normalized.encodedMessageBytes,
+  ]);
+  const bridgeInstruction = Object.freeze({
+    role: "bridgeAcceptDepositClaim",
+    programIdIndex: 12,
+    accountIndexes: Object.freeze([2, 3, 1, 4, 5, 8, 9, 11]),
+    dataBase64: Buffer.from(bridgeInstructionData).toString("base64"),
+    dataHex: bytesToHex(bridgeInstructionData),
+  });
+  const compiledInstructions = Object.freeze([
+    ...attestationInstructions,
+    transceiverInstruction,
+    bridgeInstruction,
+  ]);
+  const messageBytes = encodeLegacyMessageWithInstructions({
+    accountKeys: accountKeys.map((account) => account.bytes),
+    recentBlockhash: normalized.recentBlockhash.bytes,
+    readonlyUnsignedAccounts: 7,
+    compiledInstructions,
+  });
+
+  return Object.freeze({
+    protocol: SOLANA_DEPOSIT_CLAIM_TRANSACTION_PLAN_PROTOCOL,
+    environment: LOCALNET,
+    cluster: LOCALNET,
+    bundle: "ED25519_ATTESTATIONS_TRANSCEIVER_RECEIPT_BRIDGE_CLAIM",
+    operationIdHex: decodedMessage.operationIdHex,
+    messageDigestHex: decodedMessage.messageDigestHex,
+    amountAtomic: decodedMessage.amountAtomic.toString(),
+    solanaRecipientHex: decodedMessage.destinationHex,
+    recentBlockhashBase58: normalized.recentBlockhash.base58,
+    lastValidBlockHeight: normalized.lastValidBlockHeight,
+    managerProgramIdBase58: normalized.managerProgram.base58,
+    transceiverProgramIdBase58: normalized.transceiverProgram.base58,
+    mintBase58: normalized.mint.base58,
+    feePayerBase58: normalized.feePayer.base58,
+    accounts: Object.freeze(accountKeys.map(publicAccountMeta)),
+    pdas: Object.freeze({
+      bridgeState: publicPda(bridgeState),
+      depositClaim: publicPda(depositClaim),
+      mintAuthority: publicPda(mintAuthority),
+      transceiverConfig: publicPda(transceiverConfig),
+      verifiedReceipt: publicPda(verifiedReceipt),
+    }),
+    instructions: compiledInstructions,
+    instruction: bridgeInstruction,
+    messageBase64: Buffer.from(messageBytes).toString("base64"),
+    messageFingerprintHex: sha256Hex(messageBytes),
+    preparedTransactionBase64: undefined,
+    preparedTransactionFingerprintHex: undefined,
+  });
+}
+
 export async function prepareSignedLocalnetSolanaDepositClaimTransaction(config) {
   const plan = buildLocalnetSolanaDepositClaimTransactionPlan(config);
+  const signer = requireObject(config?.feePayerSigner, "feePayerSigner");
+  const signerPublicKey = normalizePubkeyPair(
+    {
+      feePayerSignerPublicKeyBase58: signer.publicKeyBase58,
+      feePayerSignerPublicKeyHex: signer.publicKeyHex,
+    },
+    "feePayerSignerPublicKeyBase58",
+    "feePayerSignerPublicKeyHex",
+  );
+  if (signerPublicKey.base58 !== plan.feePayerBase58) {
+    throw new Error("SolanaDepositClaimFeePayerSignerMismatch");
+  }
+  if (typeof signer.sign !== "function") {
+    throw new Error("SolanaDepositClaimSignerMissingSignFunction");
+  }
+
+  const messageBytes = Buffer.from(plan.messageBase64, "base64");
+  const signature = asBytes(await signer.sign(messageBytes), "feePayerSignature");
+  if (signature.length !== 64) {
+    throw new Error("SolanaDepositClaimSignatureLengthInvalid");
+  }
+  if (!ed25519.verify(signature, messageBytes, signerPublicKey.bytes)) {
+    throw new Error("SolanaDepositClaimSignatureVerificationFailed");
+  }
+
+  const transactionBytes = concatBytes([shortvecEncode(1), signature, messageBytes]);
+  return Object.freeze({
+    ...plan,
+    signatures: Object.freeze([
+      Object.freeze({
+        publicKeyBase58: plan.feePayerBase58,
+        signatureBase58: base58Encode(signature),
+      }),
+    ]),
+    preparedTransactionBase64: Buffer.from(transactionBytes).toString("base64"),
+    preparedTransactionFingerprintHex: sha256Hex(transactionBytes),
+  });
+}
+
+export async function prepareSignedLocalnetSolanaDepositClaimBundleTransaction(config) {
+  const plan = buildLocalnetSolanaDepositClaimBundleTransactionPlan(config);
   const signer = requireObject(config?.feePayerSigner, "feePayerSigner");
   const signerPublicKey = normalizePubkeyPair(
     {
@@ -284,17 +480,38 @@ function validateDepositClaimMessageDomain(config, message) {
 }
 
 function encodeLegacyMessage({ accountKeys, recentBlockhash, compiledInstruction }) {
+  return encodeLegacyMessageWithInstructions({
+    accountKeys,
+    recentBlockhash,
+    readonlyUnsignedAccounts: 5,
+    compiledInstructions: [compiledInstruction],
+  });
+}
+
+function encodeLegacyMessageWithInstructions({
+  accountKeys,
+  recentBlockhash,
+  readonlyUnsignedAccounts,
+  compiledInstructions,
+}) {
   return concatBytes([
-    Uint8Array.of(1, 0, 5),
+    Uint8Array.of(1, 0, checkedU8(readonlyUnsignedAccounts, "readonlyUnsignedAccounts")),
     shortvecEncode(accountKeys.length),
     ...accountKeys,
     recentBlockhash,
-    shortvecEncode(1),
-    Uint8Array.of(compiledInstruction.programIdIndex),
-    shortvecEncode(compiledInstruction.accountIndexes.length),
-    Uint8Array.from(compiledInstruction.accountIndexes),
-    shortvecEncode(Buffer.from(compiledInstruction.dataBase64, "base64").length),
-    Buffer.from(compiledInstruction.dataBase64, "base64"),
+    shortvecEncode(compiledInstructions.length),
+    ...compiledInstructions.map(encodeCompiledInstruction),
+  ]);
+}
+
+function encodeCompiledInstruction(instruction) {
+  const data = Buffer.from(instruction.dataBase64, "base64");
+  return concatBytes([
+    Uint8Array.of(checkedU8(instruction.programIdIndex, "instruction.programIdIndex")),
+    shortvecEncode(instruction.accountIndexes.length),
+    Uint8Array.from(instruction.accountIndexes.map((index) => checkedU8(index, "instruction.accountIndex"))),
+    shortvecEncode(data.length),
+    data,
   ]);
 }
 
@@ -346,6 +563,15 @@ function publicPda(pda) {
   });
 }
 
+function pubkeyFromBytes(bytes, label) {
+  const normalized = asPubkeyBytes(bytes, label);
+  return Object.freeze({
+    bytes: normalized,
+    hex: bytesToHex(normalized),
+    base58: base58Encode(normalized),
+  });
+}
+
 function requireUniqueAccountKeys(accounts) {
   const seen = new Set();
   for (const account of accounts) {
@@ -354,6 +580,74 @@ function requireUniqueAccountKeys(accounts) {
     }
     seen.add(account.addressBase58);
   }
+}
+
+function normalizeBundleAttestations(attestations, encodedMessageBytes, message) {
+  if (!Array.isArray(attestations) || attestations.length !== 2) {
+    throw new Error("SolanaDepositClaimBundleExactlyTwoAttestationsRequired");
+  }
+  const encodedMessageHex = bytesToHex(encodedMessageBytes);
+  const seen = new Set();
+  return Object.freeze(
+    attestations.map((attestation, index) => {
+      const value = requireObject(attestation, `attestations[${index}]`);
+      const publicKeyHex = normalizeHashLike(value.attesterPublicKeyHex, `attestations[${index}].attesterPublicKeyHex`);
+      const signatureHex = normalizeFixedHex(value.signatureHex, `attestations[${index}].signatureHex`, ED25519_SIGNATURE_LENGTH);
+      if (seen.has(publicKeyHex)) {
+        throw new Error("SolanaDepositClaimBundleDuplicateAttester");
+      }
+      if (
+        value.protocol !== ATTESTATION_PROTOCOL ||
+        value.mode !== ATTESTATION_MODE ||
+        value.operationIdHex !== message.operationIdHex ||
+        value.messageDigestHex !== message.messageDigestHex ||
+        value.keyEpoch !== message.keyEpoch ||
+        value.policyEpoch !== message.policyEpoch ||
+        !verifyProjectAttestation(value, encodedMessageHex)
+      ) {
+        throw new Error("SolanaDepositClaimBundleInvalidAttestation");
+      }
+      seen.add(publicKeyHex);
+      return Object.freeze({
+        attesterPublicKeyHex: publicKeyHex,
+        signatureHex,
+      });
+    }),
+  );
+}
+
+function encodeEd25519VerifierInstruction({
+  instructionIndex,
+  signatureHex,
+  publicKeyHex,
+  messageBytes,
+}) {
+  const signature = hexToBytes(normalizeFixedHex(signatureHex, "signatureHex", ED25519_SIGNATURE_LENGTH), "signatureHex");
+  const publicKey = hexToBytes(normalizeFixedHex(publicKeyHex, "publicKeyHex", ED25519_PUBLIC_KEY_LENGTH), "publicKeyHex");
+  const message = asBytes(messageBytes, "messageBytes");
+  const signatureOffset = ED25519_INSTRUCTION_HEADER_LENGTH;
+  const publicKeyOffset = signatureOffset + ED25519_SIGNATURE_LENGTH;
+  const messageOffset = publicKeyOffset + ED25519_PUBLIC_KEY_LENGTH;
+  return concatBytes([
+    Uint8Array.of(1, 0),
+    u16Le(signatureOffset),
+    u16Le(instructionIndex),
+    u16Le(publicKeyOffset),
+    u16Le(instructionIndex),
+    u16Le(messageOffset),
+    u16Le(message.length),
+    u16Le(instructionIndex),
+    signature,
+    publicKey,
+    message,
+  ]);
+}
+
+function u16Le(value) {
+  const checked = checkedInteger(value, "u16", 0, 0xffff);
+  const out = Buffer.alloc(2);
+  out.writeUInt16LE(checked, 0);
+  return out;
 }
 
 function isEd25519Point(bytes) {
@@ -396,6 +690,14 @@ function normalizeHashLike(value, label) {
   return normalized;
 }
 
+function normalizeFixedHex(value, label, byteLength) {
+  const normalized = normalizeHex(value, label);
+  if (normalized.length !== byteLength * 2) {
+    throw new Error(`${label}:Expected${byteLength}Bytes`);
+  }
+  return normalized;
+}
+
 function normalizeHexBytes(value, label) {
   return normalizeHex(value, label);
 }
@@ -405,6 +707,17 @@ function normalizeDecimal(value, label) {
     throw new Error(`${label}:ExpectedDecimalString`);
   }
   return value;
+}
+
+function checkedInteger(value, label, min, max) {
+  if (!Number.isSafeInteger(value) || value < min || value > max) {
+    throw new Error(`${label}:ExpectedInteger`);
+  }
+  return value;
+}
+
+function checkedU8(value, label) {
+  return checkedInteger(value, label, 0, 0xff);
 }
 
 function concatBytes(chunks) {
