@@ -1019,7 +1019,8 @@
 
 ## Phase 08 local FROST reserve-sweep witness attachment
 
-- Source status: implemented locally; exact source SHA and CI will be recorded after push.
+- Source status: implemented and CI verified for source commit `a04417a4562f07a3ec1d709361c714e116b4ba0f`.
+- CI: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34356317376` PASS.
 - What changed:
   - The local Native-to-Solana runner now converts validated Taproot sighash evidence into localnet-only, input-specific FROST reserve-sweep signing intents.
   - Each authorized FROST operation now binds `signingInputIndex`, so A and B authorize the exact Native transaction input they sign.
