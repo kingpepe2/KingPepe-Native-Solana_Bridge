@@ -39,8 +39,7 @@ pub fn process_instruction(
     _accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
-    process_instruction_boundary(instruction_data)
-        .map_err(|_| ProgramError::InvalidInstructionData)
+    process_instruction_boundary(instruction_data).map_err(|_| ProgramError::InvalidInstructionData)
 }
 
 pub fn process_instruction_boundary(instruction_data: &[u8]) -> Result<(), EntrypointError> {
