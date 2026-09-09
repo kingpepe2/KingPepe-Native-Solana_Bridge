@@ -286,10 +286,14 @@
 ## Phase 08 Solana account execution and SPL Token CPI source implementation
 
 - PHASE: `08`
-- source commit: pending publication
-- push result: pending
-- CI URL: pending
-- CI status: pending
+- source commit: `c3b2686cf701bc7ed795aefe9c4ba1dfd75bf11e`
+- corrective format commit / tested source SHA: `8309b3fc95bea4b84224852cb13e2f9b75099dfa`
+- push result: pushed to private GitHub repository
+- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34304533970`
+- CI status: `PASS`
+- superseded CI failure:
+  `c3b2686cf701bc7ed795aefe9c4ba1dfd75bf11e` failed Linux rustfmt and was
+  corrected by `8309b3fc95bea4b84224852cb13e2f9b75099dfa`.
 - tests:
   - `cd solana && cargo check --locked --workspace --all-targets` (pass under WSL)
   - `cd solana && cargo test --locked --workspace --all-targets` (pass under WSL, 52 Rust tests)
@@ -309,7 +313,7 @@
   - `LOCAL_E2E_INFRASTRUCTURE_MISSING`
   - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
 - next:
-  - Publish and verify this account-execution increment, then continue Phase 08 local validator/regtest wiring. Do not proceed to Phase 09 until the Native-to-Solana local E2E gate actually passes.
+  - Continue Phase 08 local validator/regtest wiring. Do not proceed to Phase 09 until the Native-to-Solana local E2E gate actually passes.
 
 ## Phase 08 Solana account-state codec implementation
 

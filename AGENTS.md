@@ -124,8 +124,9 @@
 - Required local executables were not available in the checked environment:
   `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
 - Current Solana crates include deterministic non-production localnet Program
-  IDs and validate-only economic ABI decoding. Solana economic execution is
-  still disabled, so they are not ready for a real local-validator E2E flow.
+  IDs, economic ABI decoding, program-owned account validation, receipt writes,
+  and SPL Token CPI construction. A real local-validator E2E flow is still not
+  claimed until the required localnet executables are available and exercised.
 - Do not mark Native-to-Solana local E2E as passed until a disposable
   KingPepe regtest node and Solana local validator execute the full automated
   deposit flow without per-transfer KingPepe Team approval.
@@ -150,7 +151,8 @@
   `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34295554332` PASS
 - Phase 08 validate-only Solana ABI status:
   instruction decoding and malformed/trailing-data rejection are implemented
-  locally; account execution and SPL CPI remain disabled.
+  locally. This increment is superseded by the account-execution source
+  increment below.
 - Phase 08 validate-only Solana ABI commit:
   `201c5bdc2a2fb65601331b58115e0a7543179e12`
 - Phase 08 validate-only Solana ABI CI:
@@ -174,7 +176,12 @@
   bridge manager and transceiver source now expose economic account execution
   entrypoints, program-owned PDA checks, fixed account writes, instructions
   sysvar Ed25519 loading, and SPL Token `mint_to_checked` / `burn_checked`
-  CPI construction. Local unit tests pass; publication and CI verification are
-  pending for this increment. Real local E2E is still blocked by missing
-  `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and
-  `anchor`.
+  CPI construction.
+- Phase 08 Solana account-execution implementation commit:
+  `c3b2686cf701bc7ed795aefe9c4ba1dfd75bf11e`
+- Phase 08 Solana account-execution corrective/tested source SHA:
+  `8309b3fc95bea4b84224852cb13e2f9b75099dfa`
+- Phase 08 Solana account-execution CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34304533970` PASS.
+- Real local E2E is still blocked by missing `kingpeped`, `kingpepe-cli`,
+  `solana`, `solana-test-validator`, and `anchor`.

@@ -37,7 +37,7 @@
 ## Current blockers
 
 - Phase 08 is blocked because the local environment does not provide `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, or `anchor`.
-- Current Solana crates have deterministic non-production localnet Program IDs and validate-only economic ABI decoding, but Solana economic execution is still disabled.
+- Current Solana crates have deterministic non-production localnet Program IDs, economic ABI decoding, source-level account execution, and SPL Token CPI construction. Real local-validator execution remains untested because required localnet executables are missing.
 - Full Native transaction construction, Native node acceptance, local end-to-end flows, Devnet, production configuration, external review, and activation remain later phases.
 
 ## Latest local validation
@@ -77,7 +77,7 @@
 - Phase 08 validate-only Solana ABI CI: PASS for `201c5bdc2a2fb65601331b58115e0a7543179e12`
 - Phase 08 mint-authority real Solana PDA correction CI: PASS for `94da519e7a50ea6692c445cfd307beb0fa491347`
 - Phase 08 Solana account-state codecs: PASS for `804e03d4909ad002c0cf97798bd30cda56a7d4be`
-- Phase 08 Solana account execution and SPL Token CPI source: local tests PASS; CI pending publication
+- Phase 08 Solana account execution and SPL Token CPI source: PASS for `8309b3fc95bea4b84224852cb13e2f9b75099dfa`
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 52 Rust tests after account-execution update
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
@@ -96,9 +96,9 @@
 
 ## Next phase
 
-- Continue Phase 08 by implementing Solana account execution/SPL CPI for the
-  decoded economic ABI and adding disposable KingPepe regtest plus Solana
-  local-validator tooling.
+- Continue Phase 08 by adding disposable KingPepe regtest plus Solana
+  local-validator tooling and running the full automated Native-to-Solana
+  local E2E flow.
 
 ## Phase 08 source-boundary implementation
 
@@ -193,9 +193,15 @@
   deposit-claim recording/mint CPI planning, and withdrawal burn/record CPI
   planning. Unit tests skip actual Token Program CPI invocation only because
   no local validator is available in this environment.
-- Source commit: pending publication
-- CI URL: pending
-- CI status: pending
+- Source commit: `c3b2686cf701bc7ed795aefe9c4ba1dfd75bf11e`
+- Corrective format commit / tested source SHA:
+  `8309b3fc95bea4b84224852cb13e2f9b75099dfa`
+- CI URL:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34304533970`
+- CI status: `PASS`
+- Superseded CI failure:
+  `c3b2686cf701bc7ed795aefe9c4ba1dfd75bf11e` failed Linux rustfmt and was
+  corrected by `8309b3fc95bea4b84224852cb13e2f9b75099dfa`.
 - Real daemon-backed Native-to-Solana E2E: `BLOCKED / NOT_RUN`
 
 ## Phase 08 mint-authority real Solana PDA correction
