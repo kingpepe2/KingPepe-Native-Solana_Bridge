@@ -315,6 +315,36 @@
 - next:
   - Continue Phase 08 local validator/regtest wiring. Do not proceed to Phase 09 until the Native-to-Solana local E2E gate actually passes.
 
+## Phase 08 local E2E orchestration plan
+
+- PHASE: `08`
+- source commit: `7ffd331358146bb990f9830d4f39c0849cc0bdeb`
+- push result: pushed to private GitHub repository
+- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34305873353`
+- CI status: `PASS`
+- tests:
+  - `npm run test:local-e2e-readiness` (pass, 8 readiness/orchestration tests)
+  - `npm test` (pass, 2 vectors plus 31 Node tests)
+  - `npm run local:e2e:plan` (expected BLOCKED, exit 2)
+  - `npm run doctor:local-e2e` (expected BLOCKED, exit 2)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - CI Linux format, clippy, workspace, Node, and native crate tests (PASS)
+  - CI Windows workspace, Node, and native crate tests (PASS)
+  - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
+- changed:
+  - Added a local-only orchestration planner for Anchor build, Solana local
+    validator startup, and KingPepe REGTEST startup.
+  - Enforced runtime datadir and ledger paths outside the repository.
+  - Enforced loopback-only REGTEST RPC, no public Native P2P listener, and
+    allowlisted local CLI commands.
+  - Redacted local paths from CLI plan output.
+- blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
+- next:
+  - Continue Phase 08 by integrating the actual disposable local E2E runner once the required executables are available. Do not proceed to Phase 09 until the Native-to-Solana local E2E gate actually passes.
+
 ## Phase 08 Solana account-state codec implementation
 
 - PHASE: `08`

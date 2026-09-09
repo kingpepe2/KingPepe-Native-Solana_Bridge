@@ -69,8 +69,9 @@
 - Phase 08 `Get-Command kingpeped kingpepe-cli solana solana-test-validator anchor`: NOT_FOUND on Windows
 - Phase 08 `command -v kingpeped kingpepe-cli solana-test-validator solana anchor`: NOT_FOUND under WSL
 - Phase 08 `npm run test:bridge-validator`: PASS, 6 automatic deposit pipeline tests
-- Phase 08 `npm run test:local-e2e-readiness`: PASS, 3 readiness-gate tests
+- Phase 08 `npm run test:local-e2e-readiness`: PASS, 8 readiness/orchestration tests
 - Phase 08 `npm run doctor:local-e2e`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING; missing localnet executables; both Solana programs report `READY` at the source/readiness-gate level after account-execution wiring
+- Phase 08 `npm run local:e2e:plan`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING with redacted local paths and no production configuration
 - Phase 08 source-boundary CI: PASS for `09e42e6856312a0c617eb9c14a0312012263722a`
 - Phase 08 local E2E readiness gate CI: PASS for `6f22309770f3a2f85c96093bcf8af10b47065f31`
 - Phase 08 fail-closed Solana entrypoint shell CI: PASS for `7eafd8a38d346dcb018005a7357a0012a84b0e0c`
@@ -78,6 +79,7 @@
 - Phase 08 mint-authority real Solana PDA correction CI: PASS for `94da519e7a50ea6692c445cfd307beb0fa491347`
 - Phase 08 Solana account-state codecs: PASS for `804e03d4909ad002c0cf97798bd30cda56a7d4be`
 - Phase 08 Solana account execution and SPL Token CPI source: PASS for `8309b3fc95bea4b84224852cb13e2f9b75099dfa`
+- Phase 08 local E2E orchestration plan: PASS for `7ffd331358146bb990f9830d4f39c0849cc0bdeb`
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 52 Rust tests after account-execution update
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
@@ -202,6 +204,27 @@
 - Superseded CI failure:
   `c3b2686cf701bc7ed795aefe9c4ba1dfd75bf11e` failed Linux rustfmt and was
   corrected by `8309b3fc95bea4b84224852cb13e2f9b75099dfa`.
+- Real daemon-backed Native-to-Solana E2E: `BLOCKED / NOT_RUN`
+
+## Phase 08 local E2E orchestration plan
+
+- Added `scripts/local-e2e-orchestrator.mjs`.
+- Added `npm run local:e2e:plan`.
+- Added orchestration tests to `scripts/tests/local-e2e-orchestrator.test.mjs`.
+- The orchestrator builds a local-only plan for:
+  - `anchor build`;
+  - `solana-test-validator` with localnet Program IDs from `solana/Anchor.toml`;
+  - `kingpeped` REGTEST startup with absolute disposable datadir, loopback RPC,
+    no public listening, and non-privileged ports;
+  - allowlisted `kingpepe-cli` templates for local health/stop commands.
+- Runtime datadir and Solana ledger paths must be outside the repository.
+- CLI output redacts local paths and continues to report
+  `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING` until the required executables are
+  present.
+- Source commit: `7ffd331358146bb990f9830d4f39c0849cc0bdeb`
+- CI URL:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34305873353`
+- CI status: `PASS`
 - Real daemon-backed Native-to-Solana E2E: `BLOCKED / NOT_RUN`
 
 ## Phase 08 mint-authority real Solana PDA correction

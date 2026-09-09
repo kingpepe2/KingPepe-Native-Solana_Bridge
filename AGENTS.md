@@ -134,9 +134,11 @@
   - `npm run test:bridge-validator`
 - Current local E2E readiness check:
   - `npm run test:local-e2e-readiness`
+  - `npm run local:e2e:plan`
   - `npm run doctor:local-e2e` reports
     `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING` until the required localnet
-    executables exist and Solana economic instruction execution is implemented.
+    executables exist and Solana economic instruction execution is exercised
+    under a local validator.
 - Phase 08 local E2E readiness gate commit:
   `6f22309770f3a2f85c96093bcf8af10b47065f31`
 - Phase 08 local E2E readiness gate CI:
@@ -183,5 +185,14 @@
   `8309b3fc95bea4b84224852cb13e2f9b75099dfa`
 - Phase 08 Solana account-execution CI:
   `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34304533970` PASS.
+- Phase 08 local E2E orchestration plan:
+  `scripts/local-e2e-orchestrator.mjs` builds a local-only execution plan for
+  Anchor build, Solana local validator, and KingPepe REGTEST startup. Runtime
+  datadir/ledger paths are required outside the repository, Mainnet remains
+  disabled, and the plan exits blocked until required executables exist.
+- Phase 08 local E2E orchestration commit:
+  `7ffd331358146bb990f9830d4f39c0849cc0bdeb`
+- Phase 08 local E2E orchestration CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34305873353` PASS.
 - Real local E2E is still blocked by missing `kingpeped`, `kingpepe-cli`,
   `solana`, `solana-test-validator`, and `anchor`.
