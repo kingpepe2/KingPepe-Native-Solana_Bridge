@@ -28,6 +28,11 @@ function h(label) {
   return createHash("sha256").update(label).digest("hex");
 }
 
+function mutateLastHexByte(hex) {
+  const replacement = hex.endsWith("00") ? "01" : "00";
+  return `${hex.slice(0, -2)}${replacement}`;
+}
+
 function pubkey(label) {
   return {
     bytes: hexToBytes(h(label), label),
@@ -383,7 +388,7 @@ test("bundled deposit claim plan rejects missing, duplicate, or mutated attestat
           attestations[0],
           {
             ...attestations[1],
-            signatureHex: `${attestations[1].signatureHex.slice(0, -2)}00`,
+            signatureHex: mutateLastHexByte(attestations[1].signatureHex),
           },
         ],
       }),
