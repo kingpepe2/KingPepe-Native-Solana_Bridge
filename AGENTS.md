@@ -158,5 +158,8 @@
 - Phase 08 mint-authority PDA correction:
   the bridge manager now derives the mint authority with Solana
   `Pubkey::find_program_address` seeds and exposes the bump for future account
-  initialization; source publication/CI verification is pending for this
-  increment.
+  initialization.
+- Phase 08 mint-authority PDA correction commit:
+  `94da519e7a50ea6692c445cfd307beb0fa491347`
+- Phase 08 mint-authority PDA correction CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34299827083` PASS.
