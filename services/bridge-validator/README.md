@@ -53,7 +53,9 @@ load, create, or store key files.
 to the Solana deposit submitter for localnet. It fetches or accepts a finalized
 local blockhash, prepares the exact signed claim transaction through an injected
 fee-payer signer, and submits through the existing durable submitter boundary.
-It remains localnet-only and does not load production keys or runtime state.
+It passes the derived per-operation deposit-claim PDA and configured Mint
+account to the finalized claim observer, remains localnet-only, and does not
+load production keys or runtime state.
 
 `native-reserve-sweep-adapters.mjs` implements local Native reserve-sweep
 adapter boundaries. The relayer validates the FROST A+B transcript, persists

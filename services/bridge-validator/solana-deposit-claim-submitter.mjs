@@ -70,6 +70,8 @@ export class SolanaDepositClaimSubmitter {
       preparedTransactionFingerprintHex: sha256Hex(Buffer.from(normalized.preparedTransactionBase64, "base64")),
       recentBlockhash: normalized.recentBlockhash,
       lastValidBlockHeight: normalized.lastValidBlockHeight,
+      depositClaimAccountBase58: normalized.depositClaimAccountBase58,
+      mintAccountBase58: normalized.mintAccountBase58,
     });
     assertSamePrepared(prepared, normalized);
 
@@ -155,6 +157,8 @@ export class SolanaDepositClaimSubmitter {
         operationIdHex: normalized.operationIdHex,
         messageDigestHex: normalized.messageDigestHex,
         solanaSignature,
+        depositClaimAccountBase58: normalized.depositClaimAccountBase58,
+        mintAccountBase58: normalized.mintAccountBase58,
       });
     } catch {
       return submitterDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "SOLANA_DEPOSIT_CLAIM_OBSERVER_FAILED", normalized, {
@@ -562,6 +566,12 @@ function normalizeDepositClaimRequest(config, request) {
     preparedTransactionBase64: normalizePreparedTransactionBase64(value.preparedTransactionBase64),
     recentBlockhash: normalizeBase58Like(value.recentBlockhash, "recentBlockhash"),
     lastValidBlockHeight: canonicalUintDecimal(value.lastValidBlockHeight, "lastValidBlockHeight"),
+    depositClaimAccountBase58:
+      value.depositClaimAccountBase58 === undefined
+        ? undefined
+        : normalizeBase58Like(value.depositClaimAccountBase58, "depositClaimAccountBase58"),
+    mintAccountBase58:
+      value.mintAccountBase58 === undefined ? undefined : normalizeBase58Like(value.mintAccountBase58, "mintAccountBase58"),
     maxRetries: checkedSmallInteger(value.maxRetries ?? 0, "maxRetries"),
     message,
   });
@@ -664,6 +674,12 @@ function normalizePreparedEntry(prepared) {
     ),
     recentBlockhash: normalizeBase58Like(value.recentBlockhash, "recentBlockhash"),
     lastValidBlockHeight: canonicalUintDecimal(value.lastValidBlockHeight, "lastValidBlockHeight"),
+    depositClaimAccountBase58:
+      value.depositClaimAccountBase58 === undefined
+        ? undefined
+        : normalizeBase58Like(value.depositClaimAccountBase58, "depositClaimAccountBase58"),
+    mintAccountBase58:
+      value.mintAccountBase58 === undefined ? undefined : normalizeBase58Like(value.mintAccountBase58, "mintAccountBase58"),
     submittedSignature:
       value.submittedSignature === undefined ? undefined : normalizeSolanaSignature(value.submittedSignature),
   });
@@ -679,6 +695,8 @@ function assertSamePrepared(existing, incoming) {
     "preparedTransactionBase64",
     "recentBlockhash",
     "lastValidBlockHeight",
+    "depositClaimAccountBase58",
+    "mintAccountBase58",
   ];
   for (const key of comparable) {
     if (existing[key] !== incoming[key]) {
