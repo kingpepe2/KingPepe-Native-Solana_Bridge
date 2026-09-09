@@ -125,7 +125,7 @@
     "phase08TaprootSighashEvidenceCiVerified": true,
     "phase08LocalFrostReserveSweepWitnessAttachmentImplemented": true,
     "phase08LocalFrostReserveSweepWitnessAttachmentLocalTestsPassed": true,
-    "phase08LocalFrostReserveSweepWitnessAttachmentCiVerified": false,
+    "phase08LocalFrostReserveSweepWitnessAttachmentCiVerified": true,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true
