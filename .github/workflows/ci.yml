@@ -72,7 +72,7 @@ jobs:
         run: npm run test:attesters
       - name: Run Solana observer tests
         run: npm run test:solana-observer
-      - name: Run bridge validator deposit pipeline tests
+      - name: Run bridge validator tests
         run: npm run test:bridge-validator
       - name: Run local E2E readiness gate tests
         run: npm run test:local-e2e-readiness
@@ -130,7 +130,7 @@ jobs:
         run: npm run test:attesters
       - name: Run Solana observer tests
         run: npm run test:solana-observer
-      - name: Run bridge validator deposit pipeline tests
+      - name: Run bridge validator tests
         run: npm run test:bridge-validator
       - name: Run local E2E readiness gate tests
         run: npm run test:local-e2e-readiness

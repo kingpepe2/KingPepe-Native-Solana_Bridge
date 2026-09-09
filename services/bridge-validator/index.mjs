@@ -8,3 +8,15 @@ export {
   buildDepositClaimMessage,
   depositReserveEvidenceDigestHex,
 } from "./automatic-deposit-pipeline.mjs";
+
+export {
+  FileBackedSolanaDepositClaimJournal,
+  InMemorySolanaDepositClaimJournal,
+  SOLANA_DEPOSIT_CLAIM_OBSERVATION_PROTOCOL,
+  SOLANA_DEPOSIT_CLAIM_SUBMITTER_PROTOCOL,
+  SolanaDepositClaimSubmitter,
+  SolanaLocalRpcClient,
+  depositClaimObservationDigestHex,
+  normalizeSolanaRpcEndpoint,
+  validateDepositClaimObservation,
+} from "./solana-deposit-claim-submitter.mjs";
