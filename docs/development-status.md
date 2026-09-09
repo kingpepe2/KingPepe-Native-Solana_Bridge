@@ -37,7 +37,7 @@
 ## Current blockers
 
 - Phase 08 is blocked because the local environment does not provide `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, or `anchor`.
-- Current Solana crates have deterministic non-production localnet Program IDs, economic ABI decoding, source-level account execution, SPL Token CPI construction, a localnet-only deposit-claim observer, and a localnet transaction-plan builder. Real local-validator execution remains untested because required localnet executables are missing.
+- Current Solana crates have deterministic non-production localnet Program IDs, economic ABI decoding, source-level account execution, SPL Token CPI construction, a localnet-only deposit-claim observer, a localnet transaction-plan builder, and a localnet adapter that connects signed transaction planning to durable submission. Real local-validator execution remains untested because required localnet executables are missing.
 - Full Native transaction construction, Native node acceptance, local end-to-end flows, Devnet, production configuration, external review, and activation remain later phases.
 
 ## Latest local validation
@@ -68,7 +68,7 @@
 - Phase 07 CI: PASS for `d17ba8fe61d20a88d4206f72d68a010a2d146524`
 - Phase 08 `Get-Command kingpeped kingpepe-cli solana solana-test-validator anchor`: NOT_FOUND on Windows
 - Phase 08 `command -v kingpeped kingpepe-cli solana-test-validator solana anchor`: NOT_FOUND under WSL
-- Phase 08 `npm run test:bridge-validator`: PASS, 30 bridge-validator tests (automatic deposit pipeline, file-backed deposit journal, async adapter path, Native reserve-sweep adapters, Solana deposit claim submitter, and Solana transaction-plan builder)
+- Phase 08 `npm run test:bridge-validator`: PASS, 35 bridge-validator tests (automatic deposit pipeline, file-backed deposit journal, async adapter path, Native reserve-sweep adapters, Solana deposit claim submitter, Solana transaction-plan builder, and localnet Solana deposit-claim bridge adapter)
 - Phase 08 `npm run test:native-node`: PASS, 7 Native REGTEST RPC adapter tests
 - Phase 08 `npm run test:solana-observer`: PASS, 14 Solana observer tests including the localnet deposit-claim observer
 - Phase 08 `npm run test:local-e2e-readiness`: PASS, 13 readiness/orchestration tests
@@ -91,7 +91,8 @@
 - Phase 08 deposit pipeline file-backed journal: PASS for `73df9906998f9783c309a0671739d19cfc6b589f`
 - Phase 08 Solana deposit-claim observer: PASS for `df49793f0595bb501e83405b79d21215283a1d0a`
 - Phase 08 Solana deposit-claim transaction plan: PASS for `42a5cdb3bcc60e0be7fb5d2395503f148b6d632f`
-- Phase 08 current `npm test`: PASS, 2 protocol vectors plus 74 Node tests
+- Phase 08 localnet Solana deposit-claim bridge adapter: local tests PASS, CI pending
+- Phase 08 current `npm test`: PASS, 2 protocol vectors plus 79 Node tests
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 52 Rust tests after account-execution update
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
@@ -468,6 +469,34 @@
   - `python .github/scripts/guardrails.py` (pass)
   - targeted changed-file and outgoing-range secret-pattern scans (pass)
   - real Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
+
+## Phase 08 localnet Solana deposit-claim bridge adapter
+
+- Added `services/bridge-validator/localnet-solana-deposit-claim-bridge.mjs`.
+- Added
+  `services/bridge-validator/tests/localnet-solana-deposit-claim-bridge.test.mjs`.
+- Exported the adapter through `services/bridge-validator/index.mjs`.
+- Added `SolanaLocalRpcClient.getLatestBlockhash()` for the localnet
+  blockhash dependency.
+- The adapter fetches or accepts a localnet blockhash, prepares a signed
+  deposit-claim transaction through the localnet transaction-plan builder, and
+  submits through the durable Solana deposit submitter.
+- Fee-payer signing remains injected; no key files are loaded, generated on
+  disk, or stored.
+- It remains localnet-only and returns `WAITING_FOR_DEPENDENCY` when the
+  latest blockhash dependency is unavailable.
+- Source commit: pending
+- CI URL: pending
+- CI status: pending
+- Local test status:
+  - `npm run test:bridge-validator` (pass, 35 tests)
+  - `npm test` (pass, 2 protocol vectors plus 79 Node tests)
+  - `npm audit --audit-level=low` (pass, 0 vulnerabilities)
+  - `python .github/scripts/guardrails.py` (pass)
+  - `npm run doctor:local-e2e` (`BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`;
+    missing `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`,
+    and `anchor`)
+- Real Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
 
 ## Phase 08 mint-authority real Solana PDA correction
 

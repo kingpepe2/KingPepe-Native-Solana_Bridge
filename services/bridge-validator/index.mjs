@@ -32,6 +32,12 @@ export {
 } from "./solana-deposit-claim-transaction-plan.mjs";
 
 export {
+  LOCALNET_SOLANA_DEPOSIT_CLAIM_BRIDGE_PROTOCOL,
+  LocalnetSolanaDepositClaimBridge,
+  prepareLocalnetSolanaDepositClaimRequest,
+} from "./localnet-solana-deposit-claim-bridge.mjs";
+
+export {
   FileBackedNativeReserveSweepJournal,
   InMemoryNativeReserveSweepJournal,
   NATIVE_RESERVE_SWEEP_RELAYER_PROTOCOL,

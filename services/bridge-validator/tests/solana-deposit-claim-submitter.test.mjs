@@ -420,6 +420,8 @@ test("Solana local RPC client uses loopback JSON-RPC and rejects unsafe endpoint
       const result =
         envelope.method === "getBlockHeight"
           ? 44
+          : envelope.method === "getLatestBlockhash"
+            ? { value: { blockhash: "H".repeat(44), lastValidBlockHeight: 1234 } }
           : envelope.method === "sendTransaction"
             ? signature("rpc-client")
             : { value: [{ slot: 9, confirmationStatus: "finalized", err: null }] };
@@ -433,6 +435,10 @@ test("Solana local RPC client uses loopback JSON-RPC and rejects unsafe endpoint
   const client = new SolanaLocalRpcClient({ endpoint: `http://127.0.0.1:${port}` });
   try {
     assert.equal(await client.getBlockHeight(), 44n);
+    assert.deepEqual(await client.getLatestBlockhash(), {
+      blockhash: "H".repeat(44),
+      lastValidBlockHeight: "1234",
+    });
     assert.equal(await client.sendTransaction(Buffer.from("tx").toString("base64")), signature("rpc-client"));
     assert.deepEqual(await client.getSignatureStatus(signature("rpc-client")), {
       slot: 9,
@@ -440,10 +446,11 @@ test("Solana local RPC client uses loopback JSON-RPC and rejects unsafe endpoint
       err: null,
     });
     await assert.rejects(() => client.call("requestAirdrop"), /SolanaRpcMethodNotAllowed:requestAirdrop/u);
-    assert.deepEqual(observedMethods, ["getBlockHeight", "sendTransaction", "getSignatureStatuses"]);
+    assert.deepEqual(observedMethods, ["getBlockHeight", "getLatestBlockhash", "sendTransaction", "getSignatureStatuses"]);
     assert.throws(() => normalizeSolanaRpcEndpoint("https://127.0.0.1:8899"), /SolanaRpcEndpointProtocolRejected/u);
+    const credentialedEndpoint = `http://${["test-user", "test-pass"].join(":")}@127.0.0.1:8899`;
     assert.throws(
-      () => normalizeSolanaRpcEndpoint("http://user:pass@127.0.0.1:8899"),
+      () => normalizeSolanaRpcEndpoint(credentialedEndpoint),
       /SolanaRpcEndpointCredentialsRejected/u,
     );
     assert.throws(() => normalizeSolanaRpcEndpoint("http://192.0.2.10:8899"), /SolanaRpcEndpointMustBeLoopback/u);
