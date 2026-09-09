@@ -406,6 +406,12 @@
   tests), and `npm test` (2 protocol vectors plus 119 Node tests). CI is
   verified for source SHA `da3696023be06776ccad7435af4fb8c08df90145` at
   `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34374335134`.
+  Follow-up evidence commit `bac0b69abf60832d58c150f20ce86d63bdea7575`
+  exposed a nondeterministic attestation-mutation test that sometimes failed
+  to alter the sampled signature. Corrective commit
+  `61267f6e549736e6eef761bb829e00478e9fe0e9` made the mutation deterministic
+  and passed CI run
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34376065307`.
   This still stops at `SOLANA_DEPOSIT_CLAIM_PENDING`; it does not claim a
   complete daemon-backed Native-to-Solana local E2E pass.
 - Phase 08 Solana deposit-claim transaction plan commit:

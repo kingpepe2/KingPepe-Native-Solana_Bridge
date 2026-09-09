@@ -1650,3 +1650,58 @@ OPEN BLOCKERS:
 NEXT PHASE:
 Continue Phase 08. Do not start Phase 09 until the real daemon-backed
 Native-to-Solana local E2E flow passes or a non-bypassable blocker is reported.
+
+## Phase 08 corrective report - Deterministic attestation mutation test
+
+PHASE:
+Phase 08 - Automatic Native to Solana local end-to-end.
+
+COMMIT SHA:
+`61267f6e549736e6eef761bb829e00478e9fe0e9`
+
+COMMIT MESSAGE:
+`fix(phase-08): make attestation mutation test deterministic`
+
+PUSH RESULT:
+Pushed to private `kingpepe2/KingPepe-Native-Solana_Bridge` `main`.
+
+CI RUN URL:
+`https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34376065307`
+
+CI STATUS:
+PASS.
+
+TESTS PASS/FAIL/SKIP/NOT_RUN:
+
+- FAIL before correction: evidence commit
+  `bac0b69abf60832d58c150f20ce86d63bdea7575` failed CI run
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34375362002`
+  in `services/bridge-validator/tests/solana-deposit-claim-transaction-plan.test.mjs`
+  because a randomized attestation signature mutation could leave the final
+  byte unchanged.
+- PASS after correction:
+  `node --test services\bridge-validator\tests\solana-deposit-claim-transaction-plan.test.mjs`
+  (8 tests).
+- PASS after correction:
+  `node --test services\bridge-validator\tests\*.test.mjs` (57 tests).
+- PASS after correction: `npm test` (2 protocol vectors plus 119 Node tests).
+- PASS after correction: GitHub Actions run
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34376065307`.
+
+WHAT CHANGED:
+
+- Replaced the randomized invalid-signature mutation with a deterministic
+  final-byte toggle in the bundled deposit-claim transaction-plan test.
+- No bridge runtime, Solana program, Native validation, FROST, accounting, or
+  operational policy behavior changed.
+
+OPEN BLOCKERS:
+
+- `LOCAL_E2E_INFRASTRUCTURE_MISSING`: `kingpeped`, `kingpepe-cli`,
+  `solana`, `solana-test-validator`, and `anchor` are not available in this
+  local environment.
+- Real daemon-backed Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
+
+NEXT PHASE:
+Continue Phase 08. Do not start Phase 09 until the real daemon-backed
+Native-to-Solana local E2E flow passes or a non-bypassable blocker is reported.

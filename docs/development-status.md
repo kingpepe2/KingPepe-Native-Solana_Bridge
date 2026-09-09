@@ -1161,6 +1161,14 @@
 - CI evidence:
   `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34374335134`,
   PASS.
+- Corrective CI evidence:
+  - Evidence commit `bac0b69abf60832d58c150f20ce86d63bdea7575` failed CI run
+    `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34375362002`
+    because a randomized attestation-mutation test occasionally reused the
+    same final signature byte.
+  - Corrective commit `61267f6e549736e6eef761bb829e00478e9fe0e9` made the
+    mutation deterministic and passed CI run
+    `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34376065307`.
 - What changed:
   - Added a localnet-only Solana setup submitter that queries rent exemption,
     requests disposable local-validator airdrop funding, submits the signed
