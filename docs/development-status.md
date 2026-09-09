@@ -179,6 +179,40 @@
   Solana local-validator executables, then run the full automated
   Native-to-Solana local E2E flow.
 
+## Phase 08 Native reserve fee-funding model alignment
+
+- Source status: implemented locally; source commit and CI verification
+  pending.
+- What changed:
+  - The Rust Native reserve primitive now matches the Phase 08 local
+    reserve-sweep fee model.
+  - The credited temporary-deposit amount must become the canonical reserve
+    allocation.
+  - Nonzero Native miner fees require exact separate fee-funding inputs.
+  - Missing, duplicated, temporary-outpoint-aliasing, not-spent, or wrong-amount
+    fee-funding evidence is rejected before the reserve allocation can be
+    settled.
+  - Reserve records retain non-secret fee-funding outpoints for accounting and
+    reconciliation provenance.
+- Local tests:
+  - `wsl --cd /mnt/d/KingPepe-Native-Solana_Bridge/native/frost cargo test --locked --all-targets`: PASS, 7 tests.
+  - `wsl --cd /mnt/d/KingPepe-Native-Solana_Bridge/native/proof cargo test --locked --all-targets`: PASS, 8 tests.
+  - `wsl --cd /mnt/d/KingPepe-Native-Solana_Bridge/native/reserve cargo test --locked --all-targets`: PASS, 4 tests.
+  - `wsl --cd /mnt/d/KingPepe-Native-Solana_Bridge/native/recovery cargo test --locked --all-targets`: PASS, 3 tests.
+  - `npm test`: PASS, 2 protocol vectors plus 97 Node tests.
+  - `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
+  - `python .github/scripts/guardrails.py`: PASS.
+  - JSON manifest parse checks: PASS.
+  - `git diff --check`: PASS.
+  - `rustfmt` / `cargo fmt`: NOT_RUN locally; the WSL toolchain has Cargo but
+    no installed rustfmt component.
+  - `npm run local:e2e:native-to-solana`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING.
+- Current blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`,
+    `solana-test-validator`, and `anchor`.
+  - Real daemon-backed Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
+
 ## Phase 08 source-boundary implementation
 
 - Added `services/bridge-validator/automatic-deposit-pipeline.mjs`.

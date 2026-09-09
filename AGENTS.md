@@ -254,6 +254,12 @@
   before preparing a FROST reserve-sweep signing intent and signer-policy
   authorization. The credited deposit amount must reach canonical reserve;
   Native miner fees are separately bound and require local fee-funding evidence.
+- Phase 08 Native reserve fee-funding model alignment:
+  implemented locally and source commit pending. The Rust Native reserve crate
+  now requires the credited temporary-deposit amount to become the canonical
+  reserve allocation. Nonzero Native miner fees require exact separate
+  fee-funding inputs and reject missing, duplicate, aliasing, not-spent, or
+  wrong-amount fee evidence.
 - Phase 08 Native-to-Solana deposit evidence validation status:
   implemented and CI verified for source commit
   `48a3bae917b6ddc80dcbd0a8d1e45b28fc1eff49`.

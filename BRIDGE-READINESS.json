@@ -114,6 +114,9 @@
     "phase08NativeReserveSweepSigningIntentBoundaryImplemented": true,
     "phase08NativeReserveSweepSigningIntentBoundaryLocalTestsPassed": true,
     "phase08NativeReserveSweepSigningIntentBoundaryCiVerified": true,
+    "phase08NativeReserveFeeFundingModelAligned": true,
+    "phase08NativeReserveFeeFundingModelLocalTestsPassed": true,
+    "phase08NativeReserveFeeFundingModelCiVerified": false,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true

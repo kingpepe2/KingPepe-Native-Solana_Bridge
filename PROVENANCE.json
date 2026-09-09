@@ -148,7 +148,7 @@
     {
       "path": "docs/architecture/native-validation.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Phase 06 Native proof, reserve, recovery, and trust-boundary documentation."
+      "notes": "Phase 06 Native proof, reserve, recovery, and trust-boundary documentation updated in Phase 08 for separate reserve-sweep fee-funding evidence."
     },
     {
       "path": "docs/architecture/attestation-and-observation.md",
@@ -398,12 +398,12 @@
     {
       "path": "native/reserve/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Native reserve crate documentation updated in Phase 06."
+      "notes": "Native reserve crate documentation updated in Phase 08 for credited-reserve allocation and separate Native fee-funding evidence."
     },
     {
       "path": "native/reserve/src/lib.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Canonical reserve sweep, allocation, and mint-credit transition checks."
+      "notes": "Canonical reserve sweep, allocation, mint-credit transition, and separate Native fee-funding checks."
     },
     {
       "path": "rust-toolchain.toml",

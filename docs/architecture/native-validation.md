@@ -13,7 +13,9 @@ Implemented boundaries:
 - Merkle branch reconstruction and verification.
 - UTXO observation checks so Merkle inclusion alone is not treated as proof that a deposit output remains unspent.
 - Temporary deposit validation for exact outpoint, amount, script, recipient commitment, finality, and UTXO state.
-- Canonical reserve sweep validation before mint credit is authorized.
+- Canonical reserve sweep validation before mint credit is authorized; the
+  credited temporary-deposit amount must reach canonical reserve, while Native
+  miner fees require separate fee-funding evidence and are accounted separately.
 - Recovery eligibility checks for CSV maturity, unspent status, wrong network, sweep/mint conflicts, duplicate recovery, fee bounds, and dust.
 
 Trust boundary:
