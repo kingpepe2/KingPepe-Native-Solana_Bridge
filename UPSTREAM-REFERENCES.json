@@ -15,8 +15,26 @@
     "selectedTree": "33d550b0c2bec33ede7e6d73cd44afbbe18dea8b",
     "verificationSource": "read-only recovery material in config/networks/kingpepe-mainnet.json and config/networks/kingpepe-regtest.json",
     "phase06Use": "KingPepe Native genesis, decimals, PoW, difficulty, chainwork, activation, address, transaction, and header format facts",
+    "phase08Use": "KingPepe REGTEST 8-decimal atomic units, coinbase maturity 20, Taproot activation, and Bech32 HRP rkpepe for disposable local FROST Taproot deposit/fee/reserve intent generation",
     "status": "reference-facts-only-no-git-history-import"
   },
+  "standardsReferences": [
+    {
+      "project": "BIP-173",
+      "url": "https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki",
+      "use": "Reference-only SegWit address data conversion and Bech32 framing."
+    },
+    {
+      "project": "BIP-350",
+      "url": "https://github.com/bitcoin/bips/blob/master/bip-0350.mediawiki",
+      "use": "Reference-only Bech32m checksum constant for version 1 Taproot witness addresses."
+    },
+    {
+      "project": "BIP-341",
+      "url": "https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki",
+      "use": "Reference-only Taproot P2TR scriptPubKey shape: witness version 1 with a 32-byte x-only public key."
+    }
+  ],
   "comparison": {
     "solanaProgramStructure": "matched-pattern",
     "fuzzAndTestOrganization": "intended-adopt",

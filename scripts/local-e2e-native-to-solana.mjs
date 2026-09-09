@@ -3,6 +3,12 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import {
+  FileBackedFrostStateStore,
+  NativeFrostSigner,
+  REQUIRED_FROST_SIGNERS,
+  runTwoPartyDkg,
+} from "../native/frost/index.mjs";
 import { hashJson } from "../shared/protocol/canonical-message.mjs";
 import {
   buildRegtestCliArguments,
@@ -34,10 +40,13 @@ export const LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_DRAFTED =
 const DEFAULT_AMOUNT_NATIVE = "1.00000000";
 const DEFAULT_NATIVE_DECIMALS = 8;
 const DEFAULT_NATIVE_CHAIN_NAME = "regtest";
+const DEFAULT_NATIVE_BECH32_HRP = "rkpepe";
 const DEFAULT_RESERVE_MINER_FEE_NATIVE = "0.00001000";
-const DEFAULT_COINBASE_MATURITY_BLOCKS = 101;
+const DEFAULT_COINBASE_MATURITY_BLOCKS = 20;
 const DEFAULT_DEPOSIT_FINALITY_BLOCKS = 6;
 const MAX_UNSIGNED_SWEEP_BYTES = 400_000;
+const BECH32M_CONST = 0x2bc830a3;
+const BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 
 export async function runLocalNativeToSolanaE2e(options = {}) {
   let flowResult;
@@ -46,6 +55,7 @@ export async function runLocalNativeToSolanaE2e(options = {}) {
     actualPlan = context.plan;
     flowResult = await executeNativeDepositObservationFlow({
       ...context,
+      custodyFactory: options.custodyFactory,
       flowConfig: createNativeToSolanaFlowConfig({
         plan: context.plan,
         repoRoot: context.plan.repoRoot,
@@ -117,13 +127,11 @@ export function createNativeToSolanaFlowConfig(options) {
     runId,
     stateRoot,
     userWalletName: sanitizeWalletName(value.userWalletName ?? `kingpepe-e2e-user-${runId}`),
-    depositWalletName: sanitizeWalletName(value.depositWalletName ?? `kingpepe-e2e-deposit-${runId}`),
-    reserveWalletName: sanitizeWalletName(value.reserveWalletName ?? `kingpepe-e2e-reserve-${runId}`),
-    reserveFeeWalletName: sanitizeWalletName(value.reserveFeeWalletName ?? `kingpepe-e2e-reserve-fee-${runId}`),
     amountNative,
     amountAtomic: amountAtomic.toString(),
     nativeDecimals,
     nativeChainName: sanitizeNetworkName(value.nativeChainName ?? DEFAULT_NATIVE_CHAIN_NAME),
+    nativeBech32Hrp: sanitizeBech32Hrp(value.nativeBech32Hrp ?? DEFAULT_NATIVE_BECH32_HRP),
     reserveMinerFeeNative,
     reserveMinerFeeAtomic: decimalCoinsToAtomic(reserveMinerFeeNative, nativeDecimals).toString(),
     coinbaseMaturityBlocks: checkedInteger(
@@ -146,6 +154,7 @@ export async function executeNativeDepositObservationFlow({
   executor,
   commandPaths,
   flowConfig,
+  custodyFactory = createLocalFrostTaprootCustodyContext,
 }) {
   const config = requireObject(flowConfig, "flowConfig");
   mkdirSync(config.stateRoot, { recursive: true });
@@ -167,15 +176,22 @@ export async function executeNativeDepositObservationFlow({
     return parseJson ? parseJsonOutput(result.output, step) : String(result.output ?? "").trim();
   };
 
+  const frostCustody = await custodyFactory({
+    plan,
+    flowConfig: config,
+  });
+  const depositAddress = requireNonEmptyText(frostCustody.taprootAddress, "frostCustody.taprootAddress");
+  const custodyScriptPubKeyHex = validateP2trScriptPubKeyHex(
+    frostCustody.taprootScriptPubKeyHex,
+    "frostCustody.taprootScriptPubKeyHex",
+  );
+  stages.push("LOCAL_E2E_INITIALIZE_EPHEMERAL_FROST_CUSTODY");
+  stages.push("LOCAL_E2E_CREATE_FROST_TAPROOT_DEPOSIT_INTENT");
+
   await cli({
     step: "LOCAL_E2E_CREATE_USER_WALLET",
     command: "createwallet",
     parameters: [config.userWalletName],
-  });
-  await cli({
-    step: "LOCAL_E2E_CREATE_DEPOSIT_WALLET",
-    command: "createwallet",
-    parameters: [config.depositWalletName],
   });
   const miningAddress = requireNonEmptyText(
     await cli({
@@ -191,14 +207,6 @@ export async function executeNativeDepositObservationFlow({
     command: "generatetoaddress",
     parameters: [String(config.coinbaseMaturityBlocks), miningAddress],
   });
-  const depositAddress = requireNonEmptyText(
-    await cli({
-      step: "LOCAL_E2E_CREATE_NATIVE_DEPOSIT_INTENT",
-      wallet: config.depositWalletName,
-      command: "getnewaddress",
-    }),
-    "depositAddress",
-  );
   const depositTxidHex = normalizeHash32(
     await cli({
       step: "LOCAL_E2E_SEND_NATIVE_DEPOSIT",
@@ -243,6 +251,7 @@ export async function executeNativeDepositObservationFlow({
   const depositOutput = findDepositOutput({
     rawTransaction,
     depositAddress,
+    expectedScriptPubKeyHex: custodyScriptPubKeyHex,
     amountAtomic: config.amountAtomic,
     nativeDecimals: config.nativeDecimals,
   });
@@ -264,23 +273,14 @@ export async function executeNativeDepositObservationFlow({
     depositOutput,
     depositUtxo,
   });
-  await cli({
-    step: "LOCAL_E2E_CREATE_RESERVE_WALLET",
-    command: "createwallet",
-    parameters: [config.reserveWalletName],
-  });
-  const canonicalReserveAddress = requireNonEmptyText(
-    await cli({
-      step: "LOCAL_E2E_GET_CANONICAL_RESERVE_ADDRESS",
-      wallet: config.reserveWalletName,
-      command: "getnewaddress",
-    }),
-    "canonicalReserveAddress",
-  );
+  const canonicalReserveAddress = depositAddress;
+  stages.push("LOCAL_E2E_SELECT_FROST_CANONICAL_RESERVE");
   const feeFundingInputs = await prepareLocalReserveSweepFeeFundingInputs({
     cli,
     config,
     miningAddress,
+    feeFundingAddress: depositAddress,
+    expectedFeeFundingScriptPubKeyHex: custodyScriptPubKeyHex,
   });
   const reserveSweepDraft = await draftLocalReserveSweep({
     cli,
@@ -304,8 +304,26 @@ export async function executeNativeDepositObservationFlow({
     noPerTransferKingPepeTeamApprovalState: true,
     trustBoundary: RPC_OBSERVATION,
     stages,
+    frostCustody: Object.freeze({
+      protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/LOCAL_FROST_TAPROOT_CUSTODY/V1`,
+      state: "READY",
+      localOnly: true,
+      signerIds: frostCustody.signerIds,
+      keyEpoch: frostCustody.keyEpoch,
+      aggregateTweakedXOnlyPublicKey: frostCustody.aggregateTweakedXOnlyPublicKey,
+      taprootScriptPubKeyHex: custodyScriptPubKeyHex,
+      depositAddress,
+      feeFundingAddress: depositAddress,
+      canonicalReserveAddress,
+    }),
     nativeSource,
     stateRoot: config.stateRoot,
+    depositIntent: Object.freeze({
+      address: depositAddress,
+      scriptPubKeyHex: custodyScriptPubKeyHex,
+      custody: "LOCAL_EPHEMERAL_FROST_TAPROOT",
+      recoverable: false,
+    }),
     deposit: Object.freeze({
       txidHex: depositTxidHex,
       vout: depositOutput.vout,
@@ -322,7 +340,9 @@ export async function executeNativeDepositObservationFlow({
     }),
     reserveSweep: reserveSweepDraft,
     nextRequiredImplementation: Object.freeze([
-      "SIGN_RESERVE_SWEEP_WITH_REAL_NATIVE_COMPATIBLE_FROST_A_B",
+      "COMPUTE_VALIDATED_TAPROOT_SIGHASHES_FOR_EACH_FROST_CONTROLLED_INPUT",
+      "SIGN_EACH_RESERVE_SWEEP_INPUT_WITH_REAL_NATIVE_COMPATIBLE_FROST_A_B",
+      "ATTACH_FROST_SIGNATURE_WITNESSES_TO_NATIVE_TRANSACTION",
       "BROADCAST_AND_FINALIZE_RESERVE_SWEEP",
       "SUBMIT_AND_OBSERVE_SOLANA_MINT",
       "RECONCILE_RESERVE_SUPPLY_AND_LIABILITIES",
@@ -386,18 +406,29 @@ export function validateRawDepositTransaction({ rawTransaction, expectedTxidHex 
   });
 }
 
-export function findDepositOutput({ rawTransaction, depositAddress, amountAtomic, nativeDecimals }) {
+export function findDepositOutput({
+  rawTransaction,
+  depositAddress,
+  expectedScriptPubKeyHex,
+  amountAtomic,
+  nativeDecimals,
+}) {
   const tx = requireObject(rawTransaction, "rawTransaction");
   if (!Array.isArray(tx.vout)) {
     throw new Error("LocalNativeDepositTransactionMissingOutputs");
   }
   const expectedAmountAtomic = canonicalUintDecimal(amountAtomic, "amountAtomic");
+  const expectedScript =
+    expectedScriptPubKeyHex === undefined
+      ? undefined
+      : normalizeHexText(expectedScriptPubKeyHex, "expectedScriptPubKeyHex");
   const matches = tx.vout
     .map((output, index) => normalizeDepositOutput(output, index, nativeDecimals))
     .filter(
       (output) =>
         output.amountAtomic === expectedAmountAtomic &&
-        output.addresses.includes(depositAddress),
+        output.addresses.includes(depositAddress) &&
+        (expectedScript === undefined || output.scriptPubKeyHex === expectedScript),
     );
   if (matches.length !== 1) {
     throw new Error("LocalNativeDepositOutputNotUnique");
@@ -522,27 +553,22 @@ export async function draftLocalReserveSweep({
   });
 }
 
-async function prepareLocalReserveSweepFeeFundingInputs({ cli, config, miningAddress }) {
+async function prepareLocalReserveSweepFeeFundingInputs({
+  cli,
+  config,
+  miningAddress,
+  feeFundingAddress,
+  expectedFeeFundingScriptPubKeyHex,
+}) {
   if (BigInt(config.reserveMinerFeeAtomic) === 0n) return Object.freeze([]);
-  await cli({
-    step: "LOCAL_E2E_CREATE_RESERVE_SWEEP_FEE_WALLET",
-    command: "createwallet",
-    parameters: [config.reserveFeeWalletName],
-  });
-  const feeFundingAddress = requireNonEmptyText(
-    await cli({
-      step: "LOCAL_E2E_GET_RESERVE_SWEEP_FEE_ADDRESS",
-      wallet: config.reserveFeeWalletName,
-      command: "getnewaddress",
-    }),
-    "feeFundingAddress",
-  );
+  const address = requireNonEmptyText(feeFundingAddress, "feeFundingAddress");
+  const scriptPubKeyHex = validateP2trScriptPubKeyHex(expectedFeeFundingScriptPubKeyHex, "expectedFeeFundingScriptPubKeyHex");
   const feeFundingTxidHex = normalizeHash32(
     await cli({
       step: "LOCAL_E2E_FUND_RESERVE_SWEEP_FEE_INPUT",
       wallet: config.userWalletName,
       command: "sendtoaddress",
-      parameters: [feeFundingAddress, config.reserveMinerFeeNative],
+      parameters: [address, config.reserveMinerFeeNative],
     }),
     "feeFundingTxidHex",
   );
@@ -561,7 +587,8 @@ async function prepareLocalReserveSweepFeeFundingInputs({ cli, config, miningAdd
   validateRawDepositTransaction({ rawTransaction: rawFundingTransaction, expectedTxidHex: feeFundingTxidHex });
   const feeOutput = findDepositOutput({
     rawTransaction: rawFundingTransaction,
-    depositAddress: feeFundingAddress,
+    depositAddress: address,
+    expectedScriptPubKeyHex: scriptPubKeyHex,
     amountAtomic: config.reserveMinerFeeAtomic,
     nativeDecimals: config.nativeDecimals,
   });
@@ -578,6 +605,67 @@ async function prepareLocalReserveSweepFeeFundingInputs({ cli, config, miningAdd
     nativeDecimals: config.nativeDecimals,
   });
   return Object.freeze([{ txidHex: feeFundingTxidHex, vout: feeOutput.vout }]);
+}
+
+export async function createLocalFrostTaprootCustodyContext({ plan, flowConfig }) {
+  const config = requireObject(flowConfig, "flowConfig");
+  const repoRoot = path.resolve(plan.repoRoot);
+  const frostRoot = validateStateRoot({
+    stateRoot: path.join(config.stateRoot, "ephemeral-frost-custody"),
+    repoRoot,
+    runRoot: plan.runRoot,
+  });
+  const signerA = new NativeFrostSigner({
+    signerId: REQUIRED_FROST_SIGNERS[0],
+    index: 0,
+    policy: undefined,
+    stateStore: new FileBackedFrostStateStore({
+      signerId: REQUIRED_FROST_SIGNERS[0],
+      root: path.join(frostRoot, "frost-a"),
+      repoRoot,
+    }),
+  });
+  const signerB = new NativeFrostSigner({
+    signerId: REQUIRED_FROST_SIGNERS[1],
+    index: 1,
+    policy: undefined,
+    stateStore: new FileBackedFrostStateStore({
+      signerId: REQUIRED_FROST_SIGNERS[1],
+      root: path.join(frostRoot, "frost-b"),
+      repoRoot,
+    }),
+  });
+  const keyEpoch = 1;
+  const epoch = runTwoPartyDkg([signerA, signerB], { epoch: keyEpoch });
+  const xOnly = normalizeHash32(epoch.aggregateTweakedXOnlyPublicKey, "aggregateTweakedXOnlyPublicKey");
+  return Object.freeze({
+    protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/LOCAL_FROST_TAPROOT_CUSTODY/V1`,
+    state: "READY",
+    localOnly: true,
+    keyEpoch,
+    signerIds: Object.freeze([...REQUIRED_FROST_SIGNERS]),
+    aggregateTweakedXOnlyPublicKey: xOnly,
+    taprootScriptPubKeyHex: p2trScriptPubKeyHex(xOnly),
+    taprootAddress: taprootAddressFromXOnlyPublicKey(xOnly, config.nativeBech32Hrp),
+  });
+}
+
+export function p2trScriptPubKeyHex(xOnlyPublicKeyHex) {
+  return `5120${normalizeHash32(xOnlyPublicKeyHex, "xOnlyPublicKeyHex")}`;
+}
+
+export function validateP2trScriptPubKeyHex(scriptPubKeyHex, label = "scriptPubKeyHex") {
+  const normalized = normalizeHexText(scriptPubKeyHex, label);
+  if (!/^5120[0-9a-f]{64}$/u.test(normalized)) {
+    throw new Error(`${label}:ExpectedP2trScriptPubKey`);
+  }
+  return normalized;
+}
+
+export function taprootAddressFromXOnlyPublicKey(xOnlyPublicKeyHex, hrp = DEFAULT_NATIVE_BECH32_HRP) {
+  const program = Buffer.from(normalizeHash32(xOnlyPublicKeyHex, "xOnlyPublicKeyHex"), "hex");
+  const data = [1, ...convertBits([...program], 8, 5, true)];
+  return bech32Encode(sanitizeBech32Hrp(hrp), data, BECH32M_CONST);
 }
 
 function normalizeFeeFundingInputs(value) {
@@ -634,6 +722,70 @@ function extractOutputAddresses(scriptPubKey) {
     }
   }
   return [...addresses];
+}
+
+function bech32Encode(hrp, data, checksumConstant) {
+  const values = [...data];
+  if (values.some((entry) => !Number.isInteger(entry) || entry < 0 || entry > 31)) {
+    throw new Error("Bech32 data value outside 5-bit range");
+  }
+  const checksum = bech32CreateChecksum(hrp, values, checksumConstant);
+  return `${hrp}1${[...values, ...checksum].map((entry) => BECH32_CHARSET[entry]).join("")}`;
+}
+
+function bech32CreateChecksum(hrp, data, checksumConstant) {
+  const values = [...bech32HrpExpand(hrp), ...data, 0, 0, 0, 0, 0, 0];
+  const polymod = bech32Polymod(values) ^ checksumConstant;
+  return [0, 1, 2, 3, 4, 5].map((index) => (polymod >> (5 * (5 - index))) & 31);
+}
+
+function bech32HrpExpand(hrp) {
+  return [...hrp].map((char) => char.charCodeAt(0) >> 5).concat([0], [...hrp].map((char) => char.charCodeAt(0) & 31));
+}
+
+function bech32Polymod(values) {
+  const generator = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+  let checksum = 1;
+  for (const value of values) {
+    const top = checksum >> 25;
+    checksum = ((checksum & 0x1ffffff) << 5) ^ value;
+    for (let index = 0; index < generator.length; index += 1) {
+      if (((top >> index) & 1) !== 0) {
+        checksum ^= generator[index];
+      }
+    }
+  }
+  return checksum;
+}
+
+function convertBits(data, fromBits, toBits, pad) {
+  let accumulator = 0;
+  let bits = 0;
+  const maxValue = (1 << toBits) - 1;
+  const maxAccumulator = (1 << (fromBits + toBits - 1)) - 1;
+  const result = [];
+  for (const value of data) {
+    if (value < 0 || value >> fromBits !== 0) throw new Error("invalid value while converting Bech32 groups");
+    accumulator = ((accumulator << fromBits) | value) & maxAccumulator;
+    bits += fromBits;
+    while (bits >= toBits) {
+      bits -= toBits;
+      result.push((accumulator >> bits) & maxValue);
+    }
+  }
+  if (pad) {
+    if (bits > 0) result.push((accumulator << (toBits - bits)) & maxValue);
+  } else if (bits >= fromBits || ((accumulator << (toBits - bits)) & maxValue) !== 0) {
+    throw new Error("invalid padding while converting Bech32 groups");
+  }
+  return result;
+}
+
+function sanitizeBech32Hrp(value) {
+  if (typeof value !== "string" || !/^[a-z0-9]{1,83}$/u.test(value)) {
+    throw new Error("Native Bech32 HRP is invalid");
+  }
+  return value;
 }
 
 function parseJsonOutput(output, step) {

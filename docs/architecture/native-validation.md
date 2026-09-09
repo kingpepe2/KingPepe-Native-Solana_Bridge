@@ -6,6 +6,9 @@ Implemented boundaries:
 
 - Native chain parameters for Mainnet and regtest from reviewed recovery material.
 - 8-decimal atomic KPEPE accounting.
+- KingPepe REGTEST local-runner facts from reviewed recovery material:
+  coinbase maturity `20`, Bech32m HRP `rkpepe`, and Taproot active from height
+  zero.
 - SHA256d 80-byte block-header parsing.
 - Compact target decoding/encoding, PoW target checks, difficulty retargeting, and chainwork accumulation.
 - Header version activation checks for the pinned KingPepe Native rules.
