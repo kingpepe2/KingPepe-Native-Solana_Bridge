@@ -411,9 +411,19 @@
       "notes": "Phase 08 local E2E readiness gate that checks required disposable localnet executables, Solana ABI validation/execution readiness, and Anchor localnet configuration without reading secrets."
     },
     {
+      "path": "scripts/local-e2e-orchestrator.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 local-only Native REGTEST and Solana local-validator orchestration plan. Generic REGTEST command safety conventions were reviewed from the read-only legacy KingPepe repository; TON-specific flow was excluded."
+    },
+    {
       "path": "scripts/tests/local-e2e-readiness.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Phase 08 readiness-gate tests using temporary fake toolchain and manifest fixtures only, including validate-only ABI classification."
+    },
+    {
+      "path": "scripts/tests/local-e2e-orchestrator.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 local E2E orchestration tests using temporary fake toolchain paths outside the repository."
     },
     {
       "path": "services/attesters/README.md",
