@@ -35,6 +35,14 @@ deposit message and two project attestations before RPC submission, persists the
 operation before broadcast, checks the prior signature outcome before retry, and
 requires a finalized deposit-claim observation before returning `COMPLETED`.
 
+`native-reserve-sweep-adapters.mjs` implements local Native reserve-sweep
+adapter boundaries. The relayer validates the FROST A+B transcript, persists
+the signed sweep transaction before broadcast, broadcasts through the local
+REGTEST RPC boundary, and retries idempotently. The verifier checks source
+readiness, sweep finality, deposit-input consumption, reserve script, and exact
+atomic reserve output evidence. Its current trust classification remains
+`RPC_OBSERVATION`; it is not production consensus validation.
+
 The submitter is intentionally localnet-only in this phase. It does not build
 transactions, configure production RPC, or mark Mainnet ready.
 

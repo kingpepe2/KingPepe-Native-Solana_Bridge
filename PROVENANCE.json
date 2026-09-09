@@ -481,6 +481,11 @@
       "notes": "Bridge validator service export surface."
     },
     {
+      "path": "services/bridge-validator/native-reserve-sweep-adapters.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 local Native reserve-sweep relayer and verifier adapters with FROST transcript checks, persist-before-broadcast, retry idempotency, and RPC observation trust classification."
+    },
+    {
       "path": "services/bridge-validator/solana-deposit-claim-submitter.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Phase 08 localnet Solana deposit claim submission boundary with canonical-message, attestation-threshold, persist-before-broadcast, status retry, and finalized claim-observation checks."
@@ -489,6 +494,11 @@
       "path": "services/bridge-validator/tests/automatic-deposit-pipeline.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Phase 08 deposit pipeline tests using temporary in-memory keys and temp-directory FROST state outside the repository, including promise-returning adapter coverage."
+    },
+    {
+      "path": "services/bridge-validator/tests/native-reserve-sweep-adapters.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 Native reserve-sweep adapter tests using disposable fake local RPC fixtures and no operational keys or state."
     },
     {
       "path": "services/bridge-validator/tests/solana-deposit-claim-submitter.test.mjs",

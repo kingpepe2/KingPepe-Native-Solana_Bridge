@@ -68,7 +68,7 @@
 - Phase 07 CI: PASS for `d17ba8fe61d20a88d4206f72d68a010a2d146524`
 - Phase 08 `Get-Command kingpeped kingpepe-cli solana solana-test-validator anchor`: NOT_FOUND on Windows
 - Phase 08 `command -v kingpeped kingpepe-cli solana-test-validator solana anchor`: NOT_FOUND under WSL
-- Phase 08 `npm run test:bridge-validator`: PASS, 14 bridge-validator tests (automatic deposit pipeline, async adapter path, and Solana deposit claim submitter)
+- Phase 08 `npm run test:bridge-validator`: PASS, 22 bridge-validator tests (automatic deposit pipeline, async adapter path, Native reserve-sweep adapters, and Solana deposit claim submitter)
 - Phase 08 `npm run test:native-node`: PASS, 7 Native REGTEST RPC adapter tests
 - Phase 08 `npm run test:local-e2e-readiness`: PASS, 8 readiness/orchestration tests
 - Phase 08 `npm run doctor:local-e2e`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING; missing localnet executables; both Solana programs report `READY` at the source/readiness-gate level after account-execution wiring
@@ -86,6 +86,7 @@
 - Phase 08 Native REGTEST RPC adapter: PASS for `845dfc4a86a1ef87f15e3d5ec2ca4ad91fd8fe8d`
 - Phase 08 Solana deposit claim submitter: PASS for `905a45b4c79d879e6ae27a05b3c7a39fed0a30f6`
 - Phase 08 async deposit pipeline entrypoint: PASS for `024c0019745bc4671299af135740aa9d29963116`
+- Phase 08 Native reserve-sweep adapters: local tests PASS; CI pending for the next pushed source SHA
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 52 Rust tests after account-execution update
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
@@ -350,6 +351,24 @@
   - `npm run local:e2e:bootstrap` (expected BLOCKED, exit 2)
   - CI Linux format, clippy, workspace, Node, and native crate tests (PASS)
   - CI Windows workspace, Node, and native crate tests (PASS)
+  - real Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
+
+## Phase 08 Native reserve-sweep adapters
+
+- Added `services/bridge-validator/native-reserve-sweep-adapters.mjs`.
+- Added `services/bridge-validator/tests/native-reserve-sweep-adapters.test.mjs`.
+- Exported the adapter boundary from `services/bridge-validator/index.mjs`.
+- The relayer validates the FROST A+B transcript, signed local sweep
+  transaction shape, expected operation, and expected Native sweep txid;
+  persists before broadcast; and retries without rebroadcasting an already
+  submitted operation.
+- The verifier builds reserve-sweep evidence from local RPC observations,
+  checking source readiness, sweep finality, the deposit input, reserve script,
+  exact text atomic output values, and mismatch handling.
+- Current verifier trust is `RPC_OBSERVATION`; this is not independent
+  consensus validation or production observer readiness.
+- Local test status:
+  - `npm run test:bridge-validator` (pass, 22 bridge-validator tests)
   - real Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
 
 ## Phase 08 mint-authority real Solana PDA correction

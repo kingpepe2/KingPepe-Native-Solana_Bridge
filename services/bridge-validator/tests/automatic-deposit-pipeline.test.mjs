@@ -89,6 +89,7 @@ function baseOperation(config, operationId = ZERO_HASH, overrides = {}) {
       nativeSweepTxidHex: h("reserve-sweep-txid"),
       nativeMinerFeeAtomic: "1200",
       canonicalReserveScriptPubKeyHex: p2tr("canonical-reserve"),
+      signedNativeTransactionHex: "02000000000100",
       signingIntent: {
         protocol: FROST_SIGNING_INTENT_PROTOCOL,
         mode: FROST_SIGNING_MODE,
@@ -240,6 +241,8 @@ function createPipeline(overrides = {}) {
     broadcastReserveSweep(request) {
       this.broadcasts.push(request);
       assert.equal(request.operationIdHex, operation.reserveSweep.signingIntent.operationId);
+      assert.equal(request.reserveSweep.nativeSweepTxidHex, operation.reserveSweep.nativeSweepTxidHex);
+      assert.equal(request.signedNativeTransactionHex, operation.reserveSweep.signedNativeTransactionHex);
       assert.equal(
         schnorr.verify(
           Uint8Array.from(Buffer.from(request.frostResult.signatureHex, "hex")),

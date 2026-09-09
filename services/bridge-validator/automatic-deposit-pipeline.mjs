@@ -89,6 +89,8 @@ export class AutomaticNativeToSolanaDepositPipeline {
       this.#nativeRelayer.broadcastReserveSweep({
         operationIdHex: decodedMessage.operationIdHex,
         encodedMessageHex,
+        reserveSweep: normalized.reserveSweep,
+        signedNativeTransactionHex: normalized.reserveSweep.signedNativeTransactionHex,
         signingIntent: preparedSweep.signingIntent,
         frostResult,
       }),
@@ -215,6 +217,8 @@ export class AutomaticNativeToSolanaDepositPipeline {
       await this.#nativeRelayer.broadcastReserveSweep({
         operationIdHex: decodedMessage.operationIdHex,
         encodedMessageHex,
+        reserveSweep: normalized.reserveSweep,
+        signedNativeTransactionHex: normalized.reserveSweep.signedNativeTransactionHex,
         signingIntent: preparedSweep.signingIntent,
         frostResult,
       }),
@@ -642,6 +646,10 @@ function normalizeDepositOperation(operation) {
         reserveSweep.canonicalReserveScriptPubKeyHex,
         "reserveSweep.canonicalReserveScriptPubKeyHex",
       ),
+      signedNativeTransactionHex:
+        reserveSweep.signedNativeTransactionHex === undefined
+          ? undefined
+          : normalizeHexBytes(reserveSweep.signedNativeTransactionHex, "reserveSweep.signedNativeTransactionHex"),
       signingIntent: Object.freeze({
         ...signingIntent,
         operationId: normalizeHash32(signingIntent.operationId, "signingIntent.operationId"),

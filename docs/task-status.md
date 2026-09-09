@@ -489,6 +489,32 @@
     further source increment is possible without claiming the daemon-backed E2E
     pass.
 
+## Phase 08 Native reserve-sweep adapters
+
+- PHASE: `08`
+- source commit: pending until this source increment is committed and pushed
+- CI status: pending
+- tests:
+  - `npm run test:bridge-validator` (pass, 22 bridge-validator tests)
+  - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
+- changed:
+  - Added local Native reserve-sweep relayer and verifier adapters.
+  - The relayer validates FROST A+B transcript consistency, persists signed
+    sweep transactions before local REGTEST broadcast, rejects returned txid
+    mismatch with `HARD_STOP`, and retries idempotently without rebroadcast.
+  - The verifier checks local source readiness, finalized confirmations,
+    deposit-input consumption, reserve script, and exact text atomic reserve
+    output evidence before producing reserve transition evidence.
+  - The verifier output is still `RPC_OBSERVATION`, not production consensus
+    validation.
+- blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`,
+    `solana-test-validator`, and `anchor`.
+- next:
+  - Push this source increment and verify CI. Do not proceed to Phase 09 until
+    the Native-to-Solana local E2E gate actually passes.
+
 ## Phase 08 Solana account-state codec implementation
 
 - PHASE: `08`
