@@ -275,8 +275,10 @@
   computation, FROST witness attachment, Native broadcast, Solana mint, and
   reconciliation.
 - Phase 08 Taproot sighash evidence source update:
-  implemented and locally tested; CI verification is pending for the next
-  source push. The local Native-to-Solana runner now parses the unsigned
+  implemented and CI verified for source commit
+  `36c3dbbaad092fab750abc66e2bfdb8838f05941`. CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34352340935`
+  PASS. The local Native-to-Solana runner now parses the unsigned
   reserve-sweep transaction, verifies the expected input outpoints, computes
   BIP-341 key-path `SIGHASH_DEFAULT` evidence for each FROST-controlled input,
   binds the exact reserve output and separate Native miner fee, and stops

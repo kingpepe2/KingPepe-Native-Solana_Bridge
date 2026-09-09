@@ -1254,3 +1254,60 @@ OPEN BLOCKERS:
 
 NEXT PHASE:
 Continue Phase 08. Do not start Phase 09 until the real daemon-backed Native-to-Solana local E2E flow passes.
+
+## Phase 08 report - Local Taproot sighash evidence
+
+PHASE:
+`PHASE 08 - Automatic Native to Solana local end-to-end`
+
+COMMIT SHA:
+`36c3dbbaad092fab750abc66e2bfdb8838f05941`
+
+COMMIT MESSAGE:
+`feat(phase-08): compute local taproot sighash evidence`
+
+PUSH RESULT:
+Pushed to private `kingpepe2/KingPepe-Native-Solana_Bridge` on `main`.
+
+CI RUN URL:
+`https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34352340935`
+
+CI STATUS:
+`PASS`
+
+TESTS PASS/FAIL/SKIP/NOT_RUN:
+- `node --check native/node/native-taproot-transaction.mjs`: PASS.
+- `node --check native/node/tests/native-taproot-transaction.test.mjs`: PASS.
+- `node --check scripts/local-e2e-native-to-solana.mjs`: PASS.
+- `node --check scripts/tests/local-e2e-native-to-solana.test.mjs`: PASS.
+- `node --test native/node/tests/native-taproot-transaction.test.mjs`: PASS, 3 tests.
+- `node --test scripts/tests/local-e2e-native-to-solana.test.mjs`: PASS, 10 tests.
+- `npm test`: PASS, 2 protocol vectors plus 102 Node tests.
+- `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
+- `python .github/scripts/guardrails.py`: PASS.
+- JSON manifest parse checks: PASS.
+- `git diff --check`: PASS.
+- WSL `solana` Rust workspace tests: PASS, 52 tests.
+- WSL Native FROST Rust tests: PASS, 7 tests.
+- WSL Native proof Rust tests: PASS, 8 tests.
+- WSL Native reserve Rust tests: PASS, 4 tests.
+- WSL Native recovery Rust tests: PASS, 3 tests.
+- Modified, staged, and outgoing-range secret-pattern scans: PASS.
+- CI Linux formatting, clippy, Rust/Node tests, guardrails, and audit: PASS.
+- CI Windows portable checks: PASS.
+- `npm run local:e2e:native-to-solana`: `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
+- Real daemon-backed Native-to-Solana local E2E: `BLOCKED / NOT_RUN`.
+
+WHAT CHANGED:
+- Added `native/node/native-taproot-transaction.mjs` for bounded local Native transaction parsing/serialization, BIP-341 key-path `SIGHASH_DEFAULT` evidence, and Taproot witness attachment after signatures are supplied.
+- Added a public BIP-341 wallet vector test for sighash correctness and KingPepe-specific local reserve-sweep evidence tests.
+- The local Native-to-Solana runner now verifies unsigned reserve-sweep input outpoints and computes per-input Taproot sighash evidence for the deposit and fee-funding P2TR inputs.
+- The runner now stops at `LOCAL_NATIVE_TAPROOT_SIGHASHES_VALIDATED` with `FROST_RESERVE_SWEEP_SIGNATURES_PENDING`; it still does not wallet-sign, broadcast, mint, or reconcile.
+- Updated provenance, third-party notices, upstream references, readiness, and source-status documentation without adding operational secrets or real private paths.
+
+OPEN BLOCKERS:
+- Missing local `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor` executables prevent real daemon-backed Native-to-Solana local E2E.
+- Real daemon-backed FROST signature aggregation, witness attachment, Native broadcast/finality, Solana mint submission, and reconciliation remain `BLOCKED / NOT_RUN`.
+
+NEXT PHASE:
+Continue Phase 08. Do not start Phase 09 until the real daemon-backed Native-to-Solana local E2E flow passes.

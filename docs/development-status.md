@@ -94,6 +94,8 @@
 - Phase 08 localnet Solana deposit-claim bridge adapter: PASS for `0a4c39a146d150b5291935fb2ce800100accc898`
 - Phase 08 local FROST Taproot deposit/fee/reserve intent: PASS for
   `5e98101e1b47380ade3d5fa00c445b24f37efd70`
+- Phase 08 local Taproot sighash evidence: PASS for
+  `36c3dbbaad092fab750abc66e2bfdb8838f05941`
 - Phase 08 current `npm test`: PASS, 2 protocol vectors plus 102 Node tests
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 52 Rust tests after account-execution update
@@ -262,8 +264,11 @@
 
 ## Phase 08 local Taproot sighash evidence
 
-- Source status: implemented and locally tested; CI verification pending for
-  the next source commit.
+- Source status: implemented and CI verified.
+- Source commit:
+  `36c3dbbaad092fab750abc66e2bfdb8838f05941`
+- CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34352340935` PASS.
 - What changed:
   - Added `native/node/native-taproot-transaction.mjs`.
   - Added `native/node/tests/native-taproot-transaction.test.mjs`.
@@ -286,6 +291,11 @@
   - `npm test`: PASS, 2 protocol vectors plus 102 Node tests.
   - `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
   - `python .github/scripts/guardrails.py`: PASS.
+  - WSL Rust regression gates: PASS, 52 Solana Rust tests, 7 Native FROST
+    Rust tests, 8 Native proof Rust tests, 4 Native reserve Rust tests, and 3
+    Native recovery Rust tests.
+  - CI Linux formatting, clippy, Rust/Node tests, guardrails, and audit: PASS.
+  - CI Windows portable checks: PASS.
 - Current blocker:
   - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
   - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`,
