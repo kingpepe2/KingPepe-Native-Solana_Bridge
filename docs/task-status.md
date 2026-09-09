@@ -1059,6 +1059,62 @@ OPEN BLOCKERS:
 NEXT PHASE:
 Continue Phase 08. Do not start Phase 09 until the real daemon-backed Native-to-Solana local E2E flow passes.
 
+## Phase 08 report - Solana local-validator PDA allocation path
+
+PHASE:
+`PHASE 08 - Automatic Native to Solana local end-to-end`
+
+COMMIT SHA:
+`0542b04dac5db0807b66f028e6006741c1efea06`
+
+COMMIT MESSAGE:
+`feat(phase-08): add solana pda allocation path`
+
+CORRECTIVE SHA:
+`edb184c5aff7f555110f305f3f050fb861294e13`
+
+CORRECTIVE MESSAGE:
+`fix(phase-08): apply solana rust formatting`
+
+PUSH RESULT:
+Pushed to private GitHub repository `kingpepe2/KingPepe-Native-Solana_Bridge` on branch `main`.
+
+CI RUN URL:
+`https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34366351989`
+
+CI STATUS:
+PASS for corrective source SHA `edb184c5aff7f555110f305f3f050fb861294e13`.
+Prior source SHA `0542b04dac5db0807b66f028e6006741c1efea06` failed Linux Solana Rust formatting and was superseded by the corrective commit.
+
+TESTS PASS/FAIL/SKIP/NOT_RUN:
+- `node --check services/bridge-validator/solana-deposit-claim-transaction-plan.mjs`: PASS.
+- `node --test services/bridge-validator/tests/solana-deposit-claim-transaction-plan.test.mjs`: PASS, 8 tests.
+- `npm test`: PASS, 2 protocol vectors plus 108 Node tests.
+- `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
+- `python .github/scripts/guardrails.py`: PASS.
+- JSON manifest parse checks: PASS.
+- `git diff --cached --check`: PASS.
+- Staged/outgoing secret scans: PASS.
+- WSL Solana Rust workspace tests: PASS, 53 Rust tests/doc-tests.
+- Local `cargo fmt` / `cargo clippy`: NOT_RUN locally because this environment has `cargo` but not `rustup`, `rustfmt`, or `clippy`.
+- GitHub Actions Linux rustfmt/clippy/check/test gates: PASS on corrective SHA.
+- GitHub Actions Windows check/test gates: PASS on corrective SHA.
+- `npm run local:e2e:native-to-solana`: `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
+- Real daemon-backed Native-to-Solana local E2E: `BLOCKED / NOT_RUN`.
+
+WHAT CHANGED:
+- Added signed System Program CPI allocation paths for `kingpepe-transceiver` config and verified-receipt PDA accounts.
+- Added signed System Program CPI allocation paths for `kingpepe-bridge` bridge-state and deposit-claim PDA accounts.
+- Updated the bundled localnet Solana deposit-claim transaction plan to pass fee-payer and System Program accounts into the transceiver and bridge instructions.
+- Preserved existing preallocated-account execution tests and localnet-only activation boundaries.
+
+OPEN BLOCKERS:
+- Missing local `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor` executables prevent real daemon-backed Native-to-Solana local E2E.
+- Real local-validator execution still needs disposable fee-payer funding, SPL Mint setup, token account setup, finalized claim observation, and reconciliation before full Native-to-Solana E2E can be marked PASS.
+
+NEXT PHASE:
+Continue Phase 08. Do not start Phase 09 until the real daemon-backed Native-to-Solana local E2E flow passes.
+
 ## Phase 08 report - Local FROST Taproot deposit, fee, and reserve intent
 
 PHASE:

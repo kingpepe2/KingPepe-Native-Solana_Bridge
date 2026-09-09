@@ -1106,7 +1106,10 @@
 
 ## Phase 08 Solana local-validator PDA allocation path
 
-- Source status: implemented locally; CI verification pending for this source increment.
+- Source status: implemented and CI verified for source SHA
+  `edb184c5aff7f555110f305f3f050fb861294e13`; CI run
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34366351989`
+  PASS.
 - What changed:
   - `kingpepe-transceiver` can now allocate its config and verified-receipt PDA accounts through signed System Program CPI when a payer and System Program account are supplied.
   - `kingpepe-bridge` can now allocate its bridge-state and deposit-claim PDA accounts through signed System Program CPI when a payer and System Program account are supplied.
@@ -1114,11 +1117,16 @@
   - Existing preallocated-account unit tests remain supported for source-level execution tests.
 - Local tests run so far:
   - `node --test services/bridge-validator/tests/solana-deposit-claim-transaction-plan.test.mjs`: PASS, 8 tests.
-  - `wsl.exe --cd /mnt/d/KingPepe-Native-Solana_Bridge/solana bash -lc "cargo test --locked --workspace"`: PASS, 53 Rust tests/doc-tests.
   - `npm test`: PASS, 2 protocol vectors plus 108 Node tests.
+  - `wsl.exe --cd /mnt/d/KingPepe-Native-Solana_Bridge/solana bash -lc "cargo test --locked --workspace"`: PASS, 53 Rust tests/doc-tests.
   - `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
   - `python .github/scripts/guardrails.py`: PASS.
+  - JSON manifest parse checks: PASS.
+  - `npm run local:e2e:native-to-solana`: expected `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
   - Local `cargo fmt` and `cargo clippy`: NOT_RUN locally because this WSL environment has `cargo` but not `rustup`, `rustfmt`, or `clippy`. GitHub Actions installs and runs the pinned Rust quality components.
+- CI notes:
+  - Source commit `0542b04dac5db0807b66f028e6006741c1efea06` failed Linux `cargo fmt --check --all`.
+  - Corrective commit `edb184c5aff7f555110f305f3f050fb861294e13` applied the exact Rust formatting changes and passed the full CI workflow.
 - Current blocker:
   - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
   - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.

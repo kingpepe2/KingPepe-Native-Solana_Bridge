@@ -375,8 +375,12 @@
   own PDA state/receipt/claim accounts. The bundled localnet deposit-claim
   transaction plan includes those accounts so a real local validator can create
   missing PDAs under the owning programs instead of relying on preallocated
-  test accounts. This is source-level implementation only until local Solana
-  validator infrastructure is available and exercised.
+  test accounts. Source commit `0542b04dac5db0807b66f028e6006741c1efea06`
+  failed Linux rustfmt; corrective source SHA
+  `edb184c5aff7f555110f305f3f050fb861294e13` passed CI run
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34366351989`.
+  This is source-level implementation only until local Solana validator
+  infrastructure is available and exercised.
 - Phase 08 Solana deposit-claim transaction plan commit:
   `42a5cdb3bcc60e0be7fb5d2395503f148b6d632f`
 - Phase 08 Solana deposit-claim transaction plan CI:
