@@ -32,6 +32,13 @@ export {
 } from "./solana-deposit-claim-transaction-plan.mjs";
 
 export {
+  LOCALNET_SOLANA_SETUP_PLAN_PROTOCOL,
+  LOCALNET_SOLANA_SETUP_SCOPE,
+  buildLocalnetSolanaSetupTransactionPlan,
+  prepareSignedLocalnetSolanaSetupTransaction,
+} from "./localnet-solana-setup-plan.mjs";
+
+export {
   LOCALNET_SOLANA_DEPOSIT_CLAIM_BRIDGE_PROTOCOL,
   LocalnetSolanaDepositClaimBridge,
   prepareLocalnetSolanaDepositClaimRequest,
