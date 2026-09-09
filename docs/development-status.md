@@ -99,10 +99,18 @@
 
 ## Phase 08 local E2E Native wallet raw-signing boundary
 
-- Source status: implemented locally; source commit and CI verification pending.
+- Source status: implemented and CI verified.
+- Source commit:
+  `8d091c2867eda2e1e8e6818216e23d8220f78279`.
+- CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34339945822` PASS.
 - Local tests:
   - `npm run test:local-e2e-readiness`: PASS, 23 readiness/orchestration/bootstrap/runner tests.
   - `npm run test:bridge-validator`: PASS, 39 bridge-validator tests.
+  - `npm test`: PASS, 2 protocol vectors plus 93 Node tests.
+  - `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
+  - `python .github/scripts/guardrails.py`: PASS.
+  - `npm run local:e2e:native-to-solana`: expected `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
 - What changed:
   - The local REGTEST CLI allowlist no longer permits
     `signrawtransactionwithwallet`.
