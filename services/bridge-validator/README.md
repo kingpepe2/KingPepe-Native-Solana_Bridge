@@ -37,6 +37,11 @@ the real Native reserve-sweep relayer/verifier adapter classes and the localnet
 Solana claim bridge/observer adapter classes at the same time, still using fake
 loopback RPC fixtures because the required local daemons are unavailable.
 
+The restart/retry integration coverage now uses file-backed deposit, Native
+reserve-sweep, and Solana claim journals together. A restart after Native sweep
+broadcast but before reserve finality resumes from persisted state, avoids a
+second Native broadcast, and mints once after reserve finality is observed.
+
 `FileBackedDepositJournal` persists completed deposit terminal results and
 deposit-outpoint reservations outside the source repository. It is used for
 local restart/retry safety so a completed deposit replay does not rebroadcast
