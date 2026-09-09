@@ -78,7 +78,7 @@ pub fn decode_bridge_instruction(
             }
             let message = CanonicalBridgeMessage::decode(&instruction_data[1..])
                 .map_err(|_| EntrypointError::InvalidCanonicalMessage)?;
-            Ok(BridgeInstruction::AcceptDepositClaim(message))
+            Ok(BridgeInstruction::AcceptDepositClaim(Box::new(message)))
         }
         BRIDGE_INSTRUCTION_RECORD_WITHDRAWAL_REQUEST => {
             let expected = 1 + bridge_messages::MESSAGE_LENGTH + BURN_CHECKED_INSTRUCTION_LENGTH;
@@ -92,7 +92,10 @@ pub fn decode_bridge_instruction(
             let message = CanonicalBridgeMessage::decode(&instruction_data[1..message_end])
                 .map_err(|_| EntrypointError::InvalidCanonicalMessage)?;
             let burn = decode_burn_checked(&instruction_data[message_end..])?;
-            Ok(BridgeInstruction::RecordWithdrawalRequest { message, burn })
+            Ok(BridgeInstruction::RecordWithdrawalRequest {
+                message: Box::new(message),
+                burn,
+            })
         }
         other => Err(EntrypointError::UnsupportedInstructionTag(other)),
     }
@@ -101,9 +104,9 @@ pub fn decode_bridge_instruction(
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BridgeInstruction {
     Initialize(BridgeConfig),
-    AcceptDepositClaim(CanonicalBridgeMessage),
+    AcceptDepositClaim(Box<CanonicalBridgeMessage>),
     RecordWithdrawalRequest {
-        message: CanonicalBridgeMessage,
+        message: Box<CanonicalBridgeMessage>,
         burn: BurnChecked,
     },
 }
@@ -959,7 +962,7 @@ mod tests {
             initialize
         );
 
-        let deposit = BridgeInstruction::AcceptDepositClaim(deposit_message(&config));
+        let deposit = BridgeInstruction::AcceptDepositClaim(Box::new(deposit_message(&config)));
         let deposit_bytes = deposit.encode().unwrap();
         assert_eq!(decode_bridge_instruction(&deposit_bytes).unwrap(), deposit);
         assert_eq!(
@@ -976,7 +979,7 @@ mod tests {
             decimals: config.mint_binding.decimals,
         };
         let withdrawal = BridgeInstruction::RecordWithdrawalRequest {
-            message: withdrawal_message,
+            message: Box::new(withdrawal_message),
             burn,
         };
         let withdrawal_bytes = withdrawal.encode().unwrap();

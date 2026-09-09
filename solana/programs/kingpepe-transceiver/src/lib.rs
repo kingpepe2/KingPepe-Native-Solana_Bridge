@@ -88,7 +88,7 @@ pub fn decode_transceiver_instruction(
                 return Err(EntrypointError::InvalidInstructionEncoding);
             }
             Ok(TransceiverInstruction::VerifyMessageFromEd25519 {
-                message,
+                message: Box::new(message),
                 ed25519_instruction_indexes: [first, second],
             })
         }
@@ -100,7 +100,7 @@ pub fn decode_transceiver_instruction(
 pub enum TransceiverInstruction {
     Initialize(TransceiverConfig),
     VerifyMessageFromEd25519 {
-        message: CanonicalBridgeMessage,
+        message: Box<CanonicalBridgeMessage>,
         ed25519_instruction_indexes: [u16; 2],
     },
 }
@@ -712,7 +712,7 @@ mod tests {
 
         let message = message(&config);
         let verify = TransceiverInstruction::VerifyMessageFromEd25519 {
-            message: message.clone(),
+            message: Box::new(message.clone()),
             ed25519_instruction_indexes: [0, 1],
         };
         let verify_bytes = verify.encode().unwrap();
@@ -726,7 +726,7 @@ mod tests {
         );
 
         let duplicate = TransceiverInstruction::VerifyMessageFromEd25519 {
-            message,
+            message: Box::new(message),
             ed25519_instruction_indexes: [2, 2],
         }
         .encode()
