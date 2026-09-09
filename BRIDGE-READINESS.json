@@ -92,7 +92,7 @@
     "phase08AutomaticDepositPipelineNativeAndSolanaAdapterIntegrationCiVerified": true,
     "phase08DepositPipelineAdapterJournalRestartImplemented": true,
     "phase08DepositPipelineAdapterJournalRestartLocalTestsPassed": true,
-    "phase08DepositPipelineAdapterJournalRestartCiVerified": false,
+    "phase08DepositPipelineAdapterJournalRestartCiVerified": true,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true
