@@ -528,12 +528,22 @@
     {
       "path": "services/solana-observer/index.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 07 Solana observer service export surface."
+      "notes": "Phase 07/08 Solana observer service export surface."
+    },
+    {
+      "path": "services/solana-observer/solana-deposit-claim-observer.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 localnet-only Solana deposit-claim observer and RPC boundary for finalized claim observation."
     },
     {
       "path": "services/solana-observer/solana-withdrawal-observer.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Phase 07 finalized Solana withdrawal observation and program/authority hard-stop checks."
+    },
+    {
+      "path": "services/solana-observer/tests/solana-deposit-claim-observer.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 Solana deposit-claim observer tests for finalized localnet observations, account codecs, and RPC boundaries."
     },
     {
       "path": "services/solana-observer/tests/solana-withdrawal-observer.test.mjs",

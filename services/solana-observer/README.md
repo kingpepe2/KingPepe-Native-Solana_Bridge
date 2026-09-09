@@ -1,7 +1,7 @@
 # Solana observer service
 
-The Solana observer validates finalized withdrawal records before Native payout
-authorization can proceed.
+The Solana observer validates localnet deposit-claim results and finalized
+withdrawal records before downstream authorization can proceed.
 
 Phase 07 implements:
 
@@ -16,6 +16,17 @@ Phase 07 implements:
 - Direct-burn rejection when no bridge withdrawal record exists.
 - `HARD_STOP` on unauthorized program, binary, upgrade-authority, Mint, or
   mint-authority changes.
+
+Phase 08 adds a localnet-only deposit-claim observer:
+
+- Loopback-only Solana JSON-RPC access for local validation.
+- Finalized transaction, root slot, bridge deposit-claim account, and SPL Mint
+  account reads.
+- Decoding of the bridge deposit-claim account layout emitted by the local
+  manager program test path.
+- Freeze-authority extraction so downstream checks can reject a configured Mint
+  with freeze authority set.
+- No production RPCs, keys, Program IDs, Mint identities, or operational state.
 
 Production observation remains disabled until a production-grade source policy
 and private deployment configuration are provided outside the repository.
