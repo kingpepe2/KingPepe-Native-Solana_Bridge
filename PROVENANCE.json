@@ -23,7 +23,7 @@
     {
       "path": ".github/workflows/ci.yml",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "CI workflow configuration and job sequencing."
+      "notes": "CI workflow configuration and job sequencing, including Phase 08 Native node adapter tests."
     },
     {
       "path": ".gitignore",
@@ -293,7 +293,17 @@
     {
       "path": "native/node/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Native node observation boundary notes for Phase 06."
+      "notes": "Native node observation boundary notes updated for the Phase 08 local REGTEST RPC adapter."
+    },
+    {
+      "path": "native/node/native-rpc-client.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 loopback-first KingPepe JSON-RPC adapter for local REGTEST observation, UTXO checks, controlled local broadcast, endpoint/auth boundary enforcement, and exact atomic amount parsing."
+    },
+    {
+      "path": "native/node/tests/native-rpc-client.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 Native RPC adapter tests using a disposable loopback HTTP server and temporary non-production auth cookie outside the repository."
     },
     {
       "path": "native/proof/Cargo.lock",

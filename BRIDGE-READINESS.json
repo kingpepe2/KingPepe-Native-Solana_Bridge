@@ -57,6 +57,8 @@
     "phase08LocalE2eBootstrapImplemented": true,
     "phase08LocalE2eBootstrapLocalTestsPassed": true,
     "phase08LocalE2eBootstrapCiVerified": true,
+    "phase08NativeRpcAdapterImplemented": true,
+    "phase08NativeRpcAdapterLocalTestsPassed": true,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true
