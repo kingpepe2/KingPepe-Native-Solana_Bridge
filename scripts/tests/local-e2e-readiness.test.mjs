@@ -13,7 +13,7 @@ import {
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../..");
 
-test("current repository readiness gate refuses to treat fail-closed entrypoint shells as real local E2E", () => {
+test("current repository readiness gate refuses to treat validate-only ABI as real local E2E", () => {
   const result = evaluateLocalE2eReadiness({
     repoRoot: REPO_ROOT,
     envPath: "",
@@ -24,8 +24,8 @@ test("current repository readiness gate refuses to treat fail-closed entrypoint 
   for (const command of REQUIRED_LOCAL_E2E_EXECUTABLES) {
     assert(result.blockers.includes(`MISSING_EXECUTABLE:${command}`));
   }
-  assert(result.blockers.includes("SOLANA_PROGRAM_ABI_NOT_READY:kingpepe-bridge"));
-  assert(result.blockers.includes("SOLANA_PROGRAM_ABI_NOT_READY:kingpepe-transceiver"));
+  assert(result.blockers.includes("SOLANA_PROGRAM_EXECUTION_NOT_READY:kingpepe-bridge"));
+  assert(result.blockers.includes("SOLANA_PROGRAM_EXECUTION_NOT_READY:kingpepe-transceiver"));
 });
 
 test("executable discovery is path-delimited and does not inspect unrelated environment data", () => {
@@ -88,6 +88,9 @@ test("fake complete toolchain and deployable fixture reports READY", () => {
           "use solana_program::{declare_id, entrypoint};",
           'declare_id!("11111111111111111111111111111111");',
           "entrypoint!(process_instruction);",
+          'pub const PROGRAM_ABI_STATUS: &str = "ECONOMIC_ABI_ENABLED";',
+          "pub enum TestInstruction {}",
+          "pub fn decode_test_instruction() {}",
           "pub fn process_instruction() {}",
           "",
         ].join("\n"),

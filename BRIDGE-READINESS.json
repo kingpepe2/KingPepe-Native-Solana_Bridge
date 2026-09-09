@@ -39,7 +39,10 @@
     "localnetProgramIdsConfigured": true,
     "phase08SolanaEntrypointShellsImplemented": true,
     "phase08SolanaEntrypointShellsCiVerified": true,
+    "phase08SolanaEconomicAbiValidateOnlyImplemented": true,
+    "phase08SolanaEconomicAbiValidateOnlyLocalTestsPassed": true,
     "solanaEconomicInstructionAbiReady": false,
+    "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true
   },
   "readinessGates": {
