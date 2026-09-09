@@ -41,6 +41,14 @@ deposit message and two project attestations before RPC submission, persists the
 operation before broadcast, checks the prior signature outcome before retry, and
 requires a finalized deposit-claim observation before returning `COMPLETED`.
 
+`solana-deposit-claim-transaction-plan.mjs` prepares the localnet Solana
+deposit-claim instruction and transaction bytes before submission. It derives
+the expected bridge state, deposit claim, mint-authority, and transceiver
+receipt PDAs; validates the canonical deposit message against configured
+Program IDs, Mint, and recipient token account; builds the legacy Solana
+message; and can sign with an injected local fee-payer signer. It does not
+load, create, or store key files.
+
 `native-reserve-sweep-adapters.mjs` implements local Native reserve-sweep
 adapter boundaries. The relayer validates the FROST A+B transcript, persists
 the signed sweep transaction before broadcast, broadcasts through the local
@@ -49,8 +57,9 @@ readiness, sweep finality, deposit-input consumption, reserve script, and exact
 atomic reserve output evidence. Its current trust classification remains
 `RPC_OBSERVATION`; it is not production consensus validation.
 
-The submitter is intentionally localnet-only in this phase. It does not build
-transactions, configure production RPC, or mark Mainnet ready.
+The Solana submitter and transaction-plan builder are intentionally
+localnet-only in this phase. They do not configure production RPC or mark
+Mainnet ready.
 
 The current implementation is still not the required real local E2E run. That
 gate remains blocked until a disposable KingPepe regtest daemon/CLI and Solana

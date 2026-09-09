@@ -22,6 +22,16 @@ export {
 } from "./solana-deposit-claim-submitter.mjs";
 
 export {
+  BRIDGE_INSTRUCTION_ACCEPT_DEPOSIT_CLAIM,
+  SOLANA_DEPOSIT_CLAIM_TRANSACTION_PLAN_PROTOCOL,
+  base58Decode,
+  base58Encode,
+  buildLocalnetSolanaDepositClaimTransactionPlan,
+  prepareSignedLocalnetSolanaDepositClaimTransaction,
+  shortvecEncode,
+} from "./solana-deposit-claim-transaction-plan.mjs";
+
+export {
   FileBackedNativeReserveSweepJournal,
   InMemoryNativeReserveSweepJournal,
   NATIVE_RESERVE_SWEEP_RELAYER_PROTOCOL,

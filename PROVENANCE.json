@@ -478,7 +478,7 @@
     {
       "path": "services/bridge-validator/index.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Bridge validator service export surface."
+      "notes": "Bridge validator service export surface, including Phase 08 deposit pipeline, reserve-sweep, Solana submitter, and transaction-plan boundaries."
     },
     {
       "path": "services/bridge-validator/native-reserve-sweep-adapters.mjs",
@@ -489,6 +489,11 @@
       "path": "services/bridge-validator/solana-deposit-claim-submitter.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Phase 08 localnet Solana deposit claim submission boundary with canonical-message, attestation-threshold, persist-before-broadcast, status retry, and finalized claim-observation checks."
+    },
+    {
+      "path": "services/bridge-validator/solana-deposit-claim-transaction-plan.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 localnet Solana deposit claim instruction, PDA, legacy transaction serialization, and injected fee-payer signing boundary."
     },
     {
       "path": "services/bridge-validator/tests/automatic-deposit-pipeline.test.mjs",
@@ -504,6 +509,11 @@
       "path": "services/bridge-validator/tests/solana-deposit-claim-submitter.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Phase 08 Solana deposit claim submitter tests using disposable local RPC fixtures, runtime-generated public test attestations, and temp-directory journal state outside the repository."
+    },
+    {
+      "path": "services/bridge-validator/tests/solana-deposit-claim-transaction-plan.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 Solana deposit claim transaction-plan tests using in-memory ephemeral fee-payer signing material and deterministic non-production public identities."
     },
     {
       "path": "services/indexer/README.md",
