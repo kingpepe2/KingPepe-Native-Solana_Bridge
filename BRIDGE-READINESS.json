@@ -122,7 +122,7 @@
     "phase08LocalFrostTaprootDepositIntentCiVerified": true,
     "phase08TaprootSighashEvidenceImplemented": true,
     "phase08TaprootSighashEvidenceLocalTestsPassed": true,
-    "phase08TaprootSighashEvidenceCiVerified": false,
+    "phase08TaprootSighashEvidenceCiVerified": true,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true
