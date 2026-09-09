@@ -513,7 +513,7 @@
     {
       "path": "services/bridge-validator/localnet-solana-deposit-claim-bridge.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 localnet adapter connecting signed Solana deposit-claim transaction planning to the durable submitter boundary, including derived per-operation observer account pass-through."
+      "notes": "Phase 08 localnet adapter connecting signed bundled Solana deposit-claim planning to the durable submitter boundary, including Ed25519 attestation, transceiver receipt, bridge claim, and derived per-operation observer account pass-through."
     },
     {
       "path": "services/bridge-validator/solana-deposit-claim-submitter.mjs",
@@ -523,7 +523,7 @@
     {
       "path": "services/bridge-validator/solana-deposit-claim-transaction-plan.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 localnet Solana deposit claim instruction, PDA, legacy transaction serialization, and injected fee-payer signing boundary."
+      "notes": "Phase 08 localnet Solana deposit claim instruction, PDA, legacy transaction serialization, Ed25519 attestation verifier, transceiver receipt, bridge claim bundle, and injected fee-payer signing boundary."
     },
     {
       "path": "services/bridge-validator/tests/automatic-deposit-pipeline.test.mjs",
@@ -553,7 +553,7 @@
     {
       "path": "services/bridge-validator/tests/solana-deposit-claim-transaction-plan.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 Solana deposit claim transaction-plan tests using in-memory ephemeral fee-payer signing material and deterministic non-production public identities."
+      "notes": "Phase 08 Solana deposit claim transaction-plan and bundled transceiver-receipt tests using in-memory ephemeral fee-payer and attester signing material with deterministic non-production public identities."
     },
     {
       "path": "services/indexer/README.md",

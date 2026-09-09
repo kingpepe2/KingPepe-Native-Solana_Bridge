@@ -363,7 +363,11 @@
   derives localnet bridge state, deposit claim, mint-authority, and
   transceiver receipt PDAs, builds exact `AcceptDepositClaim` instruction
   data, serializes a Solana legacy transaction message, and signs only through
-  an injected local fee-payer signer. It does not load or store key files.
+  an injected local fee-payer signer. The current source edit adds an
+  additive bundled localnet transaction path that includes both Ed25519
+  verifier instructions, the transceiver receipt verification instruction, and
+  the bridge claim/mint instruction in one signed transaction. It does not load
+  or store key files.
 - Phase 08 Solana deposit-claim transaction plan commit:
   `42a5cdb3bcc60e0be7fb5d2395503f148b6d632f`
 - Phase 08 Solana deposit-claim transaction plan CI:
@@ -373,7 +377,10 @@
   connects the transaction-plan builder to the durable Solana submitter. It
   fetches or accepts a localnet blockhash, signs only through an injected
   fee-payer signer, submits through the existing localnet RPC boundary, and
-  does not load or store key files.
+  does not load or store key files. Actual `submitDepositClaim` calls now use
+  the bundled transceiver-receipt plus bridge-claim transaction path when two
+  project attestations are supplied; the read-only planning helper still
+  supports legacy one-instruction PDA derivation when attestations are absent.
 - Phase 08 localnet Solana deposit-claim bridge adapter commit:
   `0a4c39a146d150b5291935fb2ce800100accc898`
 - Phase 08 localnet Solana deposit-claim bridge adapter CI:

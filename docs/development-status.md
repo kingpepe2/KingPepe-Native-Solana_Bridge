@@ -37,7 +37,7 @@
 ## Current blockers
 
 - Phase 08 is blocked because the local environment does not provide `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, or `anchor`.
-- Current Solana crates have deterministic non-production localnet Program IDs, economic ABI decoding, source-level account execution, SPL Token CPI construction, a localnet-only deposit-claim observer, a localnet transaction-plan builder, and a localnet adapter that connects signed transaction planning to durable submission. Real local-validator execution remains untested because required localnet executables are missing.
+- Current Solana crates have deterministic non-production localnet Program IDs, economic ABI decoding, source-level account execution, SPL Token CPI construction, a localnet-only deposit-claim observer, a bundled localnet transaction-plan builder that includes Ed25519 attestations, transceiver receipt creation, and bridge claim/mint, plus a localnet adapter that connects signed bundled planning to durable submission. Real local-validator execution remains untested because required localnet executables are missing.
 - Full Native FROST signature aggregation, witness broadcast, Native node acceptance, local end-to-end flows, Devnet, production configuration, external review, and activation remain later phases.
 
 ## Latest local validation
@@ -68,10 +68,10 @@
 - Phase 07 CI: PASS for `d17ba8fe61d20a88d4206f72d68a010a2d146524`
 - Phase 08 `Get-Command kingpeped kingpepe-cli solana solana-test-validator anchor`: NOT_FOUND on Windows
 - Phase 08 `command -v kingpeped kingpepe-cli solana-test-validator solana anchor`: NOT_FOUND under WSL
-- Phase 08 `npm run test:bridge-validator`: PASS, 43 bridge-validator tests (automatic deposit pipeline, file-backed deposit journal, async adapter path, Native reserve-sweep adapters, adapter-journal restart retry, signing-intent boundary, Solana deposit claim submitter, Solana transaction-plan builder, and localnet Solana deposit-claim bridge adapter)
+- Phase 08 `npm run test:bridge-validator`: PASS, 47 bridge-validator tests (automatic deposit pipeline, file-backed deposit journal, async adapter path, Native reserve-sweep adapters, adapter-journal restart retry, signing-intent boundary, Solana deposit claim submitter, Solana transaction-plan builder including bundled transceiver receipt planning, and localnet Solana deposit-claim bridge adapter)
 - Phase 08 `npm run test:native-node`: PASS, 10 Native REGTEST RPC adapter and Taproot transaction tests
 - Phase 08 `npm run test:solana-observer`: PASS, 14 Solana observer tests including the localnet deposit-claim observer
-- Phase 08 `npm run test:local-e2e-readiness`: PASS, 25 readiness/orchestration/bootstrap/runner tests
+- Phase 08 `npm run test:local-e2e-readiness`: PASS, 27 readiness/orchestration/bootstrap/runner tests
 - Phase 08 `npm run doctor:local-e2e`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING; missing localnet executables; both Solana programs report `READY` at the source/readiness-gate level after account-execution wiring
 - Phase 08 `npm run local:e2e:plan`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING with redacted local paths and no production configuration
 - Phase 08 `npm run local:e2e:bootstrap`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING before command execution; missing localnet executables
@@ -96,7 +96,7 @@
   `5e98101e1b47380ade3d5fa00c445b24f37efd70`
 - Phase 08 local Taproot sighash evidence: PASS for
   `36c3dbbaad092fab750abc66e2bfdb8838f05941`
-- Phase 08 current `npm test`: PASS, 2 protocol vectors plus 102 Node tests
+- Phase 08 current `npm test`: PASS, 2 protocol vectors plus 108 Node tests
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 52 Rust tests after account-execution update
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
@@ -1074,3 +1074,29 @@
   - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
   - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
   - Real daemon-backed Solana mint submission, finalized mint observation, and reconciliation remain `BLOCKED / NOT_RUN`.
+
+## Phase 08 localnet Solana deposit-claim bundle plan
+
+- Source status: implemented locally; exact source SHA and CI will be recorded after push.
+- What changed:
+  - Added an additive bundled localnet deposit-claim transaction planner that places both Ed25519 attestation verifier instructions, the `kingpepe-transceiver` receipt-verification instruction, and the `kingpepe-bridge` claim/mint instruction in one signed Solana transaction message.
+  - The localnet bridge adapter now uses the bundled plan for actual `submitDepositClaim` calls, so real submission no longer depends on a pre-existing verified receipt account.
+  - The helper used for read-only PDA/observer-account planning still permits legacy one-instruction planning when attestations are intentionally absent.
+  - The bundle validates exactly two distinct project attestations over the canonical message before transaction construction and rejects missing, duplicate, or mutated attestations.
+- Local tests run so far:
+  - `node --test services/bridge-validator/tests/solana-deposit-claim-transaction-plan.test.mjs`: PASS, 8 tests.
+  - `node --test services/bridge-validator/tests/localnet-solana-deposit-claim-bridge.test.mjs services/bridge-validator/tests/solana-deposit-claim-submitter.test.mjs services/bridge-validator/tests/automatic-deposit-pipeline.test.mjs services/bridge-validator/tests/solana-deposit-claim-transaction-plan.test.mjs`: PASS, 34 tests.
+  - `npm test`: PASS, 2 protocol vectors plus 108 Node tests.
+  - `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
+  - `python .github/scripts/guardrails.py`: PASS.
+  - JSON manifest parse checks: PASS.
+  - WSL Solana Rust workspace tests: PASS, 52 tests.
+  - WSL Native FROST Rust tests: PASS, 7 tests.
+  - WSL Native proof Rust tests: PASS, 8 tests.
+  - WSL Native reserve Rust tests: PASS, 4 tests.
+  - WSL Native recovery Rust tests: PASS, 3 tests.
+  - `npm run local:e2e:native-to-solana`: `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
+- Current blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
+  - Real local-validator execution still needs localnet account creation/initialization, funded disposable fee payer, SPL Mint setup, token account setup, finalized claim observation, and reconciliation before the full Native-to-Solana E2E can be marked PASS.

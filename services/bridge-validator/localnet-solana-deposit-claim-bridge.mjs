@@ -7,7 +7,10 @@ import {
 } from "../../shared/protocol/canonical-message.mjs";
 import { DEPOSIT_STATES } from "./automatic-deposit-pipeline.mjs";
 import { SolanaDepositClaimSubmitter } from "./solana-deposit-claim-submitter.mjs";
-import { prepareSignedLocalnetSolanaDepositClaimTransaction } from "./solana-deposit-claim-transaction-plan.mjs";
+import {
+  prepareSignedLocalnetSolanaDepositClaimBundleTransaction,
+  prepareSignedLocalnetSolanaDepositClaimTransaction,
+} from "./solana-deposit-claim-transaction-plan.mjs";
 
 export const LOCALNET_SOLANA_DEPOSIT_CLAIM_BRIDGE_PROTOCOL =
   "KINGPEPE_NATIVE_SOLANA_BRIDGE/LOCALNET_SOLANA_DEPOSIT_CLAIM_BRIDGE/V1";
@@ -46,7 +49,7 @@ export class LocalnetSolanaDepositClaimBridge {
       return bridgeDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "SOLANA_LATEST_BLOCKHASH_UNAVAILABLE", normalized);
     }
 
-    const signedPlan = await prepareSignedLocalnetSolanaDepositClaimTransaction({
+    const signedPlan = await prepareSignedLocalnetSolanaDepositClaimBundleTransaction({
       environment: this.#config.environment,
       cluster: this.#config.cluster,
       managerProgramIdHex: this.#config.managerProgramIdHex,
@@ -59,6 +62,7 @@ export class LocalnetSolanaDepositClaimBridge {
       recentBlockhashBase58: latestBlockhash.blockhash,
       lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
       encodedMessageHex: normalized.encodedMessageHex,
+      attestations: normalized.attestations,
       feePayerSigner: this.#feePayerSigner,
     });
     assertPlanMatchesRequest(signedPlan, normalized);
@@ -85,7 +89,7 @@ export async function prepareLocalnetSolanaDepositClaimRequest(config, request, 
   const bridgeConfig = normalizeLocalnetBridgeConfig(config);
   const normalized = normalizeDepositClaimBridgeRequest(bridgeConfig, request);
   const latestBlockhash = await resolveLatestBlockhash(options.blockhashSource, normalized);
-  const signedPlan = await prepareSignedLocalnetSolanaDepositClaimTransaction({
+  const planConfig = {
     environment: bridgeConfig.environment,
     cluster: bridgeConfig.cluster,
     managerProgramIdHex: bridgeConfig.managerProgramIdHex,
@@ -99,7 +103,13 @@ export async function prepareLocalnetSolanaDepositClaimRequest(config, request, 
     lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
     encodedMessageHex: normalized.encodedMessageHex,
     feePayerSigner: requireObject(options.feePayerSigner, "feePayerSigner"),
-  });
+  };
+  const signedPlan = Array.isArray(normalized.attestations)
+    ? await prepareSignedLocalnetSolanaDepositClaimBundleTransaction({
+      ...planConfig,
+      attestations: normalized.attestations,
+    })
+    : await prepareSignedLocalnetSolanaDepositClaimTransaction(planConfig);
   assertPlanMatchesRequest(signedPlan, normalized);
   return Object.freeze({
     ...request,
@@ -259,6 +269,8 @@ function publicTransactionPlan(plan) {
     feePayerBase58: plan.feePayerBase58,
     accounts: plan.accounts,
     pdas: plan.pdas,
+    bundle: plan.bundle,
+    instructions: plan.instructions,
     instruction: plan.instruction,
     messageFingerprintHex: plan.messageFingerprintHex,
     preparedTransactionFingerprintHex: plan.preparedTransactionFingerprintHex,

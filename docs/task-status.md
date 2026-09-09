@@ -1420,3 +1420,54 @@ OPEN BLOCKERS:
 
 NEXT PHASE:
 Continue Phase 08. Do not start Phase 09 until the real daemon-backed Native-to-Solana local E2E flow passes.
+
+## Phase 08 report - Localnet Solana deposit-claim bundle plan
+
+PHASE:
+`PHASE 08 - Automatic Native to Solana local end-to-end`
+
+COMMIT SHA:
+`PENDING_SOURCE_PUSH`
+
+COMMIT MESSAGE:
+`feat(phase-08): bundle solana deposit claim transaction`
+
+PUSH RESULT:
+`PENDING_SOURCE_PUSH`
+
+CI RUN URL:
+`PENDING_SOURCE_PUSH`
+
+CI STATUS:
+`PENDING_SOURCE_PUSH`
+
+TESTS PASS/FAIL/SKIP/NOT_RUN:
+- `node --check services/bridge-validator/solana-deposit-claim-transaction-plan.mjs`: PASS.
+- `node --check services/bridge-validator/localnet-solana-deposit-claim-bridge.mjs`: PASS.
+- `node --test services/bridge-validator/tests/solana-deposit-claim-transaction-plan.test.mjs`: PASS, 8 tests.
+- `node --test services/bridge-validator/tests/localnet-solana-deposit-claim-bridge.test.mjs services/bridge-validator/tests/solana-deposit-claim-transaction-plan.test.mjs services/bridge-validator/tests/solana-deposit-claim-submitter.test.mjs services/bridge-validator/tests/automatic-deposit-pipeline.test.mjs`: PASS, 34 tests.
+- `npm test`: PASS, 2 protocol vectors plus 108 Node tests.
+- `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
+- `python .github/scripts/guardrails.py`: PASS.
+- JSON manifest parse checks: PASS.
+- WSL Solana Rust workspace tests: PASS, 52 tests.
+- WSL Native FROST Rust tests: PASS, 7 tests.
+- WSL Native proof Rust tests: PASS, 8 tests.
+- WSL Native reserve Rust tests: PASS, 4 tests.
+- WSL Native recovery Rust tests: PASS, 3 tests.
+- `npm run local:e2e:native-to-solana`: `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`.
+- Real daemon-backed Native-to-Solana local E2E: `BLOCKED / NOT_RUN`.
+- Staged/outgoing secret scans, push, and CI: pending for this source edit.
+
+WHAT CHANGED:
+- Added a bundled localnet Solana claim transaction planner with two Ed25519 verifier instructions, transceiver receipt verification, and bridge claim/mint in one fee-payer-signed transaction.
+- Updated the localnet bridge adapter so actual `submitDepositClaim` no longer depends on a pre-existing verified receipt account.
+- Kept the read-only localnet planning helper able to derive PDA and observer accounts without attestations through the legacy one-instruction plan.
+- Required exactly two distinct project attestations over the canonical deposit message before bundled transaction construction.
+
+OPEN BLOCKERS:
+- Missing local `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor` executables prevent real daemon-backed Native-to-Solana local E2E.
+- Real local-validator execution still needs localnet account creation/initialization, funded disposable fee payer, SPL Mint setup, token account setup, finalized claim observation, and reconciliation before full Native-to-Solana E2E can be marked PASS.
+
+NEXT PHASE:
+Continue Phase 08. Do not start Phase 09 until the real daemon-backed Native-to-Solana local E2E flow passes.
