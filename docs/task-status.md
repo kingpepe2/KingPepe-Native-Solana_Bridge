@@ -230,16 +230,18 @@
 ## Phase 08 validate-only Solana ABI summary
 
 - PHASE: `08`
-- source commit: pending publication
-- push result: pending
-- CI URL: pending
-- CI status: pending
+- source commit: `201c5bdc2a2fb65601331b58115e0a7543179e12`
+- push result: pushed to private `origin/main`
+- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34298518315`
+- CI status: PASS
 - tests:
   - `cd solana && cargo check --locked --workspace --all-targets` (pass under WSL)
   - `cd solana && cargo test --locked --workspace --all-targets` (pass under WSL, 44 Rust tests)
   - `npm run test:local-e2e-readiness` (pass, 3 readiness-gate tests)
   - `npm test` (pass, 2 vectors plus 26 Node tests)
   - `npm run doctor:local-e2e` (expected BLOCKED, exit 2)
+  - CI Linux `cargo fmt`, `cargo clippy -- -D warnings`, workspace tests, Node tests, and native crate tests (PASS)
+  - CI Windows workspace, Node, native FROST/proof/reserve/recovery tests (PASS)
   - real Native-to-Solana local E2E (BLOCKED / NOT_RUN)
 - changed:
   - Added bridge and transceiver binary instruction decoders.
@@ -251,4 +253,4 @@
   - `SOLANA_PROGRAM_EXECUTION_NOT_READY`
   - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
 - next:
-  - Publish and verify this validate-only ABI increment, then implement account execution and SPL Token CPI.
+  - Continue Phase 08 by implementing account execution and SPL Token CPI, then provide disposable localnet infrastructure. Do not proceed to Phase 09 until the Native-to-Solana local E2E gate actually passes.

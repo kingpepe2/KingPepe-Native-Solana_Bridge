@@ -74,6 +74,7 @@
 - Phase 08 source-boundary CI: PASS for `09e42e6856312a0c617eb9c14a0312012263722a`
 - Phase 08 local E2E readiness gate CI: PASS for `6f22309770f3a2f85c96093bcf8af10b47065f31`
 - Phase 08 fail-closed Solana entrypoint shell CI: PASS for `7eafd8a38d346dcb018005a7357a0012a84b0e0c`
+- Phase 08 validate-only Solana ABI CI: PASS for `201c5bdc2a2fb65601331b58115e0a7543179e12`
 - Phase 08 `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL after validate-only ABI update
 - Phase 08 `cd solana && cargo test --locked --workspace --all-targets`: PASS under WSL, 44 Rust tests after validate-only ABI update
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
@@ -146,6 +147,9 @@
   SPL Token CPI, and local-validator execution are implemented.
 - Updated the readiness gate to classify the current programs as
   `ABI_VALIDATE_ONLY` and report `SOLANA_PROGRAM_EXECUTION_NOT_READY`.
+- Source commit: `201c5bdc2a2fb65601331b58115e0a7543179e12`
+- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34298518315`
+- CI status: `PASS`
 - Real daemon-backed Native-to-Solana E2E: `BLOCKED / NOT_RUN`
 
 ## Phase 08 fail-closed Solana entrypoint shell update

@@ -151,3 +151,7 @@
 - Phase 08 validate-only Solana ABI status:
   instruction decoding and malformed/trailing-data rejection are implemented
   locally; account execution and SPL CPI remain disabled.
+- Phase 08 validate-only Solana ABI commit:
+  `201c5bdc2a2fb65601331b58115e0a7543179e12`
+- Phase 08 validate-only Solana ABI CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34298518315` PASS.
