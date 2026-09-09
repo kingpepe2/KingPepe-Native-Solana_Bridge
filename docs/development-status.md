@@ -72,6 +72,7 @@
 - Phase 08 `npm run test:local-e2e-readiness`: PASS, 3 readiness-gate tests
 - Phase 08 `npm run doctor:local-e2e`: BLOCKED_LOCAL_INFRASTRUCTURE_MISSING
 - Phase 08 source-boundary CI: PASS for `09e42e6856312a0c617eb9c14a0312012263722a`
+- Phase 08 local E2E readiness gate CI: PASS for `6f22309770f3a2f85c96093bcf8af10b47065f31`
 - Phase 08 local Native-to-Solana E2E: BLOCKED / NOT_RUN
 
 ## Phase 03 local implementation
@@ -121,6 +122,11 @@
 - Implementation commit: `09e42e6856312a0c617eb9c14a0312012263722a`
 - CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34292181114`
 - CI status: `PASS`
+- Local E2E readiness gate commit:
+  `6f22309770f3a2f85c96093bcf8af10b47065f31`
+- Local E2E readiness gate CI URL:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34293107931`
+- Local E2E readiness gate CI status: `PASS`
 - Real daemon-backed Native-to-Solana E2E: `BLOCKED / NOT_RUN`
 
 ## Phase 04 local implementation

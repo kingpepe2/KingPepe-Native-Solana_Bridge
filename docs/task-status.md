@@ -170,6 +170,9 @@
 - push result: pushed to private `origin/main`
 - CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34292181114`
 - CI status: `PASS`
+- local E2E readiness gate commit: `6f22309770f3a2f85c96093bcf8af10b47065f31`
+- local E2E readiness gate CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34293107931`
+- local E2E readiness gate CI status: `PASS`
 - tests:
   - `Get-Command kingpeped kingpepe-cli solana-test-validator anchor` (NOT_FOUND on Windows)
   - `command -v kingpeped kingpepe-cli solana-test-validator solana anchor` (NOT_FOUND under WSL)

@@ -136,6 +136,10 @@
     `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING` until the required localnet
     executables, deployable Solana programs, and non-placeholder localnet
     program IDs exist.
+- Phase 08 local E2E readiness gate commit:
+  `6f22309770f3a2f85c96093bcf8af10b47065f31`
+- Phase 08 local E2E readiness gate CI:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34293107931` PASS
 - Phase 08 source-boundary implementation commit:
   `09e42e6856312a0c617eb9c14a0312012263722a`
 - Phase 08 source-boundary CI:

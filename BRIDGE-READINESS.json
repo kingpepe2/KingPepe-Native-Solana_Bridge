@@ -35,6 +35,7 @@
     "phase08SourceBoundaryCiVerified": true,
     "localE2eReadinessGateImplemented": true,
     "localE2eReadinessGateTestsPassed": true,
+    "localE2eReadinessGateCiVerified": true,
     "phase08LocalE2eBlocked": true
   },
   "readinessGates": {
