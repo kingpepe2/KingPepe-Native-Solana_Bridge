@@ -147,6 +147,11 @@
     "phase08NativeToSolanaLocalE2eRunnerSolanaSetupIntegrated": true,
     "phase08NativeToSolanaLocalE2eRunnerSolanaSetupLocalTestsPassed": true,
     "phase08NativeToSolanaLocalE2eRunnerSolanaSetupCiVerified": true,
+    "phase08NativeToSolanaDepositClaimRunnerIntegrated": true,
+    "phase08NativeToSolanaDepositClaimRunnerLocalTestsPassed": true,
+    "phase08NativeToSolanaDepositClaimRunnerCiVerified": true,
+    "phase08NativeToSolanaDepositClaimRunnerSourceSha": "5886301bb297c6245eeac58f5bd873c9f1184cc1",
+    "phase08NativeToSolanaLocalFakeClaimReconciliationPass": true,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true

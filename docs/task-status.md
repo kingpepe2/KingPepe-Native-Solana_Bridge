@@ -1651,6 +1651,73 @@ NEXT PHASE:
 Continue Phase 08. Do not start Phase 09 until the real daemon-backed
 Native-to-Solana local E2E flow passes or a non-bypassable blocker is reported.
 
+## Phase 08 report - Native-to-Solana deposit-claim runner integration
+
+PHASE:
+Phase 08 - Automatic Native to Solana local end-to-end.
+
+COMMIT SHA:
+`5886301bb297c6245eeac58f5bd873c9f1184cc1`
+
+COMMIT MESSAGE:
+`feat(phase-08): submit and reconcile local solana deposit claim`
+
+PUSH RESULT:
+Pushed to private `kingpepe2/KingPepe-Native-Solana_Bridge` `main`.
+
+CI RUN URL:
+`https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34379702330`
+
+CI STATUS:
+PASS.
+
+TESTS PASS/FAIL/SKIP/NOT_RUN:
+
+- PASS: `node --check scripts\local-e2e-native-to-solana.mjs`.
+- PASS: `node --check scripts\tests\local-e2e-native-to-solana.test.mjs`.
+- PASS: `node --test scripts\tests\local-e2e-native-to-solana.test.mjs services\bridge-validator\tests\localnet-solana-deposit-claim-bridge.test.mjs services\bridge-validator\tests\solana-deposit-claim-submitter.test.mjs` (26 tests).
+- PASS: `node --test services\bridge-validator\tests\*.test.mjs` (57 tests).
+- PASS: `npm test` (2 protocol vectors plus 119 Node tests).
+- PASS: WSL Solana Rust workspace tests (53 Rust tests/doc-tests).
+- PASS: WSL Native Rust crate tests (22 tests across FROST, proof, reserve, and recovery).
+- PASS: `npm audit --audit-level=low` (0 vulnerabilities).
+- PASS: `python .github\scripts\guardrails.py`.
+- PASS: `git diff --check`, staged secret scan, and outgoing-range secret scan.
+- PASS: GitHub Actions Linux and Windows jobs for exact source SHA
+  `5886301bb297c6245eeac58f5bd873c9f1184cc1`.
+- NOT_RUN/BLOCKED: real daemon-backed `npm run local:e2e:native-to-solana`
+  remains `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`; missing localnet
+  executables prevented starting KingPepe REGTEST or Solana local validator.
+
+WHAT CHANGED:
+
+- The local Native-to-Solana runner now derives the Solana deposit-claim
+  operation ID before FROST reserve-sweep signing and reuses that operation ID
+  for the canonical Solana deposit-credit message.
+- The runner prepares the deposit claim after finalized Native reserve sweep
+  and finalized localnet Solana setup, obtains two distinct local project
+  attestations over the same canonical bytes, submits through the localnet
+  Solana claim bridge boundary, and reconciles reserve/supply/liability
+  accounting after a finalized claim result.
+- Runtime-only attester signer handles remain private to the local setup
+  context and are omitted from public reports.
+- Source-level fake-backed tests now exercise the runner through completed
+  local claim and reconciliation states without introducing a per-transfer
+  KingPepe Team approval state.
+
+OPEN BLOCKERS:
+
+- `LOCAL_E2E_INFRASTRUCTURE_MISSING`: `kingpeped`, `kingpepe-cli`,
+  `solana`, `solana-test-validator`, and `anchor` are not available in this
+  local environment.
+- Real daemon-backed Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
+
+NEXT PHASE:
+Continue Phase 08 only after providing the missing disposable localnet
+executables and running the real KingPepe REGTEST plus Solana local-validator
+Native-to-Solana flow. Do not start Phase 09 until that real local E2E flow
+passes or a non-bypassable blocker is reported.
+
 ## Phase 08 corrective report - Deterministic attestation mutation test
 
 PHASE:

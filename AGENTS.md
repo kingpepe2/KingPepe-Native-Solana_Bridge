@@ -483,3 +483,16 @@
   finality.
 - Real local E2E is still blocked by missing `kingpeped`, `kingpepe-cli`,
   `solana`, `solana-test-validator`, and `anchor`.
+- Phase 08 Native-to-Solana deposit-claim runner integration:
+  source commit `5886301bb297c6245eeac58f5bd873c9f1184cc1`, CI
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34379702330`
+  PASS. The local runner now builds the canonical deposit-claim message after
+  finalized Native reserve sweep evidence, obtains two project attestations
+  from disposable localnet attester identities, submits through the localnet
+  Solana claim bridge boundary, observes finalized mint completion through the
+  claim result, and reconciles canonical reserve, minted supply, and
+  liabilities using exact BigInt accounting. The public report omits runtime
+  signer handles. This is source/local fake-backed coverage only; real
+  daemon-backed Native-to-Solana local E2E remains blocked by missing
+  `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and
+  `anchor`.

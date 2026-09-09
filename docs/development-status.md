@@ -1209,3 +1209,49 @@
   - Real local-validator account creation/finality, Solana deposit-claim
     submission, finalized mint observation, and reconciliation remain
     `BLOCKED / NOT_RUN`.
+
+## Phase 08 Native-to-Solana deposit-claim runner integration
+
+- Source status: implemented, pushed, and CI verified for source commit
+  `5886301bb297c6245eeac58f5bd873c9f1184cc1`.
+- CI evidence:
+  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34379702330`,
+  PASS.
+- What changed:
+  - The local Native-to-Solana runner now derives the canonical Solana
+    deposit-claim operation ID before FROST signing, so the FROST reserve-sweep
+    policy and the Solana claim message bind to the same economic operation.
+  - After finalized Native reserve sweep and finalized localnet Solana setup,
+    the runner builds a canonical deposit-credit message, obtains two distinct
+    project attestations from disposable localnet attester identities, submits
+    through the localnet Solana deposit-claim bridge boundary, observes a
+    finalized mint result from the claim boundary, and reconciles canonical
+    reserve, minted supply, and liabilities.
+  - Runtime-only fee-payer and attester signer handles stay inside the local
+    setup context and are omitted from public runner reports.
+  - Reconciliation uses exact integer accounting: canonical reserve,
+    minted supply, authorized unminted credits, unsettled liabilities,
+    coverage requirement, surplus, project fee, and Native miner fee.
+  - The source tests verify no per-transfer KingPepe Team approval state and no
+    signer handles in the public deposit-claim request.
+- Local tests run:
+  - `node --check scripts\local-e2e-native-to-solana.mjs`: PASS.
+  - `node --check scripts\tests\local-e2e-native-to-solana.test.mjs`: PASS.
+  - `node --test scripts\tests\local-e2e-native-to-solana.test.mjs services\bridge-validator\tests\localnet-solana-deposit-claim-bridge.test.mjs services\bridge-validator\tests\solana-deposit-claim-submitter.test.mjs`: PASS, 26 tests.
+  - `node --test services\bridge-validator\tests\*.test.mjs`: PASS, 57 tests.
+  - `npm test`: PASS, 2 protocol vectors plus 119 Node tests.
+  - `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
+  - `python .github\scripts\guardrails.py`: PASS.
+  - `git diff --check`: PASS.
+  - WSL Solana Rust workspace tests: PASS, 53 Rust tests/doc-tests.
+  - WSL Native Rust crate tests: PASS, 22 tests across FROST, proof, reserve,
+    and recovery.
+  - Staged and outgoing secret scans: PASS.
+  - `npm run local:e2e:native-to-solana`: expected
+    `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING`; no localnet commands started.
+- Current blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`,
+    `solana-test-validator`, and `anchor`.
+  - Real daemon-backed KingPepe REGTEST plus Solana local-validator
+    Native-to-Solana local E2E remains `BLOCKED / NOT_RUN`.
