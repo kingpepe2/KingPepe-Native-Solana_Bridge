@@ -1103,3 +1103,23 @@
   - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
   - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
   - Real local-validator execution still needs localnet account creation/initialization, funded disposable fee payer, SPL Mint setup, token account setup, finalized claim observation, and reconciliation before the full Native-to-Solana E2E can be marked PASS.
+
+## Phase 08 Solana local-validator PDA allocation path
+
+- Source status: implemented locally; CI verification pending for this source increment.
+- What changed:
+  - `kingpepe-transceiver` can now allocate its config and verified-receipt PDA accounts through signed System Program CPI when a payer and System Program account are supplied.
+  - `kingpepe-bridge` can now allocate its bridge-state and deposit-claim PDA accounts through signed System Program CPI when a payer and System Program account are supplied.
+  - The bundled localnet Solana deposit-claim transaction plan now carries the fee payer and System Program accounts into the transceiver and bridge instructions, so real local-validator execution is not blocked by nonexistent PDA accounts.
+  - Existing preallocated-account unit tests remain supported for source-level execution tests.
+- Local tests run so far:
+  - `node --test services/bridge-validator/tests/solana-deposit-claim-transaction-plan.test.mjs`: PASS, 8 tests.
+  - `wsl.exe --cd /mnt/d/KingPepe-Native-Solana_Bridge/solana bash -lc "cargo test --locked --workspace"`: PASS, 53 Rust tests/doc-tests.
+  - `npm test`: PASS, 2 protocol vectors plus 108 Node tests.
+  - `npm audit --audit-level=low`: PASS, 0 vulnerabilities.
+  - `python .github/scripts/guardrails.py`: PASS.
+  - Local `cargo fmt` and `cargo clippy`: NOT_RUN locally because this WSL environment has `cargo` but not `rustup`, `rustfmt`, or `clippy`. GitHub Actions installs and runs the pinned Rust quality components.
+- Current blocker:
+  - `LOCAL_E2E_INFRASTRUCTURE_MISSING`.
+  - Missing executables: `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
+  - Real local-validator execution, funded disposable fee payer, SPL Mint setup, token account setup, finalized claim observation, and reconciliation remain `BLOCKED / NOT_RUN`.

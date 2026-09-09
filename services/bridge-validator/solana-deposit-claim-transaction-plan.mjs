@@ -30,6 +30,7 @@ const ED25519_INSTRUCTION_HEADER_LENGTH = 16;
 const ED25519_SIGNATURE_LENGTH = 64;
 const ED25519_PUBLIC_KEY_LENGTH = 32;
 const INSTRUCTIONS_SYSVAR_ID_BASE58 = "Sysvar1nstructions1111111111111111111111111";
+const SYSTEM_PROGRAM_ID_BASE58 = "11111111111111111111111111111111";
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const BASE58_INDEX = new Map(Array.from(BASE58_ALPHABET, (character, index) => [character, index]));
 const BASE58_PATTERN = /^[1-9A-HJ-NP-Za-km-z]{32,128}$/u;
@@ -148,6 +149,11 @@ export function buildLocalnetSolanaDepositClaimBundleTransactionPlan(config) {
     "instructionsSysvarBase58",
     "instructionsSysvarHex",
   );
+  const systemProgram = normalizePubkeyPair(
+    { systemProgramBase58: SYSTEM_PROGRAM_ID_BASE58 },
+    "systemProgramBase58",
+    "systemProgramHex",
+  );
   const ed25519Program = pubkeyFromBytes(hexToBytes(ED25519_PROGRAM_ID_HEX, "ed25519ProgramId"), "ed25519Program");
 
   const accountKeys = [
@@ -161,6 +167,7 @@ export function buildLocalnetSolanaDepositClaimBundleTransactionPlan(config) {
     accountMeta("instructionsSysvar", instructionsSysvar, false, false),
     accountMeta("mintAuthorityPda", mintAuthority, false, false),
     accountMeta("tokenProgram", normalized.tokenProgram, false, false),
+    accountMeta("systemProgram", systemProgram, false, false),
     accountMeta("ed25519Program", ed25519Program, false, false),
     accountMeta("transceiverProgram", normalized.transceiverProgram, false, false),
     accountMeta("managerProgram", normalized.managerProgram, false, false),
@@ -170,7 +177,7 @@ export function buildLocalnetSolanaDepositClaimBundleTransactionPlan(config) {
   const attestationInstructions = attestations.map((attestation, index) =>
     Object.freeze({
       role: `ed25519Attestation${index + 1}`,
-      programIdIndex: 10,
+      programIdIndex: 11,
       accountIndexes: Object.freeze([]),
       dataBase64: Buffer.from(
         encodeEd25519VerifierInstruction({
@@ -200,8 +207,8 @@ export function buildLocalnetSolanaDepositClaimBundleTransactionPlan(config) {
   ]);
   const transceiverInstruction = Object.freeze({
     role: "transceiverVerifyMessageFromEd25519",
-    programIdIndex: 11,
-    accountIndexes: Object.freeze([6, 1, 7]),
+    programIdIndex: 12,
+    accountIndexes: Object.freeze([6, 1, 7, 0, 10]),
     dataBase64: Buffer.from(transceiverInstructionData).toString("base64"),
     dataHex: bytesToHex(transceiverInstructionData),
   });
@@ -211,8 +218,8 @@ export function buildLocalnetSolanaDepositClaimBundleTransactionPlan(config) {
   ]);
   const bridgeInstruction = Object.freeze({
     role: "bridgeAcceptDepositClaim",
-    programIdIndex: 12,
-    accountIndexes: Object.freeze([2, 3, 1, 4, 5, 8, 9, 11]),
+    programIdIndex: 13,
+    accountIndexes: Object.freeze([2, 3, 1, 4, 5, 8, 9, 12, 0, 10]),
     dataBase64: Buffer.from(bridgeInstructionData).toString("base64"),
     dataHex: bytesToHex(bridgeInstructionData),
   });
@@ -224,7 +231,7 @@ export function buildLocalnetSolanaDepositClaimBundleTransactionPlan(config) {
   const messageBytes = encodeLegacyMessageWithInstructions({
     accountKeys: accountKeys.map((account) => account.bytes),
     recentBlockhash: normalized.recentBlockhash.bytes,
-    readonlyUnsignedAccounts: 7,
+    readonlyUnsignedAccounts: 8,
     compiledInstructions,
   });
 

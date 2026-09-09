@@ -369,6 +369,14 @@
   verifier instructions, the transceiver receipt verification instruction, and
   the bridge claim/mint instruction in one signed transaction. It does not load
   or store key files.
+- Phase 08 Solana local-validator PDA allocation path:
+  `kingpepe-transceiver` and `kingpepe-bridge` accept optional fee-payer and
+  System Program accounts for signed System Program CPI allocation of their
+  own PDA state/receipt/claim accounts. The bundled localnet deposit-claim
+  transaction plan includes those accounts so a real local validator can create
+  missing PDAs under the owning programs instead of relying on preallocated
+  test accounts. This is source-level implementation only until local Solana
+  validator infrastructure is available and exercised.
 - Phase 08 Solana deposit-claim transaction plan commit:
   `42a5cdb3bcc60e0be7fb5d2395503f148b6d632f`
 - Phase 08 Solana deposit-claim transaction plan CI:

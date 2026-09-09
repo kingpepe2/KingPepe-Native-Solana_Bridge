@@ -523,7 +523,7 @@
     {
       "path": "services/bridge-validator/solana-deposit-claim-transaction-plan.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 localnet Solana deposit claim instruction, PDA, legacy transaction serialization, Ed25519 attestation verifier, transceiver receipt, bridge claim bundle, and injected fee-payer signing boundary."
+      "notes": "Phase 08 localnet Solana deposit claim instruction, PDA, legacy transaction serialization, Ed25519 attestation verifier, transceiver receipt, bridge claim bundle, optional payer/System Program account wiring for program-owned PDA allocation, and injected fee-payer signing boundary."
     },
     {
       "path": "services/bridge-validator/tests/automatic-deposit-pipeline.test.mjs",
@@ -553,7 +553,7 @@
     {
       "path": "services/bridge-validator/tests/solana-deposit-claim-transaction-plan.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 Solana deposit claim transaction-plan and bundled transceiver-receipt tests using in-memory ephemeral fee-payer and attester signing material with deterministic non-production public identities."
+      "notes": "Phase 08 Solana deposit claim transaction-plan and bundled transceiver-receipt tests using in-memory ephemeral fee-payer and attester signing material with deterministic non-production public identities, including payer/System Program account wiring for local validator PDA allocation."
     },
     {
       "path": "services/indexer/README.md",
@@ -663,7 +663,7 @@
     {
       "path": "solana/programs/kingpepe-bridge/src/lib.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Bridge manager implementation with Phase 08 economic instruction ABI decoding, real Solana PDA mint-authority derivation, fixed binary account-state codecs, account execution, SPL Token mint_to_checked and burn_checked CPI construction, and localnet-only activation."
+      "notes": "Bridge manager implementation with Phase 08 economic instruction ABI decoding, real Solana PDA mint-authority derivation, fixed binary account-state codecs, account execution, optional signed System Program CPI allocation for bridge state and deposit-claim PDAs, SPL Token mint_to_checked and burn_checked CPI construction, and localnet-only activation."
     },
     {
       "path": "solana/programs/kingpepe-bridge/tests/bridge_smoke.rs",
@@ -678,7 +678,7 @@
     {
       "path": "solana/programs/kingpepe-transceiver/src/lib.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Transceiver implementation, receipt validation, Phase 07 Ed25519 instruction binding, Phase 08 economic instruction ABI decoding, fixed binary config/receipt account codecs, instructions-sysvar Ed25519 loading, and receipt account execution."
+      "notes": "Transceiver implementation, receipt validation, Phase 07 Ed25519 instruction binding, Phase 08 economic instruction ABI decoding, fixed binary config/receipt account codecs, optional signed System Program CPI allocation for config and verified-receipt PDAs, instructions-sysvar Ed25519 loading, and receipt account execution."
     },
     {
       "path": "solana/programs/kingpepe-transceiver/tests/transceiver_smoke.rs",

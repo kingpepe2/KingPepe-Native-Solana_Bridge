@@ -16,9 +16,15 @@ use solana_program::{
     account_info::AccountInfo,
     declare_id,
     entrypoint::ProgramResult,
+    program::invoke_signed,
     program_error::ProgramError,
     pubkey::Pubkey,
-    sysvar::instructions::{load_instruction_at_checked, ID as INSTRUCTIONS_SYSVAR_ID},
+    system_instruction, system_program,
+    sysvar::{
+        instructions::{load_instruction_at_checked, ID as INSTRUCTIONS_SYSVAR_ID},
+        rent::Rent,
+        Sysvar,
+    },
 };
 use thiserror::Error;
 
@@ -418,14 +424,27 @@ fn process_initialize_accounts(
 
     let mut account_iter = accounts.iter();
     let config_account = next_required_account(&mut account_iter)?;
-    require_no_extra_accounts(&mut account_iter)?;
+    let (payer, system_program_account) = optional_payer_and_system(&mut account_iter)?;
     require_writable(config_account)?;
-    require_account_owner(config_account, program_id)?;
-    require_account_key(
+    let config_pda = derive_transceiver_config_pda(&config.transceiver_program_id, &config.mint);
+    let mint_pubkey = Pubkey::new_from_array(config.mint);
+    let (_config_pda_with_bump, config_bump) = Pubkey::find_program_address(
+        &[TRANSCEIVER_CONFIG_PDA_SEED_PREFIX, mint_pubkey.as_ref()],
+        program_id,
+    );
+    ensure_program_pda_account(
         config_account,
-        &derive_transceiver_config_pda(&config.transceiver_program_id, &config.mint),
+        payer,
+        system_program_account,
+        program_id,
+        &config_pda,
+        &[
+            TRANSCEIVER_CONFIG_PDA_SEED_PREFIX,
+            mint_pubkey.as_ref(),
+            &[config_bump],
+        ],
+        TRANSCEIVER_CONFIG_ACCOUNT_LENGTH,
     )?;
-    require_account_len(config_account, TRANSCEIVER_CONFIG_ACCOUNT_LENGTH)?;
     require_zeroed_account(config_account)?;
 
     write_account_data(config_account, &encode_transceiver_config_account(&config))?;
@@ -442,10 +461,9 @@ fn process_verify_message_accounts(
     let config_account = next_required_account(&mut account_iter)?;
     let receipt_account = next_required_account(&mut account_iter)?;
     let instructions_sysvar = next_required_account(&mut account_iter)?;
-    require_no_extra_accounts(&mut account_iter)?;
+    let (payer, system_program_account) = optional_payer_and_system(&mut account_iter)?;
 
     require_account_owner(config_account, program_id)?;
-    require_account_owner(receipt_account, program_id)?;
     require_writable(receipt_account)?;
     require_account_key(instructions_sysvar, &INSTRUCTIONS_SYSVAR_ID.to_bytes())?;
 
@@ -461,11 +479,26 @@ fn process_verify_message_accounts(
     let digest = message
         .message_digest()
         .map_err(|_| TransceiverError::InvalidMessage)?;
-    require_account_key(
+    let receipt_pda = derive_verified_receipt_pda(&config.transceiver_program_id, &digest);
+    require_account_key(receipt_account, &receipt_pda)?;
+    let digest_pubkey = Pubkey::new_from_array(digest);
+    let (_receipt_pda_with_bump, receipt_bump) = Pubkey::find_program_address(
+        &[TRANSCEIVER_RECEIPT_PDA_SEED_PREFIX, digest_pubkey.as_ref()],
+        program_id,
+    );
+    ensure_program_pda_account(
         receipt_account,
-        &derive_verified_receipt_pda(&config.transceiver_program_id, &digest),
+        payer,
+        system_program_account,
+        program_id,
+        &receipt_pda,
+        &[
+            TRANSCEIVER_RECEIPT_PDA_SEED_PREFIX,
+            digest_pubkey.as_ref(),
+            &[receipt_bump],
+        ],
+        VERIFIED_RECEIPT_ACCOUNT_LENGTH,
     )?;
-    require_account_len(receipt_account, VERIFIED_RECEIPT_ACCOUNT_LENGTH)?;
 
     let first_instruction =
         load_ed25519_instruction(instructions_sysvar, ed25519_instruction_indexes[0])?;
@@ -550,12 +583,89 @@ where
     }
 }
 
+fn optional_payer_and_system<'a, 'b, I>(
+    accounts: &mut I,
+) -> Result<
+    (
+        Option<&'a AccountInfo<'b>>,
+        Option<&'a AccountInfo<'b>>,
+    ),
+    EntrypointError,
+>
+where
+    'b: 'a,
+    I: Iterator<Item = &'a AccountInfo<'b>>,
+{
+    let payer = accounts.next();
+    let system_program_account = accounts.next();
+    if payer.is_some() != system_program_account.is_some() {
+        return Err(EntrypointError::NotEnoughAccounts);
+    }
+    require_no_extra_accounts(accounts)?;
+    Ok((payer, system_program_account))
+}
+
 fn require_writable(account: &AccountInfo) -> Result<(), EntrypointError> {
     if account.is_writable {
         Ok(())
     } else {
         Err(EntrypointError::AccountNotWritable)
     }
+}
+
+fn require_signer(account: &AccountInfo) -> Result<(), EntrypointError> {
+    if account.is_signer {
+        Ok(())
+    } else {
+        Err(EntrypointError::MissingRequiredSignature)
+    }
+}
+
+fn ensure_program_pda_account<'a>(
+    account: &AccountInfo<'a>,
+    payer: Option<&AccountInfo<'a>>,
+    system_program_account: Option<&AccountInfo<'a>>,
+    program_id: &Pubkey,
+    expected_key: &PubkeyBytes,
+    signer_seeds: &[&[u8]],
+    expected_len: usize,
+) -> Result<(), EntrypointError> {
+    require_writable(account)?;
+    require_account_key(account, expected_key)?;
+    if account.data_len() == expected_len {
+        require_account_owner(account, program_id)?;
+        return Ok(());
+    }
+    if account.data_len() != 0 {
+        return Err(EntrypointError::InvalidAccountData);
+    }
+    require_account_owner(account, &system_program::id())?;
+    let payer = payer.ok_or(EntrypointError::NotEnoughAccounts)?;
+    let system_program_account = system_program_account.ok_or(EntrypointError::NotEnoughAccounts)?;
+    require_signer(payer)?;
+    require_writable(payer)?;
+    if system_program_account.key != &system_program::id() {
+        return Err(EntrypointError::AccountKeyMismatch);
+    }
+
+    let space = u64::try_from(expected_len).map_err(|_| EntrypointError::InvalidAccountData)?;
+    let lamports = Rent::get()
+        .map_err(|_| EntrypointError::RentUnavailable)?
+        .minimum_balance(expected_len);
+    let instruction =
+        system_instruction::create_account(payer.key, account.key, lamports, space, program_id);
+    invoke_signed(
+        &instruction,
+        &[
+            payer.clone(),
+            account.clone(),
+            system_program_account.clone(),
+        ],
+        &[signer_seeds],
+    )
+    .map_err(|_| EntrypointError::SystemCpiFailed)?;
+    require_account_owner(account, program_id)?;
+    require_account_len(account, expected_len)
 }
 
 fn require_account_owner(account: &AccountInfo, expected: &Pubkey) -> Result<(), EntrypointError> {
@@ -966,6 +1076,8 @@ pub enum EntrypointError {
     UnexpectedAdditionalAccounts,
     #[error("Solana account is not writable")]
     AccountNotWritable,
+    #[error("Solana required signer is missing")]
+    MissingRequiredSignature,
     #[error("Solana account owner mismatch")]
     AccountOwnerMismatch,
     #[error("Solana account key mismatch")]
@@ -976,6 +1088,10 @@ pub enum EntrypointError {
     InvalidAccountData,
     #[error("Solana account data borrow failed")]
     AccountBorrowFailed,
+    #[error("Solana rent sysvar is unavailable")]
+    RentUnavailable,
+    #[error("Solana System Program CPI failed")]
+    SystemCpiFailed,
     #[error("Solana instructions sysvar is invalid")]
     InvalidInstructionsSysvar,
     #[error("transceiver account codec error: {0}")]
@@ -994,11 +1110,14 @@ impl From<EntrypointError> for ProgramError {
             | EntrypointError::UnsupportedInstructionTag(_) => ProgramError::InvalidInstructionData,
             EntrypointError::NotEnoughAccounts => ProgramError::NotEnoughAccountKeys,
             EntrypointError::AccountOwnerMismatch => ProgramError::IllegalOwner,
+            EntrypointError::MissingRequiredSignature => ProgramError::MissingRequiredSignature,
             EntrypointError::AccountNotWritable
             | EntrypointError::AccountKeyMismatch
             | EntrypointError::AccountAlreadyInitialized
             | EntrypointError::InvalidAccountData
             | EntrypointError::AccountBorrowFailed
+            | EntrypointError::RentUnavailable
+            | EntrypointError::SystemCpiFailed
             | EntrypointError::InvalidInstructionsSysvar
             | EntrypointError::UnexpectedAdditionalAccounts
             | EntrypointError::AccountCodec(_)

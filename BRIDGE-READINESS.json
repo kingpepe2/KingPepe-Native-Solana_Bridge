@@ -135,6 +135,9 @@
     "phase08LocalReserveSweepBroadcastFinalityImplemented": true,
     "phase08LocalReserveSweepBroadcastFinalityLocalTestsPassed": true,
     "phase08LocalReserveSweepBroadcastFinalityCiVerified": true,
+    "phase08SolanaPdaAllocationPathImplemented": true,
+    "phase08SolanaPdaAllocationPathLocalTestsPassed": true,
+    "phase08SolanaPdaAllocationPathCiVerified": false,
     "solanaEconomicInstructionAbiReady": true,
     "solanaEconomicInstructionExecutionReady": false,
     "phase08LocalE2eBlocked": true

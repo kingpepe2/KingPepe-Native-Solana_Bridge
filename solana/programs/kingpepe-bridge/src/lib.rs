@@ -17,7 +17,8 @@ use kingpepe_transceiver::{TransceiverError, TransceiverProgram, VerifiedMessage
 use solana_program::{
     account_info::AccountInfo, declare_id, entrypoint::ProgramResult, program::invoke,
     program::invoke_signed, program_error::ProgramError, program_option::COption,
-    program_pack::Pack, pubkey::Pubkey,
+    program_pack::Pack, pubkey::Pubkey, system_instruction, system_program,
+    sysvar::{rent::Rent, Sysvar},
 };
 use spl_token::state::{Account as TokenAccount, Mint as TokenMint};
 use thiserror::Error;
@@ -595,15 +596,29 @@ fn process_initialize_accounts(
     let bridge_state = next_required_account(&mut account_iter)?;
     let mint = next_required_account(&mut account_iter)?;
     let token_program = next_required_account(&mut account_iter)?;
-    require_no_extra_accounts(&mut account_iter)?;
+    let (payer, system_program_account) = optional_payer_and_system(&mut account_iter)?;
 
     require_writable(bridge_state)?;
-    require_account_owner(bridge_state, program_id)?;
-    require_account_key(
+    let bridge_state_pda =
+        derive_bridge_state_pda(&config.manager_program_id, &config.mint_binding.mint);
+    let mint_pubkey = Pubkey::new_from_array(config.mint_binding.mint);
+    let (_bridge_state_pda_with_bump, bridge_state_bump) = Pubkey::find_program_address(
+        &[BRIDGE_STATE_PDA_SEED_PREFIX, mint_pubkey.as_ref()],
+        program_id,
+    );
+    ensure_program_pda_account(
         bridge_state,
-        &derive_bridge_state_pda(&config.manager_program_id, &config.mint_binding.mint),
+        payer,
+        system_program_account,
+        program_id,
+        &bridge_state_pda,
+        &[
+            BRIDGE_STATE_PDA_SEED_PREFIX,
+            mint_pubkey.as_ref(),
+            &[bridge_state_bump],
+        ],
+        BRIDGE_STATE_ACCOUNT_LENGTH,
     )?;
-    require_account_len(bridge_state, BRIDGE_STATE_ACCOUNT_LENGTH)?;
     require_zeroed_account(bridge_state)?;
     require_account_key(mint, &config.mint_binding.mint)?;
     require_account_key(token_program, &config.mint_binding.token_program_id)?;
@@ -636,17 +651,14 @@ fn process_accept_deposit_claim_accounts(
     let mint_authority_pda = next_required_account(&mut account_iter)?;
     let token_program = next_required_account(&mut account_iter)?;
     let transceiver_program = next_required_account(&mut account_iter)?;
-    require_no_extra_accounts(&mut account_iter)?;
+    let (payer, system_program_account) = optional_payer_and_system(&mut account_iter)?;
 
     require_writable(bridge_state)?;
     require_writable(deposit_claim)?;
     require_writable(mint)?;
     require_writable(recipient_token_account)?;
     require_account_owner(bridge_state, program_id)?;
-    require_account_owner(deposit_claim, program_id)?;
     require_account_len(bridge_state, BRIDGE_STATE_ACCOUNT_LENGTH)?;
-    require_account_len(deposit_claim, DEPOSIT_CLAIM_ACCOUNT_LENGTH)?;
-    require_zeroed_account(deposit_claim)?;
 
     let mut state = read_bridge_state_account(bridge_state)?;
     if state.config.manager_program_id != program_id.to_bytes() {
@@ -657,10 +669,28 @@ fn process_accept_deposit_claim_accounts(
         bridge_state,
         &derive_bridge_state_pda(&config.manager_program_id, &config.mint_binding.mint),
     )?;
-    require_account_key(
+    let deposit_claim_pda =
+        derive_deposit_claim_pda(&config.manager_program_id, &message.operation_id);
+    require_account_key(deposit_claim, &deposit_claim_pda)?;
+    let operation_id_pubkey = Pubkey::new_from_array(message.operation_id);
+    let (_deposit_claim_pda_with_bump, deposit_claim_bump) = Pubkey::find_program_address(
+        &[DEPOSIT_CLAIM_PDA_SEED_PREFIX, operation_id_pubkey.as_ref()],
+        program_id,
+    );
+    ensure_program_pda_account(
         deposit_claim,
-        &derive_deposit_claim_pda(&config.manager_program_id, &message.operation_id),
+        payer,
+        system_program_account,
+        program_id,
+        &deposit_claim_pda,
+        &[
+            DEPOSIT_CLAIM_PDA_SEED_PREFIX,
+            operation_id_pubkey.as_ref(),
+            &[deposit_claim_bump],
+        ],
+        DEPOSIT_CLAIM_ACCOUNT_LENGTH,
     )?;
+    require_zeroed_account(deposit_claim)?;
     require_account_key(transceiver_program, &config.transceiver_program_id)?;
     require_account_owner(
         receipt_account,
@@ -960,6 +990,28 @@ where
     }
 }
 
+fn optional_payer_and_system<'a, 'b, I>(
+    accounts: &mut I,
+) -> Result<
+    (
+        Option<&'a AccountInfo<'b>>,
+        Option<&'a AccountInfo<'b>>,
+    ),
+    EntrypointError,
+>
+where
+    'b: 'a,
+    I: Iterator<Item = &'a AccountInfo<'b>>,
+{
+    let payer = accounts.next();
+    let system_program_account = accounts.next();
+    if payer.is_some() != system_program_account.is_some() {
+        return Err(EntrypointError::NotEnoughAccounts);
+    }
+    require_no_extra_accounts(accounts)?;
+    Ok((payer, system_program_account))
+}
+
 fn require_writable(account: &AccountInfo) -> Result<(), EntrypointError> {
     if account.is_writable {
         Ok(())
@@ -974,6 +1026,53 @@ fn require_signer(account: &AccountInfo) -> Result<(), EntrypointError> {
     } else {
         Err(EntrypointError::MissingRequiredSignature)
     }
+}
+
+fn ensure_program_pda_account<'a>(
+    account: &AccountInfo<'a>,
+    payer: Option<&AccountInfo<'a>>,
+    system_program_account: Option<&AccountInfo<'a>>,
+    program_id: &Pubkey,
+    expected_key: &PubkeyBytes,
+    signer_seeds: &[&[u8]],
+    expected_len: usize,
+) -> Result<(), EntrypointError> {
+    require_writable(account)?;
+    require_account_key(account, expected_key)?;
+    if account.data_len() == expected_len {
+        require_account_owner(account, program_id)?;
+        return Ok(());
+    }
+    if account.data_len() != 0 {
+        return Err(EntrypointError::InvalidAccountData);
+    }
+    require_account_owner(account, &system_program::id())?;
+    let payer = payer.ok_or(EntrypointError::NotEnoughAccounts)?;
+    let system_program_account = system_program_account.ok_or(EntrypointError::NotEnoughAccounts)?;
+    require_signer(payer)?;
+    require_writable(payer)?;
+    if system_program_account.key != &system_program::id() {
+        return Err(EntrypointError::AccountKeyMismatch);
+    }
+
+    let space = u64::try_from(expected_len).map_err(|_| EntrypointError::InvalidAccountData)?;
+    let lamports = Rent::get()
+        .map_err(|_| EntrypointError::RentUnavailable)?
+        .minimum_balance(expected_len);
+    let instruction =
+        system_instruction::create_account(payer.key, account.key, lamports, space, program_id);
+    invoke_signed(
+        &instruction,
+        &[
+            payer.clone(),
+            account.clone(),
+            system_program_account.clone(),
+        ],
+        &[signer_seeds],
+    )
+    .map_err(|_| EntrypointError::SystemCpiFailed)?;
+    require_account_owner(account, program_id)?;
+    require_account_len(account, expected_len)
 }
 
 fn require_account_owner(account: &AccountInfo, expected: &Pubkey) -> Result<(), EntrypointError> {
@@ -1621,6 +1720,10 @@ pub enum EntrypointError {
     InvalidAccountData,
     #[error("Solana account data borrow failed")]
     AccountBorrowFailed,
+    #[error("Solana rent sysvar is unavailable")]
+    RentUnavailable,
+    #[error("Solana System Program CPI failed")]
+    SystemCpiFailed,
     #[error("SPL Token CPI failed")]
     TokenCpiFailed,
     #[error("bridge account codec error: {0}")]
@@ -1648,6 +1751,8 @@ impl From<EntrypointError> for ProgramError {
             | EntrypointError::AccountAlreadyInitialized
             | EntrypointError::InvalidAccountData
             | EntrypointError::AccountBorrowFailed
+            | EntrypointError::RentUnavailable
+            | EntrypointError::SystemCpiFailed
             | EntrypointError::TokenCpiFailed
             | EntrypointError::AccountCodec(_)
             | EntrypointError::Bridge(_)

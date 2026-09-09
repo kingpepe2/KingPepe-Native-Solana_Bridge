@@ -274,6 +274,7 @@ test("bundled localnet deposit claim plan includes attestation, transceiver rece
       ["instructionsSysvar", false, false],
       ["mintAuthorityPda", false, false],
       ["tokenProgram", false, false],
+      ["systemProgram", false, false],
       ["ed25519Program", false, false],
       ["transceiverProgram", false, false],
       ["managerProgram", false, false],
@@ -291,10 +292,10 @@ test("bundled localnet deposit claim plan includes attestation, transceiver rece
   );
   assert.deepEqual(
     plan.instructions.map((instruction) => instruction.programIdIndex),
-    [10, 10, 11, 12],
+    [11, 11, 12, 13],
   );
-  assert.deepEqual(plan.instructions[2].accountIndexes, [6, 1, 7]);
-  assert.deepEqual(plan.instructions[3].accountIndexes, [2, 3, 1, 4, 5, 8, 9, 11]);
+  assert.deepEqual(plan.instructions[2].accountIndexes, [6, 1, 7, 0, 10]);
+  assert.deepEqual(plan.instructions[3].accountIndexes, [2, 3, 1, 4, 5, 8, 9, 12, 0, 10]);
 
   for (let index = 0; index < 2; index += 1) {
     const verifierData = Buffer.from(plan.instructions[index].dataBase64, "base64");
@@ -324,7 +325,7 @@ test("bundled localnet deposit claim plan includes attestation, transceiver rece
   assert.equal(plan.instruction.role, "bridgeAcceptDepositClaim");
 
   const messageBytes = Buffer.from(plan.messageBase64, "base64");
-  assert.deepEqual([...messageBytes.subarray(0, 3)], [1, 0, 7]);
+  assert.deepEqual([...messageBytes.subarray(0, 3)], [1, 0, 8]);
   assert.match(plan.messageFingerprintHex, /^[0-9a-f]{64}$/u);
   assert.equal(plan.preparedTransactionBase64, undefined);
 });
