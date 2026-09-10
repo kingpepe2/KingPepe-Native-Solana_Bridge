@@ -9,7 +9,7 @@ import {
   hexToBytes,
   validateNativeSigningIntent,
 } from "../policy/native-signing-policy.mjs";
-import { createNativeFrostSigningRequest } from "../policy/signing-request.mjs";
+import { createNativeFrostSigningRequest, validateNativeFrostAbortReceipt } from "../policy/signing-request.mjs";
 import { createTwoPartyDkgRequest, normalizeNativeFrostKeyContext } from "../policy/dkg-request.mjs";
 import { deserializeFrostPublic } from "../signer/native-frost-signer.mjs";
 
@@ -50,6 +50,8 @@ export class NativeFrostCoordinator {
   #publicPackage;
   #aggregateTweakedXOnlyPublicKey;
   #completed = new Map();
+  #hardStop = false;
+  #coordinating = false;
 
   constructor(options) {
     this.#signers = signerMap(options.signers);
@@ -62,6 +64,7 @@ export class NativeFrostCoordinator {
   }
 
   async signAutomaticallyWithNativeEvidence(intent) {
+    this.#requireReady();
     const snapshot = validateNativeSigningIntent(intent);
     // Verification executes in each participant's configured boundary; a
     // coordinator assertion cannot populate either participant's private fence.
@@ -72,6 +75,7 @@ export class NativeFrostCoordinator {
   }
 
   signAutomatically(intent, options = {}) {
+    this.#requireReady();
     const request = createNativeFrostSigningRequest(intent, options);
     const { requestId, intentDigest, messageHex, participantIds } = request;
     const existing = this.#completed.get(requestId);
@@ -93,6 +97,36 @@ export class NativeFrostCoordinator {
     }
     if (available.length !== REQUIRED_FROST_SIGNERS.length) throw new Error("FROST participant set must remain exactly A+B");
 
+    this.#coordinating = true;
+    try {
+      return this.#signRequest(request);
+    } catch (error) {
+      let confirmed = true;
+      // A response may be lost after persistence. Always contact both selected
+      // participants, including one whose commitment/share call threw.
+      for (const signerId of participantIds) {
+        try {
+          const receipt = this.#signers.get(signerId).abortSigningSession(request);
+          validateNativeFrostAbortReceipt(receipt, request, signerId);
+        } catch { confirmed = false; }
+      }
+      if (!confirmed) {
+        // Absorbing for this instance; durable service-wide fencing is separate.
+        // Do not expose underlying storage/transport error text or private paths.
+        this.#hardStop = true;
+        throw new Error("FrostCoordinatorAbortIncomplete");
+      }
+      throw error;
+    } finally { this.#coordinating = false; }
+  }
+
+  #requireReady() {
+    if (this.#hardStop) throw new Error("FrostCoordinatorHardStop");
+    if (this.#coordinating) throw new Error("FrostCoordinatorBusy");
+  }
+
+  #signRequest(request) {
+    const { requestId, intentDigest, messageHex, participantIds } = request;
     const signers = participantIds.map((signerId) => this.#signers.get(signerId));
     const commitments = signers.map((signer) => signer.signingCommitment(request));
     validateCommitmentEnvelopes(request, commitments);

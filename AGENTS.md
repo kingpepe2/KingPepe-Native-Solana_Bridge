@@ -25,10 +25,10 @@
 ## Current phase
 
 PHASE 08 INCOMPLETE. Phase 09 NOT_STARTED.
-Last verified source: 10e69a3e7756597d511ef836238bdd7fba57c1cd, private push and
+Last verified source: 0a15c4228611a64bba5868a216ca25697eb80580, private push and
 all four exact-SHA CI jobs PASS:
-https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34483410772
-Its current/staged/outgoing source and all 156 commits scanned clean; zero
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34487096912
+Its current/staged/outgoing source and all 157 commits scanned clean; zero
 workflow artifacts were uploaded. That evidence does not certify newer source.
 
 Absorbing-stop source 2bdff8f1687085d63de8c628ae12a4f2efed163e was pushed
@@ -73,15 +73,32 @@ are recorded in development-status. Do not reuse old test roots
 to bypass the new context check. The local 40-epoch retention ceiling fails
 before adding another epoch; it never deletes retained records automatically.
 
-Current unpublished full-intent enrollment: policy stores the complete normalized
+The verified full-intent enrollment: policy stores the complete normalized
 28-field immutable intent and compares its digest, retaining separate domain,
 caps and stop checks. Missing/extra fields and partial enrollment are rejected;
 the sweep builder preserves the complete intent. Initial focused 83 PASS / 7 FAIL,
 then final focused 146 PASS. Windows/WSL each 406 Node tests (11 new), two vectors
 PASS; WSL 93 Rust tests and audits PASS. Real-chain/scans/publication are tracked
-in development-status. Enrollment is not evidence truth. Participant rejection
-still requires coordinator-wide abort handling for another participant's prior
-reservation; nonce state/protected storage/IPC remain incomplete.
+in development-status. Enrollment is not evidence truth. Nonce state/protected
+storage/IPC remain incomplete.
+
+Current unpublished nonce-abort increment: synchronous coordinator failures
+attempt bound cleanup on both participants, including lost responses after a
+save. Full validated signing requests are required for abort; local session and
+tombstone consistency are checked without deserializing an active signing key.
+Reserved nonces are removed and tombstoned; already-signed shares are preserved.
+Missing/contradictory state and malformed receipts fail closed. Unconfirmed
+cleanup permanently refuses signing in that coordinator instance; this is NOT
+a durable service-wide hard stop or restart guarantee. No reset/fallback added.
+Initial focused 87 PASS / 10 FAIL, then 97 PASS; expanded focused 168 PASS.
+A final isolated tamper regression failed and was fixed: an ABORTED label cannot
+hide a persisted share. A second isolated failure exposed numeric nonce-counter
+coercion; the existing exact u64-string validator now rejects it. Windows/WSL
+each 429 Node tests (23 new), two vectors;
+WSL 93 Rust tests/audits, both SBF builds and 55 fresh real-chain checks PASS.
+Scans/publication are recorded in development-status. Reserved nonces still
+persist in local JSON; restart destruction, authenticated/fenced state, protected
+storage and authenticated IPC remain required work.
 Node 24.21.0 / npm 11.19.0 / bundled SQLite 3.53.4 are required. The SQLite
 API remains release-candidate stability 1.2, not production approval.
 See docs/development-status.md for current measured tests and publication state.
@@ -109,8 +126,9 @@ mutation on the preceding source. Current regression-tested changes close these
 configuration/API paths. The current request changes close envelope/intent ID
 and session mismatches. The current DKG changes bind deployment metadata and
 active-key selection. Current complete-intent enrollment closes purpose, evidence
-digest and unsigned-transaction identity substitution. Authenticated inner DKG
-transcripts/transport and coordinator failure cleanup remain open. The pinned
+digest and unsigned-transaction identity substitution. Synchronous coordinator
+cleanup is now implemented locally; durable restart and authenticated inner DKG
+transcripts/transport remain open. The pinned
 upstream FROST code is explicitly unaudited; never claim broader library audit
 coverage applies to it. The approved same-host topology is not the cause of
 these blockers. See docs/security/software-frost.md.

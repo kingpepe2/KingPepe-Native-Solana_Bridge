@@ -1,8 +1,74 @@
 # KingPepe Native - Solana Bridge Development Status
 
-## Current Phase 08 complete signing-intent enrollment (2026-09-10)
+## Current Phase 08 coordinated nonce abort (2026-09-10)
 
-UNPUBLISHED / LOCALLY_TESTED, including fresh real-chain validation. Policy now
+UNPUBLISHED / LOCALLY_TESTED. Synchronous coordinator failures during commitments,
+share collection, envelope validation or aggregation now attempt cleanup on both
+A and B, even when a call may have saved state and then lost its response. Abort
+accepts the full immutable validated V1 signing request, not a bare session ID.
+Saved deployment, session, reservation counter and tombstone bindings must agree.
+Unknown requests create nothing; RESERVED becomes ABORTED/CONSUMED with the stored
+nonce removed. SIGNED shares remain available for exact reconstruction, and
+repeated ABORTED cleanup is idempotent. An ABORTED label cannot conceal persisted
+share material. These are current-state checks, not an authenticated monotonic
+anchor or whole-state rollback proof.
+
+Eight-field receipts bind the local role/request/session/epoch/intent/message and
+outcome. They are synchronous API confirmations, not proof of honest remote
+storage or authenticated IPC. If either cleanup is unconfirmed, the coordinator
+still attempts the other peer, throws a fixed redacted error and permanently
+refuses further signing/evidence coordination in that instance. Reentrant
+callbacks are rejected. No reset, weaker threshold, automatic alternate payout,
+refund or policy bypass was added. This refusal is NOT a durable global stop;
+reserved nonce restart recovery and authenticated/fenced/protected state remain
+incomplete. Logical nonce removal is not forensic erasure or power-loss proof.
+
+Initial regressions: 87 PASS / 10 FAIL (nine new plus a strengthened enrollment
+test), then 97 PASS after implementation. Expanded focused suites: 168 PASS.
+A later isolated test reproduced accepting an ABORTED label over a saved share
+(0 PASS / 1 FAIL); the consistency check now rejects it. An intermediate full
+run passed 429 Node tests per platform, 93 Rust tests and all 55 real checks.
+Pre-publication review then reproduced numeric counter coercion despite
+recomputed reservation metadata (a separate 0 PASS / 1 FAIL probe). The existing
+canonical u64-string validator is now reused for both counter fields.
+Final full rerun Windows/WSL:
+each 429 Node tests (23 new) and two vectors PASS. WSL: 64 Solana + 29 Native Rust
+tests, fmt/clippy, five lockfile audits and declared-license metadata PASS.
+No failures/skips in final executed suites. npm zero vulnerabilities; bincode
+1.3.3 unmaintained warning remains reported, not ignored. Native Windows
+Cargo/combined-license and service ACL/protected-secret tests remain NOT_RUN
+locally. Injected storage failures use actual external test files, not a
+deliberately filled live disk. Assertions do not print operational secrets.
+
+Both SBF builds and a fresh REGTEST/local-validator deposit PASS: real
+Native-accepted A+B sweep, separate Ed25519 attestations, actual SPL mint and
+55 checks (22 security, seven CSV, four wallet PSBT, ten pre-mint races, seven
+claim-worker and five accounting). Reserve/supply each 100000000 atomic, pending
+credits zero, no per-transfer team approval. Withdrawal E2E and full service
+restart remain NOT_RUN. The final fresh rerun after the counter-type fix passed
+the same 55 checks and both SBF builds. Current source and all 157 existing
+commits scanned clean; exact 179-file provenance, nine JSON parses and private
+path/IP/terminology checks PASS. Staged/outgoing scans, private publication and
+exact-SHA CI pending.
+
+Provenance remains 179 files; no additions/deletions/moves, dependency/toolchain/
+license changes or third-party/legacy implementation imports. Existing original
+request/policy helpers and pinned cryptographic APIs are reused. Mainnet DISABLED;
+no production actions. Phase 08 INCOMPLETE; Phase 09 NOT_STARTED. Next: complete
+private publication, then uncertain nonce restart and durable state/reconciliation/
+service dependencies.
+
+## Previous Phase 08 complete signing-intent enrollment (verified source)
+
+Source `0a15c4228611a64bba5868a216ca25697eb80580`, message
+`fix(phase-08): enroll complete FROST signing intents`, privately pushed;
+[all four exact-SHA CI jobs PASS](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34487096912).
+CI confirms 406 Node tests, 93 Rust tests and two vectors on each platform,
+the real deposit and all 55 checks. Current/staged/outgoing source and all 157
+commits scanned clean; zero uploaded artifacts. This evidence belongs to that
+SHA, not newer source.
+
+LOCALLY_AND_CI_TESTED, including fresh real-chain validation. Policy now
 enrolls the complete normalized immutable 28-field intent, not a selected subset.
 Its digest must match in addition to the existing independent domain, epoch,
 amount/fee caps, reserve-change, pause and hard-stop checks. Missing or extra
@@ -31,8 +97,8 @@ Canonical reserve and observed supply each 100000000 atomic; pending credits
 zero. No per-transfer team approval. Withdrawal E2E and full multi-service
 restart remain NOT_RUN. Current source and all 156 existing commits scanned
 clean; exact 179-file provenance, nine JSON parses, private-path/IP checks and
-new terminology review PASS. Staged/outgoing scans, private publication and
-exact-SHA CI are pending.
+new terminology review PASS. Staged/outgoing/all-157-commit scans, private
+publication and exact-SHA CI passed as recorded above.
 
 Enrollment is a cooperative policy boundary, not cryptographic proof that chain
 data is true. Each signer retains its configured raw-evidence check. If A has

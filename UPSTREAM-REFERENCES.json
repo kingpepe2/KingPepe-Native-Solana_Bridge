@@ -62,7 +62,7 @@
       "project": "RFC 9591",
       "url": "https://www.rfc-editor.org/rfc/rfc9591.html",
       "checkedAt": "2026-09-10",
-      "use": "Reference-only sections 5.2 and 7.3-7.7: signer input checks, nonce requirements, protocol failures and application policy. Original project request metadata validation only; no pseudocode or vectors copied and no claim that the RFC defines this bridge's BIP340 suite, DKG or audit coverage."
+      "use": "Reference-only sections 5.2 and 7.3-7.7: signer input checks, nonce requirements, protocol failures and application policy. Original project request/abort metadata and synchronous failure handling; no pseudocode or vectors copied and no claim that the RFC defines this bridge's BIP340 suite, DKG or audit coverage."
     },
     {
       "project": "Solana transaction and RPC definitions",

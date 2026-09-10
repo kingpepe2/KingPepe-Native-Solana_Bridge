@@ -207,7 +207,10 @@ test("one participant's different enrollment cannot be overruled by the coordina
     assert.throws(() => coordinator.signAutomatically(intentFromAuthorization(runtime.auth)), /authorizedOperationExact/u);
     const b = JSON.parse(readFileSync(path.join(runtime.root, "frost-b", "frost-signer-state.json"), "utf8"));
     assert.equal(b.nonceReservationCounter, "0");
-    // A may already have reserved a nonce; coordinator-wide abort is separate work.
+    const a = JSON.parse(readFileSync(path.join(runtime.root, "frost-a", "frost-signer-state.json"), "utf8"));
+    const request = frostRequestFor(intentFromAuthorization(runtime.auth));
+    assert.equal(a.signing[request.sessionId].state, "ABORTED");
+    assert.equal(a.signing[request.sessionId].nonce, undefined);
   } finally { runtime.cleanup(); }
 });
 
@@ -730,6 +733,370 @@ function frostRequestFor(intent, attempt = 1) {
     messageHex,
     participantIds,
   };
+}
+
+function coordinatorWithFaults(runtime, faults = {}) {
+  const signers = [runtime.signerA, runtime.signerB].map((signer, index) => {
+    const fault = faults[index === 0 ? "A" : "B"] ?? {};
+    const invoke = (method, args) => fault[method] === undefined ? signer[method](...args) :
+      fault[method](...args, () => signer[method](...args));
+    return { signerId: signer.signerId, isAvailable: () => signer.isAvailable(),
+      signingCommitment: request => invoke("signingCommitment", [request]),
+      signatureShare: (request, commitments) => invoke("signatureShare", [request, commitments]),
+      abortSigningSession: request => invoke("abortSigningSession", [request]) };
+  });
+  return new NativeFrostCoordinator({ signers, publicPackage: runtime.epoch.publicPackage,
+    aggregateTweakedXOnlyPublicKey: runtime.epoch.aggregateTweakedXOnlyPublicKey });
+}
+
+function assertSessionOutcome(runtime, role, request, expected) {
+  const state = JSON.parse(readFileSync(path.join(runtime.root, role === "A" ? "frost-a" : "frost-b", "frost-signer-state.json"), "utf8"));
+  const session = state.signing[request.sessionId];
+  assert.equal(session?.state, expected);
+  if (expected === undefined) return;
+  assert.equal(session.nonce, undefined);
+  assert.equal(state.nonceReservationCounter, "1");
+  const tombstone = state.nonceTombstones[session.nonceReservationId];
+  assert.equal(tombstone.state, "CONSUMED");
+  if (expected === "SIGNED") assert.equal(tombstone.outcome, "SHARE_PERSISTED");
+}
+
+for (const [stage, persisted, expectedA, expectedB] of [
+  ["signingCommitment", false, "ABORTED", undefined],
+  ["signingCommitment", true, "ABORTED", "ABORTED"],
+  ["signatureShare", false, "SIGNED", "ABORTED"],
+  ["signatureShare", true, "SIGNED", "SIGNED"],
+]) {
+  test(`coordinator cleans both peers after B ${stage} fails ${persisted ? "after" : "before"} persistence`, () => {
+    const runtime = createRuntime();
+    try {
+      let aborts = 0;
+      const abort = (request, original) => { aborts += 1; return original(); };
+      const fail = (...args) => { if (persisted) args.at(-1)(); throw new Error("TEST_LOST_PARTICIPANT_RESPONSE"); };
+      const coordinator = coordinatorWithFaults(runtime, { A: { abortSigningSession: abort },
+        B: { [stage]: fail, abortSigningSession: abort } });
+      const request = frostRequestFor(intentFromAuthorization(runtime.auth));
+      assert.throws(() => coordinator.signAutomatically(request.intent), /TEST_LOST_PARTICIPANT_RESPONSE/u);
+      assert.equal(aborts, 2);
+      assertSessionOutcome(runtime, "A", request, expectedA);
+      assertSessionOutcome(runtime, "B", request, expectedB);
+    } finally { runtime.cleanup(); }
+  });
+}
+
+test("invalid commitment envelope aborts both real reservations before shares", () => {
+  const runtime = createRuntime();
+  try {
+    const coordinator = coordinatorWithFaults(runtime, { B: { signingCommitment: (request, original) =>
+      ({ ...original(), sessionId: h("altered-commitment-session") }) } });
+    const request = frostRequestFor(intentFromAuthorization(runtime.auth));
+    assert.throws(() => coordinator.signAutomatically(request.intent), /commitment domain mismatch/u);
+    for (const role of ["A", "B"]) assertSessionOutcome(runtime, role, request, "ABORTED");
+  } finally { runtime.cleanup(); }
+});
+
+test("A share failure burns both reservations even though B was not asked for a share", () => {
+  const runtime = createRuntime();
+  try {
+    const coordinator = coordinatorWithFaults(runtime, { A: { signatureShare: () => { throw new Error("TEST_SHARE_FAILURE"); } } });
+    const request = frostRequestFor(intentFromAuthorization(runtime.auth));
+    assert.throws(() => coordinator.signAutomatically(request.intent), /TEST_SHARE_FAILURE/u);
+    for (const role of ["A", "B"]) assertSessionOutcome(runtime, role, request, "ABORTED");
+  } finally { runtime.cleanup(); }
+});
+
+test("cleanup failure still visits the other peer and permanently refuses this coordinator instance", () => {
+  const runtime = createRuntime();
+  try {
+    let calls = 0;
+    const coordinator = coordinatorWithFaults(runtime, {
+      A: { signingCommitment: (request, original) => { calls += 1; return original(); },
+        abortSigningSession: () => { throw new Error("TEST_STORAGE_UNAVAILABLE"); } },
+      B: { signingCommitment: (request, original) => { original(); throw new Error("TEST_LOST_RESPONSE"); } },
+    });
+    const request = frostRequestFor(intentFromAuthorization(runtime.auth));
+    assert.throws(() => coordinator.signAutomatically(request.intent), /FrostCoordinatorAbortIncomplete/u);
+    assertSessionOutcome(runtime, "B", request, "ABORTED");
+    assert.throws(() => coordinator.signAutomatically(request.intent, { attempt: 2 }), /FrostCoordinatorHardStop/u);
+    assert.equal(calls, 1);
+  } finally { runtime.cleanup(); }
+});
+
+test("bare abort session IDs are rejected without altering a valid pending reservation", () => {
+  const runtime = createRuntime();
+  try {
+    const request = frostRequestFor(intentFromAuthorization(runtime.auth));
+    runtime.signerA.signingCommitment(request);
+    const file = path.join(runtime.root, "frost-a", "frost-signer-state.json");
+    const before = readFileSync(file);
+    assert.throws(() => runtime.signerA.abortSigningSession(request.sessionId), /PlainDataRequired/u);
+    assert.equal(before.equals(readFileSync(file)), true);
+  } finally { runtime.cleanup(); }
+});
+
+test("bound abort is durable and idempotent without reopening a burned nonce", () => {
+  const runtime = createRuntime();
+  try {
+    const request = frostRequestFor(intentFromAuthorization(runtime.auth));
+    runtime.signerA.signingCommitment(request);
+    const first = runtime.signerA.abortSigningSession(request);
+    assert.equal(first?.state, "ABORTED");
+    assert.equal(first.sessionId, request.sessionId);
+    assert.equal(first.signerId, REQUIRED_FROST_SIGNERS[0]);
+    assert.equal(Object.isFrozen(first), true);
+    assert.equal(runtime.signerA.abortSigningSession(request).state, "ABORTED");
+    assertSessionOutcome(runtime, "A", request, "ABORTED");
+    assert.throws(() => runtime.signerA.signingCommitment(request), /already burned/u);
+  } finally { runtime.cleanup(); }
+});
+
+test("abort preserves a persisted signature share and returns a bound signed receipt", () => {
+  const runtime = createRuntime();
+  try {
+    const request = frostRequestFor(intentFromAuthorization(runtime.auth));
+    runtime.coordinator.signAutomatically(request.intent);
+    for (const [index, signer] of [runtime.signerA, runtime.signerB].entries()) {
+      const file = path.join(runtime.root, index === 0 ? "frost-a" : "frost-b", "frost-signer-state.json");
+      const before = readFileSync(file);
+      const receipt = signer.abortSigningSession(request);
+      assert.equal(receipt.state, "SIGNED");
+      assert.equal(receipt.intentDigest, request.intentDigest);
+      assert.equal(before.equals(readFileSync(file)), true);
+    }
+  } finally { runtime.cleanup(); }
+});
+
+test("an aborted label cannot conceal a previously persisted share", () => {
+  const runtime = createRuntime();
+  try {
+    const request = frostRequestFor(baseAuthorization());
+    runtime.coordinator.signAutomatically(request.intent);
+    const store = new FileBackedFrostStateStore({ signerId: REQUIRED_FROST_SIGNERS[0],
+      root: path.join(runtime.root, "frost-a"), repoRoot: REPO_ROOT });
+    const altered = store.load();
+    altered.signing[request.sessionId].state = "ABORTED";
+    store.save(altered);
+    const file = path.join(store.root, "frost-signer-state.json");
+    const before = readFileSync(file);
+    assert.throws(() => runtime.signerA.abortSigningSession(request), /FrostAbortStateInvalid/u);
+    assert.equal(before.equals(readFileSync(file)), true);
+  } finally { runtime.cleanup(); }
+});
+
+test("abort of a valid unknown request does not create a reservation or write state", () => {
+  const runtime = createRuntime();
+  try {
+    const request = frostRequestFor(intentFromAuthorization(runtime.auth));
+    const file = path.join(runtime.root, "frost-a", "frost-signer-state.json");
+    const before = readFileSync(file);
+    assert.equal(runtime.signerA.abortSigningSession(request).state, "NOT_RESERVED");
+    assert.equal(before.equals(readFileSync(file)), true);
+  } finally { runtime.cleanup(); }
+});
+
+test("malformed abort requests fail before any state read or accessor execution", () => {
+  let loads = 0;
+  let getters = 0;
+  const signer = new NativeFrostSigner({ signerId: REQUIRED_FROST_SIGNERS[0], index: 0,
+    policy: makePolicy(baseAuthorization()), stateStore: { load() {
+      loads += 1; return { signerId: REQUIRED_FROST_SIGNERS[0], dkg: {} };
+    } } });
+  const request = frostRequestFor(baseAuthorization());
+  for (const change of [{ requestId: h("different") }, { epoch: 2 }, { sessionId: h("different") },
+    { attempt: 2 }, { participantIds: [...REQUIRED_FROST_SIGNERS].reverse() }, { extra: true }]) {
+    assert.throws(() => signer.abortSigningSession({ ...request, ...change }), /FrostRequest/u);
+  }
+  const accessor = { ...request };
+  Object.defineProperty(accessor, "intent", { get() { getters += 1; return request.intent; } });
+  assert.throws(() => signer.abortSigningSession(accessor), /PlainDataRequired/u);
+  assert.equal(loads, 1);
+  assert.equal(getters, 0);
+});
+
+test("abort rejects missing or contradictory tombstones without repairing stored state", () => {
+  const runtime = createRuntime();
+  try {
+    const request = frostRequestFor(baseAuthorization());
+    runtime.signerA.signingCommitment(request);
+    const store = new FileBackedFrostStateStore({ signerId: REQUIRED_FROST_SIGNERS[0],
+      root: path.join(runtime.root, "frost-a"), repoRoot: REPO_ROOT });
+    const original = store.load();
+    const nonceId = original.signing[request.sessionId].nonceReservationId;
+    for (const tamper of [state => { delete state.nonceTombstones[nonceId]; },
+      state => { state.nonceTombstones[nonceId].sessionId = h("other-session"); },
+      state => { state.nonceTombstones[nonceId].commitmentSha256 = h("other-commitment"); },
+      state => { state.nonceTombstones[nonceId].state = "CONSUMED"; },
+      state => { state.nonceReservationCounter = "0"; },
+      state => {
+        const session = state.signing[request.sessionId];
+        const tombstone = state.nonceTombstones[nonceId];
+        const { nonceReservationId: ignored, reservationCounter: previous, ...commitment } = session.commitment;
+        assert.equal(previous, "1");
+        const reservationCounter = 1; // Deliberately noncanonical type for this small public counter.
+        const replacement = sha256Canonical({ domain: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_NONCE_RESERVATION/V1",
+          signerId: REQUIRED_FROST_SIGNERS[0], reservationCounter, requestId: request.requestId, epoch: request.epoch,
+          sessionId: request.sessionId, intentDigest: request.intentDigest, messageHex: request.messageHex,
+          participantIds: [...request.participantIds].sort(), commitment });
+        session.reservationCounter = reservationCounter;
+        session.nonceReservationId = replacement;
+        session.commitment.reservationCounter = reservationCounter;
+        session.commitment.nonceReservationId = replacement;
+        tombstone.reservationCounter = reservationCounter;
+        tombstone.nonceReservationId = replacement;
+        tombstone.commitmentSha256 = sha256Canonical(session.commitment);
+        delete state.nonceTombstones[nonceId];
+        state.nonceTombstones[replacement] = tombstone;
+      }]) {
+      const corrupted = structuredClone(original);
+      tamper(corrupted);
+      store.save(corrupted);
+      const file = path.join(store.root, "frost-signer-state.json");
+      const before = readFileSync(file);
+      assert.throws(() => runtime.signerA.abortSigningSession(request), /FrostAbortStateInvalid/u);
+      assert.equal(before.equals(readFileSync(file)), true);
+    }
+  } finally { runtime.cleanup(); }
+});
+
+test("every abort receipt field and the exact field set are validated by the coordinator", () => {
+  for (const field of ["protocol", "signerId", "requestId", "epoch", "sessionId", "intentDigest", "messageHex", "state", "extra", "missing"]) {
+    const runtime = createRuntime();
+    try {
+      const coordinator = coordinatorWithFaults(runtime, {
+        A: { abortSigningSession: (request, original) => {
+          const receipt = { ...original() };
+          if (field === "missing") delete receipt.epoch;
+          else receipt[field] = field === "epoch" ? 2 : h("substituted-receipt");
+          return receipt;
+        } },
+        B: { signingCommitment: (request, original) => { original(); throw new Error("TEST_LOST_RESPONSE"); } },
+      });
+      const request = frostRequestFor(baseAuthorization());
+      assert.throws(() => coordinator.signAutomatically(request.intent), /FrostCoordinatorAbortIncomplete/u, field);
+      for (const role of ["A", "B"]) assertSessionOutcome(runtime, role, request, "ABORTED");
+      assert.throws(() => coordinator.signAutomatically(request.intent), /FrostCoordinatorHardStop/u);
+    } finally { runtime.cleanup(); }
+  }
+});
+
+test("abort receipt accessors are rejected without executing them", () => {
+  const runtime = createRuntime();
+  try {
+    let getters = 0;
+    const coordinator = coordinatorWithFaults(runtime, {
+      A: { abortSigningSession: (request, original) => {
+        const receipt = { ...original() };
+        Object.defineProperty(receipt, "state", { get() { getters += 1; return "ABORTED"; } });
+        return receipt;
+      } }, B: { signingCommitment: () => { throw new Error("TEST_FAILURE"); } },
+    });
+    assert.throws(() => coordinator.signAutomatically(baseAuthorization()), /FrostCoordinatorAbortIncomplete/u);
+    assert.equal(getters, 0);
+  } finally { runtime.cleanup(); }
+});
+
+test("aggregate verification failure preserves signed shares for exact reconstruction", () => {
+  const runtime = createRuntime();
+  try {
+    const wrong = new NativeFrostCoordinator({ signers: [runtime.signerA, runtime.signerB],
+      publicPackage: runtime.epoch.publicPackage, aggregateTweakedXOnlyPublicKey: h("wrong-aggregate-key") });
+    const request = frostRequestFor(baseAuthorization());
+    assert.throws(() => wrong.signAutomatically(request.intent), /aggregate failed/u);
+    for (const role of ["A", "B"]) assertSessionOutcome(runtime, role, request, "SIGNED");
+    const result = runtime.coordinator.signAutomatically(request.intent);
+    assert.equal(result.state, "SIGNED");
+    assert.equal(schnorr.verify(Buffer.from(result.signatureHex, "hex"), Buffer.from(result.messageHex, "hex"),
+      Buffer.from(runtime.epoch.aggregateTweakedXOnlyPublicKey, "hex")), true);
+    for (const role of ["A", "B"]) assertSessionOutcome(runtime, role, request, "SIGNED");
+  } finally { runtime.cleanup(); }
+});
+
+test("a burned attempt cannot be reused but an explicit fresh attempt uses new nonces", () => {
+  const runtime = createRuntime();
+  try {
+    let failed = false;
+    const coordinator = coordinatorWithFaults(runtime, { B: { signingCommitment: (request, original) => {
+      const value = original();
+      if (!failed) { failed = true; throw new Error("TEST_LOST_RESPONSE"); }
+      return value;
+    } } });
+    const request = frostRequestFor(baseAuthorization());
+    assert.throws(() => coordinator.signAutomatically(request.intent), /TEST_LOST_RESPONSE/u);
+    assert.throws(() => coordinator.signAutomatically(request.intent), /already burned/u);
+    const result = coordinator.signAutomatically(request.intent, { attempt: 2 });
+    assert.equal(result.state, "SIGNED");
+    assert.notEqual(result.sessionId, request.sessionId);
+    for (const role of ["frost-a", "frost-b"]) {
+      const state = JSON.parse(readFileSync(path.join(runtime.root, role, "frost-signer-state.json"), "utf8"));
+      assert.equal(state.nonceReservationCounter, "2");
+      assert.equal(state.signing[request.sessionId].state, "ABORTED");
+      assert.equal(state.signing[result.sessionId].state, "SIGNED");
+      assert.equal(state.signing[request.sessionId].nonceReservationId !== state.signing[result.sessionId].nonceReservationId, true);
+      assert.equal(Object.values(state.signing).every(session => session.nonce === undefined), true);
+    }
+  } finally { runtime.cleanup(); }
+});
+
+test("an unconfirmed abort also stops asynchronous evidence coordination", async () => {
+  const runtime = createRuntime();
+  try {
+    const coordinator = coordinatorWithFaults(runtime, { A: { abortSigningSession: () => undefined },
+      B: { signingCommitment: () => { throw new Error("TEST_LOST_RESPONSE"); } } });
+    assert.throws(() => coordinator.signAutomatically(baseAuthorization()), /FrostCoordinatorAbortIncomplete/u);
+    await assert.rejects(() => coordinator.signAutomaticallyWithNativeEvidence(baseAuthorization()), /FrostCoordinatorHardStop/u);
+  } finally { runtime.cleanup(); }
+});
+
+test("cleanup callbacks cannot reenter the active coordinator", () => {
+  const runtime = createRuntime();
+  try {
+    let reentries = 0;
+    const coordinator = coordinatorWithFaults(runtime, { A: { abortSigningSession: (request, original) => {
+      assert.throws(() => coordinator.signAutomatically(request.intent, { attempt: 2 }), /FrostCoordinatorBusy/u);
+      reentries += 1;
+      return original();
+    } }, B: { signingCommitment: () => { throw new Error("TEST_FAILURE"); } } });
+    assert.throws(() => coordinator.signAutomatically(baseAuthorization()), /TEST_FAILURE/u);
+    assert.equal(reentries, 1);
+  } finally { runtime.cleanup(); }
+});
+
+test("waiting for quorum does not reserve or abort a signing session", () => {
+  const runtime = createRuntime();
+  try {
+    let aborts = 0;
+    runtime.signerB.setAvailableForTestOnly(false);
+    const coordinator = coordinatorWithFaults(runtime, { A: { abortSigningSession: () => { aborts += 1; } } });
+    assert.equal(coordinator.signAutomatically(baseAuthorization()).state, "WAITING_FOR_QUORUM");
+    assert.equal(aborts, 0);
+    for (const role of ["A", "B"]) assertSessionOutcome(runtime, role, frostRequestFor(baseAuthorization()), undefined);
+  } finally { runtime.cleanup(); }
+});
+
+for (const saved of [false, true]) {
+  test(`abort storage error ${saved ? "after" : "before"} persistence cannot acknowledge cleanup`, () => {
+    const runtime = createRuntime();
+    try {
+      const store = new FileBackedFrostStateStore({ signerId: REQUIRED_FROST_SIGNERS[0],
+        root: path.join(runtime.root, "frost-a"), repoRoot: REPO_ROOT });
+      const request = frostRequestFor(baseAuthorization());
+      const signerA = new NativeFrostSigner({ signerId: REQUIRED_FROST_SIGNERS[0], index: 0, policy: runtime.policy,
+        stateStore: { load: () => store.load(), save(state) {
+          if (state.signing[request.sessionId]?.state === "ABORTED") {
+            if (saved) store.save(state);
+            throw Object.assign(new Error("TEST_STORAGE_FAILURE"), { code: "ENOSPC" });
+          }
+          store.save(state);
+        } } });
+      const coordinator = coordinatorWithFaults({ ...runtime, signerA }, {
+        B: { signingCommitment: (packet, original) => { original(); throw new Error("TEST_RESPONSE_LOST"); } },
+      });
+      assert.throws(() => coordinator.signAutomatically(request.intent), /FrostCoordinatorAbortIncomplete/u);
+      assert.equal(store.load().signing[request.sessionId].state, saved ? "ABORTED" : "RESERVED");
+      assertSessionOutcome(runtime, "B", request, "ABORTED");
+      assert.throws(() => coordinator.signAutomatically(request.intent, { attempt: 2 }), /FrostCoordinatorHardStop/u);
+    } finally { runtime.cleanup(); }
+  });
 }
 
 test("A+B DKG produces one valid BIP340 Taproot-compatible FROST signature", () => {

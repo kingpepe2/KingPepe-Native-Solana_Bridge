@@ -28,8 +28,8 @@ These controls protect cooperative API use, not arbitrary hostile code with
 process/host access. Policy enrollment is not proof of chain truth; each signing
 participant still needs its independent configured raw-evidence checks. The
 current in-memory policy is reconstructed from validated evidence, not restored
-from caller JSON. Authenticated inner DKG transcripts/transport and coordinator
-failure cleanup need further hardening.
+from caller JSON. Authenticated inner DKG transcripts/transport and durable
+coordinator/signer restart recovery need further hardening.
 Signer-state authentication, service access and
 rollback assurance remain incomplete. No production signing is authorized and
 none of these deficiencies requires a second physical host.
@@ -51,9 +51,43 @@ metadata. The actual Native signature message and existing valid V1 request
 digests are unchanged. A digest match states equality with local policy input;
 it does not prove Native/Solana chain truth or replace each participant's evidence
 validator. A different B policy cannot be overridden by A or the coordinator.
-If A already reserved a nonce before B rejects, coordinated abort and uncertain
-session recovery remain necessary separate work. No production permission,
+If A already reserved a nonce before B rejects, the synchronous coordinator now
+requests bound cleanup from both participants. Uncertain restart recovery remains
+separate work. No production permission,
 protected-state or rollback guarantee follows from this enrollment boundary.
+
+## Coordinated abort boundary
+
+The synchronous coordinator attempts cleanup on both A and B after commitment,
+share or aggregate processing fails. This includes calls that may have persisted
+and then lost their response. Each abort uses the complete validated V1 request;
+bare session IDs, altered metadata and accessors fail before state access.
+An unknown valid session returns NOT_RESERVED without writing. An existing
+session must match the saved deployment, request, public commitment, counter and
+tombstone. Counters require canonical u64 decimal strings; numeric JSON values
+are rejected even with recomputed metadata. Missing or contradictory records
+are rejected without repair.
+No active private-key deserialization or new policy approval is needed to destroy
+an existing reservation. RESERVED becomes ABORTED/CONSUMED and its stored nonce
+is removed before acknowledgment; SIGNED shares are preserved. Repeated abort
+is idempotent. Stored share material cannot be hidden by an ABORTED label.
+
+The eight-field local receipt binds protocol, role, request, epoch, session,
+intent digest, Native message and outcome. All fields are mandatory and exact.
+This is not a cryptographic proof that an untrusted peer erased a nonce. Service
+identity and authenticated IPC are separate requirements. Cleanup continues to
+the other participant after a failure. Any unconfirmed response permanently
+refuses signing in that coordinator instance, with a fixed error excluding
+underlying storage/transport details. Callback reentry is rejected; there is no
+reset or 1-of-2 fallback. Completed shares are not removed to manufacture a retry.
+
+This is cooperating synchronous-runtime handling, not durable global fencing,
+automatic process recovery, full rollback/clone detection or protected storage.
+Logical JSON nonce removal is not forensic erasure. RESERVED secret nonces still
+persist in external local test state; automatic destruction of uncertain sessions
+on restart remains open. Disk-full/response-loss tests inject failures around
+real external file writes, not physical power failures or a filled production
+volume. No production signing or services are authorized by these tests.
 
 ## Signing-request boundary
 

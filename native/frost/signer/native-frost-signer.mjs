@@ -8,13 +8,14 @@ import {
   assertNativeFrostRuntimePolicy,
   bytesToHex,
   canonicalJson,
+  canonicalUintDecimal,
   hexToBytes,
   nativeSigningIntentDigest,
   sha256Canonical,
   validateNativeSigningIntent,
   dataRecord,
 } from "../policy/native-signing-policy.mjs";
-import { validateNativeFrostSigningRequest } from "../policy/signing-request.mjs";
+import { createNativeFrostAbortReceipt, validateNativeFrostSigningRequest } from "../policy/signing-request.mjs";
 import { createTwoPartyDkgRequest, nativeFrostKeyContext, sameNativeFrostKeyDeployment,
   validateNativeFrostDkgRequest } from "../policy/dkg-request.mjs";
 
@@ -279,18 +280,25 @@ export class NativeFrostSigner {
     return shareEnvelope(this.signerId, request, key.secret.identifier, freshSession.shareHex, commitmentSetHash);
   }
 
-  abortSigningSession(sessionId) {
+  abortSigningSession(request) {
+    this.#requireAvailable();
+    request = validateNativeFrostSigningRequest(request);
     const state = this.#stateStore.load();
-    const session = state.signing[sessionId];
-    if (session === undefined || session.state === "SIGNED" || session.state === "ABORTED") return;
-    if (session.nonce !== undefined) delete session.nonce;
+    this.#validateStateDeployment(state);
+    const session = state.signing[request.sessionId];
+    const receipt = outcome => createNativeFrostAbortReceipt(request, this.signerId, outcome);
+    if (session === undefined) return receipt("NOT_RESERVED");
+    // Cancellation never enrolls/authorizes an operation or deserializes a key.
+    // In particular, a later policy rejection must not prevent nonce destruction.
+    assertSameSigningRequest(session, request);
+    const tombstone = validateAbortSessionState(state, session, request, this.signerId, this.frostIdentifier());
+    if (session.state === "SIGNED" || session.state === "ABORTED") return receipt(session.state);
+    delete session.nonce;
     session.state = "ABORTED";
-    const tombstone = state.nonceTombstones[session.nonceReservationId];
-    if (tombstone !== undefined) {
-      tombstone.state = "CONSUMED";
-      tombstone.outcome = "ABORTED";
-    }
+    tombstone.state = "CONSUMED";
+    tombstone.outcome = "ABORTED";
     this.#stateStore.save(state);
+    return receipt("ABORTED");
   }
 
   #authorizeRequestWithKey(request) {
@@ -601,6 +609,42 @@ function nextCounter(value) {
   const current = BigInt(value);
   if (current >= 0xffff_ffff_ffff_ffffn) throw new Error("FROST nonce reservation counter exhausted");
   return (current + 1n).toString();
+}
+
+function validateAbortSessionState(state, session, request, signerId, identifier) {
+  // These are consistency checks against the currently loaded local state, not
+  // an authenticated monotonic anchor or proof against whole-state rollback.
+  try {
+    const commitment = dataRecord(session.commitment, "FrostAbortCommitment");
+    const { nonceReservationId, reservationCounter, ...unsigned } = commitment;
+    canonicalUintDecimal(reservationCounter, "FROST reservation counter");
+    canonicalUintDecimal(state.nonceReservationCounter, "FROST nonce high-water mark");
+    if (reservationCounter === "0" ||
+        BigInt(state.nonceReservationCounter) < BigInt(reservationCounter) ||
+        reservationCounter !== session.reservationCounter || nonceReservationId !== session.nonceReservationId ||
+        unsigned.identifier !== identifier || unsigned.intentDigest !== request.intentDigest ||
+        unsigned.messageHex !== request.messageHex || canonicalJson(unsigned.participantIds) !== canonicalJson(request.participantIds) ||
+        computeNonceReservationId(signerId, reservationCounter, request, unsigned) !== nonceReservationId) throw new Error();
+    const tombstone = state.nonceTombstones[nonceReservationId];
+    if (tombstone === undefined || tombstone.nonceReservationId !== nonceReservationId ||
+        tombstone.reservationCounter !== reservationCounter || tombstone.sessionId !== request.sessionId ||
+        tombstone.requestId !== request.requestId || tombstone.epoch !== request.epoch ||
+        tombstone.intentDigest !== request.intentDigest || tombstone.messageHex !== request.messageHex ||
+        canonicalJson(tombstone.participantIds) !== canonicalJson(request.participantIds) ||
+        tombstone.commitmentSha256 !== sha256Canonical(commitment)) throw new Error();
+    if (session.state === "RESERVED") {
+      if (tombstone.state !== "RESERVED" || session.nonce === undefined || session.shareHex !== undefined ||
+          tombstone.outcome !== undefined || tombstone.shareSha256 !== undefined) throw new Error();
+    } else {
+      if (!["SIGNED", "ABORTED"].includes(session.state) || tombstone.state !== "CONSUMED" || session.nonce !== undefined) throw new Error();
+      if (session.state === "SIGNED" && (typeof session.shareHex !== "string" || !/^[0-9a-f]{64}$/u.test(session.shareHex) ||
+          tombstone.outcome !== "SHARE_PERSISTED" ||
+          tombstone.shareSha256 !== sha256Canonical({ shareHex: session.shareHex }))) throw new Error();
+      if (session.state === "ABORTED" && (session.shareHex !== undefined || tombstone.shareSha256 !== undefined ||
+          !["ABORTED", "SHARE_COMPUTATION_STARTED"].includes(tombstone.outcome))) throw new Error();
+    }
+    return tombstone;
+  } catch { throw new Error("FrostAbortStateInvalid"); }
 }
 
 function assertSameSigningRequest(session, request) {

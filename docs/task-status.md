@@ -1,6 +1,36 @@
 # KingPepe Native - Solana Bridge Task Status
 
-## Current Phase 08 complete signing-intent enrollment (2026-09-10)
+## Current Phase 08 coordinated nonce abort (2026-09-10)
+
+Implemented locally: bound abort requests/receipts, current-state/tombstone
+consistency, both-peer cleanup after coordinator failures, signed-share
+preservation and absorbing instance refusal when cleanup is unconfirmed.
+No threshold downgrade/reset. Initial focused 87 PASS / 10 FAIL, then 97 PASS;
+expanded focused 168 PASS. Two later isolated probes each failed and were fixed:
+an ABORTED label over a saved share and numeric reservation-counter coercion.
+Final Windows/WSL each 429 Node tests (23 new), two vectors PASS; WSL 93 Rust
+tests, fmt/clippy/audits PASS. Both SBF builds and fresh real deposit PASS all
+55 checks. Reserve/supply each 100000000 atomic, pending credit zero, no
+per-transfer team approval; these include the final reruns after both fixes.
+Current source/all-157-commit scans, exact 179-file provenance, nine JSON parses
+and private-path/IP checks PASS. Staged/outgoing scans/private push/exact-SHA CI
+pending.
+
+Provenance remains 179 files, no additions/deletions/moves or dependency/license
+changes. Phase 08 INCOMPLETE; Phase 09 NOT_STARTED; Mainnet DISABLED. Instance
+refusal is not durable global fencing, protected storage, restart destruction of
+reserved nonces or rollback assurance. Next: finish these gates, then uncertain
+nonce restart and authenticated/fenced state/service dependencies.
+See [detailed evidence](development-status.md#current-phase-08-coordinated-nonce-abort-2026-09-10).
+
+## Previous Phase 08 complete signing-intent enrollment (verified source)
+
+Source `0a15c4228611a64bba5868a216ca25697eb80580`, message
+`fix(phase-08): enroll complete FROST signing intents`, privately pushed;
+[all four exact-SHA CI jobs PASS](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34487096912).
+CI confirms 406 Node tests, 93 Rust tests and two vectors per platform, the real
+deposit and 55 checks. All current/staged/outgoing and 157-history-commit scans
+clean; zero artifacts. The following evidence belongs to that source SHA.
 
 Implemented locally: full immutable 28-field intent enrollment/digest matching,
 strict missing/extra-field rejection, complete sweep authorization and removal
@@ -12,15 +42,15 @@ REGTEST/Solana local-validator deposit PASS all 55 checks. Canonical reserve and
 observed supply each 100000000 atomic; pending credits zero, no per-transfer
 team approval. Withdrawal E2E and full service restart remain NOT_RUN. Current
 source and all 156 commits scan clean; exact 179-file provenance, nine JSON
-parses and private-path/IP checks PASS. Staged/outgoing scans, private push and
-exact-SHA CI pending.
+parses and private-path/IP checks PASS. Staged/outgoing/all-157-commit scans,
+private push and exact-SHA CI passed as recorded above.
 
 Provenance remains 179 files; no additions/deletions/moves, dependency/license
 changes or production actions. Phase 08 INCOMPLETE; Phase 09 NOT_STARTED; Mainnet DISABLED. Enrollment
 is not chain proof, nonce recovery or authenticated/fenced service state.
 Next: finish this increment's gates, then coordinator failure/nonce handling and
 remaining durable recovery/reconciliation dependencies.
-See [detailed evidence](development-status.md#current-phase-08-complete-signing-intent-enrollment-2026-09-10).
+See [detailed evidence](development-status.md#previous-phase-08-complete-signing-intent-enrollment-verified-source).
 
 ## Previous Phase 08 DKG deployment and active-key binding (verified source)
 

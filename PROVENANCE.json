@@ -3,6 +3,17 @@
   "generatedAt": "2026-09-10T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
   "purpose": "file-by-file provenance classification for local tracked content",
+  "phase08NonceAbortReview": {
+    "filesBefore": 179,
+    "filesAfter": 179,
+    "newFiles": [],
+    "filesDeleted": 0,
+    "filesMoved": 0,
+    "changes": "Original bound abort API/receipts, current session/tombstone consistency, both-participant coordinator cleanup, signed-share preservation, absorbing instance refusal and 23 new regressions plus strengthened enrollment rejection. Superseded bare-session-ID abort path removed.",
+    "sourceImports": "None; existing original request/policy helpers and pinned cryptographic APIs reused. RFC 9591 used as protocol-failure reference only; no pseudocode or third-party implementation copied.",
+    "dependencyChanges": "None; lockfiles, toolchains, licenses and third-party notices unchanged.",
+    "scope": "Cooperating synchronous APIs only; not authenticated protected state, durable global stops, reserved nonce restart safety or rollback proof. No production material created, moved or deleted."
+  },
   "phase08FullIntentEnrollmentReview": {
     "filesBefore": 179,
     "filesAfter": 179,
