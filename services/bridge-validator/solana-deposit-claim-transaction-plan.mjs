@@ -20,6 +20,7 @@ export const BRIDGE_INSTRUCTION_ACCEPT_DEPOSIT_CLAIM = 2;
 export const TRANSCEIVER_INSTRUCTION_VERIFY_MESSAGE_FROM_ED25519 = 2;
 export const BRIDGE_STATE_PDA_SEED_PREFIX = "kingpepe-bridge-state";
 export const DEPOSIT_CLAIM_PDA_SEED_PREFIX = "kingpepe-deposit-claim";
+export const DEPOSIT_BACKING_PDA_SEED_PREFIX = "kingpepe-deposit-backing";
 export const MINT_AUTHORITY_PDA_SEED_PREFIX = "kingpepe-mint-authority";
 export const TRANSCEIVER_CONFIG_PDA_SEED_PREFIX = "kingpepe-transceiver-config";
 export const TRANSCEIVER_RECEIPT_PDA_SEED_PREFIX = "kingpepe-transceiver-receipt";
@@ -57,6 +58,13 @@ export function buildLocalnetSolanaDepositClaimTransactionPlan(config) {
     [utf8(MINT_AUTHORITY_PDA_SEED_PREFIX), normalized.mint.bytes],
     normalized.managerProgram.bytes,
   );
+  const outputIndex = Buffer.alloc(4);
+  outputIndex.writeUInt32LE(decodedMessage.depositOutpoint.vout);
+  const depositBacking = findProgramAddress(
+    [utf8(DEPOSIT_BACKING_PDA_SEED_PREFIX), normalized.mint.bytes,
+      decodedMessage.deployment.nativeGenesis, decodedMessage.depositOutpoint.txid, outputIndex],
+    normalized.managerProgram.bytes,
+  );
   const verifiedReceipt = findProgramAddress(
     [utf8(TRANSCEIVER_RECEIPT_PDA_SEED_PREFIX), hexToBytes(decodedMessage.messageDigestHex, "messageDigestHex")],
     normalized.transceiverProgram.bytes,
@@ -68,6 +76,7 @@ export function buildLocalnetSolanaDepositClaimTransactionPlan(config) {
     accountMeta("depositClaim", depositClaim, false, true),
     accountMeta("mint", normalized.mint, false, true),
     accountMeta("recipientTokenAccount", normalized.recipientTokenAccount, false, true),
+    accountMeta("depositBacking", depositBacking, false, true),
     accountMeta("verifiedReceipt", verifiedReceipt, false, false),
     accountMeta("mintAuthorityPda", mintAuthority, false, false),
     accountMeta("tokenProgram", normalized.tokenProgram, false, false),
@@ -83,8 +92,8 @@ export function buildLocalnetSolanaDepositClaimTransactionPlan(config) {
     normalized.encodedMessageBytes,
   ]);
   const compiledInstruction = Object.freeze({
-    programIdIndex: 9,
-    accountIndexes: Object.freeze([1, 2, 5, 3, 4, 6, 7, 8, 0, 10]),
+    programIdIndex: 10,
+    accountIndexes: Object.freeze([1, 2, 6, 3, 4, 7, 8, 9, 5, 0, 11]),
     dataBase64: Buffer.from(instructionData).toString("base64"),
     dataHex: bytesToHex(instructionData),
   });
@@ -112,6 +121,7 @@ export function buildLocalnetSolanaDepositClaimTransactionPlan(config) {
     pdas: Object.freeze({
       bridgeState: publicPda(bridgeState),
       depositClaim: publicPda(depositClaim),
+      depositBacking: publicPda(depositBacking),
       mintAuthority: publicPda(mintAuthority),
       verifiedReceipt: publicPda(verifiedReceipt),
     }),
@@ -449,7 +459,7 @@ function encodeLegacyMessage({ accountKeys, recentBlockhash, compiledInstruction
     accountKeys,
     recentBlockhash,
     readonlyUnsignedAccounts: 7,
-    compiledInstructions: [compiledInstruction, computeBudgetInstruction(11)],
+    compiledInstructions: [compiledInstruction, computeBudgetInstruction(12)],
   });
 }
 

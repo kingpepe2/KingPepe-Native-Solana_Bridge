@@ -209,6 +209,7 @@ test("deposit claim transaction plan builds exact localnet instruction data and 
       ["depositClaim", false, true],
       ["mint", false, true],
       ["recipientTokenAccount", false, true],
+      ["depositBacking", false, true],
       ["verifiedReceipt", false, false],
       ["mintAuthorityPda", false, false],
       ["tokenProgram", false, false],
@@ -218,8 +219,8 @@ test("deposit claim transaction plan builds exact localnet instruction data and 
       ["computeBudgetProgram", false, false],
     ],
   );
-  assert.deepEqual(plan.instruction.accountIndexes, [1, 2, 5, 3, 4, 6, 7, 8, 0, 10]);
-  assert.equal(plan.instruction.programIdIndex, 9);
+  assert.deepEqual(plan.instruction.accountIndexes, [1, 2, 6, 3, 4, 7, 8, 9, 5, 0, 11]);
+  assert.equal(plan.instruction.programIdIndex, 10);
 
   const instructionData = Buffer.from(plan.instruction.dataBase64, "base64");
   assert.equal(instructionData[0], 2);
@@ -230,6 +231,18 @@ test("deposit claim transaction plan builds exact localnet instruction data and 
   assert.deepEqual([...messageBytes.subarray(0, 3)], [1, 0, 7]);
   assert.match(plan.messageFingerprintHex, /^[0-9a-f]{64}$/u);
   assert.equal(plan.preparedTransactionBase64, undefined);
+});
+
+test("backing PDA survives nonce and epoch rotation but binds the Native outpoint", () => {
+  const { config } = fixture();
+  const original = decodeCanonicalBridgeMessage(config.encodedMessageHex);
+  const plan = buildLocalnetSolanaDepositClaimTransactionPlan(config);
+  const changed = { ...original, operationId: undefined, keyEpoch: 8, policyEpoch: 9, nonce: new Uint8Array(32).fill(90) };
+  const rotated = buildLocalnetSolanaDepositClaimTransactionPlan({ ...config, encodedMessageHex: bytesToHex(encodeCanonicalBridgeMessage(changed)) });
+  assert.notEqual(rotated.operationIdHex, plan.operationIdHex);
+  assert.equal(rotated.pdas.depositBacking.addressBase58, plan.pdas.depositBacking.addressBase58);
+  const other = buildLocalnetSolanaDepositClaimTransactionPlan({ ...config, encodedMessageHex: bytesToHex(encodeCanonicalBridgeMessage({ ...changed, depositOutpoint: { ...changed.depositOutpoint, vout: changed.depositOutpoint.vout + 1 } })) });
+  assert.notEqual(other.pdas.depositBacking.addressBase58, plan.pdas.depositBacking.addressBase58);
 });
 
 test("signed deposit claim transaction uses injected fee-payer signer and verifies independently", async () => {

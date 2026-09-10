@@ -17,6 +17,7 @@ no-entrypoint = []
 bridge-messages = { path = "../../modules/bridge-messages" }
 solana-program = "=3.0.0"
 solana-system-interface = { version = "=2.0.0", features = ["bincode"] }
+spl-token-interface = "=2.0.0"
 thiserror = "1.0.69"
 
 [dev-dependencies]

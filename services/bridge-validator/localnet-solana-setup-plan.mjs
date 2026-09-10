@@ -112,7 +112,7 @@ export function buildLocalnetSolanaSetupTransactionPlan(config) {
     compiledInstruction(
       "transceiverInitialize",
       8,
-      [4, 0, 7],
+      [4, 1, 0, 7],
       encodeTransceiverInitialize({
         transceiverProgram: normalized.transceiverProgram,
         managerProgram: normalized.managerProgram,

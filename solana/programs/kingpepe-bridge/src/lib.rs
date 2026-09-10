@@ -46,6 +46,8 @@ pub const BRIDGE_CONFIG_INSTRUCTION_LENGTH: usize = 256;
 pub const BURN_CHECKED_INSTRUCTION_LENGTH: usize = 105;
 pub const BRIDGE_STATE_PDA_SEED_PREFIX: &[u8] = b"kingpepe-bridge-state";
 pub const DEPOSIT_CLAIM_PDA_SEED_PREFIX: &[u8] = b"kingpepe-deposit-claim";
+pub const DEPOSIT_BACKING_PDA_SEED_PREFIX: &[u8] = b"kingpepe-deposit-backing";
+pub const DEPOSIT_BACKING_MARKER_LENGTH: usize = 8 + 1 + 32 + 32;
 pub const MINT_AUTHORITY_PDA_SEED_PREFIX: &[u8] = b"kingpepe-mint-authority";
 pub const WITHDRAWAL_RECORD_PDA_SEED_PREFIX: &[u8] = b"kingpepe-withdrawal-record";
 pub const BRIDGE_ACCOUNT_VERSION: u8 = 1;
@@ -383,6 +385,7 @@ pub struct BridgeProgram {
     state: ProgramState,
     config: Option<BridgeConfig>,
     deposit_claims: BTreeMap<Hash32, DepositClaimRecord>,
+    consumed_deposit_backing: BTreeSet<PubkeyBytes>,
     withdrawal_records: BTreeMap<Hash32, WithdrawalRecord>,
     consumed_receipts: BTreeSet<Hash32>,
     minted_supply: u128,
@@ -455,7 +458,10 @@ impl BridgeProgram {
         {
             return Err(BridgeError::WrongMessageKind);
         }
-        if self.deposit_claims.contains_key(&message.operation_id) {
+        let backing = derive_deposit_backing_pda(message);
+        if self.deposit_claims.contains_key(&message.operation_id)
+            || self.consumed_deposit_backing.contains(&backing)
+        {
             return Err(BridgeError::Replay);
         }
         let digest = message
@@ -485,6 +491,7 @@ impl BridgeProgram {
         self.deposit_claims
             .insert(message.operation_id, record.clone());
         self.consumed_receipts.insert(digest);
+        self.consumed_deposit_backing.insert(backing);
         Ok(record)
     }
 
@@ -642,6 +649,11 @@ fn process_initialize_accounts(
     let token_program = next_required_account(&mut account_iter)?;
     let (payer, system_program_account) = optional_payer_and_system(&mut account_iter)?;
 
+    // Initial enrollment requires the exact Mint account to sign. An arbitrary
+    // fee payer cannot seize configuration for a Mint already chosen by users.
+    // SPL mint authority remains the bridge PDA, not this enrollment key.
+    require_account_key(mint, &config.mint_binding.mint)?;
+    require_signer(mint)?;
     require_writable(bridge_state)?;
     let bridge_state_pda =
         derive_bridge_state_pda(&config.manager_program_id, &config.mint_binding.mint);
@@ -664,7 +676,6 @@ fn process_initialize_accounts(
         BRIDGE_STATE_ACCOUNT_LENGTH,
     )?;
     require_zeroed_account(bridge_state)?;
-    require_account_key(mint, &config.mint_binding.mint)?;
     require_account_key(token_program, &config.mint_binding.token_program_id)?;
     validate_mint_account(mint, &config)?;
 
@@ -695,12 +706,14 @@ fn process_accept_deposit_claim_accounts(
     let mint_authority_pda = next_required_account(&mut account_iter)?;
     let token_program = next_required_account(&mut account_iter)?;
     let transceiver_program = next_required_account(&mut account_iter)?;
+    let backing_marker = next_required_account(&mut account_iter)?;
     let (payer, system_program_account) = optional_payer_and_system(&mut account_iter)?;
 
     require_writable(bridge_state)?;
     require_writable(deposit_claim)?;
     require_writable(mint)?;
     require_writable(recipient_token_account)?;
+    require_writable(backing_marker)?;
     require_account_owner(bridge_state, program_id)?;
     require_account_len(bridge_state, BRIDGE_STATE_ACCOUNT_LENGTH)?;
 
@@ -711,6 +724,12 @@ fn process_accept_deposit_claim_accounts(
         return Err(EntrypointError::AccountKeyMismatch);
     }
     let config = state.config.clone();
+    validate_message_domain(&config, &message)?;
+    if message.direction != BridgeDirection::NativeToSolana
+        || message.action != BridgeAction::DepositClaim
+    {
+        return Err(BridgeError::WrongMessageKind.into());
+    }
     require_account_key(
         bridge_state,
         &derive_bridge_state_pda(&config.manager_program_id, &config.mint_binding.mint),
@@ -737,6 +756,35 @@ fn process_accept_deposit_claim_accounts(
         DEPOSIT_CLAIM_ACCOUNT_LENGTH,
     )?;
     require_zeroed_account(deposit_claim)?;
+    // This PDA deliberately excludes nonce, validity, evidence and epochs.
+    // A new authorization envelope can never credit the same Native outpoint
+    // twice for this Mint. There is no instruction which closes this marker.
+    let output_index = message.deposit_outpoint.vout.to_le_bytes();
+    let backing_seeds: &[&[u8]] = &[
+        DEPOSIT_BACKING_PDA_SEED_PREFIX,
+        &message.deployment.mint,
+        &message.deployment.native_genesis,
+        &message.deposit_outpoint.txid,
+        &output_index,
+    ];
+    let (backing_pda, backing_bump) = Pubkey::find_program_address(backing_seeds, program_id);
+    ensure_program_pda_account(
+        backing_marker,
+        payer,
+        system_program_account,
+        program_id,
+        &backing_pda.to_bytes(),
+        &[
+            DEPOSIT_BACKING_PDA_SEED_PREFIX,
+            &message.deployment.mint,
+            &message.deployment.native_genesis,
+            &message.deposit_outpoint.txid,
+            &output_index,
+            &[backing_bump],
+        ],
+        DEPOSIT_BACKING_MARKER_LENGTH,
+    )?;
+    require_zeroed_account(backing_marker)?;
     require_account_key(transceiver_program, &config.transceiver_program_id)?;
     require_account_owner(
         receipt_account,
@@ -758,16 +806,14 @@ fn process_accept_deposit_claim_accounts(
         mint,
         mint_authority_pda.key.to_bytes(),
         token_program,
-        &[bridge_state, deposit_claim, recipient_token_account],
+        &[
+            bridge_state,
+            deposit_claim,
+            backing_marker,
+            recipient_token_account,
+        ],
     )?;
     validate_accounts(&config, &account_context)?;
-    validate_message_domain(&config, &message)?;
-    if message.direction != BridgeDirection::NativeToSolana
-        || message.action != BridgeAction::DepositClaim
-    {
-        return Err(BridgeError::WrongMessageKind.into());
-    }
-
     let digest = message
         .message_digest()
         .map_err(|_| BridgeError::InvalidMessage)?;
@@ -799,6 +845,12 @@ fn process_accept_deposit_claim_accounts(
         recipient: message.destination,
     };
     write_account_data(deposit_claim, &encode_deposit_claim_account(&record)?)?;
+    let mut backing_data = Vec::with_capacity(DEPOSIT_BACKING_MARKER_LENGTH);
+    backing_data.extend_from_slice(b"KPBBAK01");
+    backing_data.push(1);
+    backing_data.extend_from_slice(&message.operation_id);
+    backing_data.extend_from_slice(&digest);
+    write_account_data(backing_marker, &backing_data)?;
     write_account_data(bridge_state, &encode_bridge_state_account(&state)?)?;
     Ok(())
 }
@@ -948,6 +1000,21 @@ pub fn derive_deposit_claim_pda(
     Pubkey::find_program_address(
         &[DEPOSIT_CLAIM_PDA_SEED_PREFIX, operation_id],
         &manager_program_id,
+    )
+    .0
+    .to_bytes()
+}
+
+pub fn derive_deposit_backing_pda(message: &CanonicalBridgeMessage) -> PubkeyBytes {
+    Pubkey::find_program_address(
+        &[
+            DEPOSIT_BACKING_PDA_SEED_PREFIX,
+            &message.deployment.mint,
+            &message.deployment.native_genesis,
+            &message.deposit_outpoint.txid,
+            &message.deposit_outpoint.vout.to_le_bytes(),
+        ],
+        &Pubkey::new_from_array(message.deployment.manager_program_id),
     )
     .0
     .to_bytes()
@@ -2288,9 +2355,44 @@ mod tests {
             .encode()
             .unwrap();
 
+        assert_eq!(
+            process_instruction_accounts(
+                &id(),
+                &[
+                    state_account.clone(),
+                    mint_account.clone(),
+                    token_program.clone()
+                ],
+                &initialize
+            ),
+            Err(EntrypointError::MissingRequiredSignature)
+        );
+        assert!(state_account.data.borrow().iter().all(|byte| *byte == 0));
+        let mut mint_account = mint_account;
+        mint_account.is_signer = true;
+        let wrong_mint = test_account(
+            Pubkey::new_unique(),
+            spl_token::id(),
+            mint_account_data(&config, 0),
+            true,
+            false,
+        );
+        assert_eq!(
+            process_instruction_accounts(
+                &id(),
+                &[state_account.clone(), wrong_mint, token_program.clone()],
+                &initialize
+            ),
+            Err(EntrypointError::AccountKeyMismatch)
+        );
+        assert!(state_account.data.borrow().iter().all(|byte| *byte == 0));
         process_instruction_accounts(
             &id(),
-            &[state_account.clone(), mint_account, token_program],
+            &[
+                state_account.clone(),
+                mint_account.clone(),
+                token_program.clone(),
+            ],
             &initialize,
         )
         .unwrap();
@@ -2299,6 +2401,14 @@ mod tests {
         assert_eq!(state.config, config);
         assert_eq!(state.minted_supply, 0);
         assert_eq!(state.burned_unpaid_withdrawals, 0);
+        assert_eq!(
+            process_instruction_accounts(
+                &id(),
+                &[state_account, mint_account, token_program],
+                &initialize
+            ),
+            Err(EntrypointError::AccountAlreadyInitialized)
+        );
     }
 
     #[test]
@@ -2397,6 +2507,13 @@ mod tests {
             mint_authority,
             token_program,
             transceiver_program,
+            test_account(
+                Pubkey::new_from_array(derive_deposit_backing_pda(&message)),
+                id(),
+                vec![0; DEPOSIT_BACKING_MARKER_LENGTH],
+                false,
+                true,
+            ),
         ];
         let mut substituted = accounts.clone();
         substituted[4] = test_account(
@@ -2453,6 +2570,40 @@ mod tests {
         assert_eq!(claim.record.operation_id, message.operation_id);
         assert_eq!(claim.record.message_digest, digest);
         assert_eq!(claim.record.amount_atomic, message.amount_atomic);
+        assert_eq!(&accounts[8].data.borrow()[9..41], &message.operation_id);
+        // Even a new operation ID, nonce and evidence cannot reuse the backing.
+        let mut replay = message.clone();
+        replay.nonce = h(94);
+        replay.evidence_digest = h(95);
+        replay.operation_id = replay.derive_operation_id().unwrap();
+        let mut replay_accounts = accounts.clone();
+        replay_accounts[1] = test_account(
+            Pubkey::new_from_array(derive_deposit_claim_pda(
+                &config.manager_program_id,
+                &replay.operation_id,
+            )),
+            id(),
+            vec![0; DEPOSIT_CLAIM_ACCOUNT_LENGTH],
+            false,
+            true,
+        );
+        assert_eq!(
+            process_instruction_accounts_with_token_cpi(
+                &id(),
+                &replay_accounts,
+                &BridgeInstruction::AcceptDepositClaim(Box::new(replay))
+                    .encode()
+                    .unwrap(),
+                TokenCpiMode::SkipForTest
+            ),
+            Err(EntrypointError::AccountAlreadyInitialized)
+        );
+        assert_eq!(
+            read_bridge_state_account(&state_account)
+                .unwrap()
+                .minted_supply,
+            message.amount_atomic as u128
+        );
 
         assert_eq!(
             process_instruction_accounts_with_token_cpi(
@@ -2776,6 +2927,27 @@ mod tests {
             .accept_deposit_claim(&mut transceiver, &message, &accounts)
             .unwrap();
         bridge.rotate_epochs_for_test(8, 9).unwrap();
+        let mut rotated_message = message.clone();
+        rotated_message.policy_epoch = 8;
+        rotated_message.key_epoch = 9;
+        rotated_message.nonce = h(90);
+        rotated_message.valid_until += 10;
+        rotated_message.operation_id = rotated_message.derive_operation_id().unwrap();
+        assert_ne!(rotated_message.operation_id, message.operation_id);
+        assert_eq!(
+            derive_deposit_backing_pda(&rotated_message),
+            derive_deposit_backing_pda(&message)
+        );
+        let rotated_config = bridge.config().unwrap().clone();
+        let mut rotated_transceiver = super::tests::transceiver(&rotated_config);
+        let digest = rotated_message.message_digest().unwrap();
+        rotated_transceiver
+            .verify_message(&rotated_message, &observations(&rotated_config, digest))
+            .unwrap();
+        assert_eq!(
+            bridge.accept_deposit_claim(&mut rotated_transceiver, &rotated_message, &accounts),
+            Err(BridgeError::Replay)
+        );
         assert_eq!(bridge.deposit_claim_count(), 1);
         assert_eq!(bridge.minted_supply(), 5_000);
     }

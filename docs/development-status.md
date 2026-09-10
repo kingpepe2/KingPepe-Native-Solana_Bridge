@@ -7,13 +7,17 @@ private repository. [CI run 34437324660](https://github.com/kingpepe2/KingPepe-N
 failed in the SBF job: running host Cargo metadata from the repository root
 selected the old Native toolchain, which could not parse Solana lockfile v4.
 The corrective workflow builds from solana/ so the pinned Rust 1.89.0 applies.
-This correction awaits its exact-SHA CI; the failed run is not a stage pass.
+Correction `507c94f39b1f91630baf22824ca4094e3f99d5b6`, message
+`fix(ci): select Solana host toolchain for SBF metadata`, was pushed to PRIVATE
+origin/main; all four [CI jobs passed](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34437591936).
+The Linux job built both SBF programs and executed the real automatic deposit,
+observing reserve and Mint supply of 100000000 atomic units. No gate was disabled.
 
 Previous source `cb7b44544f8c3935ddc8065eee5d67ee220afee2`, message
 `fix(phase-08): isolate pinned SBF builds and validate real native sweep`,
 was pushed to PRIVATE origin/main and passed all four
 [CI jobs](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34432312954).
-This integration increment awaits its own commit/push/CI in this snapshot.
+The newer security increment below awaits its own commit/push/CI in this snapshot.
 CI emits the tested GITHUB_SHA; no self-referential commit SHA is embedded.
 
 - Bounded same-signature setup/receipt/claim finality waiting is implemented.
@@ -26,6 +30,20 @@ CI emits the tested GITHUB_SHA; no self-referential commit SHA is embedded.
   a second receipt broadcast; persisted integrity HARD_STOP does not clear.
 - Actual entrypoints enforce pause, hard-stop, local activation/environment,
   recipient binding and expiry. Test CPI bypass is cfg(test)-only.
+- Manager and Transceiver initial enrollment require the exact Mint identity's
+  signature. An arbitrary fee payer cannot initialize that Mint's configuration;
+  substitution and reinitialization are rejected. The Mint identity is not an
+  alternate SPL minter and is never required for normal transfer approval.
+- A permanent manager-owned backing marker binds Mint, Native genesis and exact
+  outpoint, excluding nonce, validity, evidence and epochs. It is written with
+  claim/mint atomically and has no close instruction. Rust checks cover changed
+  nonce/evidence and epoch rotation; the matching planner derives the same PDA.
+- Real-validator security checks pass: completed-operation retry is idempotent;
+  a new valid two-attester receipt with a changed nonce cannot credit consumed
+  backing; actual supply is unchanged. Rejection is validator preflight, not a
+  claimed finalized failed transaction. A test-harness account-wrapper mismatch
+  initially failed the final supply check; the corrected full run passed all
+  three checks. These are not the complete failure/reorg/restart matrix.
 - The observer checks account program ownership, PDA, freshness, Mint layout,
   exact supply, decimals, PDA mint authority and no freeze authority. It reports
   RPC_OBSERVATION, not independent chain validation.
@@ -47,14 +65,15 @@ CI emits the tested GITHUB_SHA; no self-referential commit SHA is embedded.
 - Stale AGENTS/readiness summaries were consolidated; historical evidence below
   is not proof of this newer source.
 
-Measured tests: 132 Node tests + two vectors on Windows and WSL; 56 Solana Rust
+Measured tests: 133 Node tests + two vectors on Windows and WSL; 56 Solana Rust
 tests + 22 Native supporting-crate tests in WSL. Formatting/clippy passed.
 Zero failures/skips in these measured suites; two SBF builds and real deposit
-E2E passed. Native Windows SBF, Windows service ACL/protected storage, full
+E2E plus three real-validator security checks passed. Native Windows SBF,
+Windows service ACL/protected storage, full
 failure matrix, withdrawal E2E, Devnet and fresh-clone reproducibility: NOT_RUN.
 
 Phase 08 is still incomplete. Next: exact-SHA CI, then temporary-deposit
-recovery/race coverage, initialization authorization, complete Native evidence
+recovery/race coverage, on-chain Native network/genesis binding, complete Native evidence
 wiring and real-daemon failure/replay/restart tests. The local deposit uses an
 isolated FROST-controlled P2TR test intent; this run does not prove user CSV
 recovery. File-journal tests do not prove production fsync, authenticated

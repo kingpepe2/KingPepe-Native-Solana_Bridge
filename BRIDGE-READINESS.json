@@ -7,16 +7,16 @@
   "productionBroadcastAuthorized": false,
   "lastUpdated": "2026-09-10",
   "currentPhase": "PHASE_08",
-  "currentCiFailure": {
+  "historicalCiFailure": {
     "sourceSha": "bfc704c561fcf47e9625c7aff6c8bb72b1997ba7",
     "url": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34437324660",
     "reason": "SBF host metadata used root Native toolchain instead of Solana Rust 1.89.0",
-    "correction": "Build from solana workspace; local SBF correction passed, corrective CI pending."
+    "correction": "507c94f39b1f91630baf22824ca4094e3f99d5b6 builds from solana workspace; all four CI jobs PASS including real deposit."
   },
   "evidenceScope": "Current local integration increment; its CI result must be checked at the exact source SHA. Earlier per-component CI booleans were historical, not proof of this tree.",
   "previousVerifiedSource": {
-    "sha": "cb7b44544f8c3935ddc8065eee5d67ee220afee2",
-    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34432312954",
+    "sha": "507c94f39b1f91630baf22824ca4094e3f99d5b6",
+    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34437591936",
     "status": "PASS"
   },
   "sourceState": {
@@ -31,6 +31,8 @@
     "nativeProofReserveRecovery": "MODEL_TESTED_PARTIAL_EVIDENCE_WIRING",
     "solanaObservation": "RPC_OBSERVATION_LOCALNET_ONLY_PRODUCTION_BLOCKED",
     "receiptAndClaim": "TWO_TRANSACTIONS_CANONICAL_SHARED_MESSAGE",
+    "initialEnrollment": "EXACT_MINT_SIGNATURE_REQUIRED_NOT_AN_ALTERNATE_MINTER",
+    "backingReplayProtection": "PERMANENT_OUTPOINT_PDA_REAL_LOCAL_VALIDATOR_REJECTION_TESTED",
     "legacyOversizedBundle": "REMOVED_NOT_A_VALID_LOCAL_VALIDATOR_TRANSACTION",
     "durability": "IMPLEMENTED_BUT_INCOMPLETE",
     "sdkCliApp": "INCOMPLETE",
@@ -38,18 +40,21 @@
   },
   "localValidation": {
     "windows": {
-      "nodeTestsPass": 132,
+      "nodeTestsPass": 133,
       "protocolVectorsPass": 2,
       "nativeSbf": "NOT_RUN_NOT_SUPPORTED",
       "serviceAclProtectedStorage": "NOT_RUN"
     },
     "wsl": {
-      "nodeTestsPass": 132,
+      "nodeTestsPass": 133,
       "protocolVectorsPass": 2,
       "solanaRustTestsPass": 56,
       "nativeRustTestsPass": 22,
       "sbfProgramsBuilt": 2,
       "nativeToSolana": "PASS_SINGLE_FRESH_OPERATION_REAL_DAEMONS",
+      "localValidatorSecurityChecksPass": 3,
+      "localValidatorSecurityChecksFail": 0,
+      "duplicateBacking": "NEW_NONCE_VALID_ATTESTATIONS_PREFLIGHT_REJECTED_SUPPLY_UNCHANGED",
       "canonicalReserveAtomic": "100000000",
       "observedMintSupplyAtomic": "100000000",
       "perTransferTeamApproval": false,
@@ -78,7 +83,7 @@
   "phase08Remaining": [
     "Review actual temporary-deposit recovery script and sweep/recovery race coverage",
     "Wire complete Native evidence validation into the daemon-backed path and independent attester checks",
-    "Review on-chain initialization authorization and remaining account/security dependencies",
+    "Bind Native network/genesis in on-chain configuration and review remaining account/security dependencies",
     "Exercise real-daemon failure/restart/reorg/replay cases beyond model tests"
   ],
   "readinessGates": {

@@ -3,26 +3,32 @@
 Phase 08 integration source `bfc704c561fcf47e9625c7aff6c8bb72b1997ba7` pushed;
 CI https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34437324660
 failed because the SBF job selected the root Native Cargo toolchain for Solana
-metadata. Corrective source changes that job's build directory to solana/;
-verification for the correction is pending. No security gate was disabled.
+metadata. Corrective commit `507c94f39b1f91630baf22824ca4094e3f99d5b6`, message
+`fix(ci): select Solana host toolchain for SBF metadata`, pushed to PRIVATE
+origin/main and passed all four jobs at
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34437591936.
+The Linux job executed the real deposit flow. No security gate was disabled.
 
 Current handoff (2026-09-10), Phase 08: real Native-to-Solana local happy path
 passes with Agave 4.2.2 and node-accepted FROST A+B. Finalized Native reserve
 and actual SPL Mint supply both equal 100000000 atomic units. Two packet-sized
 receipt/claim transactions replace the invalid oversized bundle. Mainnet stays
-disabled. This integration increment awaits its own commit/push/CI.
+disabled. The current security increment adds Mint-signed initial enrollment
+and a permanent Native-outpoint backing marker. Real-validator checks pass for
+idempotent completed retry, a newly signed duplicate-backing preflight rejection,
+and unchanged Mint supply. This increment awaits its own commit/push/CI.
 
 Preceding source `cb7b44544f8c3935ddc8065eee5d67ee220afee2`, message
 `fix(phase-08): isolate pinned SBF builds and validate real native sweep`, was
 pushed to PRIVATE origin/main; all four jobs passed at
 https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34432312954.
 
-Latest local suites: 132 Node tests + 2 vectors on Windows and WSL; 56 Solana
+Latest local suites: 133 Node tests + 2 vectors on Windows and WSL; 56 Solana
 Rust tests + 22 Native supporting-crate tests in WSL. No failures/skips in these
 suites. All five Rust dependency audits report zero vulnerabilities and one
 unmaintained dependency warning in the Solana graph; npm reports zero.
 See `docs/development-status.md` for scope, remaining Phase 08 recovery/evidence/
-initialization/failure-test gaps and the next step. Phase 09 has not started.
+Native-domain/failure-test gaps and the next step. Phase 09 has not started.
 
 The records below are historical; their test totals and blockers are not current.
 

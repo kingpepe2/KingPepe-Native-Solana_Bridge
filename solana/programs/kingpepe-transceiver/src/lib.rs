@@ -18,6 +18,7 @@ use solana_program::{
     entrypoint::ProgramResult,
     program::invoke_signed,
     program_error::ProgramError,
+    program_pack::Pack,
     pubkey::Pubkey,
     sysvar::{
         instructions::{
@@ -482,7 +483,20 @@ fn process_initialize_accounts(
 
     let mut account_iter = accounts.iter();
     let config_account = next_required_account(&mut account_iter)?;
+    let mint = next_required_account(&mut account_iter)?;
     let (payer, system_program_account) = optional_payer_and_system(&mut account_iter)?;
+    // One-time enrollment is authorized by the exact Mint account identity,
+    // not merely by a fee payer or a caller-provided authority field. This
+    // signature does not become SPL mint authority or per-transfer approval.
+    require_account_key(mint, &config.mint)?;
+    require_signer(mint)?;
+    require_account_owner(mint, &spl_token_interface::id())?;
+    let mint_data = mint
+        .try_borrow_data()
+        .map_err(|_| EntrypointError::AccountBorrowFailed)?;
+    spl_token_interface::state::Mint::unpack(&mint_data)
+        .map_err(|_| EntrypointError::InvalidAccountData)?;
+    drop(mint_data);
     require_writable(config_account)?;
     let config_pda = derive_transceiver_config_pda(&config.transceiver_program_id, &config.mint);
     let mint_pubkey = Pubkey::new_from_array(config.mint);
@@ -1603,8 +1617,58 @@ mod tests {
         let initialize = TransceiverInstruction::Initialize(config.clone())
             .encode()
             .unwrap();
-        process_instruction_accounts(&id(), std::slice::from_ref(&config_account), &initialize)
-            .unwrap();
+        let mut mint_data = vec![0; spl_token_interface::state::Mint::LEN];
+        spl_token_interface::state::Mint::pack(
+            spl_token_interface::state::Mint {
+                mint_authority: solana_program::program_option::COption::Some(Pubkey::new_unique()),
+                supply: 0,
+                decimals: 8,
+                is_initialized: true,
+                freeze_authority: solana_program::program_option::COption::None,
+            },
+            &mut mint_data,
+        )
+        .unwrap();
+        let mint_account = test_account(
+            Pubkey::new_from_array(config.mint),
+            spl_token_interface::id(),
+            mint_data.clone(),
+            true,
+            false,
+        );
+        let mut unsigned_mint = mint_account.clone();
+        unsigned_mint.is_signer = false;
+        let wrong_mint = test_account(
+            Pubkey::new_unique(),
+            spl_token_interface::id(),
+            mint_data.clone(),
+            true,
+            false,
+        );
+        let wrong_program = test_account(
+            Pubkey::new_from_array(config.mint),
+            system_program::id(),
+            mint_data,
+            true,
+            false,
+        );
+        for (mint, expected) in [
+            (unsigned_mint, EntrypointError::MissingRequiredSignature),
+            (wrong_mint, EntrypointError::AccountKeyMismatch),
+            (wrong_program, EntrypointError::AccountOwnerMismatch),
+        ] {
+            assert_eq!(
+                process_instruction_accounts(&id(), &[config_account.clone(), mint], &initialize),
+                Err(expected)
+            );
+            assert!(config_account.data.borrow().iter().all(|byte| *byte == 0));
+        }
+        process_instruction_accounts(
+            &id(),
+            &[config_account.clone(), mint_account.clone()],
+            &initialize,
+        )
+        .unwrap();
         assert_eq!(
             read_transceiver_config_account(&config_account)
                 .unwrap()
@@ -1612,7 +1676,11 @@ mod tests {
             config
         );
         assert_eq!(
-            process_instruction_accounts(&id(), std::slice::from_ref(&config_account), &initialize),
+            process_instruction_accounts(
+                &id(),
+                &[config_account.clone(), mint_account],
+                &initialize
+            ),
             Err(EntrypointError::AccountAlreadyInitialized)
         );
 
