@@ -13,7 +13,9 @@ import {
   hexToBytes,
   nativeSigningIntentDigest,
   sha256Canonical,
+  validateNativeSigningIntent,
 } from "../policy/native-signing-policy.mjs";
+import { validateNativeFrostSigningRequest } from "../policy/signing-request.mjs";
 
 function secureFrostRandomBytes(length = 32) {
   return Uint8Array.from(randomBytes(length));
@@ -56,7 +58,7 @@ export class NativeFrostSigner {
   async verifyNativeEvidence(intent) {
     this.#requireAvailable();
     if (this.#nativeEvidenceValidator === undefined) throw new Error("FROST native evidence verifier required");
-    const snapshot = structuredClone(intent);
+    const snapshot = validateNativeSigningIntent(intent);
     assertNativeSigningApproved(this.#policy, snapshot);
     const digest = nativeSigningIntentDigest(snapshot);
     this.#validatedNativeIntents.delete(digest);
@@ -155,6 +157,7 @@ export class NativeFrostSigner {
 
   signingCommitment(request) {
     this.#requireAvailable();
+    request = validateNativeFrostSigningRequest(request);
     const { state, key } = this.#authorizeRequestWithKey(request);
     const existing = state.signing[request.sessionId];
     if (existing !== undefined) {
@@ -204,6 +207,7 @@ export class NativeFrostSigner {
 
   signatureShare(request, commitments) {
     this.#requireAvailable();
+    request = validateNativeFrostSigningRequest(request);
     const { state, key } = this.#authorizeRequestWithKey(request);
     const session = state.signing[request.sessionId];
     if (session === undefined) throw new Error("signer has no reserved FROST nonce for session");
@@ -272,9 +276,9 @@ export class NativeFrostSigner {
 
   #authorizeRequestWithKey(request) {
     assertNativeSigningPolicy(this.#policy);
+    assertNativeSigningApproved(this.#policy, request.intent);
     const state = this.#stateStore.load();
     const key = this.#activeKey(state, request.epoch);
-    validateSigningRequestEnvelope(request, this.#policy);
     if (this.#nativeEvidenceValidator !== undefined) {
       const checkedAt = this.#validatedNativeIntents.get(request.intentDigest);
       if (checkedAt === undefined || performance.now() - checkedAt > 30_000) {
@@ -356,24 +360,6 @@ function validateRound1Set(request, round1Messages) {
   return request.participants
     .map((participant) => bySigner.get(participant.signerId))
     .map((round1) => structuredClone(round1));
-}
-
-function validateSigningRequestEnvelope(request, policy) {
-  if (request.protocol !== "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_REQUEST/V1") throw new Error("wrong FROST request protocol");
-  assertHashHex(request.requestId, "FROST request ID");
-  assertHashHex(request.sessionId, "FROST session ID");
-  assertHashHex(request.intentDigest, "FROST intent digest");
-  assertHashHex(request.messageHex, "FROST message");
-  const expectedDigest = nativeSigningIntentDigest(request.intent);
-  if (request.intentDigest !== expectedDigest) throw new Error("FROST request intent digest mismatch");
-  if (request.messageHex !== request.intent.taprootSighashHex.toLowerCase()) {
-    throw new Error("FROST request message must be the committed Taproot sighash");
-  }
-  const participantIds = [...request.participantIds].sort();
-  if (canonicalJson(participantIds) !== canonicalJson([...REQUIRED_FROST_SIGNERS].sort())) {
-    throw new Error("FROST request participant set must be exactly A+B");
-  }
-  assertNativeSigningApproved(policy, request.intent);
 }
 
 function validateCommitmentSet(request, commitments) {

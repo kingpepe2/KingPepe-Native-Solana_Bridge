@@ -6,9 +6,10 @@ import {
   bytesToHex,
   canonicalJson,
   hexToBytes,
-  nativeSigningIntentDigest,
   sha256Canonical,
+  validateNativeSigningIntent,
 } from "../policy/native-signing-policy.mjs";
+import { createNativeFrostSigningRequest } from "../policy/signing-request.mjs";
 import { deserializeFrostPublic } from "../signer/native-frost-signer.mjs";
 
 export function createTwoPartyDkgRequest(options) {
@@ -81,7 +82,7 @@ export class NativeFrostCoordinator {
   }
 
   async signAutomaticallyWithNativeEvidence(intent) {
-    const snapshot = structuredClone(intent);
+    const snapshot = validateNativeSigningIntent(intent);
     // Verification executes in each participant's configured boundary; a
     // coordinator assertion cannot populate either participant's private fence.
     for (const signerId of REQUIRED_FROST_SIGNERS) {
@@ -91,10 +92,9 @@ export class NativeFrostCoordinator {
   }
 
   signAutomatically(intent, options = {}) {
-    const requestId = assertHashHex(intent.signingRequestId, "FROST signing request ID");
+    const request = createNativeFrostSigningRequest(intent, options);
+    const { requestId, intentDigest, messageHex, participantIds } = request;
     const existing = this.#completed.get(requestId);
-    const intentDigest = nativeSigningIntentDigest(intent);
-    const messageHex = intent.taprootSighashHex.toLowerCase();
     if (existing !== undefined) {
       if (existing.intentDigest !== intentDigest || existing.messageHex !== messageHex) {
         throw new Error("completed FROST request replayed with altered message");
@@ -112,29 +112,6 @@ export class NativeFrostCoordinator {
       });
     }
     if (available.length !== REQUIRED_FROST_SIGNERS.length) throw new Error("FROST participant set must remain exactly A+B");
-
-    const attempt = options.attempt ?? 1;
-    if (!Number.isSafeInteger(attempt) || attempt < 1) throw new Error("invalid FROST signing attempt");
-    const participantIds = [...REQUIRED_FROST_SIGNERS];
-    const request = Object.freeze({
-      protocol: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_REQUEST/V1",
-      requestId,
-      epoch: intent.keyEpoch,
-      attempt,
-      sessionId: sha256Canonical({
-        protocol: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_SESSION/V1",
-        requestId,
-        epoch: intent.keyEpoch,
-        attempt,
-        intentDigest,
-        messageHex,
-        participantIds,
-      }),
-      intent: structuredClone(intent),
-      intentDigest,
-      messageHex,
-      participantIds,
-    });
 
     const signers = participantIds.map((signerId) => this.#signers.get(signerId));
     const commitments = signers.map((signer) => signer.signingCommitment(request));
@@ -174,7 +151,7 @@ export class NativeFrostCoordinator {
     const success = Object.freeze({
       state: "SIGNED",
       requestId,
-      epoch: intent.keyEpoch,
+      epoch: request.epoch,
       sessionId: request.sessionId,
       intentDigest,
       messageHex,
