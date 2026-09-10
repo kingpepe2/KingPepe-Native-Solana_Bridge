@@ -1,41 +1,38 @@
-# Native Token Transfers (NTT) Comparison
+# Native Token Transfers comparison
 
-## Reference
+Rechecked 2026-09-10 against the actual upstream tree, main and releases:
+`wormhole-foundation/native-token-transfers` at
+`250d810d42b005526e4fb7e3aea75d2d2ab8fdbb`.
+Main still identifies this commit (2026-07-30, Sui rate-limit fixes).
+Recent releases inspected include CLI 1.10.0+cli (2026-05-22), 1.9.0, 1.8.0 and
+EVM 2.0.0. A CLI/EVM release is not a KingPepe Solana production compatibility
+certification. No new upstream commit was selected merely to appear current.
 
-- Project: `wormhole-foundation/native-token-transfers`
-- Reference commit: `250d810d42b005526e4fb7e3aea75d2d2ab8fdbb`
-- License: Apache-2.0
-- Date checked: `2026-09-07`
+| Actual upstream area | KingPepe use | Difference / exclusion |
+| --- | --- | --- |
+| solana/programs/example-native-token-transfers: manager, inbox/outbox, rate_limit, transfer/redeem/release | Reference-only Manager, claim and permanent backing boundaries | Native reserve verification and liability journal are original, incomplete operationally |
+| ntt-transceiver and Wormhole receive-message accounts | Reference-only separation of verification and economic authority | Project-attested A+B Ed25519; no Guardian dependency or attestation-to-consensus equivalence |
+| solana/modules/ntt-messages and trimmed_amount | Reference-only typed binary message organization | Original fixed-width protocol, exact eight-decimal Native atomic units; no amount trimming |
+| solana/ts versioned IDLs and SDK organization | Comparison only | Direct solana-program implementation; no Anchor-generated IDL or completed SDK claim |
+| solana/tests and fixtures | Test-organization reference only | KingPepe REGTEST plus local validator; no upstream Guardian/node fixtures copied |
+| solana/fuzz/trimmed_amount | Organization reference, not implemented fuzz coverage | A complete KingPepe fuzz campaign remains pending |
+| dummy-transfer-hook, wormhole-governance, other chain programs | Excluded | No Token-2022 hook, imported governance, unrelated chain runtime or official Wormhole chain ID |
 
-## Why this reference is used
+Upstream uses its own Solana/Anchor/toolchain/dependency definitions and test
+submodules. They were inspected, not copied as compatible defaults. KingPepe pins
+its direct SBF compiler, Agave validator, Rust, Node and locks separately in
+scripts/local-e2e-toolchain.json. Cargo metadata/locked tests validate that chosen
+combination locally; this is not approval for production versions.
 
-- Message and replay structure patterns.
-- Program boundary separation between bridge manager and witness verification.
-- Typed account and integration organization for Solana workspaces.
+Direct reuse: none. Modified source reuse: none. Reference-only architectural use
+does not transfer upstream audit coverage. NTT is not KingPepe Native custody,
+UTXO verification, Taproot signing, recovery or full reserve/liability accounting.
 
-## What is reused in this phase
+Upstream root LICENSE is Apache-2.0; no root NOTICE was present in the inspected
+tree. No NTT source is vendored or claimed as KingPepe-exclusive third-party code.
+Any future source/derived import requires file-by-file provenance and preservation
+of applicable copyright, license and notices. Existing BIP-341 derived public
+vectors have their own separately preserved terms.
 
-- Design only, no source file imported yet.
-- Planned reuse patterns:
-  - Solana workspace layout families.
-  - Canonical replay protection and claim tracking model.
-  - Test and fuzz organization approach.
-
-## What is excluded in this project
-
-- TON-specific governance, config, and lite-client adapters.
-- Chain-specific modules not in scope (EVM/SUI/XRPL patterns).
-- Legacy examples or scripts that assume external multi-host Guardian trust assumptions.
-- Direct import of any `proof` or `telemetry` code until protocol-specific compatibility is proven.
-
-## Required local differences
-
-- KingPepe Native signature requirements must be handled by project-specific crypto path.
-- Same-host dual FROST participants (A+B) are approved by KingPepe Team governance for this project.
-- Automatic transfer authorization remains local and policy-driven after user wallet signatures.
-- Canonical reserve/liability model is bound to Native-backed operations and reconciliation.
-
-## Compliance notes
-
-- If any upstream file is imported later, license headers and NOTICE lines must be preserved.
-- Source hashes for imported commits must match tracked in `UPSTREAM-REFERENCES.json`.
+Sources: [pinned tree](https://github.com/wormhole-foundation/native-token-transfers/tree/250d810d42b005526e4fb7e3aea75d2d2ab8fdbb),
+[releases](https://github.com/wormhole-foundation/native-token-transfers/releases).

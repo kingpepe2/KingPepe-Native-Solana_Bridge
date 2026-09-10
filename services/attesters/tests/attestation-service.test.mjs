@@ -9,7 +9,7 @@ import {
   evaluateDepositCredit,
   verifyProjectAttestation,
 } from "../attestation-service.mjs";
-import { decodeCanonicalBridgeMessage } from "../../../shared/protocol/canonical-message.mjs";
+import { decodeCanonicalBridgeMessage, encodeCanonicalBridgeMessage, bytesToHex } from "../../../shared/protocol/canonical-message.mjs";
 
 const vectorPath = path.resolve(import.meta.dirname, "../../../solana/modules/bridge-messages/vectors/canonical-v1.json");
 const vectorFile = JSON.parse(readFileSync(vectorPath, "utf8"));
@@ -82,6 +82,40 @@ function runtime() {
   return { keyA, keyB, attesterA, attesterB };
 }
 
+test("attester signing key and policy are isolated from caller mutation", () => {
+  const key = createEphemeralAttesterKeypairForTestOnly();
+  const policy = policyFor("ATTESTER_A", key, { hardStop: true });
+  const attester = new ProjectAttester({ role: "ATTESTER_A", secretKey: key.secretKey, policy });
+  policy.hardStop = false;
+  policy.acceptedNativeTrust.push("RPC_OBSERVATION");
+  assert.equal(attester.secretKey, undefined);
+  assert.equal(Object.keys(attester).includes("secretKey"), false);
+  assert.throws(() => { attester.policy.hardStop = false; }, TypeError);
+  assert.throws(() => { attester.policy = policy; }, TypeError);
+  assert.throws(() => attester.policy.acceptedNativeTrust.push("RPC_OBSERVATION"), TypeError);
+  assert.throws(() => attester.signDepositCredit(request(), 1_700_000_600), /HARD_STOP_ACTIVE/u);
+  attester.close();
+});
+
+test("attester snapshots external key bytes and close permanently stops signing", () => {
+  const key = createEphemeralAttesterKeypairForTestOnly();
+  const attester = new ProjectAttester({ role: "ATTESTER_A", secretKey: key.secretKey, policy: policyFor("ATTESTER_A", key) });
+  key.secretKey.fill(0);
+  attester.publicKey.fill(0);
+  assert.equal(verifyProjectAttestation(attester.signDepositCredit(request(), 1_700_000_600), request().encodedMessageHex), true);
+  attester.close();
+  assert.throws(() => attester.signDepositCredit(request(), 1_700_000_600), /AttesterClosed/u);
+});
+
+test("omitted attestation clock cannot bypass an expired message", () => {
+  const { attesterA } = runtime();
+  const encoded = encodeCanonicalBridgeMessage({ ...decodedDeposit, operationId: undefined, validFrom: 1n, validUntil: 2n });
+  const decoded = decodeCanonicalBridgeMessage(encoded);
+  const expired = request({ encodedMessageHex: bytesToHex(encoded), messageDigestHex: decoded.messageDigestHex });
+  assert.throws(() => attesterA.signDepositCredit(expired), /MESSAGE_EXPIRED/u);
+  attesterA.close();
+});
+
 test("A+B project attestations sign exactly the same canonical deposit message", () => {
   const { keyA, keyB, attesterA, attesterB } = runtime();
   const first = attesterA.signDepositCredit(request(), 1_700_000_600);
@@ -132,6 +166,7 @@ test("attesters reject missing or invalid Native reserve evidence before signing
 
   const rpcOnly = evaluateDepositCredit({
     policy,
+    nowUnix: 1_700_000_600,
     request: request({ evidence: evidence({ trust: "RPC_OBSERVATION" }) }),
   });
   assert.equal(rpcOnly.state, "WAITING_FOR_DEPENDENCY");
@@ -139,6 +174,7 @@ test("attesters reject missing or invalid Native reserve evidence before signing
 
   const recoverable = evaluateDepositCredit({
     policy,
+    nowUnix: 1_700_000_600,
     request: request({ evidence: evidence({ reserveTransitionState: "TEMPORARY_RECOVERABLE" }) }),
   });
   assert.equal(recoverable.state, "WAITING_FOR_DEPENDENCY");
@@ -146,6 +182,7 @@ test("attesters reject missing or invalid Native reserve evidence before signing
 
   const wrongAmount = evaluateDepositCredit({
     policy,
+    nowUnix: 1_700_000_600,
     request: request({ evidence: evidence({ amountAtomic: "12346" }) }),
   });
   assert.equal(wrongAmount.state, "REJECTED");

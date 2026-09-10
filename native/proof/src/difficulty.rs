@@ -37,6 +37,7 @@ pub fn calculate_next_work_required(
     first_time: u32,
     params: &PowParameters,
 ) -> Result<u32, NativeProofError> {
+    difficulty_adjustment_interval(params)?;
     if params.no_retargeting {
         return Ok(last_bits);
     }
@@ -60,14 +61,21 @@ pub fn expected_next_work_required(
 ) -> Result<u32, NativeProofError> {
     let last = headers.last().ok_or(NativeProofError::BadDifficulty)?;
     let interval = difficulty_adjustment_interval(params)?;
-    let next_height = last.height + 1;
+    let next_height = last
+        .height
+        .checked_add(1)
+        .ok_or(NativeProofError::BadDifficulty)?;
     let pow_limit_bits = encode_compact(&params.pow_limit, false)?;
 
     if next_height % interval != 0 {
         if !params.allow_minimum_difficulty_blocks {
             return Ok(last.bits);
         }
-        if new_block_time > last.time.saturating_add(params.target_spacing_seconds * 2) {
+        let minimum_difficulty_delay = params
+            .target_spacing_seconds
+            .checked_mul(2)
+            .ok_or(NativeProofError::BadDifficulty)?;
+        if new_block_time > last.time.saturating_add(minimum_difficulty_delay) {
             return Ok(pow_limit_bits);
         }
         for cursor in headers.iter().rev() {
@@ -100,4 +108,37 @@ pub fn validate_compact_target(bits: u32, params: &PowParameters) -> Result<(), 
         return Err(NativeProofError::InvalidCompactTarget);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::chain::NativeChainParams;
+
+    #[test]
+    fn unrepresentable_height_and_spacing_fail_without_panicking() {
+        let mut params = NativeChainParams::regtest().pow_parameters();
+        let mut nodes = vec![DifficultyNode {
+            height: u32::MAX,
+            time: 1,
+            bits: 0x207f_ffff,
+        }];
+        assert_eq!(
+            expected_next_work_required(&nodes, 2, &params),
+            Err(NativeProofError::BadDifficulty)
+        );
+        params.no_retargeting = false;
+        params.target_timespan_seconds = 0;
+        assert_eq!(
+            calculate_next_work_required(0x207f_ffff, 2, 1, &params),
+            Err(NativeProofError::BadDifficulty)
+        );
+        nodes[0].height = 0;
+        params.target_timespan_seconds = 7_200;
+        params.target_spacing_seconds = u32::MAX;
+        assert_eq!(
+            expected_next_work_required(&nodes, 2, &params),
+            Err(NativeProofError::BadDifficulty)
+        );
+    }
 }

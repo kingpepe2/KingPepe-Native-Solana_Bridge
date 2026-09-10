@@ -126,7 +126,11 @@ test("spent or missing UTXO stays unspent=false without inventing value", async 
 
 test("endpoint, method, and auth boundaries fail closed", async () => {
   assert.throws(() => normalizeEndpoint("ftp://127.0.0.1:18443"), /NativeRpcEndpointProtocolRejected/u);
-  assert.throws(() => normalizeEndpoint("http://user:pass@127.0.0.1:18443"), /NativeRpcEndpointCredentialsRejected/u);
+  const invalidEndpoint = new URL("http://127.0.0.1:18443");
+  // Disposable, in-memory rejection inputs; never credentials for a service.
+  invalidEndpoint.username = randomUUID();
+  invalidEndpoint.password = randomUUID();
+  assert.throws(() => normalizeEndpoint(invalidEndpoint.toString()), /NativeRpcEndpointCredentialsRejected/u);
   assert.throws(() => normalizeEndpoint("http://192.0.2.10:18443"), /NativeRpcEndpointMustBeLoopback/u);
   assert.throws(
     () => readAuthorizationHeaderFromCookieFile(path.join(REPO_ROOT, "not-tracked.cookie"), REPO_ROOT),
