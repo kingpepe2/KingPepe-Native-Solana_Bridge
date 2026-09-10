@@ -2,7 +2,61 @@
 
 ## Current Phase 08 integration evidence (2026-09-10)
 
-Current claim-retry increment is UNPUBLISHED / LOCALLY_TESTED. It reconstructs
+Current accounting correction is UNPUBLISHED / LOCALLY_TESTED. The deposit
+ledger now binds credits to the full canonical message and reserve allocation,
+one deployment, operation IDs and permanent in-memory backing markers. Exact
+pending and minted retries are idempotent; different recipients, amounts,
+nonces, epochs or allocations cannot reuse a credited outpoint. Mint settlement
+requires the same credit and exact positive u64 amount (BigInt/canonical string,
+not Number). The zero project fee rule is enforced before Native signing.
+
+Finalized reserve verification now records the user obligation before attesters
+or Solana can fail. All Rust snapshot transitions validate a candidate before
+committing; late overflow, underflow, invalid count or failed coverage preserve
+the original snapshot. Reserve settlement computes all totals before consuming
+backing and rechecks amount/allocation derivation. Consumed temporary backing
+cannot be reintroduced. No operation journal or payout authority is implied by
+the Rust aggregate arithmetic model.
+
+Windows and WSL each: 190 Node tests + two vectors PASS. WSL: 64 Solana Rust +
+29 Native Rust tests, fmt/clippy and both SBF builds PASS. Eighteen added Node
+tests cover pending retry, downstream failure, exact values, binding/mutation,
+maximum u64 precision and 64 interleaved credits. Nine added Rust tests cover
+late failures and unchanged markers/balances. The first focused Node run had
+29 PASS / 2 FAIL: expired attesters throw a specific rejection rather than
+returning a decision. Tests now assert that exact rejection and the retained
+credit; no rejection/security check was disabled. Final suites have zero
+failures/skips.
+
+A fresh real REGTEST/local-validator regression passes the automatic deposit,
+22 security + seven CSV + four wallet PSBT + ten pre-mint race + five claim-worker
+crash/expiry checks. Final reserve and SPL supply each equal 100000000 atomic.
+No per-transfer KingPepe Team approval. This real single-operation regression
+is distinct from the new source-level multi-operation accounting tests; it
+does not prove durable pending-credit recovery or full-service restart.
+
+Five Rust audits and npm audit find no known vulnerabilities; the bincode
+unmaintained warning remains. Declared license metadata passes. No dependencies,
+source imports, files added/deleted/moved or licenses changed; all 169 tracked
+files retain provenance. Current source and all 148 existing commits scan clean.
+Staged/outgoing scans, reviewed private push and exact-SHA CI are required before
+publication is verified. No runtime/build artifacts are uploaded.
+
+Open dependencies: durable operation/credit journal and reconciliation before
+signing resumes, global persistent hard stops, authenticated/fenced storage,
+rollback/power-loss guarantees, full-service restart and post-mint reorg response.
+The file-backed pipeline journal does not reconstruct its in-memory ledger.
+Phase 08 remains INCOMPLETE; Phase 09 NOT_STARTED; Mainnet DISABLED.
+
+Previous source `4e4885a85c93b0ab9473b451b90fe9575bde51c8`, message
+`fix(phase-08): persist and recover signed Solana claims`, is pushed privately;
+[all four exact-SHA CI jobs PASS](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34454048203).
+Its publication scans covered current/staged/outgoing source and all 148 commits,
+with no findings. The following 172-test evidence belongs to that source.
+
+### Previous signed-claim recovery increment (verified source above)
+
+The claim-retry increment is privately published and exact-SHA CI verified. It reconstructs
 the whole current signed claim packet using the existing canonical planner,
 verifies its fee-payer signature and binds the actual programs, SPL Token
 Program, Mint, recipient, PDAs, message and blockhash. The signature is recorded
@@ -38,10 +92,10 @@ No production configuration, keys, services, deployment or activation changed.
 
 Provenance: 168 -> 169 files; one original local test added, no deletions, moves,
 dependency changes or imported source. Obsolete scaffold/missing-tool wording
-in the relevant test/validator READMEs was corrected. Current source and all 147
-existing commits scan clean; private-path/IP checks and exact 169-file provenance
-coverage pass. Staged/outgoing review, private push and exact-SHA CI remain
-required. No runtime/build artifacts are uploaded.
+in the relevant test/validator READMEs was corrected. Current/staged/outgoing
+source and all 148 commits scanned clean at publication; private-path/IP checks
+and exact 169-file provenance coverage passed. Private push and exact-SHA CI
+passed as recorded above. No runtime/build artifacts were uploaded.
 
 Previous source `9ead67ccd1b04ea53f9b878feff3a168120f2844`, message
 `fix(phase-08): verify recovery races and Native RPC errors`, is pushed privately;

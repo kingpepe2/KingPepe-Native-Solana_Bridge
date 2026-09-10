@@ -68,3 +68,23 @@ Coverage is checked as:
 `reserve >= minted_supply + authorized_unminted_credits + burned_unpaid_withdrawals + reserved_utxo_liabilities + broadcast_payout_liabilities + change_reserved`
 
 A Solana burn moves liability form. It does not remove the bridge's Native payout obligation until the payout is finalized.
+
+Every Rust snapshot transition validates a candidate copy before committing it.
+Overflow, underflow, invalid operation count, zero/net-zero amounts or failed
+coverage leave the previous snapshot unchanged. An already uncovered snapshot
+cannot be silently repaired by accepting a donation or another operation.
+
+`LedgerSnapshot` is an aggregate arithmetic model, not an operation journal,
+on-chain account, validated chain snapshot or mint/payout authority. It does not
+provide operation-level idempotence. The later withdrawal integration still
+must bind individual obligations, miner-fee quotes, inputs, change and finalized
+outcomes to a consistent durable journal; these aggregate tests do not prove
+that integration exists. Generic model fee fields do not authorize a nonzero
+project bridge fee or extraction of surplus.
+
+The service's separate `ExactDepositLedger` binds canonical deposit messages
+and reserve allocation IDs and retains in-memory operation/backing markers.
+Identical pending/minted retries are no-ops; a distinct operation cannot consume
+another credit or reuse backing. Finalized reserve settlement creates a credit
+even when attestation or minting fails. See the bridge-validator README for its
+explicit in-memory and restart limitations.

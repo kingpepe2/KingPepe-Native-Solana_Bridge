@@ -26,10 +26,25 @@
 ## Current phase and evidence
 
 PHASE 08: real local Native-to-Solana happy-path integration is now exercised.
-Race/RPC increment 9ead67ccd1b04ea53f9b878feff3a168120f2844 is pushed privately;
+Claim-retry increment 4e4885a85c93b0ab9473b451b90fe9575bde51c8 is pushed privately;
 all four exact-SHA CI jobs PASS:
-https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34451366099
-The current signed-claim retry increment is unpublished and locally tested.
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34454048203
+
+The current accounting correction is unpublished. Windows/WSL each: 190 Node
+tests + two vectors PASS; WSL: 93 Rust tests and fmt/clippy PASS. Canonical
+operation/allocation-bound credits prevent duplicate pending credit and exact
+mint settlement rejects negative/inexact amounts. Finalized backing is credited
+before downstream attestation/mint failure. Rust snapshot/reserve transitions
+commit only after all checked arithmetic and invariants pass. These are
+IN-MEMORY models; they do not establish durable unminted credits or restore
+whole-service accounting. See current status files for real-daemon regression
+and publication evidence. No new dependency or source import; 169 provenance
+entries remain. Fresh real-daemon regression also passes the automatic deposit
+and all 22/7/4/10/5 security/recovery/retry checks, with both SBF rebuilds. The
+real harness's single-operation reconciliation is distinct from the new
+source-level ledger retry tests. Do not skip Phase 08 storage/reconciliation gates.
+
+Previous signed-claim retry evidence below belongs to the verified SHA above.
 It validates the entire signed canonical claim packet and saves its actual
 signature before send. RPC signature substitution hard-stops. Missing/malformed
 execution status or height cannot authorize broadcasting or mint completion.

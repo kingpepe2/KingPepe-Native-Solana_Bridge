@@ -3,10 +3,12 @@ import path from "node:path";
 import {
   bytesToHex,
   decodeCanonicalBridgeMessage,
+  DEPLOYMENT_IDENTITY_LENGTH,
   encodeCanonicalBridgeMessage,
   hashJson,
   hexToBytes,
   isHash32Hex,
+  MESSAGE_LENGTH,
   normalizeHex,
 } from "../../shared/protocol/canonical-message.mjs";
 import {
@@ -124,6 +126,12 @@ export class AutomaticNativeToSolanaDepositPipeline {
       return this.#journal.finish(decodedMessage.operationIdHex, reserveResult);
     }
 
+    // Finalized backing creates an obligation even if attestation/minting waits.
+    const credit = Object.freeze({
+      encodedMessageHex,
+      reserveAllocationIdHex: normalized.reserveSweep.reserveAllocationIdHex,
+    });
+    this.#ledger.recordValidatedDeposit(credit);
     const attestationRequest = {
       encodedMessageHex,
       messageDigestHex: decodedMessage.messageDigestHex,
@@ -142,7 +150,6 @@ export class AutomaticNativeToSolanaDepositPipeline {
       );
     }
 
-    this.#ledger.recordValidatedDeposit(decodedMessage.amountAtomic, decodedMessage.feeAtomic);
     const minted = requireMethodResult(
       this.#solanaBridge.submitDepositClaim({
         operationIdHex: decodedMessage.operationIdHex,
@@ -163,13 +170,13 @@ export class AutomaticNativeToSolanaDepositPipeline {
         }),
       );
     }
-    if (BigInt(minted.mintedAmountAtomic) !== decodedMessage.amountAtomic) {
+    if (!isExactMintAmount(minted.mintedAmountAtomic, decodedMessage.amountAtomic)) {
       return this.#journal.finish(
         decodedMessage.operationIdHex,
         flowDecision(DEPOSIT_STATES.HARD_STOP, "SOLANA_MINT_AMOUNT_MISMATCH", decodedMessage),
       );
     }
-    this.#ledger.recordMint(decodedMessage.amountAtomic, decodedMessage.feeAtomic);
+    this.#ledger.recordMint({ ...credit, mintedAmountAtomic: minted.mintedAmountAtomic });
 
     return this.#journal.finish(
       decodedMessage.operationIdHex,
@@ -252,6 +259,11 @@ export class AutomaticNativeToSolanaDepositPipeline {
       return this.#journal.finish(decodedMessage.operationIdHex, reserveResult);
     }
 
+    const credit = Object.freeze({
+      encodedMessageHex,
+      reserveAllocationIdHex: normalized.reserveSweep.reserveAllocationIdHex,
+    });
+    this.#ledger.recordValidatedDeposit(credit);
     const attestationRequest = {
       encodedMessageHex,
       messageDigestHex: decodedMessage.messageDigestHex,
@@ -270,7 +282,6 @@ export class AutomaticNativeToSolanaDepositPipeline {
       );
     }
 
-    this.#ledger.recordValidatedDeposit(decodedMessage.amountAtomic, decodedMessage.feeAtomic);
     const minted = requireMethodResult(
       await this.#solanaBridge.submitDepositClaim({
         operationIdHex: decodedMessage.operationIdHex,
@@ -291,13 +302,13 @@ export class AutomaticNativeToSolanaDepositPipeline {
         }),
       );
     }
-    if (BigInt(minted.mintedAmountAtomic) !== decodedMessage.amountAtomic) {
+    if (!isExactMintAmount(minted.mintedAmountAtomic, decodedMessage.amountAtomic)) {
       return this.#journal.finish(
         decodedMessage.operationIdHex,
         flowDecision(DEPOSIT_STATES.HARD_STOP, "SOLANA_MINT_AMOUNT_MISMATCH", decodedMessage),
       );
     }
-    this.#ledger.recordMint(decodedMessage.amountAtomic, decodedMessage.feeAtomic);
+    this.#ledger.recordMint({ ...credit, mintedAmountAtomic: minted.mintedAmountAtomic });
 
     return this.#journal.finish(
       decodedMessage.operationIdHex,
@@ -506,51 +517,132 @@ export class FileBackedDepositJournal {
 }
 
 export class ExactDepositLedger {
-  #canonicalReserve = 0n;
-  #mintedSupply = 0n;
-  #authorizedUnmintedCredits = 0n;
-  #feesAccrued = 0n;
-  #unsettledOperations = 0n;
+  #totals = Object.freeze({
+    canonicalReserve: 0n,
+    mintedSupply: 0n,
+    authorizedUnmintedCredits: 0n,
+    feesAccrued: 0n,
+    unsettledOperations: 0n,
+  });
+  #deploymentHex;
+  #credits = new Map();
+  #backing = new Set();
+  #allocations = new Set();
 
-  recordValidatedDeposit(grossAmountAtomic, bridgeFeeAtomic) {
-    const gross = BigInt(grossAmountAtomic);
-    const fee = BigInt(bridgeFeeAtomic);
-    if (gross <= 0n) throw new Error("LedgerAmountZero");
-    if (fee > gross) throw new Error("LedgerFeeExceedsAmount");
-    this.#canonicalReserve = checkedAdd(this.#canonicalReserve, gross);
-    this.#authorizedUnmintedCredits = checkedAdd(this.#authorizedUnmintedCredits, gross - fee);
-    this.#feesAccrued = checkedAdd(this.#feesAccrued, fee);
-    this.#unsettledOperations = checkedAdd(this.#unsettledOperations, 1n);
-    this.#assertCovered();
+  // Accounting only: the caller must first validate actual reserve evidence.
+  // These in-memory markers are not durable authorization or chain proofs.
+  recordValidatedDeposit(input) {
+    const credit = normalizeLedgerCredit(input);
+    this.#assertDeployment(credit);
+    const existing = this.#credits.get(credit.operationIdHex);
+    if (existing !== undefined) {
+      assertSameLedgerCredit(existing, credit);
+      return;
+    }
+    if (this.#backing.has(credit.backingKey)) throw new Error("LedgerBackingAlreadyAllocated");
+    if (this.#allocations.has(credit.reserveAllocationIdHex)) throw new Error("LedgerReserveAllocationReused");
+    const next = Object.freeze({
+      ...this.#totals,
+      canonicalReserve: checkedAdd(this.#totals.canonicalReserve, credit.amountAtomic),
+      authorizedUnmintedCredits: checkedAdd(this.#totals.authorizedUnmintedCredits, credit.amountAtomic),
+      unsettledOperations: checkedAdd(this.#totals.unsettledOperations, 1n),
+    });
+    assertLedgerCovered(next);
+    // No validation or arithmetic remains after markers/balances start changing.
+    this.#credits.set(credit.operationIdHex, credit);
+    this.#backing.add(credit.backingKey);
+    this.#allocations.add(credit.reserveAllocationIdHex);
+    this.#deploymentHex = credit.deploymentHex;
+    this.#totals = next;
   }
 
-  recordMint(amountAtomic, bridgeFeeAtomic) {
-    const amount = BigInt(amountAtomic);
-    const fee = BigInt(bridgeFeeAtomic);
-    if (fee !== 0n) throw new Error("UnexpectedProjectBridgeFeeAtMint");
-    this.#authorizedUnmintedCredits = checkedSub(this.#authorizedUnmintedCredits, amount);
-    this.#mintedSupply = checkedAdd(this.#mintedSupply, amount);
-    this.#unsettledOperations = checkedSub(this.#unsettledOperations, 1n);
-    this.#assertCovered();
+  recordMint(input) {
+    const credit = normalizeLedgerCredit(input);
+    this.#assertDeployment(credit);
+    const amount = exactLedgerAmount(input.mintedAmountAtomic);
+    const existing = this.#credits.get(credit.operationIdHex);
+    if (existing === undefined) throw new Error("LedgerUnknownCredit");
+    assertSameLedgerCredit(existing, credit);
+    if (amount !== credit.amountAtomic) throw new Error("LedgerMintAmountMismatch");
+    if (existing.minted) return;
+    const next = Object.freeze({
+      ...this.#totals,
+      authorizedUnmintedCredits: checkedSub(this.#totals.authorizedUnmintedCredits, amount),
+      mintedSupply: checkedAdd(this.#totals.mintedSupply, amount),
+      unsettledOperations: checkedSub(this.#totals.unsettledOperations, 1n),
+    });
+    assertLedgerCovered(next);
+    this.#credits.set(credit.operationIdHex, Object.freeze({ ...existing, minted: true }));
+    this.#totals = next;
   }
 
   snapshot() {
-    const coverageRequired = this.#mintedSupply + this.#authorizedUnmintedCredits;
+    const coverageRequired = checkedAdd(this.#totals.mintedSupply, this.#totals.authorizedUnmintedCredits);
     return Object.freeze({
-      canonicalReserve: this.#canonicalReserve.toString(),
-      mintedSupply: this.#mintedSupply.toString(),
-      authorizedUnmintedCredits: this.#authorizedUnmintedCredits.toString(),
-      feesAccrued: this.#feesAccrued.toString(),
-      unsettledOperations: this.#unsettledOperations.toString(),
+      ...Object.fromEntries(Object.entries(this.#totals).map(([key, value]) => [key, value.toString()])),
       coverageRequired: coverageRequired.toString(),
-      surplus: (this.#canonicalReserve - coverageRequired).toString(),
+      surplus: checkedSub(this.#totals.canonicalReserve, coverageRequired).toString(),
     });
   }
 
-  #assertCovered() {
-    const snapshot = this.snapshot();
-    if (BigInt(snapshot.surplus) < 0n) throw new Error("LedgerInsufficientBacking");
+  #assertDeployment(credit) {
+    if (this.#deploymentHex !== undefined && this.#deploymentHex !== credit.deploymentHex) {
+      throw new Error("LedgerDeploymentMismatch");
+    }
   }
+}
+
+function normalizeLedgerCredit(input) {
+  const value = requireObject(input, "ledgerCredit");
+  if (typeof value.encodedMessageHex !== "string" || value.encodedMessageHex.length !== MESSAGE_LENGTH * 2) {
+    throw new Error("LedgerCanonicalMessageRequired");
+  }
+  const encoded = hexToBytes(value.encodedMessageHex, "ledgerMessage");
+  const message = decodeCanonicalBridgeMessage(encoded);
+  if (message.action !== "DepositClaim" || message.direction !== "NativeToSolana") {
+    throw new Error("LedgerDepositClaimRequired");
+  }
+  if (message.feeAtomic !== 0n) throw new Error("LedgerProjectBridgeFeeMustBeZero");
+  const reserveAllocationIdHex = normalizeHash32(value.reserveAllocationIdHex, "ledgerAllocation");
+  if (reserveAllocationIdHex === ZERO_HASH) throw new Error("LedgerAllocationZero");
+  return Object.freeze({
+    operationIdHex: message.operationIdHex,
+    encodedMessageHex: bytesToHex(encoded),
+    // Canonical V1 header is 12 bytes; compare the full encoded deployment.
+    deploymentHex: bytesToHex(encoded.subarray(12, 12 + DEPLOYMENT_IDENTITY_LENGTH)),
+    backingKey: `${bytesToHex(message.deployment.nativeGenesis)}:${message.depositOutpointText}`,
+    reserveAllocationIdHex,
+    amountAtomic: message.amountAtomic,
+    minted: false,
+  });
+}
+
+function assertSameLedgerCredit(existing, credit) {
+  if (existing.encodedMessageHex !== credit.encodedMessageHex || existing.reserveAllocationIdHex !== credit.reserveAllocationIdHex) {
+    throw new Error("LedgerCreditReplayAltered");
+  }
+}
+
+function exactLedgerAmount(value) {
+  if (typeof value !== "bigint" && (typeof value !== "string" || value.length > 20 || !UINT_DECIMAL.test(value))) {
+    throw new Error("LedgerExactUnsignedAmountRequired");
+  }
+  const amount = BigInt(value);
+  if (amount <= 0n || amount > 0xffff_ffff_ffff_ffffn) throw new Error("LedgerPositiveU64Required");
+  return amount;
+}
+
+function isExactMintAmount(value, expected) {
+  try {
+    return exactLedgerAmount(value) === expected;
+  } catch {
+    return false;
+  }
+}
+
+function assertLedgerCovered(totals) {
+  const coverage = checkedAdd(totals.mintedSupply, totals.authorizedUnmintedCredits);
+  if (coverage > totals.canonicalReserve) throw new Error("LedgerInsufficientBacking");
 }
 
 export function buildDepositClaimMessage(config, operation) {
@@ -611,6 +703,7 @@ export function depositReserveEvidenceDigestHex(operation) {
 
 function validateObservedDeposit(config, operation, message) {
   if (config.hardStop) return flowDecision(DEPOSIT_STATES.HARD_STOP, "HARD_STOP_ACTIVE", message);
+  if (message.feeAtomic !== 0n) return flowDecision(DEPOSIT_STATES.REJECTED, "PROJECT_BRIDGE_FEE_MUST_BE_ZERO", message);
   if (config.depositsPaused) return flowDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "DEPOSITS_PAUSED", message);
   if (!config.acceptedNativeTrust.includes(operation.deposit.trust)) {
     return flowDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "NATIVE_TRUST_NOT_ACCEPTED", message);
@@ -950,12 +1043,14 @@ function validateStateRootOutsideRepo(root, repoRoot, label) {
 }
 
 function checkedAdd(left, right) {
+  if (left < 0n || right < 0n) throw new Error("LedgerNegativeOperand");
   const result = left + right;
   if (result > 0xffff_ffff_ffff_ffff_ffff_ffff_ffff_ffffn) throw new Error("LedgerArithmeticOverflow");
   return result;
 }
 
 function checkedSub(left, right) {
+  if (left < 0n || right < 0n) throw new Error("LedgerNegativeOperand");
   if (right > left) throw new Error("LedgerInsufficientFunds");
   return left - right;
 }

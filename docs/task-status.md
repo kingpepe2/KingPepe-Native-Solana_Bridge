@@ -1,6 +1,39 @@
 # KingPepe Native - Solana Bridge Task Status
 
-Current unpublished Phase 08 increment: signed claim retry/actual process exits.
+Current unpublished Phase 08 increment: exact, idempotent, failure-atomic
+accounting. Canonical-message/allocation-bound in-memory credits survive pending
+mint/attester failures without double counting; mint settlement requires exact
+positive u64 values and the same credit. The zero project fee guard runs before
+Native signing. Rust aggregate and reserve transitions preserve all balances
+and backing markers on late error. This does not implement durable credit
+restoration, authenticated/fenced journals or full-service restart accounting.
+
+Windows/WSL each: 190 Node tests + two vectors PASS. WSL: 93 Rust tests,
+fmt/clippy, both SBF builds and fresh real deposit + 22 security + seven CSV +
+four PSBT + ten race + five claim-worker retry checks PASS. Final reserve/supply
+each 100000000 atomic, no per-transfer approval. Eighteen Node and nine Rust
+tests added; zero failures/skips in the final suites. Initial focused Node run:
+29 PASS / 2 FAIL due to expecting a returned decision from an expired attester;
+corrected to assert the actual explicit thrown rejection and retained credit.
+All existing gates remain enabled. Audits find no known vulnerabilities;
+bincode's unmaintained warning is retained. Declared license metadata passes.
+Provenance remains 169 files; no source imports/dependency changes/deletions/moves.
+Current source and all 148 existing commits scan clean. Staged/outgoing review,
+private push and exact-SHA CI remain required; no artifacts are uploaded.
+
+Previous source `4e4885a85c93b0ab9473b451b90fe9575bde51c8`, message
+`fix(phase-08): persist and recover signed Solana claims`, pushed privately;
+all four CI jobs PASS:
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34454048203.
+Its current/staged/outgoing source and all 148 commits scanned clean. Next:
+publish/verify accounting correction, then persist credit liabilities before
+downstream failures and reconcile safely on restart; finish authenticated/fenced
+journals, durable global hard stops and post-mint reorg checks. Phase 08 remains
+incomplete, Phase 09 NOT_STARTED, Mainnet DISABLED. No production work performed.
+
+### Previous signed-claim recovery increment (verified source above)
+
+The signed-claim retry increment was published privately and CI-verified.
 Complete signed claim packet and fee-payer signature validation precedes RPC.
 The known signature is saved before send; retries query that identity, never
 rebuild unknown outcomes, and can settle a finalized transaction after expiry.
@@ -16,16 +49,16 @@ and SPL supply each remain 100000000 atomic; no per-transfer approval.
 Five Rust audits and npm audit find no known vulnerabilities; retained bincode
 unmaintained warning. Declared licenses pass. Provenance 168 -> 169 files,
 one original test addition, no deletion/move/dependency changes or source imports.
-Current source and all 147 existing commits scan clean; private-path/IP and exact
-169-file provenance coverage pass. Staged/outgoing scans, reviewed commit,
-private push and exact-SHA CI are still required. No artifacts are uploaded.
+Current/staged/outgoing source and all 148 commits scanned clean; private-path/IP
+and exact 169-file provenance coverage passed. Private push and exact-SHA CI
+passed as recorded above. No artifacts were uploaded.
 
 Previous source `9ead67ccd1b04ea53f9b878feff3a168120f2844`, message
 `fix(phase-08): verify recovery races and Native RPC errors`, pushed privately;
 all four CI jobs PASS:
 https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34451366099.
 Current/staged/outgoing and all 147 commits scanned clean for that publication.
-Next: publish/verify claim retry, then durable unminted credits, remaining
+Next at that checkpoint: durable unminted credits, remaining
 account/source checks, authenticated/fenced persistence, full-service restart
 and post-mint reorg hard stops. File flushing is not complete power-loss or
 rollback assurance. Phase 08 incomplete; Phase 09 NOT_STARTED; Mainnet DISABLED.

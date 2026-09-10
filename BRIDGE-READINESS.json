@@ -15,8 +15,8 @@
   },
   "evidenceScope": "Current local integration increment; its CI result must be checked at the exact source SHA. Earlier per-component CI booleans were historical, not proof of this tree.",
   "previousVerifiedSource": {
-    "sha": "9ead67ccd1b04ea53f9b878feff3a168120f2844",
-    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34451366099",
+    "sha": "4e4885a85c93b0ab9473b451b90fe9575bde51c8",
+    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34454048203",
     "status": "PASS"
   },
   "sourceState": {
@@ -27,13 +27,15 @@
     "temporaryDepositScript": "V2_MINISCRIPT_PUBLIC_INTENT_PREIMAGE_SIGNATURE_AND_CSV_REQUIRED_REGTEST_ONLY",
     "preMintRecoverySweepRaces": "TEN_REAL_REGTEST_CHECKS_PASS_EXACT_PREVIOUS_SHA_CI_VERIFIED",
     "signedClaimPacketValidation": "COMPLETE_CANONICAL_PACKET_AND_FEE_PAYER_SIGNATURE_CHECKED_LOCALNET_ONLY",
-    "claimWorkerCrashAndExpiry": "FIVE_REAL_LOCAL_VALIDATOR_CHECKS_PASS_AWAITING_EXACT_SHA_CI",
+    "claimWorkerCrashAndExpiry": "FIVE_REAL_LOCAL_VALIDATOR_CHECKS_PASS_PREVIOUS_SHA_CI_VERIFIED",
     "claimJournalDurability": "FILE_CONTENTS_FLUSHED_PROCESS_REOPEN_TESTED_NOT_AUTHENTICATED_FENCED_OR_POWER_LOSS_PROVEN",
     "postMintDeepReorgResponse": "NOT_RUN_COMPLETE_SERVICE_E2E",
     "provenance": "FILE_BY_FILE_REVIEWED",
     "repositoryPrivacy": "VERIFIED_PRIVATE",
     "canonicalMessages": "IMPLEMENTED_AND_TESTED_LOCALLY",
-    "accounting": "PRIMITIVES_AND_SINGLE_DEPOSIT_RECONCILIATION_TESTED",
+    "accounting": "CANONICAL_OPERATION_BOUND_IN_MEMORY_CREDITS_AND_FAILURE_ATOMIC_RUST_PRIMITIVES_TESTED",
+    "pendingCreditRetry": "SOURCE_LEVEL_SYNC_ASYNC_TESTED_NOT_DURABLE_RESTART_ACCOUNTING",
+    "durableUnmintedCredits": "NOT_IMPLEMENTED",
     "frost": "REAL_NODE_ACCEPTED_2_OF_2_BIP340_LOCALNET",
     "frostRustCrate": "SUPPORTING_POLICY_STATE_MODEL_ONLY",
     "solanaPrograms": "SBF_AND_DEPOSIT_HAPPY_PATH_TESTED_LOCALNET_ONLY",
@@ -53,16 +55,16 @@
   },
   "localValidation": {
     "windows": {
-      "nodeTestsPass": 172,
+      "nodeTestsPass": 190,
       "protocolVectorsPass": 2,
       "nativeSbf": "NOT_RUN_NOT_SUPPORTED",
       "serviceAclProtectedStorage": "NOT_RUN"
     },
     "wsl": {
-      "nodeTestsPass": 172,
+      "nodeTestsPass": 190,
       "protocolVectorsPass": 2,
-      "solanaRustTestsPass": 58,
-      "nativeRustTestsPass": 26,
+      "solanaRustTestsPass": 64,
+      "nativeRustTestsPass": 29,
       "sbfProgramsBuilt": 2,
       "nativeToSolana": "PASS_SINGLE_FRESH_OPERATION_REAL_DAEMONS",
       "localValidatorSecurityChecksPass": 6,
@@ -112,7 +114,8 @@
     "Implement and test post-mint deep-reorg hard stops; ten pre-mint race/fork checks pass but are not compensation or production finality assurance",
     "Configure production Native evidence sources; current raw-header/Merkle integration is REGTEST-only with explicit local-node UTXO trust",
     "Review remaining account and source-validation dependencies",
-    "Exercise full-service restart beyond the tested signed-claim worker crashes; persist unminted credit liabilities and complete authenticated/fenced journal and rollback guarantees"
+    "Exercise full-service restart beyond the tested signed-claim worker crashes; persist unminted credit liabilities and complete authenticated/fenced journal and rollback guarantees",
+    "Persist global integrity hard stops; current in-memory accounting and per-adapter journals do not establish complete bridge-wide restart safety"
   ],
   "readinessGates": {
     "SOURCE_COMPLETE": "IMPLEMENTED_BUT_INCOMPLETE",

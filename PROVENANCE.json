@@ -83,6 +83,18 @@
     "dependencyChanges": "None",
     "terminologyReview": "No new KingPepe project-role terminology requiring renaming; official protocol and third-party terms preserved."
   },
+  "phase08AccountingReview": {
+    "filesBefore": 169,
+    "filesAfter": 169,
+    "filesDeleted": 0,
+    "filesMoved": 0,
+    "newFiles": [],
+    "changes": "Original canonical-operation-bound in-memory deposit accounting, zero project fee guard, retry conservation tests and failure-atomic Rust snapshot/reserve transitions. Removed the unsafe amount-only deposit ledger API after reviewing all call sites; retained independently implemented Rust reserve verification and arithmetic models.",
+    "sourceImports": "No third-party source, vectors or legacy implementation imported. Existing required licenses and notices retained.",
+    "dependencyChanges": "None",
+    "terminologyReview": "No new project-role naming violations. Existing Solana protocol and third-party terms remain unchanged.",
+    "scope": "In-memory accounting correction, not durable credit recovery, authenticated journals, full service restart or external review."
+  },
   "provenancePolicy": {
     "originalCodeLicense": "Proprietary (Copyright (c) 2026 KingPepe Team)",
     "provenanceClassifications": [

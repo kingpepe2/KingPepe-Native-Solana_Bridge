@@ -13,9 +13,11 @@ import {
 import {
   AutomaticNativeToSolanaDepositPipeline,
   DEPOSIT_STATES,
+  ExactDepositLedger,
   FileBackedDepositJournal,
   buildDepositClaimMessage,
 } from "../automatic-deposit-pipeline.mjs";
+import { bytesToHex, encodeCanonicalBridgeMessage } from "../../../shared/protocol/canonical-message.mjs";
 import {
   LocalnetSolanaDepositClaimBridge,
   prepareLocalnetSolanaDepositClaimRequest,
@@ -933,6 +935,267 @@ test("completed deposit retry is idempotent and does not mint or broadcast twice
   } finally {
     runtime.frost.cleanup();
   }
+});
+
+for (const asyncAdapters of [false, true]) {
+  const mode = asyncAdapters ? "async" : "sync";
+  const process = (runtime, now = 1_700_000_600) => asyncAdapters
+    ? runtime.pipeline.processDepositAsync(runtime.operation, now)
+    : runtime.pipeline.processDeposit(runtime.operation, now);
+
+  test(`${mode} pending mint retries retain one credit and settle it once`, async () => {
+    let attempts = 0;
+    const runtime = createPipeline({ asyncAdapters, solanaBridge: {
+      submitDepositClaim(request) {
+        if (++attempts < 3) return { state: DEPOSIT_STATES.WAITING_FOR_DEPENDENCY };
+        return { state: DEPOSIT_STATES.COMPLETED, mintedAmountAtomic: request.amountAtomic };
+      },
+    } });
+    try {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        assert.equal((await process(runtime)).state, DEPOSIT_STATES.WAITING_FOR_DEPENDENCY);
+        assert.deepEqual(runtime.pipeline.ledgerSnapshot(), {
+          canonicalReserve: "250000000", mintedSupply: "0", authorizedUnmintedCredits: "250000000",
+          feesAccrued: "0", unsettledOperations: "1", coverageRequired: "250000000", surplus: "0",
+        });
+      }
+      const completed = await process(runtime);
+      assert.equal(completed.state, DEPOSIT_STATES.COMPLETED);
+      assert.equal(completed.ledger.authorizedUnmintedCredits, "0");
+      assert.equal(completed.ledger.mintedSupply, "250000000");
+      assert.equal(completed.ledger.unsettledOperations, "0");
+      assert.deepEqual(await process(runtime), completed);
+      assert.equal(attempts, 3);
+    } finally { runtime.frost.cleanup(); }
+  });
+
+  test(`${mode} finalized reserve credit survives failed attestation`, async () => {
+    const runtime = createPipeline({ asyncAdapters });
+    try {
+      await assert.rejects(async () => process(runtime, 1_700_001_300), (error) =>
+        error.message === "AttestationNotAuthorized:MESSAGE_EXPIRED" &&
+        error.decision?.state === DEPOSIT_STATES.REJECTED && error.decision?.reason === "MESSAGE_EXPIRED");
+      assert.equal(runtime.solanaBridge.submissions.length, 0);
+      assert.equal(runtime.pipeline.ledgerSnapshot().authorizedUnmintedCredits, "250000000");
+      assert.equal(runtime.pipeline.ledgerSnapshot().mintedSupply, "0");
+    } finally { runtime.frost.cleanup(); }
+  });
+
+  test(`${mode} downstream exception preserves credit and retry does not inflate backing`, async () => {
+    let attempts = 0;
+    const runtime = createPipeline({ asyncAdapters, solanaBridge: {
+      submitDepositClaim(request) {
+        if (++attempts === 1) throw new Error("TestDependencyUnavailable");
+        return { state: DEPOSIT_STATES.COMPLETED, mintedAmountAtomic: request.amountAtomic };
+      },
+    } });
+    try {
+      await assert.rejects(async () => process(runtime), /TestDependencyUnavailable/u);
+      assert.equal(runtime.pipeline.ledgerSnapshot().authorizedUnmintedCredits, "250000000");
+      assert.equal((await process(runtime)).state, DEPOSIT_STATES.COMPLETED);
+      assert.equal(runtime.pipeline.ledgerSnapshot().canonicalReserve, "250000000");
+      assert.equal(runtime.pipeline.ledgerSnapshot().authorizedUnmintedCredits, "0");
+    } finally { runtime.frost.cleanup(); }
+  });
+
+  test(`${mode} imprecise mint result hard-stops without discharging the credit`, async () => {
+    const runtime = createPipeline({ asyncAdapters, solanaBridge: {
+      submitDepositClaim() { return { state: DEPOSIT_STATES.COMPLETED, mintedAmountAtomic: 250000000 }; },
+    } });
+    try {
+      const result = await process(runtime);
+      assert.equal(result.state, DEPOSIT_STATES.HARD_STOP);
+      assert.equal(result.reason, "SOLANA_MINT_AMOUNT_MISMATCH");
+      assert.equal(runtime.pipeline.ledgerSnapshot().authorizedUnmintedCredits, "250000000");
+      assert.equal(runtime.pipeline.ledgerSnapshot().mintedSupply, "0");
+    } finally { runtime.frost.cleanup(); }
+  });
+}
+
+test("unapproved project fee is rejected before any Native signing or transfer", () => {
+  const runtime = createPipeline({ operation: { deposit: { projectBridgeFeeAtomic: "1" } } });
+  try {
+    const result = runtime.pipeline.processDeposit(runtime.operation);
+    assert.equal(result.reason, "PROJECT_BRIDGE_FEE_MUST_BE_ZERO");
+    assert.equal(result.state, DEPOSIT_STATES.REJECTED);
+    assert.equal(runtime.nativeRelayer.broadcasts.length, 0);
+    assert.equal(runtime.solanaBridge.submissions.length, 0);
+    assert.equal(runtime.pipeline.ledgerSnapshot().canonicalReserve, "0");
+  } finally { runtime.frost.cleanup(); }
+});
+
+function ledgerCredit(overrides = {}, config = baseConfig()) {
+  const operation = operationWithComputedId(config, overrides);
+  return {
+    encodedMessageHex: buildDepositClaimMessage(config, operation).encodedMessageHex,
+    reserveAllocationIdHex: operation.reserveSweep.reserveAllocationIdHex,
+  };
+}
+
+test("ledger binds credit and mint idempotence to the exact canonical operation", () => {
+  const ledger = new ExactDepositLedger();
+  const credit = ledgerCredit();
+  ledger.recordValidatedDeposit(credit);
+  const pending = ledger.snapshot();
+  ledger.recordValidatedDeposit(credit);
+  assert.deepEqual(ledger.snapshot(), pending);
+  ledger.recordMint({ ...credit, mintedAmountAtomic: "250000000" });
+  const settled = ledger.snapshot();
+  ledger.recordMint({ ...credit, mintedAmountAtomic: 250000000n });
+  ledger.recordValidatedDeposit(credit);
+  assert.deepEqual(ledger.snapshot(), settled);
+  assert.equal(settled.unsettledOperations, "0");
+  assert.equal(settled.authorizedUnmintedCredits, "0");
+});
+
+test("ledger rejects coercible, negative, zero, inexact and mismatched mint values without mutation", () => {
+  const ledger = new ExactDepositLedger();
+  const credit = ledgerCredit();
+  ledger.recordValidatedDeposit(credit);
+  const before = ledger.snapshot();
+  for (const amount of [-1n, 0n, 1n << 64n, null, undefined, true, false, NaN, Infinity,
+    250000000, Number.MAX_SAFE_INTEGER + 1, "-1", "0", "01", " 250000000", "2.5e8", "250000000.0",
+    {}, { toString: () => "250000000" }, "250000001", "249999999", "1".repeat(21)]) {
+    assert.throws(() => ledger.recordMint({ ...credit, mintedAmountAtomic: amount }), /Ledger/u);
+    assert.deepEqual(ledger.snapshot(), before);
+  }
+  ledger.recordMint({ ...credit, mintedAmountAtomic: "250000000" });
+  assert.equal(ledger.snapshot().mintedSupply, "250000000");
+});
+
+test("ledger cannot use another operation's pending credit or alter its allocation", () => {
+  const ledger = new ExactDepositLedger();
+  const credit = ledgerCredit();
+  ledger.recordValidatedDeposit(credit);
+  const before = ledger.snapshot();
+  const unknown = ledgerCredit({ messageNonceHex: h("different-credit-nonce") });
+  assert.throws(() => ledger.recordMint({ ...unknown, mintedAmountAtomic: "250000000" }), /LedgerUnknownCredit/u);
+  const altered = { ...credit, reserveAllocationIdHex: h("altered-allocation") };
+  assert.throws(() => ledger.recordValidatedDeposit(altered), /LedgerCreditReplayAltered/u);
+  assert.throws(() => ledger.recordMint({ ...altered, mintedAmountAtomic: "250000000" }), /LedgerCreditReplayAltered/u);
+  assert.deepEqual(ledger.snapshot(), before);
+});
+
+test("ledger retains backing markers across recipients, amounts, messages and epochs after mint", () => {
+  const ledger = new ExactDepositLedger();
+  const credit = ledgerCredit();
+  ledger.recordValidatedDeposit(credit);
+  ledger.recordMint({ ...credit, mintedAmountAtomic: "250000000" });
+  const before = ledger.snapshot();
+  const changed = [
+    ledgerCredit({ messageNonceHex: h("new-nonce") }),
+    ledgerCredit({ deposit: { solanaRecipientHex: h("new-recipient") } }),
+    ledgerCredit({ deposit: { amountAtomic: "250000001" } }),
+    ledgerCredit({}, baseConfig({ policyEpoch: 2 })),
+    ledgerCredit({}, baseConfig({ keyEpoch: 2 })),
+    ledgerCredit({ reserveSweep: { nativeSweepTxidHex: h("another-sweep"), reserveAllocationIdHex: h("another-allocation") } }),
+  ];
+  for (const input of changed) {
+    assert.throws(() => ledger.recordValidatedDeposit(input), /LedgerBackingAlreadyAllocated/u);
+    assert.deepEqual(ledger.snapshot(), before);
+  }
+});
+
+test("ledger rejects allocation reuse by another outpoint without poisoning a valid later credit", () => {
+  const ledger = new ExactDepositLedger();
+  ledger.recordValidatedDeposit(ledgerCredit());
+  const before = ledger.snapshot();
+  const another = ledgerCredit({ deposit: { depositOutpoint: outpoint("another-backing") } });
+  assert.throws(() => ledger.recordValidatedDeposit(another), /LedgerReserveAllocationReused/u);
+  assert.deepEqual(ledger.snapshot(), before);
+  ledger.recordValidatedDeposit({ ...another, reserveAllocationIdHex: h("unique-allocation") });
+  assert.equal(ledger.snapshot().authorizedUnmintedCredits, "500000000");
+});
+
+test("ledger rejects alternate domains, non-deposit messages, nonzero fees and malformed canonical bytes", () => {
+  const ledger = new ExactDepositLedger();
+  const credit = ledgerCredit();
+  ledger.recordValidatedDeposit(credit);
+  const before = ledger.snapshot();
+  for (const field of ["nativeGenesis", "solanaDeployment", "managerProgramId", "transceiverProgramId", "mint"]) {
+    const config = baseConfig();
+    config.deployment[field] = h(`different-${field}`);
+    assert.throws(() => ledger.recordValidatedDeposit(ledgerCredit({}, config)), /LedgerDeploymentMismatch/u);
+  }
+  for (const field of ["protocolId", "nativeNetwork"]) {
+    const config = baseConfig();
+    config.deployment[field] += 1;
+    assert.throws(() => ledger.recordValidatedDeposit(ledgerCredit({}, config)), /LedgerDeploymentMismatch/u);
+  }
+  const message = buildDepositClaimMessage(baseConfig(), operationWithComputedId(baseConfig())).decodedMessage;
+  const withdrawal = bytesToHex(encodeCanonicalBridgeMessage({
+    ...message, operationId: undefined, action: "WithdrawalRequest", direction: "SolanaToNative",
+    withdrawalId: h("withdrawal-not-deposit"), depositOutpoint: { txid: ZERO_HASH, vout: 0 },
+  }));
+  assert.throws(() => ledger.recordValidatedDeposit({ ...credit, encodedMessageHex: withdrawal }), /LedgerDepositClaimRequired/u);
+  assert.throws(() => ledger.recordValidatedDeposit(ledgerCredit({ deposit: { projectBridgeFeeAtomic: "1" } })), /LedgerProjectBridgeFeeMustBeZero/u);
+  for (const input of [undefined, 100n, {}, { ...credit, reserveAllocationIdHex: ZERO_HASH },
+    { ...credit, encodedMessageHex: `${credit.encodedMessageHex}00` },
+    { ...credit, encodedMessageHex: credit.encodedMessageHex.slice(2) },
+    { ...credit, encodedMessageHex: `00${credit.encodedMessageHex.slice(2)}` }]) {
+    assert.throws(() => ledger.recordValidatedDeposit(input));
+  }
+  assert.deepEqual(ledger.snapshot(), before);
+});
+
+test("ledger preserves u64 operation and u128 aggregate precision without Number conversions", () => {
+  const ledger = new ExactDepositLedger();
+  const maximum = (1n << 64n) - 1n;
+  const credits = [maximum, 3n].map((amount, index) => ledgerCredit({
+    deposit: { amountAtomic: amount.toString(), depositOutpoint: outpoint(`precision-${index}`) },
+    reserveSweep: { reserveAllocationIdHex: h(`precision-allocation-${index}`) },
+  }));
+  for (const credit of credits) ledger.recordValidatedDeposit(credit);
+  assert.equal(ledger.snapshot().canonicalReserve, (maximum + 3n).toString());
+  ledger.recordMint({ ...credits[1], mintedAmountAtomic: 3n });
+  ledger.recordMint({ ...credits[0], mintedAmountAtomic: maximum });
+  assert.equal(ledger.snapshot().mintedSupply, (maximum + 3n).toString());
+  assert.equal(ledger.snapshot().surplus, "0");
+});
+
+test("ledger snapshots and accepted credit data cannot be mutated by the caller", () => {
+  const ledger = new ExactDepositLedger();
+  const credit = ledgerCredit();
+  const saved = { ...credit };
+  ledger.recordValidatedDeposit(credit);
+  credit.reserveAllocationIdHex = h("post-validation-mutation");
+  credit.encodedMessageHex = "00";
+  const snapshot = ledger.snapshot();
+  assert.throws(() => { snapshot.authorizedUnmintedCredits = "0"; }, TypeError);
+  assert.equal(ledger.snapshot().authorizedUnmintedCredits, "250000000");
+  ledger.recordMint({ ...saved, mintedAmountAtomic: "250000000" });
+  assert.equal(ledger.snapshot().authorizedUnmintedCredits, "0");
+});
+
+test("interleaved multi-credit retries conserve reserve and liabilities at every transition", () => {
+  const ledger = new ExactDepositLedger();
+  let total = 0n;
+  let minted = 0n;
+  const credits = Array.from({ length: 64 }, (_, index) => {
+    const amount = (1n << 53n) + BigInt(index + 1);
+    const credit = ledgerCredit({
+      deposit: { amountAtomic: amount.toString(), depositOutpoint: outpoint(`multi-credit-${index}`) },
+      reserveSweep: { reserveAllocationIdHex: h(`multi-allocation-${index}`) },
+    });
+    ledger.recordValidatedDeposit(credit);
+    ledger.recordValidatedDeposit(credit);
+    total += amount;
+    assert.equal(ledger.snapshot().authorizedUnmintedCredits, total.toString());
+    return { ...credit, mintedAmountAtomic: amount };
+  });
+  for (const credit of credits.reverse()) {
+    ledger.recordMint(credit);
+    ledger.recordMint(credit);
+    ledger.recordValidatedDeposit(credit);
+    minted += credit.mintedAmountAtomic;
+    const snapshot = ledger.snapshot();
+    assert.equal(snapshot.canonicalReserve, total.toString());
+    assert.equal(snapshot.mintedSupply, minted.toString());
+    assert.equal(snapshot.authorizedUnmintedCredits, (total - minted).toString());
+    assert.equal(snapshot.coverageRequired, total.toString());
+    assert.equal(snapshot.surplus, "0");
+  }
+  assert.equal(ledger.snapshot().unsettledOperations, "0");
 });
 
 test("file-backed deposit journal survives restart and does not rebroadcast completed deposits", () => {

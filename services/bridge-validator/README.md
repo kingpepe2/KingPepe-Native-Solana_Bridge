@@ -27,6 +27,26 @@ The pipeline:
 The pipeline exposes synchronous and asynchronous processing entrypoints. The
 asynchronous entrypoint is for promise-returning local RPC adapters and keeps
 the same validation, FROST, attestation, replay, and accounting checks.
+
+`ExactDepositLedger` records a credit after finalized reserve verification,
+before attestation or Solana dependencies can fail. The credit API requires the
+canonical deposit message and validated allocation ID; the old amount-only API
+is removed. Each ledger is bound to one canonical deployment. Operation,
+backing-outpoint and allocation markers make identical retries idempotent and
+reject backing reuse under new recipients, nonces, amounts or epochs. Mint
+settlement must name the same credit and exact positive u64 amount. Atomic units
+are BigInt/canonical decimal strings, never JavaScript Number. Aggregate sums
+are checked u128 values. The current pipeline requires project bridge fee zero
+before signing; separately funded Native miner fees are not project fees.
+
+This ledger is IN-MEMORY. It does not validate chain evidence by itself and is
+not a persistent economic journal. File-backed pipeline completion records do
+not reconstruct all ledger balances after restart. Persisting credits before
+downstream failures, global hard-stop persistence, cross-process fencing and
+consistent chain/journal reconciliation remain Phase 08 dependencies. The real
+daemon harness and its single-operation reconciliation are distinct from these
+source-level multi-operation accounting tests.
+
 Phase 08 source tests also connect this pipeline to the localnet Solana
 deposit-claim bridge, durable submitter, and finalized claim observer through
 fake loopback RPC fixtures; this is not a substitute for daemon-backed local

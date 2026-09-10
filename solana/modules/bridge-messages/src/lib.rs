@@ -595,29 +595,35 @@ impl LedgerSnapshot {
             return Err(LedgerError::FeeExceedsAmount);
         }
         let net_amount = gross_amount - bridge_fee;
-        self.canonical_reserve = checked_add(self.canonical_reserve, gross_amount as u128)?;
-        self.authorized_unminted_credits =
-            checked_add(self.authorized_unminted_credits, net_amount as u128)?;
-        self.fees_accrued = checked_add(self.fees_accrued, bridge_fee as u128)?;
-        self.unsettled_operations = self
-            .unsettled_operations
-            .checked_add(1)
-            .ok_or(LedgerError::Arithmetic)?;
-        self.assert_invariants()
+        require_positive_amount(net_amount)?;
+        self.apply_transition(|next| {
+            next.canonical_reserve = checked_add(next.canonical_reserve, gross_amount as u128)?;
+            next.authorized_unminted_credits =
+                checked_add(next.authorized_unminted_credits, net_amount as u128)?;
+            next.fees_accrued = checked_add(next.fees_accrued, bridge_fee as u128)?;
+            next.unsettled_operations = next
+                .unsettled_operations
+                .checked_add(1)
+                .ok_or(LedgerError::Arithmetic)?;
+            Ok(())
+        })
     }
 
     pub fn record_mint(&mut self, amount: u64, bridge_fee: u64) -> Result<(), LedgerError> {
         if bridge_fee != 0 {
             return Err(LedgerError::UnexpectedFeeAtMint);
         }
-        self.authorized_unminted_credits =
-            checked_sub(self.authorized_unminted_credits, amount as u128)?;
-        self.minted_supply = checked_add(self.minted_supply, amount as u128)?;
-        self.unsettled_operations = self
-            .unsettled_operations
-            .checked_sub(1)
-            .ok_or(LedgerError::InvalidOperationCount)?;
-        self.assert_invariants()
+        require_positive_amount(amount)?;
+        self.apply_transition(|next| {
+            next.authorized_unminted_credits =
+                checked_sub(next.authorized_unminted_credits, amount as u128)?;
+            next.minted_supply = checked_add(next.minted_supply, amount as u128)?;
+            next.unsettled_operations = next
+                .unsettled_operations
+                .checked_sub(1)
+                .ok_or(LedgerError::InvalidOperationCount)?;
+            Ok(())
+        })
     }
 
     pub fn record_burn_request(
@@ -629,54 +635,83 @@ impl LedgerSnapshot {
             return Err(LedgerError::FeeExceedsAmount);
         }
         let net_payout = gross_amount - fee_amount;
-        self.minted_supply = checked_sub(self.minted_supply, gross_amount as u128)?;
-        self.burned_unpaid_withdrawals =
-            checked_add(self.burned_unpaid_withdrawals, net_payout as u128)?;
-        self.fees_accrued = checked_add(self.fees_accrued, fee_amount as u128)?;
-        self.unsettled_operations = self
-            .unsettled_operations
-            .checked_add(1)
-            .ok_or(LedgerError::Arithmetic)?;
-        self.assert_invariants()
+        require_positive_amount(net_payout)?;
+        self.apply_transition(|next| {
+            next.minted_supply = checked_sub(next.minted_supply, gross_amount as u128)?;
+            next.burned_unpaid_withdrawals =
+                checked_add(next.burned_unpaid_withdrawals, net_payout as u128)?;
+            next.fees_accrued = checked_add(next.fees_accrued, fee_amount as u128)?;
+            next.unsettled_operations = next
+                .unsettled_operations
+                .checked_add(1)
+                .ok_or(LedgerError::Arithmetic)?;
+            Ok(())
+        })
     }
 
     pub fn reserve_withdrawal_utxos(&mut self, net_amount: u64) -> Result<(), LedgerError> {
-        self.burned_unpaid_withdrawals =
-            checked_sub(self.burned_unpaid_withdrawals, net_amount as u128)?;
-        self.reserved_utxo_liabilities =
-            checked_add(self.reserved_utxo_liabilities, net_amount as u128)?;
-        self.assert_invariants()
+        require_positive_amount(net_amount)?;
+        self.apply_transition(|next| {
+            next.burned_unpaid_withdrawals =
+                checked_sub(next.burned_unpaid_withdrawals, net_amount as u128)?;
+            next.reserved_utxo_liabilities =
+                checked_add(next.reserved_utxo_liabilities, net_amount as u128)?;
+            Ok(())
+        })
     }
 
     pub fn record_payout_broadcast(&mut self, net_amount: u64) -> Result<(), LedgerError> {
-        self.reserved_utxo_liabilities =
-            checked_sub(self.reserved_utxo_liabilities, net_amount as u128)?;
-        self.broadcast_payout_liabilities =
-            checked_add(self.broadcast_payout_liabilities, net_amount as u128)?;
-        self.assert_invariants()
+        require_positive_amount(net_amount)?;
+        self.apply_transition(|next| {
+            next.reserved_utxo_liabilities =
+                checked_sub(next.reserved_utxo_liabilities, net_amount as u128)?;
+            next.broadcast_payout_liabilities =
+                checked_add(next.broadcast_payout_liabilities, net_amount as u128)?;
+            Ok(())
+        })
     }
 
     pub fn record_payout_settlement(&mut self, net_amount: u64) -> Result<(), LedgerError> {
+        require_positive_amount(net_amount)?;
         let net_amount = net_amount as u128;
-        if self.broadcast_payout_liabilities >= net_amount {
-            self.broadcast_payout_liabilities =
-                checked_sub(self.broadcast_payout_liabilities, net_amount)?;
-        } else {
-            self.burned_unpaid_withdrawals =
-                checked_sub(self.burned_unpaid_withdrawals, net_amount)?;
-        }
-        self.canonical_reserve = checked_sub(self.canonical_reserve, net_amount)?;
-        self.finalized_payouts = checked_add(self.finalized_payouts, net_amount)?;
-        self.unsettled_operations = self
-            .unsettled_operations
-            .checked_sub(1)
-            .ok_or(LedgerError::InvalidOperationCount)?;
-        self.assert_invariants()
+        self.apply_transition(|next| {
+            if next.broadcast_payout_liabilities >= net_amount {
+                next.broadcast_payout_liabilities =
+                    checked_sub(next.broadcast_payout_liabilities, net_amount)?;
+            } else {
+                next.burned_unpaid_withdrawals =
+                    checked_sub(next.burned_unpaid_withdrawals, net_amount)?;
+            }
+            next.canonical_reserve = checked_sub(next.canonical_reserve, net_amount)?;
+            next.finalized_payouts = checked_add(next.finalized_payouts, net_amount)?;
+            next.unsettled_operations = next
+                .unsettled_operations
+                .checked_sub(1)
+                .ok_or(LedgerError::InvalidOperationCount)?;
+            Ok(())
+        })
     }
 
     pub fn record_reserve_donation(&mut self, amount: u64) -> Result<(), LedgerError> {
-        self.canonical_reserve = checked_add(self.canonical_reserve, amount as u128)?;
-        self.assert_invariants()
+        require_positive_amount(amount)?;
+        self.apply_transition(|next| {
+            next.canonical_reserve = checked_add(next.canonical_reserve, amount as u128)?;
+            Ok(())
+        })
+    }
+
+    // A snapshot arithmetic model, not an operation journal or payout authority.
+    // Never partially update the live snapshot when a later check fails.
+    fn apply_transition(
+        &mut self,
+        transition: impl FnOnce(&mut Self) -> Result<(), LedgerError>,
+    ) -> Result<(), LedgerError> {
+        self.assert_invariants()?;
+        let mut next = self.clone();
+        transition(&mut next)?;
+        next.assert_invariants()?;
+        *self = next;
+        Ok(())
     }
 }
 
@@ -717,6 +752,7 @@ pub enum MessageDecodeError {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum LedgerError {
+    AmountZero,
     Arithmetic,
     InsufficientFunds,
     InsufficientBacking,
@@ -733,6 +769,13 @@ pub enum BridgeStateTransitionError {
 
 fn checked_add(left: u128, right: u128) -> Result<u128, LedgerError> {
     left.checked_add(right).ok_or(LedgerError::Arithmetic)
+}
+
+fn require_positive_amount(amount: u64) -> Result<(), LedgerError> {
+    if amount == 0 {
+        return Err(LedgerError::AmountZero);
+    }
+    Ok(())
 }
 
 fn checked_sub(left: u128, right: u128) -> Result<u128, LedgerError> {
@@ -1001,5 +1044,146 @@ mod tests {
             ledger.record_validated_deposit(1, 0),
             Err(LedgerError::Arithmetic)
         ));
+    }
+
+    #[test]
+    fn failed_credit_overflow_preserves_every_field() {
+        for overflow_fee in [false, true] {
+            let mut ledger = LedgerState::new();
+            if overflow_fee {
+                ledger.fees_accrued = u128::MAX;
+            } else {
+                ledger.unsettled_operations = u64::MAX;
+            }
+            let before = ledger.clone();
+            assert_eq!(
+                ledger.record_validated_deposit(100, 1),
+                Err(LedgerError::Arithmetic)
+            );
+            assert_eq!(ledger, before);
+        }
+    }
+
+    #[test]
+    fn failed_mint_operation_count_preserves_credit_and_supply() {
+        let mut ledger = LedgerState::new();
+        ledger.record_validated_deposit(100, 0).unwrap();
+        ledger.unsettled_operations = 0;
+        let before = ledger.clone();
+        assert_eq!(
+            ledger.record_mint(100, 0),
+            Err(LedgerError::InvalidOperationCount)
+        );
+        assert_eq!(ledger, before);
+    }
+
+    #[test]
+    fn failed_burn_late_overflow_preserves_supply_and_obligations() {
+        for overflow_fee in [false, true] {
+            let mut ledger = LedgerState::new();
+            ledger.record_validated_deposit(100, 0).unwrap();
+            ledger.record_mint(100, 0).unwrap();
+            if overflow_fee {
+                ledger.fees_accrued = u128::MAX;
+            } else {
+                ledger.unsettled_operations = u64::MAX;
+            }
+            let before = ledger.clone();
+            assert_eq!(
+                ledger.record_burn_request(10, 1),
+                Err(LedgerError::Arithmetic)
+            );
+            assert_eq!(ledger, before);
+        }
+    }
+
+    #[test]
+    fn failed_payout_settlement_preserves_broadcast_liability_and_reserve() {
+        for overflow_total in [false, true] {
+            let mut ledger = LedgerState::new();
+            ledger.record_validated_deposit(100, 0).unwrap();
+            ledger.record_mint(100, 0).unwrap();
+            ledger.record_burn_request(10, 0).unwrap();
+            ledger.reserve_withdrawal_utxos(10).unwrap();
+            ledger.record_payout_broadcast(10).unwrap();
+            let error = if overflow_total {
+                ledger.finalized_payouts = u128::MAX;
+                LedgerError::Arithmetic
+            } else {
+                ledger.unsettled_operations = 0;
+                LedgerError::InvalidOperationCount
+            };
+            let before = ledger.clone();
+            assert_eq!(ledger.record_payout_settlement(10), Err(error));
+            assert_eq!(ledger, before);
+        }
+    }
+
+    #[test]
+    fn invalid_snapshot_cannot_be_silently_repaired_by_any_transition() {
+        let inconsistent = LedgerState {
+            minted_supply: 100,
+            authorized_unminted_credits: 100,
+            burned_unpaid_withdrawals: 100,
+            reserved_utxo_liabilities: 100,
+            broadcast_payout_liabilities: 100,
+            unsettled_operations: 3,
+            ..LedgerState::new()
+        };
+        for index in 0..8 {
+            let mut ledger = inconsistent.clone();
+            let result = match index {
+                0 => ledger.record_validated_deposit(100, 0),
+                1 => ledger.record_mint(100, 0),
+                2 => ledger.record_burn_request(100, 0),
+                3 => ledger.reserve_withdrawal_utxos(100),
+                4 => ledger.record_payout_broadcast(100),
+                5 => ledger.record_payout_settlement(100),
+                6 => ledger.record_reserve_donation(1_000),
+                _ => ledger.record_reserve_donation(u64::MAX),
+            };
+            assert_eq!(result, Err(LedgerError::InsufficientBacking));
+            assert_eq!(ledger, inconsistent);
+        }
+    }
+
+    #[test]
+    fn zero_and_fee_exhausted_operations_never_change_accounting() {
+        let mut ledger = LedgerState::new();
+        let before = ledger.clone();
+        assert_eq!(
+            ledger.record_validated_deposit(0, 0),
+            Err(LedgerError::AmountZero)
+        );
+        assert_eq!(
+            ledger.record_validated_deposit(1, 1),
+            Err(LedgerError::AmountZero)
+        );
+        assert_eq!(ledger.record_mint(0, 0), Err(LedgerError::AmountZero));
+        assert_eq!(
+            ledger.record_burn_request(0, 0),
+            Err(LedgerError::AmountZero)
+        );
+        assert_eq!(
+            ledger.record_burn_request(1, 1),
+            Err(LedgerError::AmountZero)
+        );
+        assert_eq!(
+            ledger.reserve_withdrawal_utxos(0),
+            Err(LedgerError::AmountZero)
+        );
+        assert_eq!(
+            ledger.record_payout_broadcast(0),
+            Err(LedgerError::AmountZero)
+        );
+        assert_eq!(
+            ledger.record_payout_settlement(0),
+            Err(LedgerError::AmountZero)
+        );
+        assert_eq!(
+            ledger.record_reserve_donation(0),
+            Err(LedgerError::AmountZero)
+        );
+        assert_eq!(ledger, before);
     }
 }
