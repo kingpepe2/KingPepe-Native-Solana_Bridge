@@ -26,20 +26,26 @@
 ## Current phase and evidence
 
 PHASE 08: real local Native-to-Solana happy-path integration is now exercised.
-PSBT increment 710ad4afce5ca169868dc618acc870fdb221bf3f is pushed privately;
+Race/RPC increment 9ead67ccd1b04ea53f9b878feff3a168120f2844 is pushed privately;
 all four exact-SHA CI jobs PASS:
-https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34449370653
-The current recovery-race increment is unpublished and locally tested. It adds
-ten real pre-mint sweep/recovery competing-spend/fork checks and five unit tests
-for isolated fork controls and unconfirmed/error classification. Infrastructure
-failure cannot count as a passing economic rejection. Current Node count is
-164 on Windows/WSL; 84 Rust tests, two vectors, both SBF builds and
-the real deposit with 22 security + seven CSV + four PSBT + ten race checks pass.
-Post-mint deep-reorg detection/response and durable restart remain incomplete.
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34451366099
+The current signed-claim retry increment is unpublished and locally tested.
+It validates the entire signed canonical claim packet and saves its actual
+signature before send. RPC signature substitution hard-stops. Missing/malformed
+execution status or height cannot authorize broadcasting or mint completion.
+Windows/WSL each: 172 Node tests + two vectors PASS. WSL: 84 Rust tests,
+fmt/clippy, both SBF builds and real deposit with 22 security + seven CSV + four
+PSBT + ten race + five claim-process-retry checks PASS. Claim workers exit before
+send and after actual validator acceptance, then resume after real blockhash
+expiry without receiving keys or creating a second mint. These are process
+crashes, not full service or power-loss recovery. File contents flush before
+rename; authenticated journals, fencing, rollback assurance, durable unminted
+credits and post-mint deep-reorg hard stops remain incomplete. Do not proceed
+to Phase 09 until required Phase 08 dependencies are resolved.
 The stricter real test exposed HTTP 500 RPC-error flattening. The adapter now
 parses Native's bounded request-matched error envelopes, never provider text or
 success on a failing HTTP status. See status files for the initial failure.
-The verified PSBT source's evidence follows; it does not certify newer changes:
+Historical PSBT source evidence follows; it does not certify newer changes:
 Windows/WSL each pass 159 Node tests + two vectors; WSL passes 84 Rust tests and
 both SBF builds. Real deposit + 22 security + seven CSV + four wallet PSBT checks
 pass. Recovery PSBTs are signed by the isolated Native user wallet, without key
@@ -108,8 +114,9 @@ Safe checks:
 - node solana/tests/local-deposit-security.mjs uses the same isolated tools/root
   and runs the real recoverable deposit plus 22 raw Native/local-validator
   security checks, seven real Native CSV recovery checks and four real Native
-  wallet PSBT checks and ten pre-mint recovery/sweep race/fork checks. This does
-  not prove post-mint deep-reorg handling or production finality.
+  wallet PSBT checks, ten pre-mint recovery/sweep race/fork checks and five actual
+  claim-worker crash/expiry checks. This does not prove post-mint deep-reorg
+  handling, full service restart, power-loss recovery or production finality.
 - CI runs cargo-audit against all five lockfiles without ignored advisories.
   bincode 1.3.3 has a retained, reported unmaintained warning, not a clean bill
   of health or production approval.

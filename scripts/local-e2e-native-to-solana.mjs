@@ -769,6 +769,7 @@ export async function submitLocalnetSolanaDepositClaim({
   rpcClient,
   claimObserver,
   journal,
+  claimSubmitter,
 }) {
   const config = requireObject(flowConfig, "flowConfig");
   const setupContext = validateLocalSolanaSetupContext(localSolanaSetupContext, config);
@@ -813,6 +814,7 @@ export async function submitLocalnetSolanaDepositClaim({
     feePayerSigner: setupContext.feePayerSigner,
     rpcClient: rpc,
     claimObserver: observer,
+    submitter: claimSubmitter,
     journal: journal ?? new FileBackedSolanaDepositClaimJournal({ root: path.join(config.stateRoot, "solana-claim-journal"), repoRoot: plan.repoRoot }),
     receiptJournal: new FileBackedSolanaDepositClaimJournal({ root: path.join(config.stateRoot, "solana-receipt-journal"), repoRoot: plan.repoRoot }),
   });

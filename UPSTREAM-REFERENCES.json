@@ -36,6 +36,12 @@
   },
   "standardsReferences": [
     {
+      "project": "Solana transaction and RPC definitions",
+      "urls": ["https://solana.com/docs/core/transactions", "https://solana.com/docs/rpc/http/sendtransaction", "https://solana.com/docs/rpc/http/getsignaturestatuses"],
+      "checkedAt": "2026-09-10",
+      "use": "Reference-only 64-byte first transaction signature identity, atomic transactions, submission versus execution, and searchTransactionHistory status queries. The existing canonical claim planner is reused to validate the complete signed packet; no upstream implementation copied."
+    },
+    {
       "project": "BIP-174",
       "url": "https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki",
       "use": "Reference-only PSBTv0 maps, unsigned transaction, witness UTXO, sighash, SHA256 preimage and proprietary public field definitions; no implementation or vectors copied."

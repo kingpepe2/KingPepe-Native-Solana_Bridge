@@ -20,7 +20,7 @@ import {
   prepareLocalnetSolanaDepositClaimRequest,
 } from "../localnet-solana-deposit-claim-bridge.mjs";
 import { FileBackedSolanaDepositClaimJournal, InMemorySolanaDepositClaimJournal, SolanaDepositClaimSubmitter } from "../solana-deposit-claim-submitter.mjs";
-import { base58Encode, findProgramAddress } from "../solana-deposit-claim-transaction-plan.mjs";
+import { base58Decode, base58Encode, findProgramAddress } from "../solana-deposit-claim-transaction-plan.mjs";
 import { bytesToHex, hexToBytes } from "../../../shared/protocol/canonical-message.mjs";
 import { SolanaDepositClaimObserver } from "../../solana-observer/solana-deposit-claim-observer.mjs";
 
@@ -209,7 +209,7 @@ function bridgeConfig(config, feePayer, overrides = {}) {
     managerProgramIdHex: config.deployment.managerProgramId,
     transceiverProgramIdHex: config.deployment.transceiverProgramId,
     mintHex: config.deployment.mint,
-    tokenProgramIdHex: h("traditional-spl-token-program"),
+    tokenProgramIdHex: Buffer.from(base58Decode("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")).toString("hex"),
     feePayerBase58: feePayer.publicKeyBase58,
     policyEpoch: config.policyEpoch,
     keyEpoch: config.keyEpoch,
@@ -253,14 +253,14 @@ class FakeLocalnetSolanaRpc {
 
   async sendTransaction(preparedTransactionBase64, options) {
     this.sendCalls.push({ preparedTransactionBase64, options });
-    this.submittedSignatures.add(base58Encode(Buffer.from(preparedTransactionBase64, "base64").subarray(1, 65)));
+    this.solanaSignature = base58Encode(Buffer.from(preparedTransactionBase64, "base64").subarray(1, 65));
+    this.submittedSignatures.add(this.solanaSignature);
     return this.solanaSignature;
   }
 
   async getSignatureStatus(solanaSignature) {
     this.statusCalls.push(solanaSignature);
-    if (!this.submittedSignatures.has(solanaSignature) &&
-        !(solanaSignature === this.solanaSignature && this.sendCalls.length > 0)) return null;
+    if (!this.submittedSignatures.has(solanaSignature)) return null;
     return structuredClone(this.status);
   }
 
@@ -286,7 +286,7 @@ class FakeDepositClaimObserver {
       rootSlot: 88,
       commitment: "finalized",
       transaction: {
-        signature: this.solanaSignature,
+        signature: input.solanaSignature,
         err: null,
       },
       programs: {

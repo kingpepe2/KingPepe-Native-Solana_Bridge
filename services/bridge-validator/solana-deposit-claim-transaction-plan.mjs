@@ -41,6 +41,35 @@ const UINT_DECIMAL = /^(0|[1-9][0-9]*)$/u;
 const SOLANA_PDA_MARKER = Buffer.from("ProgramDerivedAddress", "utf8");
 export const SOLANA_MAX_TRANSACTION_BYTES = 1232;
 
+export function verifySignedLocalnetSolanaDepositClaimTransaction(config) {
+  const encoded = config?.preparedTransactionBase64;
+  if (typeof encoded !== "string" || encoded.length > 1644) throw new Error("SolanaClaimPacketInvalid");
+  const packet = Buffer.from(encoded, "base64");
+  // Only the current canonical, one-fee-payer legacy claim format is supported.
+  // Rebuild the whole message below: these fixed offsets are not a permissive
+  // general transaction parser or permission to accept arbitrary instructions.
+  if (packet.toString("base64") !== encoded || packet.length > SOLANA_MAX_TRANSACTION_BYTES ||
+      packet.length < 101 || !packet.subarray(65, 69).equals(Buffer.from([1, 0, 7, 13])) || packet[0] !== 1) {
+    throw new Error("SolanaClaimPacketInvalid");
+  }
+  const feePayer = packet.subarray(69, 101);
+  const plan = buildLocalnetSolanaDepositClaimTransactionPlan({
+    ...config, feePayerBase58: undefined, feePayerHex: feePayer.toString("hex"),
+    tokenProgramIdHex: undefined, tokenProgramIdBase58: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  });
+  const message = Buffer.from(plan.messageBase64, "base64");
+  if (!packet.subarray(65).equals(message)) throw new Error("SolanaClaimPacketMessageMismatch");
+  const signature = packet.subarray(1, 65);
+  if (!ed25519.verify(signature, message, feePayer, { zip215: false })) {
+    throw new Error("SolanaClaimPacketSignatureInvalid");
+  }
+  return Object.freeze({
+    solanaSignature: base58Encode(signature),
+    depositClaimAccountBase58: plan.pdas.depositClaim.addressBase58,
+    mintAccountBase58: plan.mintBase58,
+  });
+}
+
 export function buildLocalnetSolanaDepositClaimTransactionPlan(config) {
   const normalized = normalizePlanConfig(config);
   const decodedMessage = decodeCanonicalBridgeMessage(normalized.encodedMessageBytes);

@@ -117,6 +117,7 @@ jobs:
               localRecovery: r.localRecovery,
               localRecoveryPsbt: r.localRecoveryPsbt,
               localRecoveryRaces: r.localRecoveryRaces,
+              localClaimRetry: r.localClaimRetry,
               nativeEvidence: f?.nativeRawEvidence,
               nativeToSolana: r.fullNativeToSolanaE2e, reserve: f?.reconciliation?.canonicalReserve,
               observedMintSupply: f?.reconciliation?.mintedSupply, productionReady: false, mainnetActivation: "DISABLED"}));
@@ -125,6 +126,7 @@ jobs:
             if (r.localRecovery?.pass !== 7 || r.localRecovery?.fail !== 0) process.exit(1);
             if (r.localRecoveryPsbt?.pass !== 4 || r.localRecoveryPsbt?.fail !== 0) process.exit(1);
             if (r.localRecoveryRaces?.pass !== 10 || r.localRecoveryRaces?.fail !== 0) process.exit(1);
+            if (r.localClaimRetry?.pass !== 5 || r.localClaimRetry?.fail !== 0) process.exit(1);
             if (f?.depositIntent?.recoverable !== true || f.depositIntent.recoveryAvailableAfterSweep !== false) process.exit(1);
             if (f.depositIntent.scriptPubKeyHex === f.frostCustody.taprootScriptPubKeyHex) process.exit(1);
           '

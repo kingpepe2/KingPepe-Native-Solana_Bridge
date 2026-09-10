@@ -30,7 +30,7 @@ import {
   FileBackedSolanaDepositClaimJournal,
   InMemorySolanaDepositClaimJournal,
 } from "../solana-deposit-claim-submitter.mjs";
-import { base58Encode, findProgramAddress } from "../solana-deposit-claim-transaction-plan.mjs";
+import { base58Decode, base58Encode, findProgramAddress } from "../solana-deposit-claim-transaction-plan.mjs";
 import { SolanaDepositClaimObserver } from "../../solana-observer/solana-deposit-claim-observer.mjs";
 import {
   FROST_SIGNING_INTENT_PROTOCOL,
@@ -375,7 +375,7 @@ function localnetBridgeConfigForPipeline(config, feePayer) {
     managerProgramIdHex: config.deployment.managerProgramId,
     transceiverProgramIdHex: config.deployment.transceiverProgramId,
     mintHex: config.deployment.mint,
-    tokenProgramIdHex: h("traditional-spl-token-program"),
+    tokenProgramIdHex: Buffer.from(base58Decode("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")).toString("hex"),
     feePayerBase58: feePayer.publicKeyBase58,
     policyEpoch: config.policyEpoch,
     keyEpoch: config.keyEpoch,
@@ -458,14 +458,14 @@ class FakeIntegratedLocalnetSolanaRpc {
 
   async sendTransaction(preparedTransactionBase64, options) {
     this.sendCalls.push({ preparedTransactionBase64, options });
-    this.submittedSignatures.add(base58Encode(Buffer.from(preparedTransactionBase64, "base64").subarray(1, 65)));
+    this.solanaSignature = base58Encode(Buffer.from(preparedTransactionBase64, "base64").subarray(1, 65));
+    this.submittedSignatures.add(this.solanaSignature);
     return this.solanaSignature;
   }
 
   async getSignatureStatus(solanaSignature) {
     this.statusCalls.push(solanaSignature);
-    if (!this.submittedSignatures.has(solanaSignature) &&
-        !(solanaSignature === this.solanaSignature && this.sendCalls.length > 0)) return null;
+    if (!this.submittedSignatures.has(solanaSignature)) return null;
     return {
       slot: 88,
       confirmationStatus: "finalized",
@@ -638,7 +638,7 @@ test("automatic Native to Solana pipeline submits through localnet Solana bridge
     assert.equal(runtime.pipeline.ledgerSnapshot().mintedSupply, "250000000");
     assert.equal(rpc.sendCalls.length, 2);
     const receiptSignature = base58Encode(Buffer.from(rpc.sendCalls[0].preparedTransactionBase64, "base64").subarray(1, 65));
-    assert.deepEqual(rpc.statusCalls, [receiptSignature, receiptSignature, rpc.solanaSignature]);
+    assert.deepEqual(rpc.statusCalls, [receiptSignature, receiptSignature, rpc.solanaSignature, rpc.solanaSignature]);
     assert.deepEqual(rpc.transactionCalls, [rpc.solanaSignature]);
     assert.deepEqual(rpc.accountInfoCalls, [
       expectedPrepared.depositClaimAccountBase58,
@@ -744,7 +744,7 @@ test("automatic Native to Solana pipeline uses Native reserve sweep adapters and
     ]);
     assert.equal(solanaRpc.sendCalls.length, 2);
     const receiptSignature = base58Encode(Buffer.from(solanaRpc.sendCalls[0].preparedTransactionBase64, "base64").subarray(1, 65));
-    assert.deepEqual(solanaRpc.statusCalls, [receiptSignature, receiptSignature, solanaRpc.solanaSignature]);
+    assert.deepEqual(solanaRpc.statusCalls, [receiptSignature, receiptSignature, solanaRpc.solanaSignature, solanaRpc.solanaSignature]);
     assert.deepEqual(solanaRpc.transactionCalls, [solanaRpc.solanaSignature]);
     assert.deepEqual(solanaRpc.accountInfoCalls, [
       expectedPrepared.depositClaimAccountBase58,

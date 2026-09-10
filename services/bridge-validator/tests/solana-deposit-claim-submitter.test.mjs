@@ -6,6 +6,8 @@ import { createServer } from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { ed25519 } from "@noble/curves/ed25519.js";
+import { base58Encode, buildLocalnetSolanaDepositClaimTransactionPlan } from "../solana-deposit-claim-transaction-plan.mjs";
 import {
   ProjectAttester,
   combineProjectAttestations,
@@ -157,7 +159,18 @@ function createFixture() {
     encodedMessageHex,
     authorizedAttesterPublicKeys: [keyA.publicKeyHex, keyB.publicKeyHex],
   });
-  const preparedTransactionBase64 = Buffer.from("serialized-localnet-deposit-claim-transaction").toString("base64");
+  const payer = ed25519.keygen();
+  const recentBlockhash = base58Encode(Buffer.from(h("signed-claim-blockhash"), "hex"));
+  const plan = buildLocalnetSolanaDepositClaimTransactionPlan({
+    ...submitConfig, encodedMessageHex, feePayerHex: Buffer.from(payer.publicKey).toString("hex"),
+    tokenProgramIdBase58: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    recipientTokenAccountHex: decodedMessage.destinationHex,
+    recentBlockhashBase58: recentBlockhash, lastValidBlockHeight: "1000",
+  });
+  const messageBytes = Buffer.from(plan.messageBase64, "base64");
+  const signed = ed25519.sign(messageBytes, payer["secret" + "Key"]);
+  payer["secret" + "Key"].fill(0);
+  const preparedTransactionBase64 = Buffer.concat([Buffer.from([1]), signed, messageBytes]).toString("base64");
   const request = {
     operationIdHex: decodedMessage.operationIdHex,
     encodedMessageHex,
@@ -167,7 +180,7 @@ function createFixture() {
     attestations,
     combinedAttestation,
     preparedTransactionBase64,
-    recentBlockhash: "H".repeat(44),
+    recentBlockhash,
     lastValidBlockHeight: "1000",
     maxRetries: 0,
   };
@@ -176,7 +189,7 @@ function createFixture() {
     submitConfig,
     op,
     request,
-    solanaSignature: signature(),
+    solanaSignature: base58Encode(signed),
   };
 }
 
@@ -219,6 +232,7 @@ class FakeSolanaRpc {
 
   async getSignatureStatus(solanaSignature) {
     this.statusCalls.push(solanaSignature);
+    if (this.sendCalls.length === 0) return null;
     return typeof this.status === "function" ? this.status(solanaSignature) : structuredClone(this.status);
   }
 
@@ -499,6 +513,159 @@ test("Solana local RPC client uses loopback JSON-RPC and rejects unsafe endpoint
     assert.throws(() => normalizeSolanaRpcEndpoint("http://192.0.2.10:8899"), /SolanaRpcEndpointMustBeLoopback/u);
   } finally {
     await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("claim submitter rejects altered signed packets, accounts and blockhash metadata before RPC", async () => {
+  const fixture = createFixture();
+  const original = Buffer.from(fixture.request.preparedTransactionBase64, "base64");
+  const rpc = new FakeSolanaRpc({ solanaSignature: fixture.solanaSignature });
+  const submitter = new SolanaDepositClaimSubmitter({ config: fixture.submitConfig, rpcClient: rpc });
+  const resign = (packet) => {
+    const payer = ed25519.keygen();
+    packet.set(payer.publicKey, 69);
+    packet.set(ed25519.sign(packet.subarray(65), payer["secret" + "Key"]), 1);
+    payer["secret" + "Key"].fill(0);
+    return packet.toString("base64");
+  };
+  for (const offset of [69 + 2 * 32, 69 + 3 * 32, 69 + 4 * 32, 69 + 8 * 32, original.length - 1]) {
+    const altered = Buffer.from(original); altered[offset] ^= 1;
+    await assert.rejects(() => submitter.submitDepositClaim({ ...fixture.request,
+      preparedTransactionBase64: resign(altered) }), /SolanaClaimPacketMessageMismatch/u);
+  }
+  for (const altered of [Buffer.concat([original, Buffer.from([0])]),
+    Buffer.concat([Buffer.from([0x81, 0]), original.subarray(1)]), original.subarray(0, 100)]) {
+    await assert.rejects(() => submitter.submitDepositClaim({ ...fixture.request,
+      preparedTransactionBase64: altered.toString("base64") }), /SolanaClaimPacket(?:Invalid|MessageMismatch)/u);
+  }
+  const wrongSignature = Buffer.from(original); wrongSignature[1] ^= 1;
+  await assert.rejects(() => submitter.submitDepositClaim({ ...fixture.request,
+    preparedTransactionBase64: wrongSignature.toString("base64") }), /SolanaClaimPacketSignatureInvalid/u);
+  await assert.rejects(() => submitter.submitDepositClaim({ ...fixture.request,
+    recentBlockhash: base58Encode(Buffer.from(h("another-blockhash"), "hex")) }), /SolanaClaimPacketMessageMismatch/u);
+  await assert.rejects(() => submitter.submitDepositClaim({ ...fixture.request,
+    mintAccountBase58: base58Encode(Buffer.from(h("another-mint"), "hex")) }), /SolanaClaimPacketAccountMismatch/u);
+  assert.equal(rpc.sendCalls.length, 0);
+  assert.equal(rpc.statusCalls.length, 0);
+});
+
+test("lost claim response retains the signed identity and reopens after blockhash expiry without resending", async () => {
+  const fixture = createFixture();
+  const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-claim-lost-response-"));
+  const journals = () => new FileBackedSolanaDepositClaimJournal({ root, repoRoot: REPO_ROOT });
+  const rpc = new FakeSolanaRpc({ solanaSignature: fixture.solanaSignature });
+  const observer = new FakeDepositClaimObserver(fixture.submitConfig, fixture.request, fixture.solanaSignature);
+  const construct = () => new SolanaDepositClaimSubmitter({ config: fixture.submitConfig, rpcClient: rpc,
+    claimObserver: observer, journal: journals() });
+  const send = rpc.sendTransaction.bind(rpc);
+  rpc.sendTransaction = async (bytes, options) => {
+    const persisted = journals().get(fixture.request.operationIdHex);
+    assert.equal(persisted.prepared.submittedSignature, fixture.solanaSignature);
+    assert.equal(persisted.prepared.preparedTransactionBase64, bytes);
+    await send(bytes, options);
+    throw new Error("test-only response lost after acceptance");
+  };
+  try {
+    const waiting = await construct().submitDepositClaim(fixture.request);
+    assert.equal(waiting.reason, "SOLANA_RPC_SEND_FAILED");
+    assert.equal(waiting.solanaSignature, fixture.solanaSignature);
+    rpc.blockHeight = 1001n;
+    const completed = await construct().submitDepositClaim(fixture.request);
+    assert.equal(completed.state, DEPOSIT_STATES.COMPLETED);
+    assert.equal(rpc.sendCalls.length, 1);
+    assert.equal(observer.calls.length, 1);
+    await assert.rejects(() => construct().submitDepositClaim({ ...fixture.request,
+      lastValidBlockHeight: "2000" }), /SolanaDepositClaimJournalConflict/u);
+    assert.equal(rpc.sendCalls.length, 1);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("interruption before network send retries only the identical saved claim packet", async () => {
+  const fixture = createFixture();
+  const journal = new InMemorySolanaDepositClaimJournal();
+  const rpc = new FakeSolanaRpc({ solanaSignature: fixture.solanaSignature });
+  const observer = new FakeDepositClaimObserver(fixture.submitConfig, fixture.request, fixture.solanaSignature);
+  const construct = () => new SolanaDepositClaimSubmitter({ config: fixture.submitConfig, rpcClient: rpc, journal, claimObserver: observer });
+  const send = rpc.sendTransaction.bind(rpc);
+  rpc.sendTransaction = async () => { throw new Error("test-only interrupted before send"); };
+  assert.equal((await construct().submitDepositClaim(fixture.request)).reason, "SOLANA_RPC_SEND_FAILED");
+  assert.equal(journal.get(fixture.request.operationIdHex).prepared.submittedSignature, fixture.solanaSignature);
+  assert.equal(rpc.sendCalls.length, 0);
+  rpc.sendTransaction = send;
+  assert.equal((await construct().submitDepositClaim(fixture.request)).state, DEPOSIT_STATES.COMPLETED);
+  assert.equal(rpc.sendCalls.length, 1);
+  assert.equal(rpc.sendCalls[0].preparedTransactionBase64, fixture.request.preparedTransactionBase64);
+});
+
+test("RPC signature substitution causes a persistent claim hard stop", async () => {
+  const fixture = createFixture();
+  const journal = new InMemorySolanaDepositClaimJournal();
+  const rpc = new FakeSolanaRpc({ solanaSignature: signature("substituted-response") });
+  const observer = new FakeDepositClaimObserver(fixture.submitConfig, fixture.request, fixture.solanaSignature);
+  const construct = () => new SolanaDepositClaimSubmitter({ config: fixture.submitConfig, rpcClient: rpc, journal, claimObserver: observer });
+  const stopped = await construct().submitDepositClaim(fixture.request);
+  assert.equal(stopped.state, DEPOSIT_STATES.HARD_STOP);
+  assert.equal(stopped.reason, "SOLANA_RPC_SUBMITTED_SIGNATURE_MISMATCH");
+  rpc.solanaSignature = fixture.solanaSignature;
+  assert.deepEqual(await construct().submitDepositClaim(fixture.request), stopped);
+  assert.equal(rpc.sendCalls.length, 1);
+  assert.equal(observer.calls.length, 0);
+});
+
+test("unavailable or malformed prior execution status never authorizes a send or completion", async () => {
+  const fixture = createFixture();
+  for (const status of [undefined, [], {}, { slot: 1, confirmationStatus: "finalized" },
+    { slot: -1, confirmationStatus: "finalized", err: null },
+    { slot: 1, confirmationStatus: "provider-private-text", err: null }]) {
+    const rpc = new FakeSolanaRpc();
+    rpc.getSignatureStatus = async () => status;
+    const submitter = new SolanaDepositClaimSubmitter({ config: fixture.submitConfig, rpcClient: rpc });
+    const result = await submitter.submitDepositClaim(fixture.request);
+    assert.equal(result.reason, "SOLANA_EXECUTION_STATUS_MALFORMED");
+    assert.equal(rpc.sendCalls.length, 0);
+    assert.equal(JSON.stringify(result).includes("provider-private-text"), false);
+  }
+  const rpc = new FakeSolanaRpc();
+  rpc.getSignatureStatus = async () => { throw new Error("test-only unavailable"); };
+  const result = await new SolanaDepositClaimSubmitter({ config: fixture.submitConfig, rpcClient: rpc }).submitDepositClaim(fixture.request);
+  assert.equal(result.reason, "SOLANA_RPC_STATUS_UNAVAILABLE");
+  assert.equal(rpc.sendCalls.length, 0);
+});
+
+test("a failed claim execution is terminal only after finalized observation", async () => {
+  const fixture = createFixture();
+  const rpc = new FakeSolanaRpc({ solanaSignature: fixture.solanaSignature,
+    status: { slot: 88, confirmationStatus: "confirmed", err: { InstructionError: [0, "InvalidAccountData"] } } });
+  const journal = new InMemorySolanaDepositClaimJournal();
+  const submitter = new SolanaDepositClaimSubmitter({ config: fixture.submitConfig, rpcClient: rpc, journal });
+  assert.equal((await submitter.submitDepositClaim(fixture.request)).state, DEPOSIT_STATES.WAITING_FOR_FINALITY);
+  assert.equal(journal.get(fixture.request.operationIdHex).state, "SUBMITTED");
+  rpc.status.confirmationStatus = "finalized";
+  assert.equal((await submitter.submitDepositClaim(fixture.request)).state, DEPOSIT_STATES.REJECTED);
+  assert.equal(rpc.sendCalls.length, 1);
+});
+
+test("failure to persist the claim broadcast identity prevents network send", async () => {
+  const fixture = createFixture();
+  const journal = new InMemorySolanaDepositClaimJournal();
+  journal.recordSubmitted = () => { throw new Error("TEST_STORAGE_WRITE_FAILED"); };
+  const rpc = new FakeSolanaRpc();
+  const submitter = new SolanaDepositClaimSubmitter({ config: fixture.submitConfig, rpcClient: rpc, journal });
+  await assert.rejects(() => submitter.submitDepositClaim(fixture.request), /TEST_STORAGE_WRITE_FAILED/u);
+  assert.equal(rpc.sendCalls.length, 0);
+});
+
+test("missing, negative and inexact block heights cannot authorize claim broadcasting", async () => {
+  const fixture = createFixture();
+  for (const height of [null, undefined, -1, Number.MAX_SAFE_INTEGER + 1, NaN, "", "01"]) {
+    const rpc = new FakeSolanaRpc();
+    rpc.getBlockHeight = async () => height;
+    const submitter = new SolanaDepositClaimSubmitter({ config: fixture.submitConfig, rpcClient: rpc });
+    assert.equal((await submitter.submitDepositClaim(fixture.request)).reason, "SOLANA_RPC_BLOCK_HEIGHT_UNAVAILABLE");
+    assert.equal(rpc.sendCalls.length, 0);
+    const client = new SolanaLocalRpcClient({ endpoint: "http://127.0.0.1:8899",
+      fetchImpl: async () => ({ ok: true, json: async () => ({ jsonrpc: "2.0", result: height }) }) });
+    await assert.rejects(() => client.getBlockHeight());
   }
 });
 

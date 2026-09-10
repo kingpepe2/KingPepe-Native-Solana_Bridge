@@ -1,6 +1,38 @@
 # KingPepe Native - Solana Bridge Task Status
 
-Current unpublished Phase 08 increment adds real pre-mint recovery/sweep races
+Current unpublished Phase 08 increment: signed claim retry/actual process exits.
+Complete signed claim packet and fee-payer signature validation precedes RPC.
+The known signature is saved before send; retries query that identity, never
+rebuild unknown outcomes, and can settle a finalized transaction after expiry.
+RPC signature substitution persists HARD_STOP. Missing/malformed execution or
+height data does not authorize economic effects.
+
+Windows/WSL each: 172 Node tests + two vectors PASS. WSL: 84 Rust tests,
+fmt/clippy, two SBF builds, real deposit + 22 security + seven CSV + four PSBT +
+ten races + five new claim-worker crash/expiry checks PASS, no final failures or
+skips. The workers exit before send and after actual acceptance, then reopen
+after real blockhash expiry without keys, rebroadcast or double mint. Reserve
+and SPL supply each remain 100000000 atomic; no per-transfer approval.
+Five Rust audits and npm audit find no known vulnerabilities; retained bincode
+unmaintained warning. Declared licenses pass. Provenance 168 -> 169 files,
+one original test addition, no deletion/move/dependency changes or source imports.
+Current source and all 147 existing commits scan clean; private-path/IP and exact
+169-file provenance coverage pass. Staged/outgoing scans, reviewed commit,
+private push and exact-SHA CI are still required. No artifacts are uploaded.
+
+Previous source `9ead67ccd1b04ea53f9b878feff3a168120f2844`, message
+`fix(phase-08): verify recovery races and Native RPC errors`, pushed privately;
+all four CI jobs PASS:
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34451366099.
+Current/staged/outgoing and all 147 commits scanned clean for that publication.
+Next: publish/verify claim retry, then durable unminted credits, remaining
+account/source checks, authenticated/fenced persistence, full-service restart
+and post-mint reorg hard stops. File flushing is not complete power-loss or
+rollback assurance. Phase 08 incomplete; Phase 09 NOT_STARTED; Mainnet DISABLED.
+
+### Previous recovery-race increment (verified source above)
+
+The recovery-race increment adds real pre-mint recovery/sweep races
 and forced-fork tests. Both candidate spends use actual signatures: FROST A+B for
 the sweep and the Native user wallet for recovery. Ten node-backed checks pass,
 including both winner orders, equal-fee mempool conflicts, disconnected reserve
@@ -13,11 +45,11 @@ PSBT + ten race checks PASS. No final suite failures/skips. Reserve/supply for
 the original operation remain 100000000 atomic. Audits find no known
 vulnerabilities; bincode's unmaintained warning is retained. Provenance 167 ->
 168 files, one original test addition, no deletion/move/dependency changes.
-Current source and 146 existing commits scan clean; private-path/IP and exact
-provenance coverage checks pass. Specific chain-state rejection errors are
+Current/staged/outgoing source and all 147 commits scanned clean at publication;
+private-path/IP and exact provenance checks passed. Specific rejection errors are
 required; infrastructure failures cannot count as successful race checks. Five
-new unit tests cover that distinction and fork-control isolation. Staged/outgoing scans, commit/private push and
-exact-SHA CI remain required. No runtime/build artifacts are uploaded.
+new unit tests cover that distinction and fork-control isolation. Private push
+and exact-SHA CI passed as recorded above. No runtime/build artifacts uploaded.
 
 An initially stricter real run FAILED: the Native adapter flattened HTTP 500
 structured errors into transport errors when the losing transaction was absent.
@@ -31,9 +63,8 @@ PSBT increment `710ad4afce5ca169868dc618acc870fdb221bf3f`, message
 `feat(phase-08): support Native wallet recovery PSBTs`, is pushed privately;
 all four exact-SHA CI jobs PASS:
 https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34449370653.
-Next: publish/verify race tests, then address durable unminted
-credits, crash/restart, remaining account/source validation and post-mint reorg
-hard stops. Phase 08 incomplete; Phase 09 NOT_STARTED; Mainnet DISABLED.
+The next work after this historical increment was signed-claim retry, followed
+by durable unminted credits and the remaining Phase 08 security dependencies.
 
 Prior increment details follow; their counts do not certify the new race tests.
 

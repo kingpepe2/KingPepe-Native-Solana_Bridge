@@ -15,8 +15,8 @@
   },
   "evidenceScope": "Current local integration increment; its CI result must be checked at the exact source SHA. Earlier per-component CI booleans were historical, not proof of this tree.",
   "previousVerifiedSource": {
-    "sha": "710ad4afce5ca169868dc618acc870fdb221bf3f",
-    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34449370653",
+    "sha": "9ead67ccd1b04ea53f9b878feff3a168120f2844",
+    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34451366099",
     "status": "PASS"
   },
   "sourceState": {
@@ -25,7 +25,10 @@
     "finalizedSweepWitnessSignatures": "CHECKED_BY_BOTH_ATTESTERS_REGTEST_ONLY",
     "recoveryPsbtWalletIntegration": "EXACT_SHA_CI_PASS_PINNED_REGTEST_WALLET_ONLY",
     "temporaryDepositScript": "V2_MINISCRIPT_PUBLIC_INTENT_PREIMAGE_SIGNATURE_AND_CSV_REQUIRED_REGTEST_ONLY",
-    "preMintRecoverySweepRaces": "TEN_REAL_REGTEST_CHECKS_PASS_AWAITING_EXACT_SHA_CI",
+    "preMintRecoverySweepRaces": "TEN_REAL_REGTEST_CHECKS_PASS_EXACT_PREVIOUS_SHA_CI_VERIFIED",
+    "signedClaimPacketValidation": "COMPLETE_CANONICAL_PACKET_AND_FEE_PAYER_SIGNATURE_CHECKED_LOCALNET_ONLY",
+    "claimWorkerCrashAndExpiry": "FIVE_REAL_LOCAL_VALIDATOR_CHECKS_PASS_AWAITING_EXACT_SHA_CI",
+    "claimJournalDurability": "FILE_CONTENTS_FLUSHED_PROCESS_REOPEN_TESTED_NOT_AUTHENTICATED_FENCED_OR_POWER_LOSS_PROVEN",
     "postMintDeepReorgResponse": "NOT_RUN_COMPLETE_SERVICE_E2E",
     "provenance": "FILE_BY_FILE_REVIEWED",
     "repositoryPrivacy": "VERIFIED_PRIVATE",
@@ -50,13 +53,13 @@
   },
   "localValidation": {
     "windows": {
-      "nodeTestsPass": 164,
+      "nodeTestsPass": 172,
       "protocolVectorsPass": 2,
       "nativeSbf": "NOT_RUN_NOT_SUPPORTED",
       "serviceAclProtectedStorage": "NOT_RUN"
     },
     "wsl": {
-      "nodeTestsPass": 164,
+      "nodeTestsPass": 172,
       "protocolVectorsPass": 2,
       "solanaRustTestsPass": 58,
       "nativeRustTestsPass": 26,
@@ -74,6 +77,9 @@
       "nativeWalletRecoveryPsbtChecksFail": 0,
       "nativePreMintRaceChecksPass": 10,
       "nativePreMintRaceChecksFail": 0,
+      "solanaClaimProcessRetryChecksPass": 5,
+      "solanaClaimProcessRetryChecksFail": 0,
+      "solanaClaimExpiry": "ACTUAL_VALIDATOR_BLOCK_HEIGHT_PASSED_LAST_VALID_HEIGHT_BEFORE_WORKER_REOPEN",
       "rawInputHeaders": 33,
       "rawReserveHeaders": 39,
       "duplicateBacking": "NEW_NONCE_VALID_ATTESTATIONS_PREFLIGHT_REJECTED_SUPPLY_UNCHANGED",
@@ -106,7 +112,7 @@
     "Implement and test post-mint deep-reorg hard stops; ten pre-mint race/fork checks pass but are not compensation or production finality assurance",
     "Configure production Native evidence sources; current raw-header/Merkle integration is REGTEST-only with explicit local-node UTXO trust",
     "Review remaining account and source-validation dependencies",
-    "Exercise real-daemon failure/restart/reorg/replay cases beyond model tests"
+    "Exercise full-service restart beyond the tested signed-claim worker crashes; persist unminted credit liabilities and complete authenticated/fenced journal and rollback guarantees"
   ],
   "readinessGates": {
     "SOURCE_COMPLETE": "IMPLEMENTED_BUT_INCOMPLETE",

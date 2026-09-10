@@ -35,7 +35,8 @@ E2E validation.
 An additional Phase 08 integration test connects the same automatic pipeline to
 the real Native reserve-sweep relayer/verifier adapter classes and the localnet
 Solana claim bridge/observer adapter classes at the same time, still using fake
-loopback RPC fixtures because the required local daemons are unavailable.
+loopback RPC fixtures. The separate real-daemon harness is described below;
+these fixtures are not independent end-to-end evidence.
 
 The restart/retry integration coverage now uses file-backed deposit, Native
 reserve-sweep, and Solana claim journals together. A restart after Native sweep
@@ -52,7 +53,8 @@ operation cannot reuse an already-reserved deposit outpoint.
 claim submission boundary used after A+B attestation. It accepts prebuilt
 transaction bytes from the local harness/SDK layer, verifies the canonical
 deposit message and two project attestations before RPC submission, persists the
-operation before broadcast, checks the prior signature outcome before retry, and
+operation and actual signed transaction identity before broadcast, checks that
+signature's prior outcome before retry, and
 requires a finalized deposit-claim observation before returning `COMPLETED`.
 
 `solana-deposit-claim-transaction-plan.mjs` prepares the localnet Solana
@@ -83,7 +85,35 @@ The Solana submitter and transaction-plan builder are intentionally
 localnet-only in this phase. They do not configure production RPC or mark
 Mainnet ready.
 
-The current implementation is still not the required real local E2E run. That
-gate remains blocked until a disposable KingPepe regtest daemon/CLI and Solana
-local-validator/Anchor toolchain are available and the Solana programs are
-deployable in that environment.
+## Signed claim retry boundary
+
+The submitter reconstructs the entire current one-signer legacy claim message
+with the existing planner and verifies its Ed25519 fee-payer signature. The
+packet must bind the configured programs, traditional SPL Token Program, Mint,
+recipient, PDAs, canonical message and reported blockhash. Alternate formats,
+extra instructions/trailing bytes and substituted accounts are rejected.
+
+The first signature is known before RPC submission. The external journal saves
+that identity before sending; retries query it with transaction-history search.
+A missing response is not a failed transaction. Before expiry, only the same
+saved packet may be rebroadcast if no status is observed. After expiry, unknown
+outcome waits; this implementation never rebuilds the packet. A finalized old
+signature can still be observed and settled after its blockhash expires.
+Missing/malformed status or height cannot authorize sending or completion.
+A substituted RPC-returned signature causes a persistent HARD_STOP.
+
+Journal file contents are flushed before rename. This is not authenticated
+storage, cross-process fencing, complete rollback detection or a power-loss
+guarantee for directory metadata. Those production requirements remain open.
+
+`solana/tests/local-deposit-security.mjs` runs actual REGTEST/local-validator
+deposits and adversarial checks with pinned tools, including claim workers that
+exit abruptly before send and after validator acceptance, then resume after
+real blockhash expiry. Workers use existing signed packets/public attestations,
+not signing keys. This is claim-worker process recovery, not restart of all
+services, nonce rollback assurance or completion of both bridge directions.
+See `docs/development-status.md` for exact tested source and results.
+
+RPC semantics are reference-only: [sendTransaction](https://solana.com/docs/rpc/http/sendtransaction)
+and [getSignatureStatuses](https://solana.com/docs/rpc/http/getsignaturestatuses).
+No upstream implementation is copied or audit coverage implied.

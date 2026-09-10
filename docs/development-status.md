@@ -2,7 +2,57 @@
 
 ## Current Phase 08 integration evidence (2026-09-10)
 
-Current recovery-race increment is UNPUBLISHED / LOCALLY_TESTED. Both possible
+Current claim-retry increment is UNPUBLISHED / LOCALLY_TESTED. It reconstructs
+the whole current signed claim packet using the existing canonical planner,
+verifies its fee-payer signature and binds the actual programs, SPL Token
+Program, Mint, recipient, PDAs, message and blockhash. The signature is recorded
+before broadcast; a lost response never permits a new packet/operation.
+Prior status is queried even after expiry. A mismatched RPC-returned signature
+causes persistent HARD_STOP; malformed/missing status or height fails closed.
+Finalized failure is distinguished from non-final execution observation.
+
+Windows and WSL each: 172 Node tests + two vectors PASS. Eight added unit tests
+cover packet/metadata substitution, lost-response reopen after expiry, pre-send
+interruption, signature substitution, malformed status, failed-transaction
+finality, write failure and invalid heights. Existing fixtures used fabricated
+Token Program IDs and response signatures; they were corrected to the official
+SPL Token Program and actual signed packets, not excepted from verification.
+
+WSL: 58 Solana Rust + 26 Native Rust tests, fmt/clippy and both SBF builds PASS.
+A fresh real REGTEST/local-validator run passes the automatic deposit, 22
+security + seven CSV + four PSBT + ten race checks, plus five new process-retry
+checks: saved identity before abrupt exit, identical packet after restart,
+exit after actual validator acceptance but before completion is recorded,
+reopen after actual blockhash expiry without sending, and completed reopen
+without another mint. Each restart uses a new process without signing keys.
+Final reserve and observed SPL supply each equal 100000000 atomic units.
+There is no per-transfer KingPepe Team approval. Executed final suites have
+zero failures/skips. Five Rust audits and npm audit find no known vulnerabilities;
+bincode's unmaintained warning remains. Declared license metadata passes.
+
+File contents flush before rename, but authenticated/fenced journals, power-loss
+directory-metadata guarantees and rollback assurance are NOT established. Full
+service restart, durable unminted credits, post-mint reorg response and other
+Phase 08 source/validation dependencies remain open. Phase 09 NOT_STARTED.
+No production configuration, keys, services, deployment or activation changed.
+
+Provenance: 168 -> 169 files; one original local test added, no deletions, moves,
+dependency changes or imported source. Obsolete scaffold/missing-tool wording
+in the relevant test/validator READMEs was corrected. Current source and all 147
+existing commits scan clean; private-path/IP checks and exact 169-file provenance
+coverage pass. Staged/outgoing review, private push and exact-SHA CI remain
+required. No runtime/build artifacts are uploaded.
+
+Previous source `9ead67ccd1b04ea53f9b878feff3a168120f2844`, message
+`fix(phase-08): verify recovery races and Native RPC errors`, is pushed privately;
+[all four exact-SHA CI jobs PASS](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34451366099).
+Its 164 Node + two vectors, 84 Rust, SBF and 22/7/4/10 real checks apply to that
+source only. Current, staged, outgoing and all 147 commits scanned clean at its
+publication; no artifacts were uploaded. New changes need their own validation.
+
+### Previous recovery-race increment (verified source above)
+
+The recovery-race increment was locally tested and then CI-verified. Both possible
 first winners (real FROST A+B sweep or Native-wallet CSV recovery) are exercised
 with separate test deposits and fees. Equal-fee mempool conflict, finalized
 exclusion, disconnected reserve rejection and an alternative pre-mint branch
@@ -20,9 +70,9 @@ specific chain-state errors; infrastructure failure cannot count as PASS. Five R
 audits and npm audit find no known vulnerabilities; bincode's unmaintained
 warning remains. Declared dependency licenses pass. Provenance 167 -> 168 files,
 one original test added; no deletions/moves/dependency or licensing changes.
-Current source and all 146 existing commits scan clean; private-path/IP checks
-and exact 168-file provenance coverage pass. Staged/outgoing scans, private push
-and exact-SHA CI remain required. No runtime/build artifacts are uploaded.
+At publication, current/staged/outgoing source and all 147 commits scanned clean;
+private-path/IP checks and exact 168-file provenance coverage passed. Private push
+and exact-SHA CI passed as recorded above. No runtime/build artifacts uploaded.
 
 The stricter real run initially FAILED when a never-broadcast losing sweep was
 queried. The Native adapter discarded the structured RPC error on HTTP 500,

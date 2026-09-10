@@ -72,6 +72,17 @@
     "sourceImports": "No code copied; pinned Native generateblock and invalidateblock behavior reviewed. Existing provenance and notices preserved.",
     "dependencyChanges": "None"
   },
+  "phase08ClaimRetryReview": {
+    "filesBefore": 168,
+    "filesAfter": 169,
+    "filesDeleted": 0,
+    "filesMoved": 0,
+    "newFiles": ["solana/tests/local-claim-retry.mjs"],
+    "changes": "Original exact signed-claim packet reconstruction, pre-broadcast transaction identity persistence, status-aware retry and process-crash/real-blockhash-expiry tests. Existing synthetic unit fixtures now use the official SPL Token Program and actual packet signatures.",
+    "sourceImports": "Reference-only Solana transaction/RPC definitions; no upstream implementation copied. Required existing vector attribution and third-party notices retained.",
+    "dependencyChanges": "None",
+    "terminologyReview": "No new KingPepe project-role terminology requiring renaming; official protocol and third-party terms preserved."
+  },
   "provenancePolicy": {
     "originalCodeLicense": "Proprietary (Copyright (c) 2026 KingPepe Team)",
     "provenanceClassifications": [
@@ -84,6 +95,11 @@
     ]
   },
   "trackedFiles": [
+    {
+      "path": "solana/tests/local-claim-retry.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original local-validator worker-crash and real-blockhash-expiry test; restarts from the existing external signed-claim journal without receiving signing keys. No upstream implementation copied."
+    },
     {
       "path": "solana/tests/local-recovery-races.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
