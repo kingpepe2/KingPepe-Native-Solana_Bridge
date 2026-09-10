@@ -15,15 +15,16 @@
   },
   "evidenceScope": "Current local integration increment; its CI result must be checked at the exact source SHA. Earlier per-component CI booleans were historical, not proof of this tree.",
   "previousVerifiedSource": {
-    "sha": "7640dedcbadd9c31c120b3ebc5b7231eaa36cde2",
-    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34445169540",
+    "sha": "38cabeccd14c9e011e1c91fe1224d0b7bb721961",
+    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34447032014",
     "status": "PASS"
   },
   "sourceState": {
     "recoveryScriptIncrement": "EXACT_SHA_CI_PASS",
-    "recoverableDepositIntegration": "REAL_LOCAL_FROST_BIP342_SWEEP_AND_MINT_PASS_AWAITING_EXACT_SHA_CI",
+    "recoverableDepositIntegration": "EXACT_SHA_CI_PASS_FOR_PREVIOUS_SOURCE_CURRENT_V2_PSBT_LOCAL_PASS",
     "finalizedSweepWitnessSignatures": "CHECKED_BY_BOTH_ATTESTERS_REGTEST_ONLY",
-    "recoveryPsbtWalletIntegration": "NOT_IMPLEMENTED",
+    "recoveryPsbtWalletIntegration": "PINNED_REGTEST_WALLET_SIGN_FINALIZE_RECEIVE_REPLAY_PASS_AWAITING_EXACT_SHA_CI",
+    "temporaryDepositScript": "V2_MINISCRIPT_PUBLIC_INTENT_PREIMAGE_SIGNATURE_AND_CSV_REQUIRED_REGTEST_ONLY",
     "provenance": "FILE_BY_FILE_REVIEWED",
     "repositoryPrivacy": "VERIFIED_PRIVATE",
     "canonicalMessages": "IMPLEMENTED_AND_TESTED_LOCALLY",
@@ -47,13 +48,13 @@
   },
   "localValidation": {
     "windows": {
-      "nodeTestsPass": 155,
+      "nodeTestsPass": 159,
       "protocolVectorsPass": 2,
       "nativeSbf": "NOT_RUN_NOT_SUPPORTED",
       "serviceAclProtectedStorage": "NOT_RUN"
     },
     "wsl": {
-      "nodeTestsPass": 155,
+      "nodeTestsPass": 159,
       "protocolVectorsPass": 2,
       "solanaRustTestsPass": 58,
       "nativeRustTestsPass": 26,
@@ -65,8 +66,10 @@
       "signerAttesterRawEvidenceCoverageChecksPass": 1,
       "recoverableDepositReserveSeparationChecksPass": 1,
       "combinedRealSecurityChecksPass": 22,
-      "nativeCsvRecoveryChecksPass": 6,
+      "nativeCsvRecoveryChecksPass": 7,
       "nativeCsvRecoveryChecksFail": 0,
+      "nativeWalletRecoveryPsbtChecksPass": 4,
+      "nativeWalletRecoveryPsbtChecksFail": 0,
       "rawInputHeaders": 33,
       "rawReserveHeaders": 39,
       "duplicateBacking": "NEW_NONCE_VALID_ATTESTATIONS_PREFLIGHT_REJECTED_SUPPLY_UNCHANGED",
@@ -96,7 +99,7 @@
     "externalReview": "NOT_RUN"
   },
   "phase08Remaining": [
-    "Test competing sweep/recovery transactions and reorgs; implement offline PSBT wallet integration",
+    "Test competing sweep/recovery transactions and reorgs; end-user recovery onboarding beyond the pinned test wallet remains future SDK/app work",
     "Configure production Native evidence sources; current raw-header/Merkle integration is REGTEST-only with explicit local-node UTXO trust",
     "Review remaining account and source-validation dependencies",
     "Exercise real-daemon failure/restart/reorg/replay cases beyond model tests"

@@ -230,16 +230,18 @@ export function verifyRegtestSweepSignatures({ sweep, inputs, tapscriptSpends, r
   let scriptPathInputs = 0;
   for (const [index, input] of sweep.inputs.entries()) {
     const script = tapscriptSpends?.[index];
-    if (input.witness.length !== (script === undefined ? 1 : 3) || input.witness[0]?.length !== 64) {
+    if (input.witness.length !== (script === undefined ? 1 : 4) || input.witness[0]?.length !== 64) {
       throw new Error("RAW_NATIVE_SWEEP_WITNESS_INVALID");
     }
     if (script === undefined) {
       if (spentOutputs[index].scriptPubKeyHex !== reserveScriptHex) throw new Error("RAW_NATIVE_SWEEP_WITNESS_INVALID");
     } else {
-      if (!/^20[0-9a-f]{64}7520[0-9a-f]{64}ac$/u.test(script.scriptHex)
+      if (!/^82012088a820[0-9a-f]{64}8820[0-9a-f]{64}ac$/u.test(script.scriptHex)
         || script.scriptHex.slice(-66, -2) !== reserveScriptHex.slice(4)
-        || Buffer.from(input.witness[1]).toString("hex") !== script.scriptHex
-        || Buffer.from(input.witness[2]).toString("hex") !== script.controlBlockHex) {
+        || input.witness[1].length !== 32 || Buffer.from(input.witness[1]).toString("hex") !== script.publicPreimageHex
+        || createHash("sha256").update(Buffer.from(input.witness[1])).digest("hex") !== script.scriptHex.slice(12, 76)
+        || Buffer.from(input.witness[2]).toString("hex") !== script.scriptHex
+        || Buffer.from(input.witness[3]).toString("hex") !== script.controlBlockHex) {
         throw new Error("RAW_NATIVE_SWEEP_WITNESS_INVALID");
       }
       verifyTaprootControlBlock({ ...script, scriptPubKeyHex: spentOutputs[index].scriptPubKeyHex });

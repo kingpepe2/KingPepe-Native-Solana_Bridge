@@ -2,14 +2,58 @@
 
 ## Current Phase 08 integration evidence (2026-09-10)
 
-Latest verified source: `7640dedcbadd9c31c120b3ebc5b7231eaa36cde2`, message
+Latest verified source: `38cabeccd14c9e011e1c91fe1224d0b7bb721961`, message
+`feat(phase-08): sweep recoverable deposits with real FROST tapscript signatures`,
+has been pushed privately. [All four exact-SHA CI jobs passed](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34447032014).
+That SHA passed 155 Node tests + two vectors, 58 Solana Rust + 26 Native Rust tests,
+both SBF builds, the recoverable deposit, 22 security checks and six recovery checks.
+
+Current PSBT increment: locally tested, awaiting its own commit/private push and
+exact-SHA CI. Bounded offline PSBTv0/BIP371 preparation includes only public
+recovery information, never a private key. The unsigned inspector rejects
+duplicate/alternate/unknown fields, signed inputs, version/domain/tree
+substitution, trailing bytes and oversized data; it does not grant authorization.
+Four new unit tests pass. In the real Native wallet test, the wallet signs and
+finalizes the PSBT without exporting a private key, the node accepts the spend,
+the payout appears at a normal wallet-recognized address and replay is rejected.
+Compatibility is limited to the pinned REGTEST wallet.
+
+The initial real wallet test FAILED: Native's Miniscript signer could not sign
+the V1 OP_DROP-prefixed recovery leaf, despite valid node/script tests. V2 uses
+standard SHA256/CSV/signature fragments. Its 32-byte intent preimage is public,
+not an authorization secret. FROST and user signatures remain mandatory; CSV is
+still enforced by Native consensus. No old output is silently reinterpreted,
+no production output was migrated, and external test wallets were preserved.
+Fresh reruns pass; no gate was removed or weakened.
+
+Current measured Windows and WSL suites: 159 Node tests + two vectors each.
+WSL: 58 Solana Rust + 26 Native Rust tests, fmt/clippy and two SBF builds PASS.
+Real REGTEST + local-validator run: automatic deposit, 22 security checks,
+seven CSV recovery checks and four Native-wallet PSBT checks PASS. Reserve and
+SPL supply each equal 100000000 atomic units; no per-transfer team approval.
+All executed final suites have zero failures/skips. Five Rust audits and npm
+audit find no known vulnerabilities; the bincode unmaintained warning remains.
+Declared dependency licenses pass. Provenance: 164 -> 167 files, three original
+source/test additions; zero deletions/moves, new dependencies or upstream imports.
+Current source and all 145 existing commits scan without secret findings;
+private-path/IP boundary checks and exact provenance-path coverage pass. Staged
+and outgoing scans remain mandatory before commit/publication. No build or
+runtime artifacts are uploaded.
+
+Remaining Phase 08 work includes competing sweep/recovery transactions and reorgs,
+remaining account/source checks, real crash/restart cases and durable
+liability/fencing guarantees. End-user wallet onboarding remains SDK/app work.
+Phase 09 is NOT_STARTED; production remains disabled and unconfigured.
+
+### Previous checkpoints
+
+Recovery-script source: `7640dedcbadd9c31c120b3ebc5b7231eaa36cde2`, message
 `feat(phase-08): validate Native CSV recovery scripts on regtest`, pushed to
 PRIVATE origin/main; all four [CI jobs passed](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34445169540).
 That SHA passed 152 Node tests + two vectors, 58 Solana Rust + 26 Native Rust tests,
 both SBF builds, the real deposit, 17 security checks and six real recovery checks.
 
-Current recoverable-deposit integration is locally tested, awaiting its own
-commit/private push/exact-SHA CI. The normal flow now obtains a public recovery
+The verified recoverable-deposit integration obtains a public recovery
 key from the isolated Native user wallet, commits the deployment/recipient/amount/
 epoch-bound deposit intent into a temporary two-branch script, signs its sweep
 leaf with real FROST A+B, and finalizes a distinct non-user-recoverable reserve.
@@ -34,12 +78,8 @@ licenses pass. Current source and all 144 existing commits scan clean; staged an
 outgoing scans remain required. Provenance stays at 164 files with no additions,
 deletions, moves, third-party imports or new dependencies in this increment.
 
-Remaining Phase 08 work includes competing sweep/recovery transactions and reorgs,
-offline PSBT/wallet integration, remaining account/source checks, real crash/restart
-cases and durable liability/fencing guarantees. A single happy-path run does not
-establish those properties or production readiness. Phase 09 is NOT_STARTED.
-
-### Previous checkpoints
+Those 155-test counts describe the prior integration; the newer PSBT work and
+its measured scope are recorded at the top of this document.
 
 Raw-evidence source: `ef15e6e648935044edbb4b09874119bc6c823fc7`, message
 `fix(phase-08): validate raw Native evidence before signing and attesting`, pushed

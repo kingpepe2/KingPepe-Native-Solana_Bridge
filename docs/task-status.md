@@ -1,18 +1,50 @@
 # KingPepe Native - Solana Bridge Task Status
 
-Latest verified increment: `7640dedcbadd9c31c120b3ebc5b7231eaa36cde2`, message
+Recoverable-deposit increment `38cabeccd14c9e011e1c91fe1224d0b7bb721961`,
+`feat(phase-08): sweep recoverable deposits with real FROST tapscript signatures`,
+is pushed privately; all four exact-SHA CI jobs PASS:
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34447032014.
+That SHA passed 155 Node tests + two vectors, 84 Rust tests, both SBF builds,
+the real deposit and 22 security + six CSV recovery checks.
+
+Current Phase 08 PSBT increment: locally tested, awaiting commit/private push
+and exact-SHA CI. Implements bounded offline unsigned PSBT preparation/inspection,
+public key origins and V2 Miniscript-compatible intent scripts. An initial real
+wallet test failed for V1's OP_DROP prefix; V2 fixes wallet compatibility without
+removing the public intent binding, signature or CSV checks. Old outputs are not
+silently migrated; no production keys, outputs or services were touched.
+
+Windows and WSL: 159 Node tests + two vectors PASS. WSL: 58 Solana Rust + 26 Native
+Rust tests, fmt/clippy and both SBF builds PASS. Real automatic deposit + 22
+security + seven CSV recovery + four Native-wallet PSBT checks PASS. The actual
+wallet signed without exporting its key, received the finalized payout and the
+node rejected replay. Reserve/supply each 100000000 atomic; no team approval step.
+Five Rust audits and npm audit find no known vulnerabilities, with bincode's
+unmaintained warning retained. Declared licenses pass. Provenance 164 -> 167
+files, three original source/test additions, no deletions/moves/new dependencies.
+Current source and all 145 existing commits scan clean; private-path/IP checks
+pass and all 167 source paths have provenance. Staged/outgoing scans remain
+mandatory; no runtime/build artifacts are uploaded.
+
+Next: push/verify the PSBT increment, then competing sweep/recovery and reorg
+tests, remaining source/account checks and real crash/durable-credit tests.
+Phase 08 is incomplete; Phase 09 NOT_STARTED; Mainnet DISABLED.
+
+The following entries describe earlier checkpoints, not the newer tree.
+
+Recovery-script increment: `7640dedcbadd9c31c120b3ebc5b7231eaa36cde2`, message
 `feat(phase-08): validate Native CSV recovery scripts on regtest`, pushed to
 PRIVATE origin/main. All four CI jobs PASS:
 https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34445169540.
 It passed 152 Node tests + two vectors, 58 Solana Rust + 26 Native Rust tests,
 two SBF builds, the real deposit, 17 security checks and six CSV recovery checks.
 
-Current Phase 08 increment: integrate the committed user-recoverable temporary
+The recoverable-deposit increment integrated the committed user-recoverable temporary
 script into the real automatic deposit flow; obtain only a Native-user public
 key, reconstruct policy in each authorizing role, use real FROST BIP342 sweep
 signatures, finalize a separate canonical reserve, and verify actual witness
-signatures before both attestations and mint. Locally tested; its commit/private
-push/exact-SHA CI are pending. Windows and WSL: 155 Node tests + two vectors PASS.
+signatures before both attestations and mint. Its private push and exact-SHA CI
+passed as recorded above. Windows and WSL: 155 Node tests + two vectors PASS.
 WSL: 58 Solana Rust + 26 Native Rust tests, fmt/clippy, two SBF builds PASS.
 Real REGTEST/local-validator deposit + 22 security checks + six CSV recovery
 checks PASS; reserve/supply each 100000000 atomic. No per-transfer approval.
@@ -22,11 +54,7 @@ Current source and 144 existing commits scan clean. Provenance remains 164 files
 none added/deleted/moved; no new dependencies or third-party source imports.
 Audits retain the unmaintained bincode warning; no known vulnerabilities found.
 
-Next: publish/verify this increment, then test competing sweep/recovery and reorg
-cases, implement offline PSBT support, and close remaining source/account/crash/
-liability-persistence gaps before Phase 09. Mainnet remains DISABLED.
-
-The following entries describe earlier checkpoints, not the newer tree.
+The current PSBT work and remaining Phase 08 gaps are recorded at the top.
 
 Raw-evidence increment `ef15e6e648935044edbb4b09874119bc6c823fc7`, message
 `fix(phase-08): validate raw Native evidence before signing and attesting`, pushed

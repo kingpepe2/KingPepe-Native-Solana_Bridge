@@ -71,6 +71,12 @@ export async function testLocalNativeRecovery(context) {
     assert.equal((await check(sign(disabledSequence.toString("hex")))).allowed, false);
     passed.push("CSV_DISABLE_FLAG_CANNOT_BYPASS_RECOVERY_SCRIPT");
     assert.equal((await check(signed)).allowed, true);
+    const wrongPreimage = Buffer.from(policy.depositCommitmentHex, "hex"); wrongPreimage[0] ^= 1;
+    const wrongCommitmentWitness = attachTaprootWitnesses({ unsignedNativeTransactionHex: recovery.unsignedTransactionHex,
+      spentOutputs: recovery.spentOutputs, signatures: [Buffer.from(parseNativeTransactionHex(signed).inputs[0].witness[0]).toString("hex")],
+      tapscriptSpends: [{ ...policy.recovery, publicPreimageHex: wrongPreimage.toString("hex") }] }).rawSignedTransactionHex;
+    assert.equal((await check(wrongCommitmentWitness)).allowed, false);
+    passed.push("RECOVERY_WRONG_PUBLIC_INTENT_PREIMAGE_REJECTED_BY_NODE");
     const payoutId = await cli("sendrawtransaction", [signed]);
     assert.equal(payoutId, parseNativeTransactionHex(signed).txidHex);
     await mine(1);
@@ -81,6 +87,6 @@ export async function testLocalNativeRecovery(context) {
     assert.equal((await check(signed)).allowed, false);
     passed.push("RECOVERY_REPLAY_REJECTED_BY_NODE");
     return Object.freeze({ pass: passed.length, fail: 0, passed: Object.freeze(passed),
-      scope: "Real REGTEST user-recovery script semantics; not full recoverable-deposit bridge integration, sweep/recovery reorg race coverage or PSBT wallet integration." });
+      scope: "Real REGTEST user-recovery script semantics; sweep/recovery races and reorgs remain separate gaps. Wallet PSBT checks are reported separately." });
   } finally { userSecret.fill(0); }
 }

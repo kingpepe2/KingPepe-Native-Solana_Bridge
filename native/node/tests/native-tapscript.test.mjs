@@ -1,6 +1,7 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 // Public generator-point fixtures only; not operational wallet identities.
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { test } from "node:test";
 import { secp256k1, schnorr } from "@noble/curves/secp256k1.js";
 import { bridgeNumsPublicKeyHex, tapLeafHashHex, verifyTaprootControlBlock } from "../native-tapscript.mjs";
@@ -14,6 +15,7 @@ const pointX = (point) => Buffer.from(point.toBytes()).subarray(1).toString("hex
 const frost = pointX(secp256k1.Point.BASE);
 const recovery = pointX(secp256k1.Point.BASE.double());
 const h = (byte) => byte.repeat(32);
+const publicIntentLock = (commitment) => `82012088a820${createHash("sha256").update(Buffer.from(commitment, "hex")).digest("hex")}88`;
 const config = () => ({ nativeGenesisHex: REGTEST_GENESIS, depositCommitmentHex: h("07"),
   frostPublicKeyHex: frost, userRecoveryPublicKeyHex: recovery, csvDelayBlocks: 12 });
 const intent = () => ({ nativeGenesisHex: REGTEST_GENESIS, solanaDeploymentHex: h("01"), managerProgramIdHex: h("02"),
@@ -31,6 +33,7 @@ test("public NUMS derivation and both committed spending paths reconstruct the t
     assert.equal(leaf.controlBlockHex.length, 65 * 2);
   }
   assert.equal(built.productionReady, false);
+  assert.equal(built.protocol, "KINGPEPE_REGTEST_RECOVERABLE_DEPOSIT/V2");
   assert.equal(built.localOnly, true);
   assert.notEqual(built.scriptPubKeyHex, built.canonicalReserveScriptPubKeyHex);
 });
@@ -39,8 +42,8 @@ test("CSV recovery branch uses minimal block-based script numbers at encoding bo
   for (const [delay, encoded] of [[1, "51"], [12, "5c"], [16, "60"], [17, "0111"], [127, "017f"],
     [128, "028000"], [255, "02ff00"], [256, "020001"], [32768, "03008000"], [65535, "03ffff00"]]) {
     const built = buildRegtestRecoverableDeposit({ ...config(), csvDelayBlocks: delay });
-    assert.equal(built.recovery.scriptHex, `20${h("07")}75${encoded}b27520${recovery}ac`);
-    assert.equal(built.sweep.scriptHex, `20${h("07")}7520${frost}ac`);
+    assert.equal(built.recovery.scriptHex, `${encoded}b269${publicIntentLock(h("07"))}20${recovery}ac`);
+    assert.equal(built.sweep.scriptHex, `${publicIntentLock(h("07"))}20${frost}ac`);
   }
 });
 
@@ -102,9 +105,10 @@ test("script-path sighash binds the leaf and mixed witness attachment preserves 
     signatures: ["07".repeat(64)], tapscriptSpends: [built.recovery] });
   const parsed = parseNativeTransactionHex(attached.rawSignedTransactionHex);
   assert.equal(parsed.txidHex, parseNativeTransactionHex(raw).txidHex);
-  assert.equal(parsed.inputs[0].witness.length, 3);
-  assert.equal(Buffer.from(parsed.inputs[0].witness[1]).toString("hex"), built.recovery.scriptHex);
-  assert.equal(Buffer.from(parsed.inputs[0].witness[2]).toString("hex"), built.recovery.controlBlockHex);
+  assert.equal(parsed.inputs[0].witness.length, 4);
+  assert.equal(Buffer.from(parsed.inputs[0].witness[1]).toString("hex"), built.depositCommitmentHex);
+  assert.equal(Buffer.from(parsed.inputs[0].witness[2]).toString("hex"), built.recovery.scriptHex);
+  assert.equal(Buffer.from(parsed.inputs[0].witness[3]).toString("hex"), built.recovery.controlBlockHex);
 });
 
 test("script witness metadata cannot override the actual spent output and extensions fail closed", () => {
@@ -159,7 +163,8 @@ test("each authorizing role must reconstruct the deposit against expected intent
   for (const patch of [{ intent: { ...expectedIntent, amountAtomic: "1" } }, { csvDelayBlocks: 13 },
     { depositScriptPubKeyHex: policy.canonicalReserveScriptPubKeyHex }, { reserveScriptPubKeyHex: policy.scriptPubKeyHex },
     { userRecoveryPublicKeyHex: pointX(secp256k1.Point.BASE.double().double()) },
-    { policy: { ...policy, sweep: policy.recovery } }, { policy: { ...policy, productionReady: true } }]) {
+    { policy: { ...policy, sweep: policy.recovery } }, { policy: { ...policy, productionReady: true } },
+    { policy: { ...policy, sweep: { ...policy.sweep, publicPreimageHex: h("ff") } } }]) {
     assert.throws(() => validateRegtestRecoverableDepositIntent({ ...expected, ...patch }), /Substituted/u);
   }
 });
@@ -179,7 +184,7 @@ test("finalized sweep witness signatures are checked even when a modified witnes
     const expected = { sweep, inputs: spentOutputs, tapscriptSpends: [policy.sweep], reserveScriptHex: policy.canonicalReserveScriptPubKeyHex };
     assert.deepEqual(verifyRegtestSweepSignatures(expected), { scriptPathInputs: 1, keyPathInputs: 0 });
     assert.throws(() => verifyRegtestSweepSignatures({ ...expected, sweep: { inputs: [] }, inputs: [], tapscriptSpends: [] }), /WITNESS_INVALID/u);
-    for (const index of [0, 1, 2]) {
+    for (const index of [0, 1, 2, 3]) {
       const changed = structuredClone(sweep); changed.inputs[0].witness[index][0] ^= 1;
       assert.equal(changed.txidHex, sweep.txidHex);
       assert.throws(() => verifyRegtestSweepSignatures({ ...expected, sweep: changed }), /RAW_NATIVE_SWEEP_/u);

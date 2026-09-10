@@ -64,7 +64,7 @@ The CLI is REGTEST-only and bounded to short local chains; production evidence
 sources and resource policy remain unconfigured. The normal REGTEST deposit now
 uses the committed recovery script and a real FROST BIP342 sweep to a separate
 reserve. See [recovery construction and scope](../../native/recovery/README.md).
-Competing recovery/sweep transactions, reorgs, PSBT wallet support, production
+Competing recovery/sweep transactions, reorgs, production
 storage/fencing and complete failure testing remain Phase 08 gaps.
 
 Each role rebuilds the temporary script against the expected deployment, Mint,
@@ -76,12 +76,16 @@ key-path scripts; the deposit input uses the committed sweep leaf. A and B each
 recompute the corresponding BIP342/BIP341 sighash before participating.
 
 The finalized witness checker requires the exact committed sweep script/control
-block, one default 64-byte signature for each input, the configured FROST public
+block and public intent preimage, one default 64-byte signature for each input, the configured FROST public
 key and recomputed sighashes over actual inputs/outputs. Altered witness bytes
 can leave the legacy txid unchanged, so raw transaction inclusion alone does not
 replace this check. The helper accepts the bridge's limited sweep script, not
 arbitrary Native scripts, annexes or alternative sighash types. Native consensus
 validity and canonical UTXO selection retain the node trust boundary above.
+V2 temporary scripts use standard Miniscript fragments so the pinned Native
+user wallet can sign offline-prepared recovery PSBTs. The public preimage does
+not replace the user/FROST signature or recovery CSV check. See the recovery
+documentation for the actual wallet test and the unsigned inspector's limits.
 
 ## Phase 06 primitives
 

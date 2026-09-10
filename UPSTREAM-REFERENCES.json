@@ -29,9 +29,20 @@
     "phase08Use": "KingPepe REGTEST 8-decimal atomic units, coinbase maturity 20, Taproot activation, Bech32 HRP rkpepe, median-time-past 11 and two-hour future-header bound for isolated FROST deposits and raw header/Merkle verification",
     "phase08HeaderTimeSources": ["src/chain.h: MAX_FUTURE_BLOCK_TIME and GetMedianTimePast", "src/validation.cpp: ContextualCheckBlockHeader"],
     "phase08RecoverySources": ["src/kernel/chainparams.cpp: REGTEST CSVHeight=1 and Taproot ALWAYS_ACTIVE", "src/script/interpreter.cpp: CHECKSEQUENCEVERIFY", "src/bitcoin-cli.cpp: ParseResult suppresses null output", "src/wallet/rpc/addresses.cpp: getaddressinfo single-key public-key and ismine fields"],
+    "phase08PsbtSources": ["src/wallet/scriptpubkeyman.cpp: FillPSBT locates keys using public taproot origins", "src/script/sign.cpp: SignTaprootScript parses Miniscript and uses SHA256 preimages", "src/script/miniscript.h: OLDER, SHA256 and VERIFY fragment compilation"],
     "status": "reference-facts-only-no-git-history-import"
   },
   "standardsReferences": [
+    {
+      "project": "BIP-174",
+      "url": "https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki",
+      "use": "Reference-only PSBTv0 maps, unsigned transaction, witness UTXO, sighash, SHA256 preimage and proprietary public field definitions; no implementation or vectors copied."
+    },
+    {
+      "project": "BIP-371",
+      "url": "https://github.com/bitcoin/bips/blob/master/bip-0371.mediawiki",
+      "use": "Reference-only Taproot PSBT recovery leaf/control block, public key origin, internal key and Merkle root fields; no implementation or vectors copied."
+    },
     {
       "project": "BIP-342",
       "url": "https://github.com/bitcoin/bips/blob/master/bip-0342.mediawiki",

@@ -20,6 +20,8 @@ export const ALLOWED_REGTEST_CLI_COMMANDS = Object.freeze(
   new Set([
     "createwallet",
     "createrawtransaction",
+    "decodepsbt",
+    "finalizepsbt",
     "generatetoaddress",
     "getblock",
     "getblockchaininfo",
@@ -28,10 +30,12 @@ export const ALLOWED_REGTEST_CLI_COMMANDS = Object.freeze(
     "getaddressinfo",
     "getnewaddress",
     "getrawtransaction",
+    "gettransaction",
     "gettxout",
     "sendtoaddress",
     "sendrawtransaction",
     "testmempoolaccept",
+    "walletprocesspsbt",
     "stop",
   ]),
 );

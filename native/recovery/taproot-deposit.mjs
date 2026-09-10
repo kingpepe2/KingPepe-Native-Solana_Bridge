@@ -26,19 +26,23 @@ export function buildRegtestRecoverableDeposit({ nativeGenesisHex, depositCommit
   const recovery = publicKey(userRecoveryPublicKeyHex);
   if (frost === recovery) throw new Error("RecoveryKeyMustBeDistinct");
   const delay = positive(csvDelayBlocks, 0xffff);
-  // The fixed-size drop binds the deposit intent into each leaf. CSV is
-  // enforced on-chain in the recovery branch, not inferred from an RPC flag.
-  const sweepScriptHex = `20${commitment}7520${frost}ac`;
-  const recoveryScriptHex = `20${commitment}75${scriptNumber(delay)}b27520${recovery}ac`;
+  // Standard Miniscript fragments let the Native wallet sign the recovery
+  // PSBT. The 32-byte intent digest is PUBLIC, not an access-control secret.
+  // Each branch still requires its key's signature; recovery also requires CSV.
+  const commitmentHash = createHash("sha256").update(Buffer.from(commitment, "hex")).digest("hex");
+  const intentLock = `82012088a820${commitmentHash}88`;
+  const sweepScriptHex = `${intentLock}20${frost}ac`;
+  const recoveryScriptHex = `${scriptNumber(delay)}b269${intentLock}20${recovery}ac`;
   const output = createTwoLeafTaprootOutput({ internalPublicKeyHex: bridgeNumsPublicKeyHex(),
     firstScriptHex: sweepScriptHex, secondScriptHex: recoveryScriptHex });
   const canonicalReserveScriptPubKeyHex = `5120${frost}`;
   if (output.scriptPubKeyHex === canonicalReserveScriptPubKeyHex) throw new Error("RecoveryReserveMustBeSeparate");
-  return Object.freeze({ protocol: "KINGPEPE_REGTEST_RECOVERABLE_DEPOSIT/V1", localOnly: true, productionReady: false,
+  return Object.freeze({ protocol: "KINGPEPE_REGTEST_RECOVERABLE_DEPOSIT/V2", localOnly: true, productionReady: false,
     nativeGenesisHex, depositCommitmentHex: commitment, frostPublicKeyHex: frost, userRecoveryPublicKeyHex: recovery,
     csvDelayBlocks: delay, scriptPubKeyHex: output.scriptPubKeyHex, outputPublicKeyHex: output.outputPublicKeyHex,
     internalPublicKeyHex: output.internalPublicKeyHex, merkleRootHex: output.merkleRootHex,
-    sweep: output.first, recovery: output.second, canonicalReserveScriptPubKeyHex });
+    sweep: Object.freeze({ ...output.first, publicPreimageHex: commitment }),
+    recovery: Object.freeze({ ...output.second, publicPreimageHex: commitment }), canonicalReserveScriptPubKeyHex });
 }
 
 // Each authorizing role rebuilds against its expected deployment/recipient and
@@ -53,7 +57,7 @@ export function validateRegtestRecoverableDepositIntent({ intent, policy, deposi
     if (rebuilt[field] !== policy[field]) throw new Error("RecoveryDepositIntentSubstituted");
   }
   for (const branch of ["sweep", "recovery"]) {
-    for (const field of ["scriptHex", "controlBlockHex", "leafHashHex"]) {
+    for (const field of ["scriptHex", "controlBlockHex", "leafHashHex", "publicPreimageHex"]) {
       if (rebuilt[branch][field] !== policy[branch]?.[field]) throw new Error("RecoveryDepositIntentSubstituted");
     }
   }

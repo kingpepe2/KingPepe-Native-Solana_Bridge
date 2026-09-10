@@ -26,12 +26,20 @@
 ## Current phase and evidence
 
 PHASE 08: real local Native-to-Solana happy-path integration is now exercised.
-Recovery-script commit 7640dedcbadd9c31c120b3ebc5b7231eaa36cde2 was pushed to
-PRIVATE origin/main and passed all four jobs, including 17 security checks and
-six real Native CSV recovery checks:
-https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34445169540
-The current recoverable-deposit integration needs its own commit/push/exact-SHA
-CI. The real flow now obtains only a public recovery key from the isolated user's
+Recoverable-deposit integration 38cabeccd14c9e011e1c91fe1224d0b7bb721961 is pushed
+privately; all four exact-SHA CI jobs PASS:
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34447032014
+That SHA measured 155 Node tests, two vectors, 84 Rust tests and a real deposit
+with 22 security and six CSV recovery checks. It does not certify newer code.
+The current PSBT increment is locally tested, awaiting its own private push/CI.
+Windows/WSL each pass 159 Node tests + two vectors; WSL passes 84 Rust tests and
+both SBF builds. Real deposit + 22 security + seven CSV + four wallet PSBT checks
+pass. Recovery PSBTs are signed by the isolated Native user wallet, without key
+export; the finalized payout is recognized by that wallet. V1's consensus-valid
+OP_DROP prefix failed real wallet signing. V2 uses standard Miniscript fragments
+with a PUBLIC intent preimage, still requiring a signature and recovery CSV.
+This is pinned REGTEST wallet compatibility, not a general or production claim.
+The real deposit flow obtains only a public recovery key from the isolated user's
 Native wallet, commits the deposit intent, spends the temporary script with
 FROST A+B BIP342 signatures and finalizes a distinct non-user-recoverable reserve.
 Both attesters check actual sweep witness signatures as well as raw evidence.
@@ -58,7 +66,7 @@ selection still explicitly trusts the configured local validating Native node.
 Native RPC bodies and external verifier input/output are bounded and fail closed.
 
 This does NOT prove the complete bridge is finished. Phase 08 security
-dependencies still need review: recovery races/reorgs and PSBT wallet integration,
+dependencies still need review: recovery races/reorgs and end-user wallet onboarding,
 production evidence sources, remaining account/source validation,
 failure/restart scenarios and durable storage guarantees. Phase 09 has not
 started. Production observers, configuration, review and activation are absent.
@@ -91,8 +99,8 @@ Safe checks:
   fresh KINGPEPE_LOCAL_E2E_ROOT. Generated SBF keypairs also stay external.
 - node solana/tests/local-deposit-security.mjs uses the same isolated tools/root
   and runs the real recoverable deposit plus 22 raw Native/local-validator
-  security checks and six real Native CSV recovery checks. Recovery/sweep race,
-  reorg and PSBT wallet integration coverage remain incomplete.
+  security checks, seven real Native CSV recovery checks and four real Native
+  wallet PSBT checks. Recovery/sweep race and reorg coverage remain incomplete.
 - CI runs cargo-audit against all five lockfiles without ignored advisories.
   bincode 1.3.3 has a retained, reported unmaintained warning, not a clean bill
   of health or production approval.

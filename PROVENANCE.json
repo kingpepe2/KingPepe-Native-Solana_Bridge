@@ -51,6 +51,17 @@
     "dependencyChanges": "None",
     "cleanup": "Removed non-recoverable deposit-intent construction from the normal local flow; retained key-path cryptographic regression tests and reserve fee signing."
   },
+  "phase08RecoveryPsbtReview": {
+    "filesBefore": 164,
+    "filesAfter": 167,
+    "filesDeleted": 0,
+    "filesMoved": 0,
+    "newFiles": ["native/recovery/recovery-psbt.mjs", "native/node/tests/recovery-psbt.test.mjs", "solana/tests/local-recovery-psbt.mjs"],
+    "changes": "Original bounded offline PSBT encoding/inspection, V2 public-commitment Miniscript-compatible script construction and real isolated Native wallet recovery tests. V1 prefix replaced only for new REGTEST outputs; old external test data preserved.",
+    "sourceImports": "No third-party source or vector copied. BIP174/BIP371 field facts and pinned Native Miniscript/PSBT behavior referenced; required existing notices unchanged.",
+    "dependencyChanges": "None",
+    "terminologyReview": "New original files contain no prohibited project-role terminology; protocol and required third-party terminology preserved."
+  },
   "provenancePolicy": {
     "originalCodeLicense": "Proprietary (Copyright (c) 2026 KingPepe Team)",
     "provenanceClassifications": [
@@ -63,6 +74,21 @@
     ]
   },
   "trackedFiles": [
+    {
+      "path": "solana/tests/local-recovery-psbt.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated Native wallet PSBT compatibility test; no private key export and no production wallet access."
+    },
+    {
+      "path": "native/recovery/recovery-psbt.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original bounded REGTEST-only unsigned PSBTv0/BIP371 encoding and subset inspection against standard field definitions; no upstream implementation copied, no secret access or signing. Wallet compatibility requires real tests."
+    },
+    {
+      "path": "native/node/tests/recovery-psbt.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original public format and resource-boundary fixtures, not operational identities, wallet signing or chain proofs."
+    },
     {
       "path": "native/node/native-tapscript.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
