@@ -7,6 +7,12 @@
   "productionBroadcastAuthorized": false,
   "lastUpdated": "2026-09-10",
   "currentPhase": "PHASE_08",
+  "currentCiFailure": {
+    "sourceSha": "bfc704c561fcf47e9625c7aff6c8bb72b1997ba7",
+    "url": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34437324660",
+    "reason": "SBF host metadata used root Native toolchain instead of Solana Rust 1.89.0",
+    "correction": "Build from solana workspace; local SBF correction passed, corrective CI pending."
+  },
   "evidenceScope": "Current local integration increment; its CI result must be checked at the exact source SHA. Earlier per-component CI booleans were historical, not proof of this tree.",
   "previousVerifiedSource": {
     "sha": "cb7b44544f8c3935ddc8065eee5d67ee220afee2",

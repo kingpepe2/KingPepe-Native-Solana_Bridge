@@ -1,5 +1,11 @@
 # KingPepe Native - Solana Bridge Task Status
 
+Phase 08 integration source `bfc704c561fcf47e9625c7aff6c8bb72b1997ba7` pushed;
+CI https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34437324660
+failed because the SBF job selected the root Native Cargo toolchain for Solana
+metadata. Corrective source changes that job's build directory to solana/;
+verification for the correction is pending. No security gate was disabled.
+
 Current handoff (2026-09-10), Phase 08: real Native-to-Solana local happy path
 passes with Agave 4.2.2 and node-accepted FROST A+B. Finalized Native reserve
 and actual SPL Mint supply both equal 100000000 atomic units. Two packet-sized

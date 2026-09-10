@@ -2,6 +2,13 @@
 
 ## Current Phase 08 integration evidence (2026-09-10)
 
+Integration source `bfc704c561fcf47e9625c7aff6c8bb72b1997ba7` was pushed to the
+private repository. [CI run 34437324660](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34437324660)
+failed in the SBF job: running host Cargo metadata from the repository root
+selected the old Native toolchain, which could not parse Solana lockfile v4.
+The corrective workflow builds from solana/ so the pinned Rust 1.89.0 applies.
+This correction awaits its exact-SHA CI; the failed run is not a stage pass.
+
 Previous source `cb7b44544f8c3935ddc8065eee5d67ee220afee2`, message
 `fix(phase-08): isolate pinned SBF builds and validate real native sweep`,
 was pushed to PRIVATE origin/main and passed all four
