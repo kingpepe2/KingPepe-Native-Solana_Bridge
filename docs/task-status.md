@@ -2,6 +2,20 @@
 
 ## Current Phase 08 DKG transcript and durable handoff (2026-09-10)
 
+BLOCKED: GITHUB_ACTIONS_ACCOUNT_EXECUTION_BLOCKED.
+Source `0133a6cc7f22bf880249a72a62502aa4bf3a638b`, message
+`fix(phase-08): bind and persist FROST DKG handoffs`, pushed PRIVATE.
+[CI 34503594802](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34503594802)
+failed before any of the four jobs started. CI tests NOT_RUN; account-level
+annotations require KingPepe Team action. Workflow active; no logs/artifacts.
+No privacy, protection, security-gate or account settings changed. Dependent
+implementation is stopped. Restore Actions, rerun this SHA and the latest
+continuity-only commit, verify all four jobs, then continue Phase 08.
+
+The clean published SHA was rerun locally after the blocked launch: Windows/WSL
+each 476 Node tests and two vectors, WSL 93 Rust tests/audits, both SBF builds and
+55 fresh real-chain checks PASS. Local evidence is not a CI pass.
+
 Implemented locally: bounded immutable inner-message validation, own announced/
 private polynomial binding, cryptographically verified handoff at both recipients
 before finalization, exact transcript retries and saved-setup resume without
@@ -14,7 +28,8 @@ atomic, pending credits zero, no per-transfer team approval. Native Windows
 Cargo/service ACL tests, withdrawal E2E and full multi-service restart remain
 NOT_RUN locally. Current tree and all 160 existing commits scan clean; exact
 180-file provenance, nine JSON parses and private-path/IP checks PASS. Private
-origin verified. Staged/outgoing scans, publication and exact-SHA CI pending.
+origin verified. Staged/outgoing/all-161-commit scans PASS and private publication
+succeeded; exact-SHA CI is BLOCKED as described above.
 
 Provenance 179 to 180 files; one original message module, no source imports,
 deletions/moves or dependency/license changes. No production actions. Phase 08

@@ -2,7 +2,29 @@
 
 ## Current Phase 08 DKG transcript and durable handoff (2026-09-10)
 
-UNPUBLISHED / LOCALLY_TESTED. Original bounded inner-message snapshots
+PUBLISHED / LOCALLY_TESTED / CI_BLOCKED. Source
+`0133a6cc7f22bf880249a72a62502aa4bf3a638b`, message
+`fix(phase-08): bind and persist FROST DKG handoffs`, pushed to the verified
+PRIVATE repository. [CI run](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34503594802)
+concluded failure because all four jobs were rejected before any step started.
+CI tests are NOT_RUN. All four annotations identify an account-level execution
+restriction requiring KingPepe Team action; workflow remains active, no logs or
+uploaded artifacts. Private account details are not recorded in source.
+
+BLOCKER: GITHUB_ACTIONS_ACCOUNT_EXECUTION_BLOCKED. No security gate, protection,
+privacy or account setting was changed. Stop dependent implementation. Once
+KingPepe Team restores Actions execution, rerun this source SHA and the latest
+continuity-only commit, inspect all four exact-SHA jobs, then continue Phase 08.
+This is not a request to activate Mainnet or provision production keys.
+
+After the failed CI launch, the clean published SHA was rerun locally without
+source changes: Windows/WSL each 476 Node tests and two vectors, WSL 93 Rust tests,
+fmt/clippy and audits PASS; both SBF builds and all 55 fresh real-chain checks
+PASS. No failures/skips among executed checks. Local evidence does not replace
+the missing CI result. Production and the unfinished withdrawal/service paths
+remain disabled or NOT_RUN as documented below.
+
+Original bounded inner-message snapshots
 reject accessors, malformed sets, unknown fields, noncanonical encodings and
 wrong roles before state reads. Each participant checks its announced round-one
 material and private polynomial commitment. The pinned DKG primitive verifies
@@ -38,7 +60,8 @@ approval. Withdrawal E2E and full multi-service restart remain NOT_RUN.
 Current tree and all 160 existing history commits scan clean; exact 180-file
 provenance, nine JSON parses and private-path/IP checks PASS. No added project-role
 naming exceptions. Private origin and zero remote divergence verified. Staged/
-outgoing scans, publication and exact-SHA CI pending. Phase 08 INCOMPLETE;
+outgoing and all-161-commit scans PASS; private publication succeeded. Exact-SHA
+CI is BLOCKED as described above. Phase 08 INCOMPLETE;
 Phase 09 NOT_STARTED.
 
 Provenance: 179 to 180 files, one original DKG message module; no deletions/moves,
