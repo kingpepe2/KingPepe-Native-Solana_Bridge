@@ -106,6 +106,12 @@ impl ReserveLedger {
         &mut self,
         deposit: ValidatedTemporaryDeposit,
     ) -> Result<(), ReserveError> {
+        if self
+            .consumed_temporary_outpoints
+            .contains(&deposit.outpoint)
+        {
+            return Err(ReserveError::DuplicateTemporaryOutpointConsumption);
+        }
         if self.temporary_deposits.contains_key(&deposit.outpoint) {
             return Err(ReserveError::DuplicateTemporaryDeposit);
         }
@@ -193,23 +199,40 @@ impl ReserveLedger {
         if self.reserve_allocations.contains_key(&record.allocation_id) {
             return Err(ReserveError::DuplicateReserveAllocation);
         }
-        self.temporary_deposits.remove(&record.temporary_outpoint);
-        self.consumed_temporary_outpoints
-            .insert(record.temporary_outpoint);
-        self.canonical_reserve_atomic = self
+        if record.reserve_amount_atomic == 0
+            || self.temporary_deposits[&record.temporary_outpoint].amount_atomic
+                != record.reserve_amount_atomic
+            || record.allocation_id
+                != reserve_allocation_id(
+                    record.temporary_outpoint,
+                    record.sweep_txid,
+                    record.reserve_output_index,
+                    record.reserve_amount_atomic,
+                )
+        {
+            return Err(ReserveError::ReserveAmountMismatch);
+        }
+        // Resolve every fallible calculation before consuming backing markers.
+        let canonical_reserve_atomic = self
             .canonical_reserve_atomic
             .checked_add(record.reserve_amount_atomic as u128)
             .ok_or(ReserveError::ReserveOverflow)?;
-        self.authorized_unminted_credits_atomic = self
+        let authorized_unminted_credits_atomic = self
             .authorized_unminted_credits_atomic
             .checked_add(record.reserve_amount_atomic as u128)
             .ok_or(ReserveError::ReserveOverflow)?;
-        self.spent_native_fees_atomic = self
+        let spent_native_fees_atomic = self
             .spent_native_fees_atomic
             .checked_add(record.native_network_fee_atomic as u128)
             .ok_or(ReserveError::ReserveOverflow)?;
+        self.temporary_deposits.remove(&record.temporary_outpoint);
+        self.consumed_temporary_outpoints
+            .insert(record.temporary_outpoint);
         self.reserve_allocations
             .insert(record.allocation_id, record);
+        self.canonical_reserve_atomic = canonical_reserve_atomic;
+        self.authorized_unminted_credits_atomic = authorized_unminted_credits_atomic;
+        self.spent_native_fees_atomic = spent_native_fees_atomic;
         Ok(())
     }
 
@@ -506,6 +529,97 @@ mod tests {
             .unwrap_err(),
             ReserveError::FeeFundingAmountMismatch
         );
+    }
+
+    #[test]
+    fn reserve_overflow_never_consumes_temporary_backing_or_allocation() {
+        for field in 0..3 {
+            let mut ledger = ReserveLedger::default();
+            ledger.record_temporary_deposit(deposit()).unwrap();
+            match field {
+                0 => ledger.canonical_reserve_atomic = u128::MAX,
+                1 => ledger.authorized_unminted_credits_atomic = u128::MAX,
+                _ => ledger.spent_native_fees_atomic = u128::MAX,
+            }
+            let before = ledger.clone();
+            assert_eq!(
+                ledger.settle_reserve_sweep(accounting_test_record()),
+                Err(ReserveError::ReserveOverflow)
+            );
+            assert_eq!(ledger, before);
+            assert_eq!(
+                ledger.authorize_mint_from_temporary(deposit().outpoint),
+                Err(ReserveError::TemporaryDepositCannotMint)
+            );
+        }
+    }
+
+    #[test]
+    fn substituted_amount_or_allocation_cannot_mutate_reserve_ledger() {
+        let mut ledger = ReserveLedger::default();
+        ledger.record_temporary_deposit(deposit()).unwrap();
+        let before = ledger.clone();
+        for field in 0..4 {
+            let mut record = accounting_test_record();
+            match field {
+                0 => record.reserve_amount_atomic += 1,
+                1 => record.reserve_amount_atomic = 0,
+                2 => record.allocation_id = [4; 32],
+                _ => record.sweep_txid = [4; 32],
+            }
+            assert_eq!(
+                ledger.settle_reserve_sweep(record),
+                Err(ReserveError::ReserveAmountMismatch)
+            );
+            assert_eq!(ledger, before);
+        }
+        ledger
+            .settle_reserve_sweep(accounting_test_record())
+            .unwrap();
+        assert_eq!(ledger.authorized_unminted_credits_atomic(), 5_000);
+    }
+
+    #[test]
+    fn consumed_temporary_backing_and_mint_credit_cannot_be_reintroduced() {
+        let mut ledger = ReserveLedger::default();
+        let record = accounting_test_record();
+        ledger.record_temporary_deposit(deposit()).unwrap();
+        ledger.settle_reserve_sweep(record.clone()).unwrap();
+        let pending = ledger.clone();
+        assert_eq!(
+            ledger.record_temporary_deposit(deposit()),
+            Err(ReserveError::DuplicateTemporaryOutpointConsumption)
+        );
+        assert_eq!(
+            ledger.consume_mint_credit(record.allocation_id, 4_999),
+            Err(ReserveError::MintCreditUnavailable)
+        );
+        assert_eq!(ledger, pending);
+        ledger
+            .consume_mint_credit(record.allocation_id, 5_000)
+            .unwrap();
+        let consumed = ledger.clone();
+        assert_eq!(
+            ledger.consume_mint_credit(record.allocation_id, 5_000),
+            Err(ReserveError::MintCreditUnavailable)
+        );
+        assert_eq!(ledger, consumed);
+    }
+
+    // Pure arithmetic fixtures, not proof of a real chain transition.
+    fn accounting_test_record() -> ReserveSweepRecord {
+        let temporary_outpoint = deposit().outpoint;
+        ReserveSweepRecord {
+            allocation_id: reserve_allocation_id(temporary_outpoint, [8; 32], 0, 5_000),
+            temporary_outpoint,
+            sweep_txid: [8; 32],
+            reserve_output_index: 0,
+            reserve_amount_atomic: 5_000,
+            native_network_fee_atomic: 100,
+            fee_funding_outpoints: vec![fee_funding().outpoint],
+            block_hash: [9; 32],
+            block_height: 20,
+        }
     }
 
     fn deposit() -> ValidatedTemporaryDeposit {

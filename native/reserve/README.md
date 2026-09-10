@@ -17,4 +17,15 @@ Implemented in Phase 06:
 - Canonical reserve allocation IDs are stable and single-use.
 - Mint credits are consumed once by allocation ID.
 
+Settlement rechecks the recorded temporary amount and allocation derivation,
+then computes all checked totals before removing temporary backing or inserting
+consumption markers. Arithmetic failure preserves the entire ledger. Consumed
+temporary outputs cannot be reintroduced; failed mint-credit consumption also
+leaves existing balances and markers unchanged.
+
+This is an in-memory reserve primitive. Public record fields are not chain proof;
+callers must supply independently validated reserve evidence. The crate does not
+provide durable journals, service fencing, snapshot rollback detection or the
+complete bridge's global reconciliation mechanism.
+
 No operational secrets are committed in this repository.
