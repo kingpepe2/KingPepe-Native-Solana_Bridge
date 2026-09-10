@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { runLocalNativeToSolanaE2e, submitLocalnetSolanaDepositClaim } from "../../scripts/local-e2e-native-to-solana.mjs";
 import { createLocalNativeEvidenceVerifier } from "../../scripts/local-native-evidence-verifier.mjs";
 import { testLocalNativeRecovery } from "./local-native-recovery.mjs";
+import { testRecoveryPsbtWithNativeWallet } from "./local-recovery-psbt.mjs";
 import { verifyRegtestSweepSignatures } from "../../native/node/native-raw-evidence.mjs";
 import { parseNativeTransactionHex } from "../../native/node/native-taproot-transaction.mjs";
 import { combineProjectAttestations } from "../../services/attesters/attestation-service.mjs";
@@ -18,6 +19,7 @@ import { bytesToHex, decodeCanonicalBridgeMessage, encodeCanonicalBridgeMessage 
 export async function runLocalDepositSecurityE2e(repoRoot) {
   const passed = [];
   let recovery;
+  let recoveryPsbt;
   let reserveVerificationInput;
   const result = await runLocalNativeToSolanaE2e({
     repoRoot,
@@ -184,6 +186,7 @@ export async function runLocalDepositSecurityE2e(repoRoot) {
       assert.equal(mint.freezeAuthorityHex, null, "FREEZE_AUTHORITY_CHANGED");
       passed.push("MINT_SUPPLY_UNCHANGED_AFTER_REPLAY");
       recovery = await testLocalNativeRecovery(context);
+      recoveryPsbt = await testRecoveryPsbtWithNativeWallet(context);
       return completed;
     },
   });
@@ -213,7 +216,7 @@ export async function runLocalDepositSecurityE2e(repoRoot) {
     }
     passed.push("RECOVERABLE_DEPOSIT_TO_DISTINCT_RESERVE_VERIFIED");
   }
-  return { ...result, localRecovery: recovery, localSecurity: { passed, pass: passed.length, fail: result.state === "COMPLETED" && passed.length === 22 ? 0 : 1,
+  return { ...result, localRecovery: recovery, localRecoveryPsbt: recoveryPsbt, localSecurity: { passed, pass: passed.length, fail: result.state === "COMPLETED" && passed.length === 22 ? 0 : 1,
     scope: "Real raw Native evidence/policy rejection, local-validator deposit, idempotent retry, backing replay and domain checks; not complete adversarial coverage." } };
 }
 

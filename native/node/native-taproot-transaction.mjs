@@ -93,6 +93,7 @@ export function createLocalTaprootSighashEvidence(input) {
     signingInputIndex,
     ...(tapscriptSpend === undefined ? {} : { tapscriptSpend: Object.freeze({
       scriptHex: tapscriptSpend.scriptHex, controlBlockHex: tapscriptSpend.controlBlockHex,
+      ...(tapscriptSpend.publicPreimageHex === undefined ? {} : { publicPreimageHex: tapscriptSpend.publicPreimageHex }),
     }) }),
     recipientScriptPubKeyHex: reserveOutput.output.scriptPubKeyHex,
     changeScriptPubKeyHex: expectedChangeScriptPubKeyHex ?? reserveOutput.output.scriptPubKeyHex,
@@ -345,7 +346,12 @@ export function attachTaprootWitnesses(input) {
     const scriptSpend = value.tapscriptSpends?.[index];
     if (scriptSpend === undefined) return Object.freeze([signatureBytes]);
     verifyTaprootControlBlock({ ...scriptSpend, scriptPubKeyHex: spentOutputs[index].scriptPubKeyHex });
-    return Object.freeze([signatureBytes, Buffer.from(scriptSpend.scriptHex, "hex"), Buffer.from(scriptSpend.controlBlockHex, "hex")]);
+    const preimage = scriptSpend.publicPreimageHex;
+    if (preimage !== undefined && (typeof preimage !== "string" || !/^[0-9a-f]{64}$/u.test(preimage))) {
+      throw new Error("NativeTaprootPublicPreimageInvalid");
+    }
+    return Object.freeze([signatureBytes, ...(preimage === undefined ? [] : [Buffer.from(preimage, "hex")]),
+      Buffer.from(scriptSpend.scriptHex, "hex"), Buffer.from(scriptSpend.controlBlockHex, "hex")]);
   });
   const rawSignedTransaction = serializeNativeTransactionParts({
     version: transaction.version,

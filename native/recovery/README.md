@@ -22,7 +22,7 @@ and does not sign or broadcast recovery transactions.
 public BIP341 NUMS internal point. No key-path secret is provisioned. The sweep
 leaf checks the existing FROST aggregate x-only public key; the recovery leaf
 checks a distinct user Native public key after a block-based CSV delay. Both
-leaves commit the deposit intent with a fixed 32-byte push and OP_DROP. The
+leaves use the V2 public-intent SHA256 lock described below. The
 canonical reserve remains a different key-path P2TR output without that user's
 recovery branch. A Solana wallet is not assumed to control the Native recovery
 key. This construction is REGTEST-only; no production delay is selected.
@@ -49,12 +49,13 @@ outpoint/value/script, P2TR destination and explicit fee/max-fee. It returns a
 version-2 unsigned transaction and public witness metadata. It never signs or
 broadcasts, and does not claim that the UTXO is currently unspent or mature.
 It rejects unauthorized fees and conservatively requires net value above the
-pinned Native P2TR dust boundary. This is not yet wallet-compatible PSBT tooling.
+pinned Native P2TR dust boundary.
 
-Ten script/intent/witness unit tests and six real-node recovery checks pass in
+Ten script/intent/witness unit tests and seven real-node recovery checks pass in
 the Phase 08 local harness.
 The real checks cover immature and one-block-early recovery, wrong signing
-amount, attempts to disable CSV, mature broadcast/finality and replay rejection.
+amount, attempts to disable CSV, a substituted public intent preimage, mature
+broadcast/finality and replay rejection.
 The simulated user's test key exists in memory only; its original buffer is
 cleared afterward, without claiming complete managed-runtime memory erasure.
 All test wallets and daemon state stay outside the checkout. The recovery test
@@ -69,13 +70,54 @@ the local Solana program mint the credit. The same user's recovery leaf is not
 present in the canonical reserve. Windows orchestration tests reject missing,
 watch-only or malformed recovery public identities before any deposit payment.
 
-Not yet proved: competing sweep/recovery race and reorg handling, or offline
-PSBT wallet compatibility. The isolated Native wallet supplies the recovery
-public key, but end-user wallet onboarding remains future SDK/app work. The Rust
+Not yet proved: competing sweep/recovery race and reorg handling. End-user
+wallet onboarding remains future SDK/app work. The Rust
 eligibility model is not a substitute for actual script tests. Mainnet stays
 disabled; a happy-path local run is not production activation approval.
 
+## V2 script and offline recovery PSBT
+
+The pinned Native wallet parses tapscript as Miniscript. The prior V1 OP_DROP
+intent prefix was consensus-valid but the actual wallet could not sign its
+recovery PSBT. V2 uses these standard fragments, where H is SHA256 of the
+32-byte public intent commitment, A is the FROST public key and U the user's
+Native public key:
+
+- Sweep: `and_v(v:sha256(H),pk(A))`.
+- Recovery: `and_v(v:older(delay),and_v(v:sha256(H),pk(U)))`.
+
+The witness contains signature, public commitment, script and control block.
+The commitment is not a secret or access-control credential: a valid signature
+is still required, and the recovery branch additionally enforces CSV on-chain.
+V2 changes the temporary output script. Old V1 outputs are not silently
+reinterpreted; funding/script mismatch rejects preparation. No production output
+or identity was created or migrated. Existing external test data is preserved.
+
+`recovery-psbt.mjs` prepares bounded PSBTv0/BIP371 data entirely offline. It includes
+the unsigned transaction, exact witness UTXO, SIGHASH_DEFAULT, recovery leaf and
+control block, public commitment preimage, public key origin, NUMS internal key
+and Merkle root. It includes no sweep leaf or private wallet material. The
+fingerprint and derivation path must be explicitly supplied as public data.
+A proprietary public field records Native genesis and the intent commitment;
+ordinary wallets need not enforce it, so it is not a network-verification proof.
+
+The unsigned subset inspector rejects duplicate/unknown or alternate-encoded
+fields, unsupported versions, signature fields, malformed lengths, inconsistent
+tree metadata and oversized data. This is structural inspection, not UTXO,
+script-policy, maturity or user authorization. Preparation/inspection always
+return signing and broadcasting unauthorized; wallet compatibility is not
+inferred for an arbitrary user's wallet.
+
+Four unit tests cover encoding, public origins and malformed/adversarial inputs.
+The isolated real-wallet test uses only a Native public key and its public
+origin, asks that test wallet to sign/finalize, and checks actual node acceptance,
+finality, receipt at a wallet-recognized address and replay rejection. No private
+key is exported. Compatibility is
+limited to the pinned Native wallet; other wallets and production are untested.
+
 Standard references (not copied implementations): [BIP341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki),
 [BIP342](https://github.com/bitcoin/bips/blob/master/bip-0342.mediawiki), and
-[BIP112](https://github.com/bitcoin/bips/blob/master/bip-0112.mediawiki). Native
+[BIP112](https://github.com/bitcoin/bips/blob/master/bip-0112.mediawiki),
+[BIP174](https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki) and
+[BIP371](https://github.com/bitcoin/bips/blob/master/bip-0371.mediawiki). Native
 activation/interpreter facts are pinned in `UPSTREAM-REFERENCES.json`.
