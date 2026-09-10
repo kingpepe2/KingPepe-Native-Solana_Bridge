@@ -15,8 +15,8 @@
   },
   "evidenceScope": "Current local integration increment; its CI result must be checked at the exact source SHA. Earlier per-component CI booleans were historical, not proof of this tree.",
   "previousVerifiedSource": {
-    "sha": "95d00b19026dd56320cc012f580802bff6300fc0",
-    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34439119240",
+    "sha": "33b622638617258660019302b6db8d8868e7093f",
+    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34440113182",
     "status": "PASS"
   },
   "sourceState": {
@@ -28,7 +28,9 @@
     "frostRustCrate": "SUPPORTING_POLICY_STATE_MODEL_ONLY",
     "solanaPrograms": "SBF_AND_DEPOSIT_HAPPY_PATH_TESTED_LOCALNET_ONLY",
     "attestations": "PROJECT_ATTESTED_2_OF_2_ED25519",
-    "nativeProofReserveRecovery": "MODEL_TESTED_PARTIAL_EVIDENCE_WIRING",
+    "nativeProofReserveRecovery": "RAW_HEADER_MERKLE_SIGNER_ATTESTER_LOCAL_E2E_TESTED_USER_RECOVERY_INCOMPLETE",
+    "nativeEvidenceSourceTrust": "RAW_HEADERS_VERIFIED_CANONICAL_CHAIN_AND_UTXO_FROM_CONFIGURED_VALIDATING_NODE_RPC",
+    "signerIsolation": "SEPARATE_LOCAL_OBJECTS_AND_STATE_SERVICE_IPC_ACL_NOT_PROVEN",
     "solanaObservation": "RPC_OBSERVATION_LOCALNET_ONLY_PRODUCTION_BLOCKED",
     "receiptAndClaim": "TWO_TRANSACTIONS_CANONICAL_SHARED_MESSAGE",
     "initialEnrollment": "EXACT_MINT_SIGNATURE_REQUIRED_NOT_AN_ALTERNATE_MINTER",
@@ -41,20 +43,25 @@
   },
   "localValidation": {
     "windows": {
-      "nodeTestsPass": 134,
+      "nodeTestsPass": 144,
       "protocolVectorsPass": 2,
       "nativeSbf": "NOT_RUN_NOT_SUPPORTED",
       "serviceAclProtectedStorage": "NOT_RUN"
     },
     "wsl": {
-      "nodeTestsPass": 134,
+      "nodeTestsPass": 144,
       "protocolVectorsPass": 2,
       "solanaRustTestsPass": 58,
-      "nativeRustTestsPass": 22,
+      "nativeRustTestsPass": 26,
       "sbfProgramsBuilt": 2,
       "nativeToSolana": "PASS_SINGLE_FRESH_OPERATION_REAL_DAEMONS",
       "localValidatorSecurityChecksPass": 6,
       "localValidatorSecurityChecksFail": 0,
+      "rawNativeSecurityChecksPass": 10,
+      "signerAttesterRawEvidenceCoverageChecksPass": 1,
+      "combinedRealSecurityChecksPass": 17,
+      "rawInputHeaders": 33,
+      "rawReserveHeaders": 39,
       "duplicateBacking": "NEW_NONCE_VALID_ATTESTATIONS_PREFLIGHT_REJECTED_SUPPLY_UNCHANGED",
       "canonicalReserveAtomic": "100000000",
       "observedMintSupplyAtomic": "100000000",
@@ -83,7 +90,7 @@
   },
   "phase08Remaining": [
     "Review actual temporary-deposit recovery script and sweep/recovery race coverage",
-    "Wire complete Native evidence validation into the daemon-backed path and independent attester checks",
+    "Configure production Native evidence sources; current raw-header/Merkle integration is REGTEST-only with explicit local-node UTXO trust",
     "Review remaining account and source-validation dependencies",
     "Exercise real-daemon failure/restart/reorg/replay cases beyond model tests"
   ],
@@ -94,7 +101,7 @@
     "FROST_NATIVE_SIGNATURE_PASS": "PASS_LOCAL_NATIVE_REGTEST_NODE",
     "NONCE_SAFETY_PASS": "LOCAL_TESTS_ONLY_PRODUCTION_ROLLBACK_NOT_PROVEN",
     "SOLANA_PROGRAM_AUDIT_PASS": "AUDIT_REQUIRED",
-    "NATIVE_VALIDATION_PASS": "MODEL_TESTED_EVIDENCE_WIRING_INCOMPLETE",
+    "NATIVE_VALIDATION_PASS": "RAW_NATIVE_DEPOSIT_E2E_PASS_REGTEST_ONLY_PRODUCTION_UNCONFIGURED",
     "RECONCILIATION_PASS": "SINGLE_LOCAL_DEPOSIT_ONLY",
     "BACKUP_RESTORE_PASS": "NOT_RUN",
     "SECRET_SCAN_PASS": "REQUIRED_BEFORE_EVERY_COMMIT_AND_PUSH",

@@ -32,6 +32,7 @@ export class NativeRpcClient {
   #authHeader;
   #fetchFn;
   #timeoutMs;
+  #maximumResponseBytes;
   #nextId = 1;
 
   constructor(options = {}) {
@@ -44,6 +45,8 @@ export class NativeRpcClient {
       throw new Error("NativeRpcFetchUnavailable");
     }
     this.#timeoutMs = checkedPositiveInteger(options.timeoutMs ?? DEFAULT_TIMEOUT_MS, "timeoutMs");
+    this.#maximumResponseBytes = checkedPositiveInteger(options.maximumResponseBytes ?? 8_000_000, "maximumResponseBytes");
+    if (this.#maximumResponseBytes > 16_000_000) throw new Error("NativeRpcResponseLimitTooLarge");
   }
 
   endpointForReport() {
@@ -77,22 +80,24 @@ export class NativeRpcClient {
         }),
         signal: controller.signal,
       });
-      const raw = await response.text();
       if (!response.ok) {
+        await response.body?.cancel();
         throw rpcError("NativeRpcHttpFailure", method, response.status);
       }
+      const raw = await readBoundedRpcResponse(response, this.#maximumResponseBytes);
       let envelope;
       try {
         envelope = JSON.parse(raw);
       } catch {
         throw rpcError("NativeRpcInvalidJson", method);
       }
-      if (!envelope || typeof envelope !== "object") {
+      if (!envelope || typeof envelope !== "object" || Array.isArray(envelope) || envelope.id !== id) {
         throw rpcError("NativeRpcInvalidEnvelope", method);
       }
       if (envelope.error !== null && envelope.error !== undefined) {
         throw rpcError("NativeRpcRejected", method, envelope.error?.code);
       }
+      if (!Object.hasOwn(envelope, "result")) throw rpcError("NativeRpcInvalidEnvelope", method);
       return Object.freeze({
         method,
         id: envelope.id,
@@ -217,6 +222,29 @@ export class NativeRpcClient {
   async stop() {
     return (await this.call("stop")).result;
   }
+}
+
+async function readBoundedRpcResponse(response, maximum) {
+  const declared = response.headers?.get("content-length");
+  if (declared !== null && declared !== undefined && (!/^[0-9]+$/u.test(declared) || Number(declared) > maximum)) {
+    await response.body?.cancel();
+    throw new Error("NativeRpcResponseTooLarge");
+  }
+  if (!response.body?.getReader) throw new Error("NativeRpcBoundedStreamRequired");
+  const reader = response.body.getReader();
+  const parts = [];
+  let length = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      length += value.byteLength;
+      if (length > maximum) { await reader.cancel(); throw new Error("NativeRpcResponseTooLarge"); }
+      parts.push(Buffer.from(value));
+    }
+    try { return new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(parts, length)); }
+    catch { throw new Error("NativeRpcInvalidUtf8"); }
+  } finally { reader.releaseLock(); }
 }
 
 export function createNativeRegtestRpcClient(options = {}) {

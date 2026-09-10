@@ -156,6 +156,20 @@ test("RPC errors are reported without echoing auth material", async () => {
   );
 });
 
+test("RPC responses enforce byte bounds, request identity and strict UTF-8 before authorization", async () => {
+  for (const response of [new Response("x".repeat(65)), new Response("{}", { headers: { "content-length": "65" } })]) {
+    const client = new NativeRpcClient({ maximumResponseBytes: 64, fetchFn: async () => response });
+    await assert.rejects(() => client.getBlockchainInfo(), /NativeRpcResponseTooLarge/u);
+  }
+  for (const text of ['{"id":2,"result":true}', '{"id":1}', '[]']) {
+    const client = new NativeRpcClient({ fetchFn: async () => new Response(text) });
+    await assert.rejects(() => client.getBlockchainInfo(), /NativeRpcInvalidEnvelope/u);
+  }
+  const invalid = new NativeRpcClient({ fetchFn: async () => new Response(Uint8Array.of(0xff)) });
+  await assert.rejects(() => invalid.getBlockchainInfo(), /NativeRpcInvalidUtf8/u);
+  assert.throws(() => new NativeRpcClient({ maximumResponseBytes: 16_000_001 }), /NativeRpcResponseLimitTooLarge/u);
+});
+
 async function withRpcServer(callback, options = {}) {
   const requests = options.requests ?? [];
   const server = http.createServer(async (request, response) => {

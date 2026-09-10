@@ -19,6 +19,17 @@
     "dependencyChanges": "None",
     "changes": "Original protocol/Native-domain configuration validation, compact mandatory-zero initialization encoding, matching local setup wiring and real-validator adversarial checks. No upstream source copied."
   },
+  "phase08RawEvidenceReview": {
+    "filesBefore": 155,
+    "filesAfter": 160,
+    "filesDeleted": 0,
+    "filesMoved": 0,
+    "newFiles": ["native/proof/src/evidence.rs", "native/proof/src/bin/kingpepe-native-evidence.rs", "native/node/native-raw-evidence.mjs", "native/node/tests/native-raw-evidence.test.mjs", "scripts/local-native-evidence-verifier.mjs"],
+    "sourceImports": "Original implementation against pinned Native consensus/serialization facts. No third-party implementation copied and no legacy Git history imported.",
+    "dependencyChanges": "None; executable uses the existing locked Native proof crate and standard library.",
+    "cleanup": "Removed unused RPC-object-only deposit fingerprint helper after repository-wide usage review; retained independently implemented Rust and JavaScript transaction parsers.",
+    "terminologyReview": "New and changed original implementation contains no KingPepe project-role use of the prohibited terminology; protocol and third-party terms remain unchanged."
+  },
   "provenancePolicy": {
     "originalCodeLicense": "Proprietary (Copyright (c) 2026 KingPepe Team)",
     "provenanceClassifications": [
@@ -31,6 +42,31 @@
     ]
   },
   "trackedFiles": [
+    {
+      "path": "native/proof/src/evidence.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Bounded REGTEST raw-header/Merkle evidence verification and negative tests, using pinned Native consensus facts; not copied upstream implementation or full block/UTXO validation."
+    },
+    {
+      "path": "native/proof/src/bin/kingpepe-native-evidence.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "REGTEST-only bounded stdin verifier; emits fixed-shape non-secret digests/counts and generic failure."
+    },
+    {
+      "path": "native/node/native-raw-evidence.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Canonical evidence encoder, local node collector, Rust process boundary and independently evaluated signing/reserve policies; no keys or broadcast authority."
+    },
+    {
+      "path": "native/node/tests/native-raw-evidence.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Explicit encoder and source-boundary models with malformed-input/resource/substitution tests. Fixtures are not claimed as full consensus-valid Native blocks."
+    },
+    {
+      "path": "scripts/local-native-evidence-verifier.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Pinned local proof executable build and REGTEST adapter construction; resolved build/runtime roots remain outside the checkout."
+    },
     {
       "path": "solana/tests/local-deposit-security.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",

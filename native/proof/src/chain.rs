@@ -203,7 +203,16 @@ impl HeaderChain {
         if parsed.previous_hash != last.hash {
             return Err(NativeProofError::HeaderParentMismatch);
         }
-        let next_height = last.height + 1;
+        let next_height = last
+            .height
+            .checked_add(1)
+            .ok_or_else(|| NativeProofError::ResourceLimit("header height".to_owned()))?;
+        let mut recent_times: Vec<u32> =
+            self.headers.iter().rev().take(11).map(|h| h.time).collect();
+        recent_times.sort_unstable();
+        if parsed.time <= recent_times[recent_times.len() / 2] {
+            return Err(NativeProofError::InvalidHeaderTime);
+        }
         assert_contextual_header_version(parsed.version, next_height, self.params)?;
         let expected = expected_next_work_required(
             &self.difficulty_nodes(),
@@ -264,7 +273,9 @@ pub fn assert_contextual_header_version(
 }
 
 pub fn confirmations_at_tip(block_height: u32, tip_height: u32) -> Option<u32> {
-    tip_height.checked_sub(block_height).map(|depth| depth + 1)
+    tip_height
+        .checked_sub(block_height)
+        .and_then(|depth| depth.checked_add(1))
 }
 
 pub fn assert_finality(

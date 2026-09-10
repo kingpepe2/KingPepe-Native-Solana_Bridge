@@ -26,7 +26,8 @@
     "selectedTree": "33d550b0c2bec33ede7e6d73cd44afbbe18dea8b",
     "verificationSource": "Recovery facts cross-checked against the exact upstream source commit/tree and checksum-verified archive; daemon/CLI built and exercised in isolated REGTEST.",
     "phase06Use": "KingPepe Native genesis, decimals, PoW, difficulty, chainwork, activation, address, transaction, and header format facts",
-    "phase08Use": "KingPepe REGTEST 8-decimal atomic units, coinbase maturity 20, Taproot activation, and Bech32 HRP rkpepe for disposable local FROST Taproot deposit/fee/reserve intent generation",
+    "phase08Use": "KingPepe REGTEST 8-decimal atomic units, coinbase maturity 20, Taproot activation, Bech32 HRP rkpepe, median-time-past 11 and two-hour future-header bound for isolated FROST deposits and raw header/Merkle verification",
+    "phase08HeaderTimeSources": ["src/chain.h: MAX_FUTURE_BLOCK_TIME and GetMedianTimePast", "src/validation.cpp: ContextualCheckBlockHeader"],
     "status": "reference-facts-only-no-git-history-import"
   },
   "standardsReferences": [

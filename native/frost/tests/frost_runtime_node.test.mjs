@@ -107,7 +107,7 @@ function makePolicy(auth) {
   });
 }
 
-function createRuntime() {
+function createRuntime(evidenceValidators = {}) {
   const root = withTempRoot();
   const auth = baseAuthorization();
   const policy = makePolicy(auth);
@@ -121,8 +121,10 @@ function createRuntime() {
     root: path.join(root, "frost-b"),
     repoRoot: REPO_ROOT,
   });
-  const signerA = new NativeFrostSigner({ signerId: REQUIRED_FROST_SIGNERS[0], index: 0, policy, stateStore: storeA });
-  const signerB = new NativeFrostSigner({ signerId: REQUIRED_FROST_SIGNERS[1], index: 1, policy, stateStore: storeB });
+  const signerA = new NativeFrostSigner({ signerId: REQUIRED_FROST_SIGNERS[0], index: 0, policy, stateStore: storeA,
+    nativeEvidenceValidator: evidenceValidators.A });
+  const signerB = new NativeFrostSigner({ signerId: REQUIRED_FROST_SIGNERS[1], index: 1, policy, stateStore: storeB,
+    nativeEvidenceValidator: evidenceValidators.B });
   const epoch = runTwoPartyDkg([signerA, signerB], { epoch: 1 });
   const coordinator = new NativeFrostCoordinator({
     signers: [signerA, signerB],
@@ -177,6 +179,42 @@ test("A+B DKG produces one valid BIP340 Taproot-compatible FROST signature", () 
     );
   } finally {
     runtime.cleanup();
+  }
+});
+
+test("configured signer evidence fences cannot be bypassed with synchronous coordination or A-only verification", async () => {
+  const calls = [];
+  const validator = (role) => async (intent) => { calls.push(role); return { digestHex: intent.proofFingerprint }; };
+  const runtime = createRuntime({ A: validator("A"), B: validator("B") });
+  try {
+    const intent = intentFromAuthorization(runtime.auth);
+    assert.throws(() => runtime.coordinator.signAutomatically(intent), /FROST fresh independent Native evidence required/u);
+    await runtime.signerA.verifyNativeEvidence(intent);
+    assert.throws(() => runtime.signerB.signingCommitment(frostRequestFor(intent)), /FROST fresh independent Native evidence required/u);
+    const pending = runtime.coordinator.signAutomaticallyWithNativeEvidence(intent);
+    // Caller's mutation cannot alter the authorization snapshot while awaiting RPC.
+    intent.amountAtomic = "1";
+    const result = await pending;
+    assert.equal(result.state, "SIGNED");
+    assert.deepEqual(calls, ["A", "A", "B"]);
+  } finally { runtime.cleanup(); }
+});
+
+test("each participant fails closed when Native evidence is absent, changed or unavailable", async () => {
+  for (const badRole of ["A", "B"]) {
+    for (const behavior of ["missing", "changed", "outage"]) {
+      const good = async (intent) => ({ digestHex: intent.proofFingerprint });
+      const validators = { A: good, B: good };
+      validators[badRole] = behavior === "missing" ? undefined : async () => {
+        if (behavior === "outage") throw new Error("TEST_SOURCE_UNAVAILABLE");
+        return { digestHex: h("substituted-proof") };
+      };
+      const runtime = createRuntime(validators);
+      try {
+        await assert.rejects(() => runtime.coordinator.signAutomaticallyWithNativeEvidence(intentFromAuthorization(runtime.auth)),
+          /verifier required|evidence digest mismatch|TEST_SOURCE_UNAVAILABLE/u);
+      } finally { runtime.cleanup(); }
+    }
   }
 });
 

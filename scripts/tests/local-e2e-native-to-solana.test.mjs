@@ -70,7 +70,7 @@ test("native-to-solana runner blocks before executing deposit flow when local in
   assert.deepEqual(executor.calls, []);
 });
 
-test("native-to-solana runner executes daemon deposit observation sequence without an admin approval state", async () => {
+test("native-to-solana orchestration model executes observation sequence without a team approval state", async () => {
   const runRoot = mkdtempSync(path.join(os.tmpdir(), "kingpepe-native-to-solana-runner-"));
   const executor = new FakeExecutor();
   try {
@@ -81,6 +81,7 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
       healthAttempts: 1,
       custodyFactory: fakeCustodyFactory,
       reserveSweepSigner: fakeReserveSweepSigner,
+      nativeEvidenceVerifierFactory: fakeNativeEvidenceVerifierFactory,
       localSolanaSetupFactory: fakeLocalSolanaSetupFactory,
       solanaSetup: fakeSolanaSetup,
       solanaDepositClaim: fakeSolanaDepositClaim,
@@ -260,6 +261,29 @@ test("native-to-solana runner executes daemon deposit observation sequence witho
   }
 });
 
+test("either attester changing raw evidence prevents claim submission in the orchestration model", async () => {
+  for (const changedInvocation of [2, 3]) {
+    const runRoot = mkdtempSync(path.join(os.tmpdir(), "kingpepe-attester-evidence-model-"));
+    let submitted = false;
+    let invocations = 0;
+    try {
+      const verifier = fakeNativeEvidenceVerifierFactory();
+      const result = await runLocalNativeToSolanaE2e({ plan: readyPlan(runRoot), executor: new FakeExecutor(),
+        programArtifactExists: () => true, healthAttempts: 1, custodyFactory: fakeCustodyFactory,
+        reserveSweepSigner: fakeReserveSweepSigner, localSolanaSetupFactory: fakeLocalSolanaSetupFactory,
+        solanaSetup: fakeSolanaSetup, solanaDepositClaim: async () => { submitted = true; throw new Error("UNEXPECTED_SUBMISSION"); },
+        nativeEvidenceVerifierFactory: () => ({ ...verifier, verifyReserve: async () => {
+          invocations += 1;
+          return invocations === changedInvocation ? { digestHex: h("changed-attester-evidence") } : verifier.verifyReserve();
+        } }), flowConfig: { runId: "attester-model", amountNative: "1.00000000" } });
+      assert.equal(result.state, "LOCAL_NATIVE_TO_SOLANA_E2E_FAILED");
+      assert.equal(result.fullNativeToSolanaE2e, "FAILED");
+      assert.equal(submitted, false);
+      assert.equal(invocations, 3);
+    } finally { rmSync(runRoot, { recursive: true, force: true }); }
+  }
+});
+
 test("local FROST Taproot custody context derives disposable rkpepe P2TR custody outside the repository", async () => {
   const runRoot = mkdtempSync(path.join(os.tmpdir(), "kingpepe-native-to-solana-frost-custody-"));
   try {
@@ -339,7 +363,7 @@ test("local reserve sweep signer uses real A+B FROST signatures and attaches Tap
       expectedChangeScriptPubKeyHex: custody.taprootScriptPubKeyHex,
     });
 
-    const signed = signLocalReserveSweepWithFrost({
+    const signed = await signLocalReserveSweepWithFrost({
       plan,
       flowConfig: config,
       frostCustody: custody,
@@ -358,6 +382,8 @@ test("local reserve sweep signer uses real A+B FROST signatures and attaches Tap
       reserveSweepDraft,
       taprootSighashEvidences,
       operationIdHex: h("real-frost-local-reserve-sweep-operation"),
+      // Cryptographic fixture, not a Native chain-validation claim.
+      nativeEvidenceValidator: async (intent) => ({ digestHex: intent.proofFingerprint }),
     });
 
     assert.equal(signed.state, "SIGNED_WITNESS_ATTACHED");
@@ -790,6 +816,12 @@ test("deposit observation flow rejects raw transaction txid mismatch", async () 
     rmSync(runRoot, { recursive: true, force: true });
   }
 });
+
+function fakeNativeEvidenceVerifierFactory() {
+  // Explicit orchestration model only. Real E2E uses the compiled Rust verifier.
+  return { verifyInputs: async () => ({ status: "SOURCE_MODEL_ONLY", digestHex: h("model-input-proof") }),
+    verifyReserve: async () => ({ status: "SOURCE_MODEL_ONLY", digestHex: h("model-reserve-proof") }) };
+}
 
 function buildUnsignedSweepHex() {
   return buildUnsignedTransactionHex({

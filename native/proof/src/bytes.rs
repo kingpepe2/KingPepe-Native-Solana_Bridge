@@ -23,7 +23,7 @@ pub fn parse_hex(
     expected_bytes: Option<usize>,
     label: &str,
 ) -> Result<Vec<u8>, NativeProofError> {
-    if value.len() % 2 != 0 {
+    if value.len() % 2 != 0 || !value.is_ascii() {
         return Err(NativeProofError::InvalidHex(label.to_owned()));
     }
     if let Some(expected) = expected_bytes {

@@ -1,13 +1,36 @@
 # KingPepe Native - Solana Bridge Task Status
 
+Latest verified Phase 08 increment `33b622638617258660019302b6db8d8868e7093f`,
+`fix(phase-08): bind attestations to configured native domain`, pushed to PRIVATE
+origin/main; four CI jobs PASS:
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34440113182.
+It executed the real deposit and six security checks.
+
+Current raw-evidence increment: required bounded Rust raw-header/Merkle validation
+before each FROST participant and attester authorization, independently recomputed
+Native transaction/sighash policy, finalized sweep/UTXO checks, digest-bound claims,
+bounded RPC streams, and negative tests. Latest full local validation: 144 Node
+tests + two vectors on Windows and WSL; 58 Solana Rust + 26 Native Rust tests in
+WSL; two SBF builds, real automatic deposit and 17 real security checks PASS.
+Current source and 142 existing commits passed secret scanning; 160 provenance
+entries cover the new tree. Dependencies unchanged; audits retain the reported
+unmaintained bincode warning. Its commit/push/exact-SHA CI are pending in this
+snapshot. No production data or identities were provisioned or published.
+
+Next: verify this increment's CI, then resolve temporary user-recovery scripts,
+recovery races, remaining account/source checks and real failure/restart tests.
+Same-process local signer objects are not deployed isolated services; shared
+validating-node UTXO observations are not independent cryptographic UTXO proofs.
+Phase 08 remains incomplete; Phase 09 is NOT_STARTED; Mainnet is DISABLED.
+
+Earlier Phase 08 increment records follow; their counts are historical.
+
 Phase 08 security increment `95d00b19026dd56320cc012f580802bff6300fc0`, message
 `fix(phase-08): authorize mint enrollment and prevent backing replay`, pushed to
 PRIVATE origin/main and passed all four jobs:
 https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34439119240.
 CI executed the deposit and three real-validator replay/retry/supply checks.
-The current next increment binds the Transceiver's protocol/Native domain;
-six local-validator checks now pass, including new dual-signed wrong-domain
-rejections. This newer source awaits its own commit/push/exact-SHA CI.
+The subsequent domain-binding increment and its CI are recorded above.
 
 Phase 08 integration source `bfc704c561fcf47e9625c7aff6c8bb72b1997ba7` pushed;
 CI https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34437324660
@@ -32,7 +55,7 @@ Preceding source `cb7b44544f8c3935ddc8065eee5d67ee220afee2`, message
 pushed to PRIVATE origin/main; all four jobs passed at
 https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34432312954.
 
-Latest local suites: 134 Node tests + 2 vectors on Windows and WSL; 58 Solana
+At that earlier checkpoint: 134 Node tests + 2 vectors on Windows and WSL; 58 Solana
 Rust tests + 22 Native supporting-crate tests in WSL. No failures/skips in these
 suites. All five Rust dependency audits report zero vulnerabilities and one
 unmaintained dependency warning in the Solana graph; npm reports zero.

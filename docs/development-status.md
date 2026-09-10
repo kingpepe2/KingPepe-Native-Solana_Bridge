@@ -2,11 +2,51 @@
 
 ## Current Phase 08 integration evidence (2026-09-10)
 
+Domain-binding commit `33b622638617258660019302b6db8d8868e7093f`, message
+`fix(phase-08): bind attestations to configured native domain`, pushed to PRIVATE
+origin/main; all four [CI jobs passed](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34440113182),
+including six real-validator security checks. This is the latest verified SHA;
+the current raw-evidence increment below awaits its own commit/push/exact-SHA CI.
+
+Current increment: the REGTEST deposit harness invokes a bounded locked Rust
+executable to check raw genesis-to-tip headers, PoW/difficulty/chainwork, header
+time rules, transaction bytes/txids, Merkle roots and confirmations. Each FROST
+participant independently invokes it, checks live inputs and recomputes Native
+transaction/sighash and fee/change policy. Each separate Ed25519 attester invokes
+it again for finalized sweep evidence and checks the reserve UTXO. Claim evidence
+binds the verified packet digest; sweep and mint-claim identities are distinct.
+Native RPC streaming, request-ID and UTF-8 boundaries fail closed. The old unused
+RPC-object-only fingerprint helper was removed. No dependency was added.
+
+Latest real run: both programs built; Native REGTEST and Agave local validator
+completed the automatic deposit, reserve 100000000 / SPL supply 100000000 atomic.
+Input evidence validated 33 headers/two transactions for each role/input; reserve
+evidence validated 39 headers/three transactions for both attesters. All 17 real
+checks passed: six prior Solana checks, ten Native substitution/spent-output
+checks, and one role-by-role raw evidence coverage check. Windows and WSL each
+passed 144 Node tests plus two vectors; WSL passed 58 Solana Rust and 26 Native
+Rust tests, fmt and clippy. One initial new unit assertion mismatched the exact
+error wording; corrected assertion and complete reruns passed. No gate was removed.
+All five Rust audits found zero vulnerabilities; the known unmaintained bincode
+warning remains reported. npm and declared dependency-license audits passed.
+Current tracked/untracked source and 142 pre-increment commits scanned without
+secret findings; staged/outgoing scans must also pass before publication.
+Provenance now covers 160 files (155 before, five original source/test additions,
+zero deleted/moved files); existing third-party legal notices are unchanged.
+
+These runs use separate signer objects/state roots and repeat raw validation
+against the same local Native node. They do not prove deployed service/process
+isolation, Windows ACLs, protected storage or authenticated IPC. Canonical-chain
+selection and UTXO state remain configured validating-node RPC observations;
+raw header/Merkle checks are not full block-script validation or trustlessness.
+See [Native boundaries](architecture/native-validation.md). Production sources,
+user CSV recovery, durable fencing and the full failure matrix remain incomplete.
+
 Security commit `95d00b19026dd56320cc012f580802bff6300fc0`, message
 `fix(phase-08): authorize mint enrollment and prevent backing replay`, pushed to
 PRIVATE origin/main; all four [CI jobs passed](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34439119240).
 CI measured the real deposit plus three retry/replay/supply checks. Its exact-SHA
-evidence does not certify the newer domain-binding change described below.
+evidence does not certify newer changes described above.
 
 Integration source `bfc704c561fcf47e9625c7aff6c8bb72b1997ba7` was pushed to the
 private repository. [CI run 34437324660](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34437324660)
@@ -23,7 +63,7 @@ Previous source `cb7b44544f8c3935ddc8065eee5d67ee220afee2`, message
 `fix(phase-08): isolate pinned SBF builds and validate real native sweep`,
 was pushed to PRIVATE origin/main and passed all four
 [CI jobs](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34432312954).
-The newer security increment below awaits its own commit/push/CI in this snapshot.
+The newer raw-evidence increment above awaits its own commit/push/CI in this snapshot.
 CI emits the tested GITHUB_SHA; no self-referential commit SHA is embedded.
 
 - Bounded same-signature setup/receipt/claim finality waiting is implemented.
@@ -79,16 +119,16 @@ CI emits the tested GITHUB_SHA; no self-referential commit SHA is embedded.
 - Stale AGENTS/readiness summaries were consolidated; historical evidence below
   is not proof of this newer source.
 
-Measured tests: 134 Node tests + two vectors on Windows and WSL; 58 Solana Rust
-tests + 22 Native supporting-crate tests in WSL. Formatting/clippy passed.
+Measured tests: 144 Node tests + two vectors on Windows and WSL; 58 Solana Rust
+tests + 26 Native proof/supporting-crate tests in WSL. Formatting/clippy passed.
 Zero failures/skips in these measured suites; two SBF builds and real deposit
-E2E plus six real-validator security checks passed. Native Windows SBF,
+E2E plus 17 real Native/local-validator security checks passed. Native Windows SBF,
 Windows service ACL/protected storage, full
 failure matrix, withdrawal E2E, Devnet and fresh-clone reproducibility: NOT_RUN.
 
 Phase 08 is still incomplete. Next: exact-SHA CI, then temporary-deposit
-recovery/race coverage, remaining account/source validation, complete Native evidence
-wiring and real-daemon failure/replay/restart tests. The local deposit uses an
+recovery/race coverage, remaining account/source validation, production Native
+evidence sources and real-daemon failure/replay/restart tests. The local deposit uses an
 isolated FROST-controlled P2TR test intent; this run does not prove user CSV
 recovery. File-journal tests do not prove production fsync, authenticated
 storage, fencing or rollback guarantees. Production observers remain BLOCKED.
