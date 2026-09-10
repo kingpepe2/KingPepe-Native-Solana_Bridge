@@ -1,6 +1,6 @@
 [provider]
 cluster = "localnet"
-wallet = "~/.config/solana/id.json"
+wallet = "${LOCALNET_FEE_PAYER_REF}"
 
 [programs.localnet]
 kingpepe_bridge = "EfoRF4BDDspsi53XYL62mCyhCtf3FceV5LpRkRdwYqKM"

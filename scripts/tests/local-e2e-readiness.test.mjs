@@ -46,6 +46,8 @@ test("executable discovery is path-delimited and does not inspect unrelated envi
       platform: "linux",
     });
     assert.equal(missing.state, "MISSING");
+    mkdirSync(path.join(root, "kingpeped"));
+    assert.equal(findExecutable("kingpeped", { envPath: root, platform: process.platform }).state, "MISSING");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

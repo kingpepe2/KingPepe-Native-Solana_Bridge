@@ -6,8 +6,10 @@ import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import {
   createLocalE2ePlan,
+  initializeLocalE2eRunRoot,
   READY_TO_RUN_LOCAL_E2E,
   REQUIRED_KINGPEPE_REGTEST_VERSION,
+  REQUIRED_SOLANA_VERSION,
   sanitizePlanForReport,
 } from "./local-e2e-orchestrator.mjs";
 
@@ -37,6 +39,7 @@ export async function withLocalE2eInfrastructure(options = {}, runFlow = async (
     createLocalE2ePlan({
       repoRoot: options.repoRoot ?? process.cwd(),
       runRoot: options.runRoot ?? process.env.KINGPEPE_LOCAL_E2E_ROOT,
+      buildRoot: options.buildRoot,
       envPath: options.envPath,
       platform: options.platform,
       pathExt: options.pathExt,
@@ -60,6 +63,9 @@ export async function withLocalE2eInfrastructure(options = {}, runFlow = async (
   const programArtifactExists = options.programArtifactExists ?? existsSync;
 
   try {
+    // The default executor starts real services; it must claim a new private
+    // test directory before any compiler can generate disposable keypairs.
+    if (executor instanceof DefaultLocalE2eExecutor) initializeLocalE2eRunRoot(plan);
     await runVersionCheck({
       executor,
       commandPaths,
@@ -74,19 +80,15 @@ export async function withLocalE2eInfrastructure(options = {}, runFlow = async (
       expectedSubstring: REQUIRED_KINGPEPE_REGTEST_VERSION,
       checks,
     });
-    await runVersionCheck({ executor, commandPaths, command: "solana", checks });
-    await runVersionCheck({ executor, commandPaths, command: "anchor", checks });
-
-    await runPlanCommand({
-      executor,
-      commandPaths,
-      command: plan.commands[0],
-      checks,
-      timeoutMs: options.commandTimeoutMs,
-    });
+    for (const command of ["solana", "solana-test-validator", "cargo-build-sbf"]) {
+      await runVersionCheck({ executor, commandPaths, command, expectedSubstring: REQUIRED_SOLANA_VERSION, checks });
+    }
+    for (const command of plan.commands.filter((entry) => entry.step.startsWith("BUILD_SBF_"))) {
+      await runPlanCommand({ executor, commandPaths, command, checks, timeoutMs: options.commandTimeoutMs ?? 600_000 });
+    }
     for (const artifactPath of [plan.paths.bridgeProgramSo, plan.paths.transceiverProgramSo]) {
       if (!programArtifactExists(artifactPath)) {
-        return bootstrapResult(BLOCKED_PROGRAM_ARTIFACT_MISSING, "ANCHOR_BUILD_ARTIFACT_MISSING", plan, {
+        return bootstrapResult(BLOCKED_PROGRAM_ARTIFACT_MISSING, "SBF_BUILD_ARTIFACT_MISSING", plan, {
           checks,
           missingArtifact: artifactBasename(artifactPath),
           commandsStarted: [],
@@ -97,15 +99,15 @@ export async function withLocalE2eInfrastructure(options = {}, runFlow = async (
     const solana = executor.startLongRunning({
       step: "START_SOLANA_LOCAL_VALIDATOR",
       executable: commandPaths.get("solana-test-validator"),
-      args: plan.commands[1].args,
-      cwd: plan.commands[1].cwd,
+      args: plan.commands.find((entry) => entry.step === "START_SOLANA_LOCAL_VALIDATOR").args,
+      cwd: plan.repoRoot,
     });
     services.push(solana);
     const native = executor.startLongRunning({
       step: "START_KINGPEPE_REGTEST",
       executable: commandPaths.get("kingpeped"),
-      args: plan.commands[2].args,
-      cwd: plan.commands[2].cwd,
+      args: plan.commands.find((entry) => entry.step === "START_KINGPEPE_REGTEST").args,
+      cwd: plan.repoRoot,
     });
     services.push(native);
 
@@ -146,7 +148,9 @@ export async function withLocalE2eInfrastructure(options = {}, runFlow = async (
   } catch (error) {
     return bootstrapResult(LOCAL_E2E_BOOTSTRAP_FAILED, error.code ?? "BOOTSTRAP_COMMAND_FAILED", plan, {
       checks,
-      error: String(error.message ?? error).slice(0, 512),
+      error: error.code === LOCAL_E2E_FLOW_FAILED ? "Local economic flow failed" : "Local infrastructure command failed",
+      ...(error.step === undefined ? {} : { failedStep: error.step }),
+      ...(error.sourceLocation === undefined ? {} : { failureSource: error.sourceLocation }),
       commandsStarted: services.map((service) => service.step),
       fullNativeToSolanaE2e: error.code === LOCAL_E2E_FLOW_FAILED ? "FAILED" : "NOT_RUN",
     });
@@ -240,7 +244,9 @@ async function runVersionCheck({
     executable: commandPaths.get(command),
     args: ["--version"],
   });
-  if (expectedSubstring !== undefined && !result.output.includes(expectedSubstring)) {
+  const exactVersion = expectedSubstring === undefined ? undefined :
+    new RegExp(`(?:^|\\s)${expectedSubstring.replaceAll(".", "\\.")}(?=\\s|$)`, "u");
+  if (exactVersion !== undefined && !exactVersion.test(result.output)) {
     throw Object.assign(new Error(`${command} version does not include ${expectedSubstring}`), {
       code: BLOCKED_LOCAL_E2E_VERSION_MISMATCH,
     });
@@ -321,6 +327,7 @@ async function stopServices({ executor, commandPaths, plan, services }) {
 function commandError(step, detail) {
   return Object.assign(new Error(`${step} failed: ${String(detail).trim().slice(0, 512)}`), {
     code: "BOOTSTRAP_COMMAND_FAILED",
+    step,
   });
 }
 
@@ -334,8 +341,28 @@ async function runLocalE2eFlowCallback(runFlow, context) {
   } catch (error) {
     throw Object.assign(new Error(String(error.message ?? error).slice(0, 512)), {
       code: LOCAL_E2E_FLOW_FAILED,
+      step: error.step,
+      sourceLocation: sanitizedErrorSource(error, context.plan.repoRoot),
     });
   }
+}
+
+function sanitizedErrorSource(error, repoRoot) {
+  // Only a source-relative location is reportable; never echo error messages,
+  // subprocess output, credentials, or runtime paths.
+  for (const frame of String(error.stack ?? "").split("\n").slice(1)) {
+    const match = /\b(file:\/\/\/[^\s)]+):(\d+):(\d+)/u.exec(frame);
+    if (match === null) continue;
+    try {
+      const relative = path.relative(repoRoot, fileURLToPath(match[1]));
+      if (relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative)) {
+        return `${relative.split(path.sep).join("/")}:${match[2]}`;
+      }
+    } catch {
+      // Unrecognized frames are not diagnostic evidence.
+    }
+  }
+  return undefined;
 }
 
 function sanitizeFlowExtra(value) {

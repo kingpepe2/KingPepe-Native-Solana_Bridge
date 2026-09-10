@@ -48,7 +48,8 @@ test("bootstrap runs build and service health checks with fake complete toolchai
   assert.deepEqual(result.commandsStarted, ["START_SOLANA_LOCAL_VALIDATOR", "START_KINGPEPE_REGTEST"]);
   assert.deepEqual(executor.started, ["START_SOLANA_LOCAL_VALIDATOR", "START_KINGPEPE_REGTEST"]);
   assert.deepEqual(executor.stopped, ["START_KINGPEPE_REGTEST", "START_SOLANA_LOCAL_VALIDATOR"]);
-  assert(executor.calls.includes("BUILD_SOLANA_PROGRAMS"));
+  assert(executor.calls.includes("BUILD_SBF_KINGPEPE_TRANSCEIVER"));
+  assert(executor.calls.includes("BUILD_SBF_KINGPEPE_BRIDGE"));
   assert(executor.calls.includes("CHECK_SOLANA_LOCAL_VALIDATOR_HEALTH"));
   assert(executor.calls.includes("CHECK_KINGPEPE_REGTEST_HEALTH"));
   assert.equal(result.plan.repoRoot, "${REPO_ROOT}");
@@ -105,7 +106,8 @@ test("infrastructure harness stops services and does not report E2E pass when in
   assert.equal(result.state, LOCAL_E2E_BOOTSTRAP_FAILED);
   assert.equal(result.reason, LOCAL_E2E_FLOW_FAILED);
   assert.equal(result.fullNativeToSolanaE2e, "FAILED");
-  assert.match(result.error, /synthetic Native to Solana flow failure/u);
+  assert.equal(result.error, "Local economic flow failed");
+  assert(!JSON.stringify(result).includes("synthetic Native to Solana flow failure"));
   assert.deepEqual(result.commandsStarted, ["START_SOLANA_LOCAL_VALIDATOR", "START_KINGPEPE_REGTEST"]);
   assert.deepEqual(executor.stopped, ["START_KINGPEPE_REGTEST", "START_SOLANA_LOCAL_VALIDATOR"]);
 });
@@ -124,7 +126,7 @@ test("bootstrap blocks mismatched KingPepe REGTEST versions before starting serv
   assert.deepEqual(executor.started, []);
 });
 
-test("bootstrap requires Anchor build artifacts before starting validators", async () => {
+test("bootstrap requires SBF build artifacts before starting validators", async () => {
   const executor = new FakeExecutor();
   const result = await runLocalE2eBootstrap({
     plan: readyPlan(),
@@ -132,8 +134,18 @@ test("bootstrap requires Anchor build artifacts before starting validators", asy
     programArtifactExists: () => false,
   });
   assert.equal(result.state, BLOCKED_PROGRAM_ARTIFACT_MISSING);
-  assert.equal(result.reason, "ANCHOR_BUILD_ARTIFACT_MISSING");
+  assert.equal(result.reason, "SBF_BUILD_ARTIFACT_MISSING");
   assert.deepEqual(executor.started, []);
+});
+
+test("bootstrap rejects SDK and validator version substitutions before building", async () => {
+  for (const step of ["CHECK_SOLANA_VERSION", "CHECK_SOLANA_TEST_VALIDATOR_VERSION", "CHECK_CARGO_BUILD_SBF_VERSION"]) {
+    const executor = new FakeExecutor({ outputs: new Map([[step, "Solana 1.18.260"]]) });
+    const result = await runLocalE2eBootstrap({ plan: readyPlan(), executor });
+    assert.equal(result.reason, BLOCKED_LOCAL_E2E_VERSION_MISMATCH);
+    assert(!executor.calls.some((entry) => entry.startsWith("BUILD_SBF_")));
+    assert.deepEqual(executor.started, []);
+  }
 });
 
 test("bootstrap stops started services if a health check fails", async () => {
@@ -205,6 +217,9 @@ class FakeExecutor {
 function defaultOutput(step) {
   if (step === "CHECK_KINGPEPED_VERSION" || step === "CHECK_KINGPEPE_CLI_VERSION") {
     return "KingPepe Core version v31.1.0";
+  }
+  if (["CHECK_SOLANA_VERSION", "CHECK_SOLANA_TEST_VALIDATOR_VERSION", "CHECK_CARGO_BUILD_SBF_VERSION"].includes(step)) {
+    return "Solana 1.18.26";
   }
   return `${step} ok`;
 }

@@ -1,0 +1,31 @@
+{
+  "environment": "LOCALNET_REGTEST_ONLY",
+  "node": {
+    "version": "22.23.2",
+    "linuxArchiveSha256": "d60acfe00a2932254bb0ad20e01b0d74397a0875595de719654b214f4b03f307"
+  },
+  "solana": {
+    "version": "1.18.26",
+    "platformToolsVersion": "v1.41",
+    "linuxArchiveUrl": "https://github.com/solana-labs/solana/releases/download/v1.18.26/solana-release-x86_64-unknown-linux-gnu.tar.bz2",
+    "linuxArchiveSha256": "10246c7f446006036192d81d859e761bcb3e7d1f40059bf27a56e1c29b0dbc40",
+    "selection": "Matches the existing locked solana-program 1.18.26 dependency; isolated local validation only, not a production toolchain approval."
+  },
+  "native": {
+    "version": "v31.1.0",
+    "sourceRepository": "https://github.com/kingpepe2/king-pepe-source-code",
+    "sourceCommit": "3f2621820ffefae59cbe48b350f5f8f6ec8a6da5",
+    "sourceTree": "33d550b0c2bec33ede7e6d73cd44afbbe18dea8b",
+    "sourceArchiveSha256": "91551e9c29543691afef8c28689fe71f23c864876e289817a58baa3431d48acf"
+  },
+  "rustup": {
+    "version": "1.28.2",
+    "autoSelfUpdate": "DISABLED"
+  },
+  "gitleaks": {
+    "version": "8.24.3",
+    "linuxArchiveSha256": "9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c",
+    "checksumSource": "https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_checksums.txt"
+  },
+  "integrityNotes": "Archive hashes pin the bytes fetched over HTTPS from official release/source endpoints. Node and Gitleaks archives were also compared with official checksum lists. These checks do not constitute an independent audit or release-signature attestation."
+}

@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -9,7 +10,10 @@ export const LOCAL_E2E_ORCHESTRATOR_PROTOCOL =
   "KINGPEPE_NATIVE_SOLANA_BRIDGE/LOCAL_E2E_ORCHESTRATOR/V1";
 export const READY_TO_RUN_LOCAL_E2E = "READY_TO_RUN_LOCAL_E2E";
 export const BLOCKED_LOCAL_E2E = "BLOCKED_LOCAL_INFRASTRUCTURE_MISSING";
-export const REQUIRED_KINGPEPE_REGTEST_VERSION = "v31.1.0";
+const toolchain = JSON.parse(readFileSync(new URL("./local-e2e-toolchain.json", import.meta.url), "utf8"));
+export const REQUIRED_KINGPEPE_REGTEST_VERSION = toolchain.native.version;
+export const REQUIRED_SOLANA_VERSION = toolchain.solana.version;
+export const REQUIRED_SBF_TOOLS_VERSION = toolchain.solana.platformToolsVersion;
 
 export const ALLOWED_REGTEST_CLI_COMMANDS = Object.freeze(
   new Set([
@@ -38,7 +42,11 @@ const DEFAULT_SOLANA_FAUCET_PORT = 9900;
 export function createLocalE2ePlan(options = {}) {
   const repoRoot = path.resolve(options.repoRoot ?? process.cwd());
   const runRoot = validateLocalE2eRunRoot(
-    options.runRoot ?? path.join(os.tmpdir(), "kingpepe-native-solana-local-e2e"),
+    options.runRoot ?? path.join(os.tmpdir(), `kingpepe-native-solana-local-e2e-${randomUUID()}`),
+    repoRoot,
+  );
+  const cargoTargetDir = validateLocalE2eRunRoot(
+    options.buildRoot ?? process.env.KINGPEPE_LOCAL_BUILD_ROOT ?? path.join(runRoot, "cargo-target"),
     repoRoot,
   );
   const nativeRpcPort = validateNonPrivilegedPort(
@@ -69,12 +77,12 @@ export function createLocalE2ePlan(options = {}) {
   const paths = Object.freeze({
     nativeDatadir: path.join(runRoot, "native-regtest"),
     solanaLedger: path.join(runRoot, "solana-ledger"),
-    bridgeProgramSo: path.join(repoRoot, "solana", "target", "deploy", "kingpepe_bridge.so"),
+    sbfOutDir: path.join(runRoot, "sbf-output"),
+    cargoTargetDir,
+    bridgeProgramSo: path.join(runRoot, "sbf-output", "kingpepe_bridge.so"),
     transceiverProgramSo: path.join(
-      repoRoot,
-      "solana",
-      "target",
-      "deploy",
+      runRoot,
+      "sbf-output",
       "kingpepe_transceiver.so",
     ),
   });
@@ -110,12 +118,19 @@ export function createLocalE2ePlan(options = {}) {
     }),
     paths,
     commands: Object.freeze([
-      Object.freeze({
-        step: "BUILD_SOLANA_PROGRAMS",
-        executable: "anchor",
+      // Separate builds keep the bridge's no-entrypoint dependency feature
+      // from disabling the transceiver's standalone entrypoint.
+      ...["kingpepe-transceiver", "kingpepe-bridge"].map((program) => Object.freeze({
+        step: `BUILD_SBF_${program.replaceAll("-", "_").toUpperCase()}`,
+        executable: "cargo-build-sbf",
         cwd: path.join(repoRoot, "solana"),
-        args: Object.freeze(["build"]),
-      }),
+        args: Object.freeze([
+          "--manifest-path", path.join(repoRoot, "solana", "programs", program, "Cargo.toml"),
+          "--sbf-out-dir", paths.sbfOutDir,
+          "--tools-version", REQUIRED_SBF_TOOLS_VERSION,
+          "--", "--locked", "--jobs", "2", "--target-dir", path.join(paths.cargoTargetDir, program),
+        ]),
+      })),
       Object.freeze({
         step: "START_SOLANA_LOCAL_VALIDATOR",
         executable: "solana-test-validator",
@@ -171,6 +186,10 @@ export function buildRegtestDaemonArguments({ datadir, rpcPort, p2pPort }) {
     `-datadir=${normalizedDatadir}`,
     "-server=1",
     "-listen=0",
+    "-connect=0",
+    "-dnsseed=0",
+    "-txindex=1",
+    "-fallbackfee=0.00001000",
     `-rpcport=${validateNonPrivilegedPort(rpcPort, "Native REGTEST RPC port")}`,
     "-rpcbind=127.0.0.1",
     "-rpcallowip=127.0.0.1",
@@ -223,9 +242,10 @@ export function buildSolanaValidatorArguments({
   validateSolanaProgramId(bridgeProgramId, "Bridge Program ID");
   validateSolanaProgramId(transceiverProgramId, "Transceiver Program ID");
   return Object.freeze([
-    "--reset",
     "--ledger",
     normalizedLedger,
+    "--bind-address",
+    "127.0.0.1",
     "--rpc-port",
     String(validateNonPrivilegedPort(rpcPort, "Solana local-validator RPC port")),
     "--faucet-port",
@@ -257,8 +277,22 @@ export function readLocalnetProgramIds(repoRoot) {
 
 export function validateLocalE2eRunRoot(runRoot, repoRoot) {
   const normalized = validateAbsolutePath(runRoot, "Local E2E run root");
-  validatePathOutsideRepo(normalized, repoRoot, "Local E2E run root");
+  validatePathOutsideRepo(resolveExistingParents(normalized), resolveExistingParents(repoRoot), "Local E2E run root");
+  if (normalized === path.parse(normalized).root || normalized === path.resolve(os.homedir())) {
+    throw new Error("Local E2E run root must be a dedicated directory");
+  }
   return normalized;
+}
+
+export function initializeLocalE2eRunRoot(plan) {
+  validateLocalE2eRunRoot(plan.runRoot, plan.repoRoot);
+  // Existing state must be inspected explicitly; never reset it for a new run.
+  mkdirSync(plan.runRoot, { mode: 0o700 });
+  for (const directory of [plan.paths.nativeDatadir, plan.paths.sbfOutDir]) {
+    mkdirSync(directory, { mode: 0o700 });
+  }
+  validateLocalE2eRunRoot(plan.paths.cargoTargetDir, plan.repoRoot);
+  mkdirSync(plan.paths.cargoTargetDir, { recursive: true, mode: 0o700 });
 }
 
 export function validateNonPrivilegedPort(value, label) {
@@ -272,6 +306,10 @@ export function sanitizePlanForReport(plan) {
   return deepSanitize(plan, [
     [plan.repoRoot, "${REPO_ROOT}"],
     [plan.runRoot, "${LOCAL_E2E_RUN_ROOT}"],
+    [plan.paths.cargoTargetDir, "${LOCAL_E2E_BUILD_ROOT}"],
+    ...plan.readiness.requiredExecutables
+      .filter((entry) => entry.path !== undefined)
+      .map((entry) => [entry.path, `\${LOCAL_E2E_BIN}/${entry.command}`]),
   ]);
 }
 
@@ -283,9 +321,18 @@ function validateAbsolutePath(value, label) {
 }
 
 function validatePathOutsideRepo(value, repoRoot, label) {
-  if (isSameOrInside(path.resolve(repoRoot), path.resolve(value))) {
+  if (isSameOrInside(path.resolve(repoRoot), path.resolve(value)) ||
+      isSameOrInside(path.resolve(value), path.resolve(repoRoot))) {
     throw new Error(`${label} must be outside the source repository`);
   }
+}
+
+function resolveExistingParents(value) {
+  const absolute = path.resolve(value);
+  if (existsSync(absolute)) return realpathSync(absolute);
+  const parent = path.dirname(absolute);
+  if (parent === absolute) throw new Error("Local E2E path cannot be resolved");
+  return path.join(resolveExistingParents(parent), path.basename(absolute));
 }
 
 function isSameOrInside(parent, candidate) {
