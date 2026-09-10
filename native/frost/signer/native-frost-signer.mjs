@@ -6,6 +6,8 @@ import {
   REQUIRED_FROST_THRESHOLD,
   assertHashHex,
   assertNativeSigningApproved,
+  assertNativeSigningPolicy,
+  assertNativeFrostRuntimePolicy,
   bytesToHex,
   canonicalJson,
   hexToBytes,
@@ -29,7 +31,7 @@ export class NativeFrostSigner {
     if (!Number.isSafeInteger(options.index) || options.index < 0 || options.index > 1) throw new Error("invalid FROST signer index");
     this.signerId = options.signerId;
     this.index = options.index;
-    this.#policy = options.policy;
+    this.#policy = assertNativeFrostRuntimePolicy(options.policy);
     this.#stateStore = options.stateStore;
     if (options.nativeEvidenceValidator !== undefined && typeof options.nativeEvidenceValidator !== "function") {
       throw new Error("FROST native evidence validator must be a function");
@@ -269,6 +271,7 @@ export class NativeFrostSigner {
   }
 
   #authorizeRequestWithKey(request) {
+    assertNativeSigningPolicy(this.#policy);
     const state = this.#stateStore.load();
     const key = this.#activeKey(state, request.epoch);
     validateSigningRequestEnvelope(request, this.#policy);

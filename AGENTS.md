@@ -25,25 +25,32 @@
 ## Current phase
 
 PHASE 08 INCOMPLETE. Phase 09 NOT_STARTED.
-Last verified source: 2de96942d7da69466a6130cb55804916171e4976, private push and
+Last verified source: ee011923da423475c4ccae3c9685d8a1ce257f23, private push and
 all four exact-SHA CI jobs PASS:
-https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34466302475
-Its current/staged/outgoing source and all 151 commits scanned clean; zero
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34472369148
+Its current/staged/outgoing source and all 153 commits scanned clean; zero
 workflow artifacts were uploaded. That evidence does not certify newer source.
 
 Absorbing-stop source 2bdff8f1687085d63de8c628ae12a4f2efed163e was pushed
 privately. CI 34470295877 completed the real deposit and all 55 checks but failed
 because the workflow still required five rather than seven claim-worker checks.
-Do NOT label that SHA all-CI-pass. Current unpublished correction requires all
+Do NOT label that SHA all-CI-pass. The verified ee011923 correction requires all
 seven and both named stopped-worker checks, with six executable CI-gate tests.
 Sweep/claim/pipeline retries return the stored stop; late callbacks and journal
 writes cannot clear it. Pipeline boundaries recheck journal/ledger status before
 further signing/broadcast and retain pending credit on contradictory mint results.
-Forty-five new Node regressions pass, including real file/database reopen and
-controlled callback races. With six CI-gate tests, Windows/WSL each pass 324 Node tests and
-two vectors; WSL passes 93 Rust tests and audits. See development-status for the
-separate fresh real-chain and publication evidence. No global restart/fencing
-claim follows from these cooperating-worker guards.
+Its 324 Node tests per platform include 45 stop regressions and six CI-gate tests;
+exact-SHA CI completes the real deposit and all 55 integration checks. No global
+restart/fencing claim follows from these cooperating-worker guards.
+
+Current unpublished policy increment: explicit localnet/verified REGTEST genesis,
+immutable private authorization lookup, frozen inspection records and strict
+bounded fields. Local DKG-only capability cannot sign transactions. Windows/WSL
+each pass 357 Node tests (33 new), two vectors; WSL passes 93 Rust tests and audits.
+An initial 355-test run exposed two undefined-policy DKG setup calls and the first
+fresh E2E failed there. The harness now uses the explicit DKG-only capability;
+the guard was not bypassed. See development-status for subsequent real-chain,
+scan and publication evidence. These are API boundaries, not a hostile-code sandbox.
 Node 24.21.0 / npm 11.19.0 / bundled SQLite 3.53.4 are required. The SQLite
 API remains release-candidate stability 1.2, not production approval.
 See docs/development-status.md for current measured tests and publication state.
@@ -66,9 +73,10 @@ Canonical choice/UTXO and Solana observation trust the configured local validati
 nodes. RPC_OBSERVATION is not independent proof or a production observer.
 Production observation, service ACLs/protected storage/IPC, full restart,
 global hard stops, post-mint deep-reorg response and external review remain open.
-Read-only review also reproduced matching Mainnet policy approval and mutation
-of the exposed authorization Map (no keys/signing/network). Close these local
-signer-policy boundaries next, after the CI correction passes. The pinned
+Read-only review reproduced matching Mainnet policy approval and exposed Map
+mutation on the preceding source. Current regression-tested changes close these
+configuration/API paths. Request-envelope/intent identity and DKG deployment
+transcript binding still need hardening before signer-state work. The pinned
 upstream FROST code is explicitly unaudited; never claim broader library audit
 coverage applies to it. The approved same-host topology is not the cause of
 these blockers. See docs/security/software-frost.md.
