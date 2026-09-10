@@ -1,13 +1,41 @@
 # KingPepe Native - Solana Bridge Task Status
 
+Latest verified increment: `7640dedcbadd9c31c120b3ebc5b7231eaa36cde2`, message
+`feat(phase-08): validate Native CSV recovery scripts on regtest`, pushed to
+PRIVATE origin/main. All four CI jobs PASS:
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34445169540.
+It passed 152 Node tests + two vectors, 58 Solana Rust + 26 Native Rust tests,
+two SBF builds, the real deposit, 17 security checks and six CSV recovery checks.
+
+Current Phase 08 increment: integrate the committed user-recoverable temporary
+script into the real automatic deposit flow; obtain only a Native-user public
+key, reconstruct policy in each authorizing role, use real FROST BIP342 sweep
+signatures, finalize a separate canonical reserve, and verify actual witness
+signatures before both attestations and mint. Locally tested; its commit/private
+push/exact-SHA CI are pending. Windows and WSL: 155 Node tests + two vectors PASS.
+WSL: 58 Solana Rust + 26 Native Rust tests, fmt/clippy, two SBF builds PASS.
+Real REGTEST/local-validator deposit + 22 security checks + six CSV recovery
+checks PASS; reserve/supply each 100000000 atomic. No per-transfer approval.
+An outdated orchestration call-order assertion was corrected for the new public
+key calls and early genesis check; full reruns pass. No gate was weakened.
+Current source and 144 existing commits scan clean. Provenance remains 164 files,
+none added/deleted/moved; no new dependencies or third-party source imports.
+Audits retain the unmaintained bincode warning; no known vulnerabilities found.
+
+Next: publish/verify this increment, then test competing sweep/recovery and reorg
+cases, implement offline PSBT support, and close remaining source/account/crash/
+liability-persistence gaps before Phase 09. Mainnet remains DISABLED.
+
+The following entries describe earlier checkpoints, not the newer tree.
+
 Raw-evidence increment `ef15e6e648935044edbb4b09874119bc6c823fc7`, message
 `fix(phase-08): validate raw Native evidence before signing and attesting`, pushed
 to PRIVATE origin/main; four CI jobs PASS:
 https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34442633781.
 The tested source passed the real deposit and 17 security checks.
 Recovery-script construction, BIP342 sighashes, mixed witness attachment and
-unsigned offline preparation now pass local validation; commit/private push/
-exact-SHA CI are pending for this increment. Eight new unit tests and six actual
+unsigned offline preparation passed local validation and the commit/private push/
+exact-SHA CI recorded above. Eight new unit tests and six actual
 Native-node CSV recovery checks pass. Full rerun: 152 Node tests + two vectors
 on Windows and WSL; 58 Solana Rust + 26 Native Rust tests, fmt/clippy and two SBF
 builds in WSL; automatic deposit + 17 security checks pass, reserve/supply each
@@ -17,10 +45,10 @@ unmaintained bincode warning remains reported; all five Rust audits and npm audi
 find zero vulnerabilities. Declared dependency licenses pass. Current source and
 143 existing commits scan clean; staged/outgoing scans must precede publication.
 Provenance: 160 -> 164 files, four original code/test additions, none deleted/moved.
-No normal-flow recovery, FROST script-path sweep, race/reorg or PSBT integration
-is claimed yet. Continue Phase 08; do not advance Phase 09.
+At that earlier checkpoint no normal-flow recovery, FROST script-path sweep or
+race/reorg/PSBT integration was claimed. The newer integration is recorded above.
 
-Latest verified Phase 08 increment `33b622638617258660019302b6db8d8868e7093f`,
+Historical Phase 08 increment `33b622638617258660019302b6db8d8868e7093f`,
 `fix(phase-08): bind attestations to configured native domain`, pushed to PRIVATE
 origin/main; four CI jobs PASS:
 https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34440113182.

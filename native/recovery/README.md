@@ -51,7 +51,8 @@ broadcasts, and does not claim that the UTXO is currently unspent or mature.
 It rejects unauthorized fees and conservatively requires net value above the
 pinned Native P2TR dust boundary. This is not yet wallet-compatible PSBT tooling.
 
-Eight unit tests and six real-node checks pass in the Phase 08 local harness.
+Ten script/intent/witness unit tests and six real-node recovery checks pass in
+the Phase 08 local harness.
 The real checks cover immature and one-block-early recovery, wrong signing
 amount, attempts to disable CSV, mature broadcast/finality and replay rejection.
 The simulated user's test key exists in memory only; its original buffer is
@@ -59,10 +60,20 @@ cleared afterward, without claiming complete managed-runtime memory erasure.
 All test wallets and daemon state stay outside the checkout. The recovery test
 uses separate test funds and does not create an additional Solana mint credit.
 
-Not yet proved: recoverable-deposit integration into the automatic bridge path,
-real FROST signatures spending the sweep leaf, sweep/recovery race and reorg
-handling, or offline PSBT wallet compatibility. The Rust eligibility model is
-not a substitute for these actual Native script tests. Mainnet stays disabled.
+The normal automatic deposit flow now obtains a public recovery key from the
+isolated Native user wallet and uses this temporary script. Real FROST A+B
+signatures spend the sweep leaf; separately funded key-path inputs pay the miner
+fee, preserving the full credited deposit in the distinct canonical reserve.
+Only after sweep finality and both attesters' raw-evidence/witness checks does
+the local Solana program mint the credit. The same user's recovery leaf is not
+present in the canonical reserve. Windows orchestration tests reject missing,
+watch-only or malformed recovery public identities before any deposit payment.
+
+Not yet proved: competing sweep/recovery race and reorg handling, or offline
+PSBT wallet compatibility. The isolated Native wallet supplies the recovery
+public key, but end-user wallet onboarding remains future SDK/app work. The Rust
+eligibility model is not a substitute for actual script tests. Mainnet stays
+disabled; a happy-path local run is not production activation approval.
 
 Standard references (not copied implementations): [BIP341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki),
 [BIP342](https://github.com/bitcoin/bips/blob/master/bip-0342.mediawiki), and

@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 import { runLocalNativeToSolanaE2e, submitLocalnetSolanaDepositClaim } from "../../scripts/local-e2e-native-to-solana.mjs";
 import { createLocalNativeEvidenceVerifier } from "../../scripts/local-native-evidence-verifier.mjs";
 import { testLocalNativeRecovery } from "./local-native-recovery.mjs";
+import { verifyRegtestSweepSignatures } from "../../native/node/native-raw-evidence.mjs";
+import { parseNativeTransactionHex } from "../../native/node/native-taproot-transaction.mjs";
 import { combineProjectAttestations } from "../../services/attesters/attestation-service.mjs";
 import { SolanaLocalRpcClient } from "../../services/bridge-validator/solana-deposit-claim-submitter.mjs";
 import { prepareSignedLocalnetSolanaDepositReceiptTransaction } from "../../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs";
@@ -16,6 +18,7 @@ import { bytesToHex, decodeCanonicalBridgeMessage, encodeCanonicalBridgeMessage 
 export async function runLocalDepositSecurityE2e(repoRoot) {
   const passed = [];
   let recovery;
+  let reserveVerificationInput;
   const result = await runLocalNativeToSolanaE2e({
     repoRoot,
     nativeEvidenceVerifierFactory: async (options) => {
@@ -33,6 +36,11 @@ export async function runLocalDepositSecurityE2e(repoRoot) {
               await assert.rejects(() => verifier.verifyInputs(wrong), /RAW_NATIVE_INPUT_SUBSTITUTED/u);
               passed.push(label);
             }
+            await assert.rejects(() => verifier.verifyReserve({ deposit: input.inputs[0], feeInputs: input.inputs.slice(1),
+              sweepTxid: input.inputs[0].txid, reserveVout: input.inputs[0].vout,
+              reserveScriptHex: input.inputs[1].scriptPubKeyHex, feeAtomic: input.inputs[1].amountAtomic,
+              minimumConfirmations: 1 }), /RAW_NATIVE_SWEEP_SUBSTITUTED/u);
+            passed.push("UNSWEPT_TEMPORARY_DEPOSIT_NOT_MINT_ELIGIBLE");
           }
           return verifier.verifyInputs(input);
         },
@@ -51,12 +59,21 @@ export async function runLocalDepositSecurityE2e(repoRoot) {
               await assert.rejects(() => verifier.verifySweepSigning(wrong), /RAW_NATIVE_SIGNING_INTENT_SUBSTITUTED/u);
               passed.push(label);
             }
+            await assert.rejects(() => verifier.verifySweepSigning({ ...input, tapscriptSpends: undefined }), /RAW_NATIVE_SIGNING_INTENT_SUBSTITUTED/u);
+            passed.push("SWEEP_SCRIPT_PATH_DOWNGRADE_REJECTED");
+            const wrongControl = structuredClone(input);
+            const controlBytes = Buffer.from(wrongControl.tapscriptSpends[0].controlBlockHex, "hex");
+            controlBytes[0] ^= 1;
+            wrongControl.tapscriptSpends[0].controlBlockHex = controlBytes.toString("hex");
+            await assert.rejects(() => verifier.verifySweepSigning(wrongControl), /NativeTaprootControlBlockMismatch/u);
+            passed.push("SWEEP_CONTROL_BLOCK_SUBSTITUTION_REJECTED");
           }
           return verifier.verifySweepSigning(input);
         },
         verifyReserve: async (input) => {
           if (!testedReserve) {
             testedReserve = true;
+            reserveVerificationInput = structuredClone(input);
             await assert.rejects(() => verifier.verifyInputs({ inputs: [input.deposit], minimumConfirmations: 1 }), /RAW_NATIVE_INPUT_NOT_AVAILABLE/u);
             passed.push("SPENT_TEMPORARY_DEPOSIT_NOT_REUSABLE");
             await assert.rejects(() => verifier.verifyReserve({ ...input, feeAtomic: "0" }), /RAW_NATIVE_SWEEP_VALUE_MISMATCH/u);
@@ -67,6 +84,14 @@ export async function runLocalDepositSecurityE2e(repoRoot) {
       };
     },
     solanaDepositClaim: async (context) => {
+      const sweep = parseNativeTransactionHex(context.signedReserveSweep.signedNativeTransactionHex);
+      const changed = structuredClone(sweep); changed.inputs[0].witness[0][0] ^= 1;
+      assert.equal(changed.txidHex, sweep.txidHex);
+      assert.throws(() => verifyRegtestSweepSignatures({ sweep: changed,
+        inputs: [reserveVerificationInput.deposit, ...reserveVerificationInput.feeInputs],
+        tapscriptSpends: reserveVerificationInput.tapscriptSpends, reserveScriptHex: reserveVerificationInput.reserveScriptHex }),
+      /RAW_NATIVE_SWEEP_SIGNATURE_INVALID/u);
+      passed.push("FINALIZED_WITNESS_TAMPERING_REJECTED");
       const completed = await submitLocalnetSolanaDepositClaim(context);
       if (completed.state !== "COMPLETED") return completed;
       const retry = await submitLocalnetSolanaDepositClaim(context);
@@ -179,8 +204,16 @@ export async function runLocalDepositSecurityE2e(repoRoot) {
       assert.equal(raw.attesters[role].utxoTrust, "CONFIGURED_LOCAL_VALIDATING_NODE_RPC_OBSERVATION");
     }
     passed.push("BOTH_SIGNERS_AND_ATTESTERS_VALIDATE_RAW_EVIDENCE");
+    const intent = result.nativeToSolanaE2e.depositIntent;
+    assert.equal(intent.recoverable, true);
+    assert.equal(intent.recoveryAvailableAfterSweep, false);
+    assert.notEqual(intent.scriptPubKeyHex, result.nativeToSolanaE2e.frostCustody.taprootScriptPubKeyHex);
+    for (const evidence of [raw.reserveEvidence, raw.attesters.ATTESTER_A, raw.attesters.ATTESTER_B]) {
+      assert.deepEqual(evidence.witnessSignatures, { scriptPathInputs: 1, keyPathInputs: 1 });
+    }
+    passed.push("RECOVERABLE_DEPOSIT_TO_DISTINCT_RESERVE_VERIFIED");
   }
-  return { ...result, localRecovery: recovery, localSecurity: { passed, pass: passed.length, fail: result.state === "COMPLETED" && passed.length === 17 ? 0 : 1,
+  return { ...result, localRecovery: recovery, localSecurity: { passed, pass: passed.length, fail: result.state === "COMPLETED" && passed.length === 22 ? 0 : 1,
     scope: "Real raw Native evidence/policy rejection, local-validator deposit, idempotent retry, backing replay and domain checks; not complete adversarial coverage." } };
 }
 

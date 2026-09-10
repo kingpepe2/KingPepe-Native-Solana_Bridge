@@ -43,7 +43,8 @@ not persistent rollback protection or authenticated IPC. Core cryptographic
 fixtures without a source adapter do not represent an operational service.
 
 After sweep finality, each attester fetches/verifies the parents and exact sweep
-again, checks the canonical reserve UTXO and verifies the same evidence digest
+again, independently verifies actual witness signatures, checks the canonical
+reserve UTXO and verifies the same evidence digest
 before Ed25519 signing. Signing the claim without a verifier is rejected. The
 pre-sweep FROST operation and later mint claim have distinct identities: finalized
 sweep evidence does not exist when the sweep itself is authorized. Finalized
@@ -60,11 +61,27 @@ validation, independent fork-choice proof or UTXO proof. Canonical-chain selecti
 and unspent state retain `CONFIGURED_LOCAL_VALIDATING_NODE_RPC_OBSERVATION`
 trust. A/B use the same host and Native node, not physically independent sources.
 The CLI is REGTEST-only and bounded to short local chains; production evidence
-sources and resource policy remain unconfigured. A separate REGTEST user CSV
-script now passes actual node tests, but the normal deposit flow still uses its
-non-recoverable test intent. See [recovery construction and scope](../../native/recovery/README.md).
-Full deposit/sweep integration, recovery races, production storage/fencing and
-complete failure testing remain Phase 08 gaps.
+sources and resource policy remain unconfigured. The normal REGTEST deposit now
+uses the committed recovery script and a real FROST BIP342 sweep to a separate
+reserve. See [recovery construction and scope](../../native/recovery/README.md).
+Competing recovery/sweep transactions, reorgs, PSBT wallet support, production
+storage/fencing and complete failure testing remain Phase 08 gaps.
+
+Each role rebuilds the temporary script against the expected deployment, Mint,
+recipient, amount, epochs, intent nonce, Native user recovery public key, FROST
+public key and CSV delay. The user's Native wallet supplies only a public key;
+its private material stays in the isolated test wallet. The 144-block default is
+explicitly REGTEST-only, not a production policy value. Fee inputs use reserve
+key-path scripts; the deposit input uses the committed sweep leaf. A and B each
+recompute the corresponding BIP342/BIP341 sighash before participating.
+
+The finalized witness checker requires the exact committed sweep script/control
+block, one default 64-byte signature for each input, the configured FROST public
+key and recomputed sighashes over actual inputs/outputs. Altered witness bytes
+can leave the legacy txid unchanged, so raw transaction inclusion alone does not
+replace this check. The helper accepts the bridge's limited sweep script, not
+arbitrary Native scripts, annexes or alternative sighash types. Native consensus
+validity and canonical UTXO selection retain the node trust boundary above.
 
 ## Phase 06 primitives
 

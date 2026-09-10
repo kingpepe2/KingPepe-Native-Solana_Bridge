@@ -2,12 +2,51 @@
 
 ## Current Phase 08 integration evidence (2026-09-10)
 
-Latest verified source: `ef15e6e648935044edbb4b09874119bc6c823fc7`, message
+Latest verified source: `7640dedcbadd9c31c120b3ebc5b7231eaa36cde2`, message
+`feat(phase-08): validate Native CSV recovery scripts on regtest`, pushed to
+PRIVATE origin/main; all four [CI jobs passed](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34445169540).
+That SHA passed 152 Node tests + two vectors, 58 Solana Rust + 26 Native Rust tests,
+both SBF builds, the real deposit, 17 security checks and six real recovery checks.
+
+Current recoverable-deposit integration is locally tested, awaiting its own
+commit/private push/exact-SHA CI. The normal flow now obtains a public recovery
+key from the isolated Native user wallet, commits the deployment/recipient/amount/
+epoch-bound deposit intent into a temporary two-branch script, signs its sweep
+leaf with real FROST A+B, and finalizes a distinct non-user-recoverable reserve.
+Separate fee inputs preserve the full deposit credit. Each role reconstructs
+the intent/script; each attester also independently checks actual sweep witness
+signatures against the configured group key and recomputed sighashes. Ed25519
+remains attestation-only. No per-transfer KingPepe Team approval was introduced.
+
+Windows and WSL each pass 155 Node tests + two vectors; WSL passes 58 Solana Rust
+and 26 Native Rust tests, fmt/clippy and both SBF builds. Fresh real-daemon runs
+pass the automatic recoverable deposit, 22 security checks and six CSV recovery
+checks. Reserve and SPL supply both equal 100000000 atomic units. New real checks
+reject unswept mint eligibility, script-path downgrade, control-block substitution
+and altered witness signatures with an unchanged txid; both attesters verify one
+BIP342 deposit input and one key-path fee input. Three new unit tests cover intent
+substitution, witness integrity and invalid Native recovery-public-key handling.
+The orchestration sequence assertion was updated for the new public-key calls
+and early genesis check, then fully rerun. Final measured suites have no failures
+or skips. No security gate was removed. All five Rust audits and npm audit find
+zero vulnerabilities; the unmaintained bincode warning remains. Declared dependency
+licenses pass. Current source and all 144 existing commits scan clean; staged and
+outgoing scans remain required. Provenance stays at 164 files with no additions,
+deletions, moves, third-party imports or new dependencies in this increment.
+
+Remaining Phase 08 work includes competing sweep/recovery transactions and reorgs,
+offline PSBT/wallet integration, remaining account/source checks, real crash/restart
+cases and durable liability/fencing guarantees. A single happy-path run does not
+establish those properties or production readiness. Phase 09 is NOT_STARTED.
+
+### Previous checkpoints
+
+Raw-evidence source: `ef15e6e648935044edbb4b09874119bc6c823fc7`, message
 `fix(phase-08): validate raw Native evidence before signing and attesting`, pushed
 to PRIVATE origin/main. All four [CI jobs passed](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34442633781),
 including the real deposit and all 17 Native/Solana security checks.
-Current recovery-script increment is LOCALLY_TESTED, awaiting its own commit,
-private push and exact-SHA CI. Eight new construction/encoding/sighash/unsigned
+Recovery-script increment `7640dedcbadd9c31c120b3ebc5b7231eaa36cde2` passed its
+private push and exact-SHA CI above. Eight construction/encoding/sighash/unsigned
 preparation tests pass. A fresh isolated REGTEST + local-validator run passed
 the automatic deposit, all 17 existing security checks, and six real CSV recovery
 checks: immature and one-block-early rejection, wrong sighash amount rejection,
@@ -27,10 +66,10 @@ The source and all 143 existing commits scan without secrets. Staged and outgoin
 scans remain mandatory before publication. Provenance covers 164 files, up from
 160: four original code/test files, no deletions, moves or new dependencies.
 
-This does not integrate recoverable deposits into the normal bridge flow, verify
-the FROST BIP342 sweep branch, provide PSBT wallet integration, or prove sweep/
-recovery races and reorganizations. Those remain Phase 08 work. Earlier CI is
-not evidence for this newer tree. See [recovery scope](../native/recovery/README.md).
+That checkpoint did not integrate recoverable deposits or the FROST BIP342 sweep
+branch into the normal flow. The newer integration is described above; PSBT and
+race/reorg coverage remain incomplete. Earlier CI is not evidence for newer code.
+See [recovery scope](../native/recovery/README.md).
 
 The following raw-evidence and earlier increment counts are historical.
 
@@ -151,18 +190,17 @@ CI emits the tested GITHUB_SHA; no self-referential commit SHA is embedded.
 - Stale AGENTS/readiness summaries were consolidated; historical evidence below
   is not proof of this newer source.
 
-Measured current tests: 152 Node tests + two vectors on Windows and WSL; 58 Solana
+Measured current tests: 155 Node tests + two vectors on Windows and WSL; 58 Solana
 Rust tests + 26 Native proof/supporting-crate tests in WSL. Formatting/clippy pass.
 Zero failures/skips in these final measured suites; two SBF builds and real deposit
-E2E plus 17 security checks and six Native recovery checks pass. Native Windows SBF,
+E2E plus 22 security checks and six Native recovery checks pass. Native Windows SBF,
 Windows service ACL/protected storage, full
 failure matrix, withdrawal E2E, Devnet and fresh-clone reproducibility: NOT_RUN.
 
-Phase 08 is still incomplete. Next: publish/verify this increment, then integrate
-the tested recovery script into normal deposits and verify the FROST script-path
-sweep; add race, reorg and remaining source/failure/restart tests. The normal local
-deposit still uses the isolated non-recoverable FROST P2TR intent. File-journal
-tests do not prove production fsync, authenticated
+Phase 08 is still incomplete. Next: publish/verify this integration increment,
+then add competing recovery/sweep, reorg, PSBT and remaining source/failure/restart
+tests. The normal local deposit now uses a user-recoverable temporary script and
+real FROST BIP342 sweep. File-journal tests do not prove production fsync, authenticated
 storage, fencing or rollback guarantees. Production observers remain BLOCKED.
 Phase 09 has not started; productionReady=false; Mainnet activation DISABLED.
 

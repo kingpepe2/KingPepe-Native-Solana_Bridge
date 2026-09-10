@@ -5,7 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { ed25519 } from "@noble/curves/ed25519.js";
-import { schnorr } from "@noble/curves/secp256k1.js";
+import { schnorr, secp256k1 } from "@noble/curves/secp256k1.js";
+import { REGTEST_GENESIS } from "../../native/node/native-raw-evidence.mjs";
 import {
   LOCAL_NATIVE_TO_SOLANA_COMPLETED,
   LOCAL_NATIVE_TO_SOLANA_BLOCKED,
@@ -34,6 +35,7 @@ import { createLocalE2ePlan } from "../local-e2e-orchestrator.mjs";
 import { REQUIRED_LOCAL_E2E_EXECUTABLES } from "../local-e2e-readiness.mjs";
 import {
   attachKeyPathTaprootWitnesses,
+  attachTaprootWitnesses,
   createLocalTaprootSighashEvidences,
   parseNativeTransactionHex,
 } from "../../native/node/native-taproot-transaction.mjs";
@@ -42,11 +44,13 @@ import { base58Encode } from "../../services/bridge-validator/solana-deposit-cla
 const REPO_ROOT = path.resolve(import.meta.dirname, "../..");
 const DEPOSIT_TXID = h("phase08-real-daemon-deposit-txid");
 const FEE_FUNDING_TXID = h("phase08-reserve-sweep-fee-funding-txid");
-const FROST_AGGREGATE_XONLY_HEX = h("phase08-local-frost-aggregate-xonly");
+// Public generator-point fixtures, not operational signing identities.
+const FROST_AGGREGATE_XONLY_HEX = Buffer.from(secp256k1.Point.BASE.toBytes()).subarray(1).toString("hex");
+const RECOVERY_PUBLIC_KEY_HEX = Buffer.from(secp256k1.Point.BASE.double().toBytes()).toString("hex");
 const SCRIPT_HEX = p2trScriptPubKeyHex(FROST_AGGREGATE_XONLY_HEX);
 const FEE_FUNDING_SCRIPT_HEX = SCRIPT_HEX;
 const FROST_TAPROOT_ADDRESS = taprootAddressFromXOnlyPublicKey(FROST_AGGREGATE_XONLY_HEX, "rkpepe");
-const REGTEST_GENESIS_HASH = h("kingpepe-regtest-genesis");
+const REGTEST_GENESIS_HASH = REGTEST_GENESIS;
 const REGTEST_BEST_BLOCK_HASH = h("kingpepe-regtest-best-block");
 const UNSIGNED_SWEEP_HEX = buildUnsignedSweepHex();
 const UNSIGNED_SWEEP_TXID = parseNativeTransactionHex(UNSIGNED_SWEEP_HEX).txidHex;
@@ -133,13 +137,16 @@ test("native-to-solana orchestration model executes observation sequence without
     assert.equal(result.nativeToSolanaE2e.deposit.nativeGenesisHash, REGTEST_GENESIS_HASH);
     assert.equal(result.nativeToSolanaE2e.deposit.sourceBestBlockHash, REGTEST_BEST_BLOCK_HASH);
     assert.equal(result.nativeToSolanaE2e.deposit.sourceBestHeight, 26);
-    assert.equal(result.nativeToSolanaE2e.deposit.scriptPubKeyHex, SCRIPT_HEX);
+    assert.equal(result.nativeToSolanaE2e.deposit.scriptPubKeyHex, result.nativeToSolanaE2e.depositIntent.policy.scriptPubKeyHex);
+    assert.notEqual(result.nativeToSolanaE2e.deposit.scriptPubKeyHex, SCRIPT_HEX);
     assert.match(result.nativeToSolanaE2e.deposit.proofFingerprintHex, /^[0-9a-f]{64}$/u);
-    assert.equal(result.nativeToSolanaE2e.depositIntent.address, FROST_TAPROOT_ADDRESS);
-    assert.equal(result.nativeToSolanaE2e.depositIntent.scriptPubKeyHex, SCRIPT_HEX);
-    assert.equal(result.nativeToSolanaE2e.depositIntent.custody, "LOCAL_EPHEMERAL_FROST_TAPROOT");
+    assert.notEqual(result.nativeToSolanaE2e.depositIntent.address, FROST_TAPROOT_ADDRESS);
+    assert.equal(result.nativeToSolanaE2e.depositIntent.scriptPubKeyHex, result.nativeToSolanaE2e.deposit.scriptPubKeyHex);
+    assert.equal(result.nativeToSolanaE2e.depositIntent.custody, "LOCAL_RECOVERABLE_TAPSCRIPT_TO_FROST_RESERVE");
+    assert.equal(result.nativeToSolanaE2e.depositIntent.recoverable, true);
+    assert.equal(result.nativeToSolanaE2e.depositIntent.policy.userRecoveryPublicKeyHex, RECOVERY_PUBLIC_KEY_HEX.slice(2));
     assert.equal(result.nativeToSolanaE2e.frostCustody.aggregateTweakedXOnlyPublicKey, FROST_AGGREGATE_XONLY_HEX);
-    assert.equal(result.nativeToSolanaE2e.frostCustody.depositAddress, FROST_TAPROOT_ADDRESS);
+    assert.equal(result.nativeToSolanaE2e.frostCustody.depositAddress, result.nativeToSolanaE2e.depositIntent.address);
     assert.equal(result.nativeToSolanaE2e.frostCustody.canonicalReserveAddress, FROST_TAPROOT_ADDRESS);
     assert.equal(result.nativeToSolanaE2e.nativeSource.trust, "RPC_OBSERVATION");
     assert.equal(result.nativeToSolanaE2e.reserveSweep.state, "FINALIZED_CANONICAL_RESERVE");
@@ -187,7 +194,7 @@ test("native-to-solana orchestration model executes observation sequence without
     assert.match(result.nativeToSolanaE2e.stateRoot, /^\$\{LOCAL_E2E_RUN_ROOT\}/u);
     assert.equal(result.nativeToSolanaE2e.stateRoot.includes(runRoot), false);
     assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_INITIALIZE_EPHEMERAL_FROST_CUSTODY"));
-    assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_CREATE_FROST_TAPROOT_DEPOSIT_INTENT"));
+    assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_CREATE_RECOVERABLE_DEPOSIT_INTENT"));
     assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_SELECT_FROST_CANONICAL_RESERVE"));
     assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_COMPUTE_VALIDATED_TAPROOT_SIGHASHES"));
     assert(result.nativeToSolanaE2e.stages.includes("LOCAL_E2E_SIGN_RESERVE_SWEEP_WITH_FROST_A_B"));
@@ -233,12 +240,14 @@ test("native-to-solana orchestration model executes observation sequence without
       executor.calls.filter((step) => step.startsWith("LOCAL_E2E_")),
       [
         "LOCAL_E2E_CREATE_USER_WALLET",
+        "LOCAL_E2E_OBSERVE_NATIVE_GENESIS_HASH",
+        "LOCAL_E2E_GET_USER_RECOVERY_ADDRESS",
+        "LOCAL_E2E_GET_USER_RECOVERY_PUBLIC_KEY",
         "LOCAL_E2E_GET_USER_MINING_ADDRESS",
         "LOCAL_E2E_MINE_USER_FUNDS",
         "LOCAL_E2E_SEND_NATIVE_DEPOSIT",
         "LOCAL_E2E_MINE_DEPOSIT_FINALITY",
         "LOCAL_E2E_OBSERVE_NATIVE_SOURCE_SNAPSHOT",
-        "LOCAL_E2E_OBSERVE_NATIVE_GENESIS_HASH",
         "LOCAL_E2E_OBSERVE_DEPOSIT_TRANSACTION",
         "LOCAL_E2E_VERIFY_DEPOSIT_UTXO_UNSPENT",
         "LOCAL_E2E_FUND_RESERVE_SWEEP_FEE_INPUT",
@@ -308,6 +317,24 @@ test("local FROST Taproot custody context derives disposable rkpepe P2TR custody
     assert.equal(custody.taprootAddress.includes(String(REPO_ROOT)), false);
   } finally {
     rmSync(runRoot, { recursive: true, force: true });
+  }
+});
+
+test("missing, watch-only or substituted Native recovery identity prevents payment initiation", async () => {
+  for (const info of [{}, { ismine: false, pubkey: RECOVERY_PUBLIC_KEY_HEX },
+    { ismine: true, iswatchonly: true, pubkey: RECOVERY_PUBLIC_KEY_HEX },
+    { ismine: true, pubkey: "ff".repeat(33) }]) {
+    const runRoot = mkdtempSync(path.join(os.tmpdir(), "kingpepe-invalid-recovery-public-"));
+    const executor = new FakeExecutor({ outputs: new Map([["LOCAL_E2E_GET_USER_RECOVERY_PUBLIC_KEY", JSON.stringify(info)]]) });
+    try {
+      const result = await runLocalNativeToSolanaE2e({ plan: readyPlan(runRoot), executor,
+        programArtifactExists: () => true, healthAttempts: 1, custodyFactory: fakeCustodyFactory,
+        reserveSweepSigner: fakeReserveSweepSigner, nativeEvidenceVerifierFactory: fakeNativeEvidenceVerifierFactory,
+        localSolanaSetupFactory: fakeLocalSolanaSetupFactory, solanaSetup: fakeSolanaSetup, solanaDepositClaim: fakeSolanaDepositClaim });
+      assert.notEqual(result.state, "COMPLETED");
+      assert.equal(executor.calls.includes("LOCAL_E2E_SEND_NATIVE_DEPOSIT"), false);
+      assert.equal(executor.calls.includes("LOCAL_E2E_BROADCAST_FROST_SIGNED_RESERVE_SWEEP"), false);
+    } finally { rmSync(runRoot, { recursive: true, force: true }); }
   }
 });
 
@@ -1026,11 +1053,13 @@ function fakeSolanaPubkey(label) {
   };
 }
 
-function fakeReserveSweepSigner({ reserveSweepDraft, taprootSighashEvidences, operationIdHex }) {
+function fakeReserveSweepSigner({ reserveSweepDraft, taprootSighashEvidences, operationIdHex, spentOutputs, tapscriptSpends }) {
   const signatures = taprootSighashEvidences.map((_, index) => h(`fake-local-taproot-signature-${index}`) + h(`fake-local-taproot-tail-${index}`));
-  const attached = attachKeyPathTaprootWitnesses({
+  const attached = attachTaprootWitnesses({
     unsignedNativeTransactionHex: reserveSweepDraft.unsignedNativeTransactionHex,
     signatures,
+    spentOutputs,
+    tapscriptSpends,
   });
   return {
     state: "SIGNED_WITNESS_ATTACHED",
@@ -1080,9 +1109,23 @@ class FakeExecutor {
     if (this.failures.has(command.step)) {
       throw new Error(`${command.step} rejected by fake executor`);
     }
+    if (command.step === "LOCAL_E2E_SEND_NATIVE_DEPOSIT") {
+      this.depositAddress = command.args[command.args.indexOf("sendtoaddress") + 1];
+      // Decode only the encoder-produced fixture for fake RPC observations.
+      // No checksum/consensus validation is claimed by this orchestration model.
+      const alphabet = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+      let accumulator = 0; let bits = 0; const bytes = [];
+      for (const char of this.depositAddress.slice(this.depositAddress.lastIndexOf("1") + 2, -6)) {
+        accumulator = ((accumulator << 5) | alphabet.indexOf(char)) & 0xffff;
+        bits += 5;
+        if (bits >= 8) { bits -= 8; bytes.push((accumulator >>> bits) & 0xff); }
+      }
+      assert.equal(bytes.length, 32);
+      this.depositScript = `5120${Buffer.from(bytes).toString("hex")}`;
+    }
     return {
       step: command.step,
-      output: this.outputs.get(command.step) ?? defaultOutput(command.step),
+      output: this.outputs.get(command.step) ?? defaultOutput(command.step, this),
     };
   }
 
@@ -1097,7 +1140,7 @@ class FakeExecutor {
   }
 }
 
-function defaultOutput(step) {
+function defaultOutput(step, fixture = {}) {
   if (step === "CHECK_KINGPEPED_VERSION" || step === "CHECK_KINGPEPE_CLI_VERSION") {
     return "KingPepe Core version v31.1.0";
   }
@@ -1106,6 +1149,8 @@ function defaultOutput(step) {
   }
   if (step === "CHECK_CARGO_BUILD_SBF_VERSION") return "solana-cargo-build-sbf 4.1.0";
   if (step === "LOCAL_E2E_GET_USER_MINING_ADDRESS") return "bcrt1qkingpepeminingaddress";
+  if (step === "LOCAL_E2E_GET_USER_RECOVERY_ADDRESS") return "fixture-native-recovery-address";
+  if (step === "LOCAL_E2E_GET_USER_RECOVERY_PUBLIC_KEY") return JSON.stringify({ ismine: true, pubkey: RECOVERY_PUBLIC_KEY_HEX });
   if (step === "LOCAL_E2E_SEND_NATIVE_DEPOSIT") return DEPOSIT_TXID;
   if (step === "LOCAL_E2E_FUND_RESERVE_SWEEP_FEE_INPUT") return FEE_FUNDING_TXID;
   if (step === "LOCAL_E2E_CREATE_UNSIGNED_NATIVE_RESERVE_SWEEP") return UNSIGNED_SWEEP_HEX;
@@ -1134,8 +1179,8 @@ function defaultOutput(step) {
           n: 1,
           value: "1.00000000",
           scriptPubKey: {
-            hex: SCRIPT_HEX,
-            address: FROST_TAPROOT_ADDRESS,
+            hex: fixture.depositScript ?? SCRIPT_HEX,
+            address: fixture.depositAddress ?? FROST_TAPROOT_ADDRESS,
           },
         },
       ],
@@ -1159,7 +1204,7 @@ function defaultOutput(step) {
   if (step === "LOCAL_E2E_VERIFY_DEPOSIT_UTXO_UNSPENT") {
     return JSON.stringify({
       value: "1.00000000",
-      scriptPubKey: { hex: SCRIPT_HEX },
+      scriptPubKey: { hex: fixture.depositScript ?? SCRIPT_HEX },
       bestblock: REGTEST_BEST_BLOCK_HASH,
       confirmations: 6,
       coinbase: false,

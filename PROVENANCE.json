@@ -40,6 +40,17 @@
     "dependencyChanges": "None; uses the existing pinned curve dependency and Node standard library.",
     "terminologyReview": "No new project-role terminology requiring replacement; existing Solana protocol and third-party terms preserved."
   },
+  "phase08RecoverableIntegrationReview": {
+    "filesBefore": 164,
+    "filesAfter": 164,
+    "filesDeleted": 0,
+    "filesMoved": 0,
+    "newFiles": [],
+    "changes": "Original integration of the existing recovery scripts into the automatic REGTEST deposit flow; separate Native user public recovery key, immutable intent reconstruction in each role, mixed FROST BIP342/key-path sweep and actual finalized witness verification. Expanded unit and real-daemon negative tests.",
+    "sourceImports": "No third-party or legacy implementation imported. Native getaddressinfo public-key behavior checked against pinned src/wallet/rpc/addresses.cpp.",
+    "dependencyChanges": "None",
+    "cleanup": "Removed non-recoverable deposit-intent construction from the normal local flow; retained key-path cryptographic regression tests and reserve fee signing."
+  },
   "provenancePolicy": {
     "originalCodeLicense": "Proprietary (Copyright (c) 2026 KingPepe Team)",
     "provenanceClassifications": [
@@ -550,7 +561,7 @@
     {
       "path": "scripts/local-e2e-native-to-solana.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 local-only Native-to-Solana E2E command runner that composes the bootstrap harness with daemon deposit observation, disposable FROST aggregate Taproot deposit/fee/reserve intent generation using KingPepe REGTEST Bech32m HRP rkpepe and coinbase maturity 20 from read-only recovery network config, local Native source/genesis/txid validation, non-secret proof fingerprinting, explicit local fee-funding inputs for nonzero reserve-sweep miner fees, credited deposit preservation as the canonical reserve allocation, BIP-341 key-path SIGHASH_DEFAULT evidence for each FROST-controlled input, localnet-only input-specific FROST signing intents, disposable software FROST A+B signatures, Taproot key-path witness attachment, local signed reserve-sweep broadcast/finality validation, disposable local Solana setup identity generation and setup-submitter handoff bound to the exact local KPEPE Mint, runtime state under the local E2E run root outside the repository, and fail-closed blocking before Solana deposit-claim submission/reconciliation without claiming a full E2E pass."
+      "notes": "Original REGTEST/local-validator automatic deposit integration: Native-user public recovery key, committed temporary CSV deposit, separate fee funding, raw evidence checks, real FROST BIP342 sweep to a distinct reserve, separately keyed Ed25519 attestations, SPL mint and reconciliation. Runtime material stays external; no production readiness claim."
     },
     {
       "path": "scripts/tests/local-e2e-readiness.test.mjs",

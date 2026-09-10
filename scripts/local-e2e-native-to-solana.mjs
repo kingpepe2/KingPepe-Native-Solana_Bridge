@@ -1,10 +1,13 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { createLocalNativeEvidenceVerifier } from "./local-native-evidence-verifier.mjs";
+import { REGTEST_GENESIS } from "../native/node/native-raw-evidence.mjs";
+import { buildRegtestRecoverableDeposit, deriveRegtestDepositCommitment,
+  validateRegtestRecoverableDepositIntent } from "../native/recovery/taproot-deposit.mjs";
 import {
   ATTESTATION_MODE,
   ATTESTATION_PROTOCOL,
@@ -60,7 +63,7 @@ import {
   decimalCoinsToAtomic,
 } from "../native/node/native-rpc-client.mjs";
 import {
-  attachKeyPathTaprootWitnesses,
+  attachTaprootWitnesses,
   createLocalTaprootSighashEvidences,
   parseNativeTransactionHex,
 } from "../native/node/native-taproot-transaction.mjs";
@@ -259,6 +262,8 @@ export function createNativeToSolanaFlowConfig(options) {
     nativeNetwork,
     nativeChainName: sanitizeNetworkName(value.nativeChainName ?? DEFAULT_NATIVE_CHAIN_NAME),
     nativeBech32Hrp: sanitizeBech32Hrp(value.nativeBech32Hrp ?? DEFAULT_NATIVE_BECH32_HRP),
+    recoveryDelayBlocks: checkedInteger(value.recoveryDelayBlocks ?? 144, "recoveryDelayBlocks", 1, 0xffff),
+    depositNonceHex: normalizeHash32(value.depositNonceHex ?? randomBytes(32).toString("hex"), "depositNonceHex"),
     reserveMinerFeeNative,
     reserveMinerFeeAtomic: reserveMinerFeeAtomic.toString(),
     solanaDeploymentHex,
@@ -329,19 +334,50 @@ export async function executeNativeDepositObservationFlow({
     plan,
     flowConfig: config,
   });
-  const depositAddress = requireNonEmptyText(frostCustody.taprootAddress, "frostCustody.taprootAddress");
+  const canonicalReserveAddress = requireNonEmptyText(frostCustody.taprootAddress, "frostCustody.taprootAddress");
   const custodyScriptPubKeyHex = validateP2trScriptPubKeyHex(
     frostCustody.taprootScriptPubKeyHex,
     "frostCustody.taprootScriptPubKeyHex",
   );
   stages.push("LOCAL_E2E_INITIALIZE_EPHEMERAL_FROST_CUSTODY");
-  stages.push("LOCAL_E2E_CREATE_FROST_TAPROOT_DEPOSIT_INTENT");
 
   await cli({
     step: "LOCAL_E2E_CREATE_USER_WALLET",
     command: "createwallet",
     parameters: [config.userWalletName],
   });
+  const nativeGenesisHash = normalizeHash32(await cli({ step: "LOCAL_E2E_OBSERVE_NATIVE_GENESIS_HASH",
+    command: "getblockhash", parameters: ["0"] }), "nativeGenesisHash");
+  if (nativeGenesisHash !== REGTEST_GENESIS || config.nativeChainName !== "regtest" || config.nativeBech32Hrp !== "rkpepe") {
+    throw new Error("LocalRecoverableDepositRegtestRequired");
+  }
+  // Only a public key leaves the isolated user's Native wallet. Solana keys are
+  // never assumed to authorize the user's Native recovery branch.
+  const recoveryKeyAddress = await cli({ step: "LOCAL_E2E_GET_USER_RECOVERY_ADDRESS", wallet: config.userWalletName,
+    command: "getnewaddress", parameters: ["recovery", "bech32"] });
+  const recoveryKeyInfo = await cli({ step: "LOCAL_E2E_GET_USER_RECOVERY_PUBLIC_KEY", wallet: config.userWalletName,
+    command: "getaddressinfo", parameters: [recoveryKeyAddress], parseJson: true });
+  if (recoveryKeyInfo.ismine !== true || recoveryKeyInfo.iswatchonly === true
+    || typeof recoveryKeyInfo.pubkey !== "string" || !/^(02|03)[0-9a-f]{64}$/u.test(recoveryKeyInfo.pubkey)) {
+    throw new Error("LocalNativeUserRecoveryPublicKeyRequired");
+  }
+  const depositIntentContext = Object.freeze({ nativeGenesisHex: nativeGenesisHash, solanaDeploymentHex: config.solanaDeploymentHex,
+    managerProgramIdHex: config.bridgeProgramIdHex, transceiverProgramIdHex: config.transceiverProgramIdHex,
+    mintHex: config.mintHex, recipientHex: setupContext.recipientTokenAccountHex, nonceHex: config.depositNonceHex,
+    amountAtomic: config.amountAtomic, protocolId: config.protocolId, nativeNetwork: config.nativeNetwork,
+    policyEpoch: config.policyEpoch, keyEpoch: config.keyEpoch });
+  const depositPolicy = buildRegtestRecoverableDeposit({ nativeGenesisHex: nativeGenesisHash,
+    depositCommitmentHex: deriveRegtestDepositCommitment(depositIntentContext),
+    frostPublicKeyHex: frostCustody.aggregateTweakedXOnlyPublicKey,
+    userRecoveryPublicKeyHex: recoveryKeyInfo.pubkey.slice(2), csvDelayBlocks: config.recoveryDelayBlocks });
+  const depositAddress = taprootAddressFromXOnlyPublicKey(depositPolicy.outputPublicKeyHex, config.nativeBech32Hrp);
+  const depositScriptPubKeyHex = depositPolicy.scriptPubKeyHex;
+  const validateDepositIntent = () => validateRegtestRecoverableDepositIntent({ intent: depositIntentContext, policy: depositPolicy,
+    depositScriptPubKeyHex, reserveScriptPubKeyHex: custodyScriptPubKeyHex,
+    frostPublicKeyHex: frostCustody.aggregateTweakedXOnlyPublicKey, userRecoveryPublicKeyHex: recoveryKeyInfo.pubkey.slice(2),
+    csvDelayBlocks: config.recoveryDelayBlocks });
+  validateDepositIntent();
+  stages.push("LOCAL_E2E_CREATE_RECOVERABLE_DEPOSIT_INTENT");
   const miningAddress = requireNonEmptyText(
     await cli({
       step: "LOCAL_E2E_GET_USER_MINING_ADDRESS",
@@ -377,14 +413,6 @@ export async function executeNativeDepositObservationFlow({
     command: "getblockchaininfo",
     parseJson: true,
   });
-  const nativeGenesisHash = normalizeHash32(
-    await cli({
-      step: "LOCAL_E2E_OBSERVE_NATIVE_GENESIS_HASH",
-      command: "getblockhash",
-      parameters: ["0"],
-    }),
-    "nativeGenesisHash",
-  );
   const nativeSource = validateLocalNativeSourceSnapshot({
     blockchainInfo,
     genesisHash: nativeGenesisHash,
@@ -401,7 +429,7 @@ export async function executeNativeDepositObservationFlow({
   const depositOutput = findDepositOutput({
     rawTransaction,
     depositAddress,
-    expectedScriptPubKeyHex: custodyScriptPubKeyHex,
+    expectedScriptPubKeyHex: depositScriptPubKeyHex,
     amountAtomic: config.amountAtomic,
     nativeDecimals: config.nativeDecimals,
   });
@@ -417,19 +445,18 @@ export async function executeNativeDepositObservationFlow({
     expectedConfirmations: config.depositFinalityBlocks,
     nativeDecimals: config.nativeDecimals,
   });
-  const canonicalReserveAddress = depositAddress;
   stages.push("LOCAL_E2E_SELECT_FROST_CANONICAL_RESERVE");
   const feeFundingInputs = await prepareLocalReserveSweepFeeFundingInputs({
     cli,
     config,
     miningAddress,
-    feeFundingAddress: depositAddress,
+    feeFundingAddress: canonicalReserveAddress,
     expectedFeeFundingScriptPubKeyHex: custodyScriptPubKeyHex,
   });
   const nativeVerifier = await nativeEvidenceVerifierFactory({ plan });
   const evidenceInputs = Object.freeze([
     Object.freeze({ txid: depositTxidHex, vout: depositOutput.vout, amountAtomic: config.amountAtomic,
-      scriptPubKeyHex: custodyScriptPubKeyHex, minimumConfirmations: config.depositFinalityBlocks }),
+      scriptPubKeyHex: depositScriptPubKeyHex, minimumConfirmations: config.depositFinalityBlocks }),
     ...feeFundingInputs.map((input) => Object.freeze({ txid: input.txidHex, vout: input.vout,
       amountAtomic: input.amountAtomic, scriptPubKeyHex: input.scriptPubKeyHex, minimumConfirmations: 1 })),
   ]);
@@ -447,18 +474,13 @@ export async function executeNativeDepositObservationFlow({
     feeFundingInputs,
     proofFingerprintHex,
   });
+  const spentOutputs = Object.freeze(evidenceInputs.map((input) => Object.freeze({
+    amountAtomic: input.amountAtomic, scriptPubKeyHex: input.scriptPubKeyHex })));
+  const tapscriptSpends = Object.freeze([depositPolicy.sweep, ...feeFundingInputs.map(() => undefined)]);
   const taprootSighashEvidences = createLocalTaprootSighashEvidences({
     unsignedNativeTransactionHex: reserveSweepDraft.unsignedNativeTransactionHex,
-    spentOutputs: [
-      {
-        amountAtomic: config.amountAtomic,
-        scriptPubKeyHex: custodyScriptPubKeyHex,
-      },
-      ...feeFundingInputs.map((input) => ({
-        amountAtomic: input.amountAtomic,
-        scriptPubKeyHex: input.scriptPubKeyHex,
-      })),
-    ],
+    spentOutputs,
+    tapscriptSpends,
     proofFingerprintHex,
     reserveAmountAtomic: config.amountAtomic,
     nativeMinerFeeAtomic: config.reserveMinerFeeAtomic,
@@ -502,13 +524,18 @@ export async function executeNativeDepositObservationFlow({
     },
     reserveSweepDraft,
     taprootSighashEvidences,
+    spentOutputs,
+    tapscriptSpends,
     operationIdHex: sweepOperationIdHex,
-    nativeEvidenceValidator: async (intent) => nativeVerifier.verifySweepSigning({
-      inputs: evidenceInputs, minimumConfirmations: config.depositFinalityBlocks,
-      unsignedTransactionHex: reserveSweepDraft.unsignedNativeTransactionHex,
-      reserveAmountAtomic: config.amountAtomic, feeAtomic: config.reserveMinerFeeAtomic,
-      reserveScriptHex: custodyScriptPubKeyHex, intent,
-    }),
+    nativeEvidenceValidator: async (intent) => {
+      validateDepositIntent();
+      return nativeVerifier.verifySweepSigning({
+        inputs: evidenceInputs, minimumConfirmations: config.depositFinalityBlocks,
+        unsignedTransactionHex: reserveSweepDraft.unsignedNativeTransactionHex,
+        reserveAmountAtomic: config.amountAtomic, feeAtomic: config.reserveMinerFeeAtomic,
+        reserveScriptHex: custodyScriptPubKeyHex, intent, tapscriptSpends,
+      });
+    },
   });
   stages.push("LOCAL_E2E_SIGN_RESERVE_SWEEP_WITH_FROST_A_B");
   stages.push("LOCAL_E2E_ATTACH_FROST_TAPROOT_WITNESSES");
@@ -523,8 +550,9 @@ export async function executeNativeDepositObservationFlow({
   const reserveEvidenceInput = Object.freeze({ deposit: evidenceInputs[0], feeInputs: evidenceInputs.slice(1),
     sweepTxid: finalizedReserveSweep.nativeSweepTxidHex, reserveVout: finalizedReserveSweep.reserveOutputVout,
     reserveScriptHex: custodyScriptPubKeyHex, feeAtomic: config.reserveMinerFeeAtomic,
-    minimumConfirmations: config.depositFinalityBlocks });
+    minimumConfirmations: config.depositFinalityBlocks, tapscriptSpends });
   const reserveEvidence = await nativeVerifier.verifyReserve(reserveEvidenceInput);
+  validateDepositIntent();
   const creditDeposit = Object.freeze({ txidHex: depositTxidHex, vout: depositOutput.vout,
     amountAtomic: config.amountAtomic, proofFingerprintHex: normalizeHash32(reserveEvidence.digestHex, "reserveEvidence.digestHex") });
   const operationIdHex = deriveLocalnetDepositClaimOperationId({ flowConfig: config, localSolanaSetupContext: setupContext,
@@ -581,6 +609,7 @@ export async function executeNativeDepositObservationFlow({
     finalizedReserveSweep,
     operationIdHex,
     nativeEvidenceValidator: async (role) => {
+      validateDepositIntent();
       const result = await nativeVerifier.verifyReserve(reserveEvidenceInput);
       attesterEvidence[role] = result;
       return result;
@@ -603,6 +632,8 @@ export async function executeNativeDepositObservationFlow({
     reserveSweepDraft,
     signedReserveSweep,
     taprootSighashEvidences,
+    depositPolicy,
+    depositIntentContext,
     finalizedReserveSweep,
     localnetSolanaSetup,
     depositClaimRequest,
@@ -631,16 +662,19 @@ export async function executeNativeDepositObservationFlow({
       aggregateTweakedXOnlyPublicKey: frostCustody.aggregateTweakedXOnlyPublicKey,
       taprootScriptPubKeyHex: custodyScriptPubKeyHex,
       depositAddress,
-      feeFundingAddress: depositAddress,
+      feeFundingAddress: canonicalReserveAddress,
       canonicalReserveAddress,
     }),
     nativeSource,
     stateRoot: config.stateRoot,
     depositIntent: Object.freeze({
       address: depositAddress,
-      scriptPubKeyHex: custodyScriptPubKeyHex,
-      custody: "LOCAL_EPHEMERAL_FROST_TAPROOT",
-      recoverable: false,
+      scriptPubKeyHex: depositScriptPubKeyHex,
+      custody: "LOCAL_RECOVERABLE_TAPSCRIPT_TO_FROST_RESERVE",
+      recoverable: true,
+      recoveryAvailableAfterSweep: false,
+      policy: depositPolicy,
+      context: depositIntentContext,
     }),
     deposit: Object.freeze({
       txidHex: depositTxidHex,
@@ -1407,6 +1441,8 @@ export async function signLocalReserveSweepWithFrost({
   taprootSighashEvidences,
   operationIdHex,
   nativeEvidenceValidator,
+  spentOutputs,
+  tapscriptSpends,
 }) {
   if (typeof nativeEvidenceValidator !== "function") throw new Error("LocalNativeEvidenceVerifierRequired");
   const config = requireObject(flowConfig, "flowConfig");
@@ -1480,9 +1516,11 @@ export async function signLocalReserveSweepWithFrost({
     }
     return result.signatureHex;
   });
-  const witnessAttachment = attachKeyPathTaprootWitnesses({
+  const witnessAttachment = attachTaprootWitnesses({
     unsignedNativeTransactionHex: reserveSweepDraft.unsignedNativeTransactionHex,
     signatures,
+    spentOutputs,
+    tapscriptSpends,
   });
   if (witnessAttachment.txidHex !== reserveSweepDraft.unsignedNativeTransactionId) {
     throw new Error("LocalReserveSweepSignedTxidMismatch");
