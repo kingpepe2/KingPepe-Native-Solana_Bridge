@@ -299,6 +299,29 @@ test("Solana deposit submitter finalizes a localnet claim after two attestations
   }
 });
 
+test("RPC failure diagnostics never echo arbitrary provider or adapter error fields", async () => {
+  const fixture = createFixture();
+  for (const safe of [false, true]) {
+    const rpc = new FakeSolanaRpc({ solanaSignature: fixture.solanaSignature });
+    rpc.sendTransaction = async () => {
+      const error = new Error("private-test-diagnostic");
+      error.code = -32002;
+      error.executionFault = safe ? "SBF_COMPUTE_BUDGET_EXCEEDED" : "private-test-diagnostic";
+      error.instructionFailure = { index: 0, reason: safe ? "ProgramFailedToComplete" : "private-test-diagnostic", extra: "private-test-diagnostic" };
+      throw error;
+    };
+    const observer = new FakeDepositClaimObserver(fixture.submitConfig, fixture.request, fixture.solanaSignature);
+    const submitter = new SolanaDepositClaimSubmitter({ config: fixture.submitConfig, rpcClient: rpc, claimObserver: observer });
+    const result = await submitter.submitDepositClaim(fixture.request);
+    assert.equal(result.state, DEPOSIT_STATES.WAITING_FOR_DEPENDENCY);
+    assert.equal(result.rpcCode, -32002);
+    assert.equal(JSON.stringify(result).includes("private-test-diagnostic"), false);
+    if (safe) assert.deepEqual(result.instructionFailure, { index: 0, reason: "ProgramFailedToComplete" });
+    else assert.equal(result.instructionFailure, undefined);
+    assert.equal(observer.calls.length, 0);
+  }
+});
+
 test("completed Solana deposit claim retry does not resubmit transaction bytes", async () => {
   const fixture = createFixture();
   const rpc = new FakeSolanaRpc({ solanaSignature: fixture.solanaSignature });

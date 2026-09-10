@@ -24,10 +24,11 @@ use solana_program::{
     program_option::COption,
     program_pack::Pack,
     pubkey::Pubkey,
-    system_instruction, system_program,
-    sysvar::{rent::Rent, Sysvar},
+    sysvar::{clock::Clock, rent::Rent, Sysvar},
 };
+use solana_system_interface::{instruction as system_instruction, program as system_program};
 use spl_token::state::{Account as TokenAccount, Mint as TokenMint};
+use spl_token_interface as spl_token;
 use thiserror::Error;
 
 declare_id!("EfoRF4BDDspsi53XYL62mCyhCtf3FceV5LpRkRdwYqKM");
@@ -543,23 +544,13 @@ impl BridgeProgram {
 
     fn require_ready_for_deposits(&self) -> Result<&BridgeConfig, BridgeError> {
         let config = self.config.as_ref().ok_or(BridgeError::Uninitialized)?;
-        if self.state != ProgramState::LocalnetTesting {
-            return Err(BridgeError::ActivationDisabled);
-        }
-        if config.hard_stop || config.deposits_paused {
-            return Err(BridgeError::PausedOrHardStopped);
-        }
+        require_ready_for_action(&self.state, config, true)?;
         Ok(config)
     }
 
     fn require_ready_for_withdrawals(&self) -> Result<&BridgeConfig, BridgeError> {
         let config = self.config.as_ref().ok_or(BridgeError::Uninitialized)?;
-        if self.state != ProgramState::LocalnetTesting {
-            return Err(BridgeError::ActivationDisabled);
-        }
-        if config.hard_stop || config.withdrawals_paused {
-            return Err(BridgeError::PausedOrHardStopped);
-        }
+        require_ready_for_action(&self.state, config, false)?;
         Ok(config)
     }
 }
@@ -567,7 +558,53 @@ impl BridgeProgram {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TokenCpiMode {
     Invoke,
+    #[cfg(test)]
     SkipForTest,
+}
+
+fn require_ready_for_action(
+    state: &ProgramState,
+    config: &BridgeConfig,
+    deposit: bool,
+) -> Result<(), BridgeError> {
+    if *state != ProgramState::LocalnetTesting
+        || config.environment != BridgeEnvironment::Localnet
+        || config.mainnet_activation_enabled
+    {
+        return Err(BridgeError::ActivationDisabled);
+    }
+    if config.hard_stop
+        || (deposit && config.deposits_paused)
+        || (!deposit && config.withdrawals_paused)
+    {
+        return Err(BridgeError::PausedOrHardStopped);
+    }
+    Ok(())
+}
+
+fn validate_message_time(message: &CanonicalBridgeMessage, now: u64) -> Result<(), BridgeError> {
+    if now < message.valid_from || now > message.valid_until {
+        return Err(BridgeError::MessageValidityWindow);
+    }
+    Ok(())
+}
+
+fn validate_onchain_message_time(
+    message: &CanonicalBridgeMessage,
+    mode: TokenCpiMode,
+) -> Result<(), EntrypointError> {
+    #[cfg(test)]
+    if mode == TokenCpiMode::SkipForTest {
+        // Account-model unit tests have no runtime sysvars. The real entrypoint
+        // always uses Invoke, and this variant does not exist in the SBF binary.
+        return validate_message_time(message, 1).map_err(Into::into);
+    }
+    let _ = mode;
+    let now = Clock::get()
+        .map_err(|_| EntrypointError::InvalidAccountData)?
+        .unix_timestamp;
+    let now = u64::try_from(now).map_err(|_| EntrypointError::InvalidAccountData)?;
+    validate_message_time(message, now).map_err(Into::into)
 }
 
 fn process_instruction_accounts_with_token_cpi(
@@ -668,6 +705,8 @@ fn process_accept_deposit_claim_accounts(
     require_account_len(bridge_state, BRIDGE_STATE_ACCOUNT_LENGTH)?;
 
     let mut state = read_bridge_state_account(bridge_state)?;
+    require_ready_for_action(&state.state, &state.config, true)?;
+    validate_onchain_message_time(&message, token_cpi_mode)?;
     if state.config.manager_program_id != program_id.to_bytes() {
         return Err(EntrypointError::AccountKeyMismatch);
     }
@@ -734,6 +773,9 @@ fn process_accept_deposit_claim_accounts(
         .map_err(|_| BridgeError::InvalidMessage)?;
     let receipt = read_verified_receipt_account(receipt_account)?.receipt;
     validate_receipt(&config, &receipt, &message, digest)?;
+    if message.destination.as_slice() != recipient_token_account.key.as_ref() {
+        return Err(BridgeError::AccountMismatch.into());
+    }
     validate_recipient_token_account(recipient_token_account, mint.key)?;
 
     invoke_mint_to_checked_if_enabled(
@@ -789,6 +831,8 @@ fn process_record_withdrawal_accounts(
     require_zeroed_account(withdrawal_record)?;
 
     let mut state = read_bridge_state_account(bridge_state)?;
+    require_ready_for_action(&state.state, &state.config, false)?;
+    validate_onchain_message_time(&message, token_cpi_mode)?;
     if state.config.manager_program_id != program_id.to_bytes() {
         return Err(EntrypointError::AccountKeyMismatch);
     }
@@ -1199,9 +1243,11 @@ fn invoke_mint_to_checked_if_enabled<'a>(
     require_account_key(mint, &config.mint_binding.mint)?;
     require_account_key(mint_authority_pda, &config.mint_binding.mint_authority_pda)?;
     require_account_key(token_program, &config.mint_binding.token_program_id)?;
+    #[cfg(test)]
     if token_cpi_mode == TokenCpiMode::SkipForTest {
         return Ok(());
     }
+    let _ = token_cpi_mode;
     let instruction = spl_token::instruction::mint_to_checked(
         token_program.key,
         mint.key,
@@ -1242,9 +1288,11 @@ fn invoke_burn_checked_if_enabled<'a>(
     decimals: u8,
     token_cpi_mode: TokenCpiMode,
 ) -> Result<(), EntrypointError> {
+    #[cfg(test)]
     if token_cpi_mode == TokenCpiMode::SkipForTest {
         return Ok(());
     }
+    let _ = token_cpi_mode;
     let instruction = spl_token::instruction::burn_checked(
         token_program.key,
         source_token_account.key,
@@ -1809,6 +1857,8 @@ pub enum BridgeError {
     InvalidMessage,
     #[error("message domain mismatch")]
     MessageDomainMismatch,
+    #[error("message is outside its validity window")]
+    MessageValidityWindow,
     #[error("wrong message kind")]
     WrongMessageKind,
     #[error("verified receipt is missing")]
@@ -1991,7 +2041,6 @@ mod tests {
             data,
             account_owner,
             false,
-            0,
         )
     }
 
@@ -2308,7 +2357,7 @@ mod tests {
             true,
         );
         let recipient = test_account(
-            Pubkey::new_unique(),
+            Pubkey::new_from_array(message.destination.clone().try_into().unwrap()),
             spl_token::id(),
             token_account_data(mint_pubkey, Pubkey::new_unique(), 0),
             false,
@@ -2339,18 +2388,61 @@ mod tests {
             .encode()
             .unwrap();
 
+        let accounts = [
+            state_account.clone(),
+            claim_account.clone(),
+            receipt_account,
+            mint_account,
+            recipient,
+            mint_authority,
+            token_program,
+            transceiver_program,
+        ];
+        let mut substituted = accounts.clone();
+        substituted[4] = test_account(
+            Pubkey::new_unique(),
+            spl_token::id(),
+            token_account_data(mint_pubkey, Pubkey::new_unique(), 0),
+            false,
+            true,
+        );
+        assert_eq!(
+            process_instruction_accounts_with_token_cpi(
+                &id(),
+                &substituted,
+                &deposit,
+                TokenCpiMode::SkipForTest
+            ),
+            Err(BridgeError::AccountMismatch.into())
+        );
+        let mut paused = config.clone();
+        paused.deposits_paused = true;
+        state_account
+            .data
+            .borrow_mut()
+            .copy_from_slice(&encoded_state_account(&paused));
+        assert!(process_instruction_accounts_with_token_cpi(
+            &id(),
+            &accounts,
+            &deposit,
+            TokenCpiMode::SkipForTest
+        )
+        .is_err());
+        assert_eq!(
+            read_bridge_state_account(&state_account)
+                .unwrap()
+                .minted_supply,
+            0
+        );
+        assert!(claim_account.data.borrow().iter().all(|byte| *byte == 0));
+        state_account
+            .data
+            .borrow_mut()
+            .copy_from_slice(&encoded_state_account(&config));
+
         process_instruction_accounts_with_token_cpi(
             &id(),
-            &[
-                state_account.clone(),
-                claim_account.clone(),
-                receipt_account,
-                mint_account,
-                recipient,
-                mint_authority,
-                token_program,
-                transceiver_program,
-            ],
+            &accounts,
             &deposit,
             TokenCpiMode::SkipForTest,
         )
@@ -2371,6 +2463,40 @@ mod tests {
             ),
             Err(EntrypointError::NotEnoughAccounts)
         );
+    }
+
+    #[test]
+    fn economic_action_gates_reject_pause_hard_stop_and_environment_bypass() {
+        let config = base_config();
+        let ready = ProgramState::LocalnetTesting;
+        for deposit in [true, false] {
+            assert_eq!(require_ready_for_action(&ready, &config, deposit), Ok(()));
+            assert!(
+                require_ready_for_action(&ProgramState::Phase0Disabled, &config, deposit).is_err()
+            );
+            for environment in [BridgeEnvironment::Devnet, BridgeEnvironment::Mainnet] {
+                let mut disabled = config.clone();
+                disabled.environment = environment;
+                assert!(require_ready_for_action(&ready, &disabled, deposit).is_err());
+            }
+            let mut stopped = config.clone();
+            stopped.hard_stop = true;
+            assert!(require_ready_for_action(&ready, &stopped, deposit).is_err());
+            let mut paused = config.clone();
+            paused.deposits_paused = deposit;
+            paused.withdrawals_paused = !deposit;
+            assert!(require_ready_for_action(&ready, &paused, deposit).is_err());
+        }
+    }
+
+    #[test]
+    fn economic_message_window_matches_attester_inclusive_bounds() {
+        let message = deposit_message(&base_config());
+        assert!(validate_message_time(&message, 0).is_err());
+        assert_eq!(validate_message_time(&message, 1), Ok(()));
+        assert_eq!(validate_message_time(&message, 2), Ok(()));
+        assert!(validate_message_time(&message, 3).is_err());
+        assert!(validate_message_time(&message, u64::MAX).is_err());
     }
 
     #[test]

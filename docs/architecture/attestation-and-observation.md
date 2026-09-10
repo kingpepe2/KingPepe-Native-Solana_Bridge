@@ -1,6 +1,23 @@
 # Attestation and Solana observation
 
-## Phase 07 implementation
+## Current Phase 08 boundary
+
+The local deposit observer reports RPC_OBSERVATION, including when its source
+is our disposable local validator. It checks account program ownership,
+derived claim PDA, context freshness, transaction success, exact SPL Mint layout,
+supply, decimals and PDA mint authority. Source outages wait; confirmed account
+or authority contradictions create a persisted HARD_STOP which retry cannot
+clear. Production chain-source/bytecode verification is still BLOCKED.
+
+Two Ed25519 attestations now execute in the real local validator over identical
+canonical message bytes. Strict cross-instruction offsets share those bytes
+with the transceiver instruction; final receipt creation precedes a separate
+claim/mint transaction. This verifies who attested, not the truth of Native
+chain evidence. Native full-evidence wiring and recovery races remain Phase 08
+work. Both attesters are KingPepe Team controlled and can share one host/source;
+they are not physically independent or trustless observers.
+
+## Historical Phase 07 implementation
 
 Phase 07 adds service-level attestation and observation code. It does not deploy
 Solana programs, configure production identities, or authorize Mainnet.

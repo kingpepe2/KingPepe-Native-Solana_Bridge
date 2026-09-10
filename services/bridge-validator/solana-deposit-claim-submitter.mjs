@@ -24,6 +24,23 @@ const UINT_DECIMAL = /^(0|[1-9][0-9]*)$/u;
 const BASE64_TRANSACTION = /^[A-Za-z0-9+/]+={0,2}$/u;
 const BASE58_LIKE = /^[1-9A-HJ-NP-Za-km-z]{32,128}$/u;
 const JSON_RPC_VERSION = "2.0";
+const INSTRUCTION_FAILURE_REASONS = new Set(["InvalidAccountData", "InvalidArgument", "InvalidInstructionData", "InsufficientFunds", "ProgramFailedToComplete", "ComputationalBudgetExceeded", "AccountNotRentExempt", "AccountAlreadyInitialized", "IncorrectProgramId"]);
+const EXECUTION_FAULTS = new Set(["SBF_STACK_ACCESS_VIOLATION", "SBF_ACCESS_VIOLATION", "SBF_HEAP_EXHAUSTED", "SBF_COMPUTE_BUDGET_EXCEEDED"]);
+
+function sanitizedRpcDiagnostic(error) {
+  const result = {};
+  if (Number.isSafeInteger(error?.code)) result.rpcCode = error.code;
+  if (EXECUTION_FAULTS.has(error?.executionFault)) result.executionFault = error.executionFault;
+  const failure = error?.instructionFailure;
+  if (Number.isInteger(failure?.index) && failure.index >= 0 && failure.index <= 255) {
+    if (Number.isInteger(failure.customCode) && failure.customCode >= 0 && failure.customCode <= 0xffff_ffff) {
+      result.instructionFailure = { index: failure.index, customCode: failure.customCode };
+    } else if (INSTRUCTION_FAILURE_REASONS.has(failure.reason)) {
+      result.instructionFailure = { index: failure.index, reason: failure.reason };
+    }
+  }
+  return result;
+}
 const ALLOWED_SOLANA_RPC_METHODS = new Set([
   "getAccountInfo",
   "getBlockHeight",
@@ -59,6 +76,11 @@ export class SolanaDepositClaimSubmitter {
     if (completed !== undefined) {
       assertSamePrepared(completed.prepared, normalized);
       return structuredClone(completed.result);
+    }
+    const terminal = this.#journal.get(normalized.operationIdHex);
+    if (terminal?.state === DEPOSIT_STATES.HARD_STOP || terminal?.state === DEPOSIT_STATES.REJECTED) {
+      assertSamePrepared(terminal.prepared, normalized);
+      return structuredClone(terminal.result);
     }
 
     const prepared = this.#journal.persistPrepared({
@@ -99,8 +121,8 @@ export class SolanaDepositClaimSubmitter {
         maxRetries: normalized.maxRetries,
         skipPreflight: false,
       });
-    } catch {
-      return submitterDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "SOLANA_RPC_SEND_FAILED", normalized);
+    } catch (error) {
+      return submitterDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "SOLANA_RPC_SEND_FAILED", normalized, sanitizedRpcDiagnostic(error));
     }
     const solanaSignature = normalizeSolanaSignature(signature);
     this.#journal.recordSubmitted(normalized.operationIdHex, solanaSignature);
@@ -163,7 +185,12 @@ export class SolanaDepositClaimSubmitter {
         depositClaimAccountBase58: normalized.depositClaimAccountBase58,
         mintAccountBase58: normalized.mintAccountBase58,
       });
-    } catch {
+    } catch (error) {
+      if (["SOLANA_DEPOSIT_ACCOUNT_ADDRESS_MISMATCH", "SOLANA_DEPOSIT_ACCOUNT_PROGRAM_MISMATCH", "SOLANA_MINT_AUTHORITY_OR_PRECISION_MISMATCH"].includes(error.integrityCode)) {
+        const result = submitterDecision(DEPOSIT_STATES.HARD_STOP, error.integrityCode, normalized);
+        this.#journal.recordTerminal(normalized.operationIdHex, result);
+        return result;
+      }
       return submitterDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "SOLANA_DEPOSIT_CLAIM_OBSERVER_FAILED", normalized, {
         solanaSignature,
       });
@@ -182,6 +209,7 @@ export class SolanaDepositClaimSubmitter {
       mintedAmountAtomic: normalized.amountAtomic,
       slot: String(status.slot ?? observation.slot),
       sourceBoundary: observation.trust,
+      ...(observation.mint.supplyAtomic === undefined ? {} : { mintSupplyAtomic: observation.mint.supplyAtomic }),
     });
     this.#journal.recordCompleted(normalized.operationIdHex, completed);
     return completed;
@@ -241,7 +269,27 @@ export class SolanaLocalRpcClient {
       throw rpcError("SolanaRpcInvalidEnvelope", method);
     }
     if (envelope.error !== null && envelope.error !== undefined) {
-      throw rpcError("SolanaRpcRejected", method, envelope.error?.code);
+      const error = rpcError("SolanaRpcRejected", method, envelope.error?.code);
+      const failure = envelope.error?.data?.err?.InstructionError;
+      const logs = envelope.error?.data?.logs;
+      if (Array.isArray(logs)) {
+        for (const line of logs) {
+          if (typeof line !== "string") continue;
+          if (/Access violation in stack frame/iu.test(line)) error.executionFault = "SBF_STACK_ACCESS_VIOLATION";
+          else if (/Access violation/iu.test(line)) error.executionFault = "SBF_ACCESS_VIOLATION";
+          else if (/memory allocation failed|out of memory/iu.test(line)) error.executionFault = "SBF_HEAP_EXHAUSTED";
+          else if (/exceeded CUs meter|exceeded maximum number of instructions|ComputationalBudgetExceeded/iu.test(line)) error.executionFault = "SBF_COMPUTE_BUDGET_EXCEEDED";
+        }
+      }
+      if (Array.isArray(failure) && failure.length === 2 && Number.isSafeInteger(failure[0])) {
+        const detail = failure[1];
+        if (Number.isSafeInteger(detail?.Custom)) {
+          error.instructionFailure = { index: failure[0], customCode: detail.Custom };
+        } else if (INSTRUCTION_FAILURE_REASONS.has(detail)) {
+          error.instructionFailure = { index: failure[0], reason: detail };
+        }
+      }
+      throw error;
     }
     return envelope.result;
   }
@@ -750,6 +798,7 @@ function normalizePreparedTransactionBase64(value) {
     throw new Error("SolanaPreparedTransactionBase64Invalid");
   }
   const decoded = Buffer.from(value, "base64");
+  if (decoded.length > 1232) throw new Error("SolanaTransactionPacketLimitExceeded");
   if (decoded.length === 0 || decoded.toString("base64") !== value) {
     throw new Error("SolanaPreparedTransactionBase64Invalid");
   }

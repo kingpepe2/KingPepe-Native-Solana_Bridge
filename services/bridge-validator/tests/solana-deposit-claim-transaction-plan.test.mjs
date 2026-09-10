@@ -5,9 +5,9 @@ import { test } from "node:test";
 import {
   base58Decode,
   base58Encode,
-  buildLocalnetSolanaDepositClaimBundleTransactionPlan,
+  buildLocalnetSolanaDepositReceiptTransactionPlan,
   buildLocalnetSolanaDepositClaimTransactionPlan,
-  prepareSignedLocalnetSolanaDepositClaimBundleTransaction,
+  prepareSignedLocalnetSolanaDepositReceiptTransaction,
   prepareSignedLocalnetSolanaDepositClaimTransaction,
   shortvecEncode,
 } from "../solana-deposit-claim-transaction-plan.mjs";
@@ -214,9 +214,11 @@ test("deposit claim transaction plan builds exact localnet instruction data and 
       ["tokenProgram", false, false],
       ["transceiverProgram", false, false],
       ["managerProgram", false, false],
+      ["systemProgram", false, false],
+      ["computeBudgetProgram", false, false],
     ],
   );
-  assert.deepEqual(plan.instruction.accountIndexes, [1, 2, 5, 3, 4, 6, 7, 8]);
+  assert.deepEqual(plan.instruction.accountIndexes, [1, 2, 5, 3, 4, 6, 7, 8, 0, 10]);
   assert.equal(plan.instruction.programIdIndex, 9);
 
   const instructionData = Buffer.from(plan.instruction.dataBase64, "base64");
@@ -225,7 +227,7 @@ test("deposit claim transaction plan builds exact localnet instruction data and 
   assert.equal(bytesToHex(instructionData.subarray(1)), config.encodedMessageHex);
 
   const messageBytes = Buffer.from(plan.messageBase64, "base64");
-  assert.deepEqual([...messageBytes.subarray(0, 3)], [1, 0, 5]);
+  assert.deepEqual([...messageBytes.subarray(0, 3)], [1, 0, 7]);
   assert.match(plan.messageFingerprintHex, /^[0-9a-f]{64}$/u);
   assert.equal(plan.preparedTransactionBase64, undefined);
 });
@@ -249,6 +251,7 @@ test("signed deposit claim transaction uses injected fee-payer signer and verifi
 
   const transactionBytes = Buffer.from(prepared.preparedTransactionBase64, "base64");
   assert.equal(transactionBytes[0], 1);
+  assert.ok(transactionBytes.length <= 1232);
   const signature = transactionBytes.subarray(1, 65);
   const messageBytes = transactionBytes.subarray(65);
   assert.deepEqual(messageBytes, Buffer.from(prepared.messageBase64, "base64"));
@@ -256,33 +259,27 @@ test("signed deposit claim transaction uses injected fee-payer signer and verifi
   assert.equal(JSON.stringify(prepared).includes("secret"), false);
 });
 
-test("bundled localnet deposit claim plan includes attestation, transceiver receipt, and bridge claim instructions", () => {
+test("receipt transaction references one canonical message and fits the Solana packet limit", () => {
   const { config } = fixture();
   const attestations = createAttestations(config);
-  const plan = buildLocalnetSolanaDepositClaimBundleTransactionPlan({
+  const plan = buildLocalnetSolanaDepositReceiptTransactionPlan({
     ...config,
     attestations,
   });
 
-  assert.equal(plan.bundle, "ED25519_ATTESTATIONS_TRANSCEIVER_RECEIPT_BRIDGE_CLAIM");
+  assert.equal(plan.bundle, "ED25519_ATTESTATIONS_TRANSCEIVER_RECEIPT");
   assert.equal(plan.instructions.length, 4);
   assert.deepEqual(
     plan.accounts.map((account) => [account.role, account.isSigner, account.isWritable]),
     [
       ["feePayer", true, true],
       ["verifiedReceipt", false, true],
-      ["bridgeState", false, true],
-      ["depositClaim", false, true],
-      ["mint", false, true],
-      ["recipientTokenAccount", false, true],
       ["transceiverConfig", false, false],
       ["instructionsSysvar", false, false],
-      ["mintAuthorityPda", false, false],
-      ["tokenProgram", false, false],
       ["systemProgram", false, false],
       ["ed25519Program", false, false],
       ["transceiverProgram", false, false],
-      ["managerProgram", false, false],
+      ["computeBudgetProgram", false, false],
     ],
   );
 
@@ -292,15 +289,14 @@ test("bundled localnet deposit claim plan includes attestation, transceiver rece
       "ed25519Attestation1",
       "ed25519Attestation2",
       "transceiverVerifyMessageFromEd25519",
-      "bridgeAcceptDepositClaim",
+      "localnetComputeUnitLimit",
     ],
   );
   assert.deepEqual(
     plan.instructions.map((instruction) => instruction.programIdIndex),
-    [11, 11, 12, 13],
+    [5, 5, 6, 7],
   );
-  assert.deepEqual(plan.instructions[2].accountIndexes, [6, 1, 7, 0, 10]);
-  assert.deepEqual(plan.instructions[3].accountIndexes, [2, 3, 1, 4, 5, 8, 9, 12, 0, 10]);
+  assert.deepEqual(plan.instructions[2].accountIndexes, [2, 1, 3, 0, 4]);
 
   for (let index = 0; index < 2; index += 1) {
     const verifierData = Buffer.from(plan.instructions[index].dataBase64, "base64");
@@ -310,12 +306,14 @@ test("bundled localnet deposit claim plan includes attestation, transceiver rece
     assert.equal(verifierData.readUInt16LE(4), index);
     assert.equal(verifierData.readUInt16LE(6), 80);
     assert.equal(verifierData.readUInt16LE(8), index);
-    assert.equal(verifierData.readUInt16LE(10), 112);
+    assert.equal(verifierData.readUInt16LE(10), 1);
     assert.equal(verifierData.readUInt16LE(12), 514);
-    assert.equal(verifierData.readUInt16LE(14), index);
+    assert.equal(verifierData.readUInt16LE(14), 2);
     assert.equal(bytesToHex(verifierData.subarray(16, 80)), attestations[index].signatureHex);
     assert.equal(bytesToHex(verifierData.subarray(80, 112)), attestations[index].attesterPublicKeyHex);
-    assert.equal(bytesToHex(verifierData.subarray(112)), config.encodedMessageHex);
+    assert.equal(verifierData.length, 112);
+    const shared = Buffer.from(plan.instructions[2].dataBase64, "base64").subarray(1, 515);
+    assert.equal(ed25519.verify(verifierData.subarray(16, 80), shared, verifierData.subarray(80, 112)), true);
   }
 
   const transceiverData = Buffer.from(plan.instructions[2].dataBase64, "base64");
@@ -324,20 +322,20 @@ test("bundled localnet deposit claim plan includes attestation, transceiver rece
   assert.equal(transceiverData.readUInt16LE(515), 0);
   assert.equal(transceiverData.readUInt16LE(517), 1);
 
-  const bridgeData = Buffer.from(plan.instructions[3].dataBase64, "base64");
-  assert.equal(bridgeData[0], 2);
-  assert.equal(bytesToHex(bridgeData.subarray(1)), config.encodedMessageHex);
-  assert.equal(plan.instruction.role, "bridgeAcceptDepositClaim");
+  assert.equal(plan.instruction.role, "transceiverVerifyMessageFromEd25519");
 
   const messageBytes = Buffer.from(plan.messageBase64, "base64");
-  assert.deepEqual([...messageBytes.subarray(0, 3)], [1, 0, 8]);
+  assert.deepEqual([...messageBytes.subarray(0, 3)], [1, 0, 6]);
+  const budgetData = Buffer.from(plan.instructions[3].dataBase64, "base64");
+  assert.equal(budgetData[0], 2);
+  assert.equal(budgetData.readUInt32LE(1), 600_000);
   assert.match(plan.messageFingerprintHex, /^[0-9a-f]{64}$/u);
   assert.equal(plan.preparedTransactionBase64, undefined);
 });
 
-test("signed bundled localnet claim transaction verifies fee-payer signature independently", async () => {
+test("signed localnet receipt transaction verifies fee-payer signature independently", async () => {
   const { config, feePayer } = fixture();
-  const prepared = await prepareSignedLocalnetSolanaDepositClaimBundleTransaction({
+  const prepared = await prepareSignedLocalnetSolanaDepositReceiptTransaction({
     ...config,
     attestations: createAttestations(config),
     feePayerSigner: {
@@ -348,12 +346,13 @@ test("signed bundled localnet claim transaction verifies fee-payer signature ind
     },
   });
 
-  assert.equal(prepared.bundle, "ED25519_ATTESTATIONS_TRANSCEIVER_RECEIPT_BRIDGE_CLAIM");
+  assert.equal(prepared.bundle, "ED25519_ATTESTATIONS_TRANSCEIVER_RECEIPT");
   assert.match(prepared.preparedTransactionBase64, /^[A-Za-z0-9+/]+={0,2}$/u);
   assert.match(prepared.preparedTransactionFingerprintHex, /^[0-9a-f]{64}$/u);
   assert.equal(prepared.signatures.length, 1);
   const transactionBytes = Buffer.from(prepared.preparedTransactionBase64, "base64");
   assert.equal(transactionBytes[0], 1);
+  assert.ok(transactionBytes.length <= 1232);
   const signature = transactionBytes.subarray(1, 65);
   const messageBytes = transactionBytes.subarray(65);
   assert.deepEqual(messageBytes, Buffer.from(prepared.messageBase64, "base64"));
@@ -361,12 +360,12 @@ test("signed bundled localnet claim transaction verifies fee-payer signature ind
   assert.equal(JSON.stringify(prepared).includes("secret"), false);
 });
 
-test("bundled deposit claim plan rejects missing, duplicate, or mutated attestations", () => {
+test("receipt plan rejects missing, duplicate, or mutated attestations", () => {
   const { config } = fixture();
   const attestations = createAttestations(config);
   assert.throws(
     () =>
-      buildLocalnetSolanaDepositClaimBundleTransactionPlan({
+      buildLocalnetSolanaDepositReceiptTransactionPlan({
         ...config,
         attestations: [attestations[0]],
       }),
@@ -374,7 +373,7 @@ test("bundled deposit claim plan rejects missing, duplicate, or mutated attestat
   );
   assert.throws(
     () =>
-      buildLocalnetSolanaDepositClaimBundleTransactionPlan({
+      buildLocalnetSolanaDepositReceiptTransactionPlan({
         ...config,
         attestations: [attestations[0], attestations[0]],
       }),
@@ -382,7 +381,7 @@ test("bundled deposit claim plan rejects missing, duplicate, or mutated attestat
   );
   assert.throws(
     () =>
-      buildLocalnetSolanaDepositClaimBundleTransactionPlan({
+      buildLocalnetSolanaDepositReceiptTransactionPlan({
         ...config,
         attestations: [
           attestations[0],

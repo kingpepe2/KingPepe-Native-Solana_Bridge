@@ -1,6 +1,7 @@
 use kingpepe_bridge::{
     derive_mint_authority_pda, BridgeConfig, BridgeEnvironment, BridgeProgram, MintBinding,
 };
+use spl_token_interface as spl_token;
 
 fn h(byte: u8) -> [u8; 32] {
     [byte; 32]

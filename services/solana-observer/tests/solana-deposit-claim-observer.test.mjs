@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { once } from "node:events";
 import { createServer } from "node:http";
 import { test } from "node:test";
+import { base58Encode, findProgramAddress } from "../../bridge-validator/solana-deposit-claim-transaction-plan.mjs";
 import {
   SolanaDepositClaimObserver,
   SolanaDepositClaimRpcClient,
@@ -11,8 +12,8 @@ import {
   normalizeSolanaDepositClaimRpcEndpoint,
 } from "../solana-deposit-claim-observer.mjs";
 
-const CLAIM_ACCOUNT_BASE58 = "A".repeat(44);
-const MINT_ACCOUNT_BASE58 = "B".repeat(44);
+const CLAIM_ACCOUNT_BASE58 = findProgramAddress([Buffer.from("kingpepe-deposit-claim"), Buffer.from(h("operation-id"), "hex")], Buffer.from(h("bridge-manager-program"), "hex")).base58;
+const MINT_ACCOUNT_BASE58 = base58Encode(Buffer.from(h("kpepe-spl-mint"), "hex"));
 
 function h(label) {
   return createHash("sha256").update(label).digest("hex");
@@ -62,6 +63,10 @@ function depositClaimBytes({
 
 function mintBytes({ freezeAuthorityHex = null } = {}) {
   const out = Buffer.alloc(82);
+  out.writeUInt32LE(1, 0);
+  const authority = findProgramAddress([Buffer.from("kingpepe-mint-authority"), Buffer.from(config().mintHex, "hex")], Buffer.from(config().managerProgramIdHex, "hex"));
+  Buffer.from(authority.hex, "hex").copy(out, 4);
+  out.writeBigUInt64LE(250000000n, 36);
   out.writeUInt8(8, 44);
   out.writeUInt8(1, 45);
   if (freezeAuthorityHex === null) {
@@ -75,7 +80,10 @@ function mintBytes({ freezeAuthorityHex = null } = {}) {
 
 function accountInfo(bytes) {
   return {
+    context: { slot: "90" },
     value: {
+      executable: false,
+      owner: bytes.length === 211 ? base58Encode(Buffer.from(config().managerProgramIdHex, "hex")) : "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
       data: [Buffer.from(bytes).toString("base64"), "base64"],
     },
   };
@@ -119,7 +127,8 @@ test("localnet deposit claim observer emits submitter-compatible finalized obser
     solanaSignature: signature(),
   });
 
-  assert.equal(observation.trust, "LOCAL_VALIDATION");
+  assert.equal(observation.trust, "RPC_OBSERVATION");
+  assert.equal(observation.mint.supplyAtomic, "250000000");
   assert.equal(observation.cluster, "localnet");
   assert.equal(observation.commitment, "finalized");
   assert.equal(observation.slot, "88");
@@ -233,6 +242,35 @@ test("deposit claim observer fails closed for unavailable transaction or non-loc
       }),
     /LocalnetOnly/,
   );
+});
+
+test("observer rejects account-program substitution, stale snapshots, and changed Mint authority", async () => {
+  const request = { operationIdHex: h("operation-id"), messageDigestHex: h("message-digest"), solanaSignature: signature() };
+  const mutations = [
+    rpc => { rpc.accounts.get(CLAIM_ACCOUNT_BASE58).value.owner = MINT_ACCOUNT_BASE58; },
+    rpc => { rpc.accounts.get(CLAIM_ACCOUNT_BASE58).value.executable = true; },
+    rpc => { rpc.accounts.get(CLAIM_ACCOUNT_BASE58).context.slot = "87"; },
+    rpc => { rpc.accounts.get(MINT_ACCOUNT_BASE58).value.owner = CLAIM_ACCOUNT_BASE58; },
+    rpc => { const bytes = mintBytes(); bytes[4] ^= 1; rpc.accounts.set(MINT_ACCOUNT_BASE58, accountInfo(bytes)); },
+    rpc => { const bytes = mintBytes(); bytes[44] = 9; rpc.accounts.set(MINT_ACCOUNT_BASE58, accountInfo(bytes)); },
+  ];
+  for (const mutate of mutations) {
+    const rpc = new FakeDepositClaimRpcClient();
+    mutate(rpc);
+    const observer = new SolanaDepositClaimObserver({ config: config(), rpcClient: rpc });
+    await assert.rejects(() => observer.observeFinalizedDepositClaim(request));
+  }
+  const observer = new SolanaDepositClaimObserver({ config: config(), rpcClient: new FakeDepositClaimRpcClient() });
+  await assert.rejects(() => observer.observeFinalizedDepositClaim({ ...request, depositClaimAccountBase58: MINT_ACCOUNT_BASE58 }), /ADDRESS_MISMATCH/);
+});
+
+test("Mint decoding retains u64 precision and rejects extra data or uninitialized state", () => {
+  const bytes = mintBytes();
+  bytes.writeBigUInt64LE(0xffff_ffff_ffff_ffffn, 36);
+  assert.equal(decodeSplMintAccountBytes(bytes).supplyAtomic, "18446744073709551615");
+  assert.throws(() => decodeSplMintAccountBytes(Buffer.concat([bytes, Buffer.from([0])])), /InvalidLength/);
+  bytes[45] = 0;
+  assert.throws(() => decodeSplMintAccountBytes(bytes), /InvalidInitialization/);
 });
 
 test("deposit claim RPC client is loopback-only and method-restricted", async () => {

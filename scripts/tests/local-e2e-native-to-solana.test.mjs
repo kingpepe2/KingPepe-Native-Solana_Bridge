@@ -961,6 +961,7 @@ async function fakeSolanaDepositClaim({ flowConfig, localSolanaSetupContext, dep
     messageDigestHex: depositClaimRequest.messageDigestHex,
     solanaSignature: fakeSolanaSignature("local-e2e-solana-deposit-claim"),
     mintedAmountAtomic: flowConfig.amountAtomic,
+    mintSupplyAtomic: flowConfig.amountAtomic,
     slot: "88",
     sourceBoundary: "LOCAL_VALIDATION",
   };
@@ -1068,9 +1069,10 @@ function defaultOutput(step) {
   if (step === "CHECK_KINGPEPED_VERSION" || step === "CHECK_KINGPEPE_CLI_VERSION") {
     return "KingPepe Core version v31.1.0";
   }
-  if (["CHECK_SOLANA_VERSION", "CHECK_SOLANA_TEST_VALIDATOR_VERSION", "CHECK_CARGO_BUILD_SBF_VERSION"].includes(step)) {
-    return "Solana 1.18.26";
+  if (["CHECK_SOLANA_VERSION", "CHECK_SOLANA_TEST_VALIDATOR_VERSION"].includes(step)) {
+    return "Solana 4.2.2";
   }
+  if (step === "CHECK_CARGO_BUILD_SBF_VERSION") return "solana-cargo-build-sbf 4.1.0";
   if (step === "LOCAL_E2E_GET_USER_MINING_ADDRESS") return "bcrt1qkingpepeminingaddress";
   if (step === "LOCAL_E2E_SEND_NATIVE_DEPOSIT") return DEPOSIT_TXID;
   if (step === "LOCAL_E2E_FUND_RESERVE_SWEEP_FEE_INPUT") return FEE_FUNDING_TXID;

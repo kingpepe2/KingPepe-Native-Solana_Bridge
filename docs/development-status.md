@@ -1,40 +1,60 @@
 # KingPepe Native - Solana Bridge Development Status
 
-## Current Phase 08 local build evidence (2026-09-10)
+## Current Phase 08 integration evidence (2026-09-10)
 
-This increment replaces the missing-tool blocker with actual WSL build and
-partial daemon-backed execution evidence. Publication/CI for this increment are
-pending in this source snapshot; the workflow records the tested source SHA.
-The preceding evidence commit `85d988ea176708e45129e4a48a488384376dd147` passed
-[CI](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34380671767).
+Previous source `cb7b44544f8c3935ddc8065eee5d67ee220afee2`, message
+`fix(phase-08): isolate pinned SBF builds and validate real native sweep`,
+was pushed to PRIVATE origin/main and passed all four
+[CI jobs](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34432312954).
+This integration increment awaits its own commit/push/CI in this snapshot.
+CI emits the tested GITHUB_SHA; no self-referential commit SHA is embedded.
 
-- Built Native daemon and CLI from verified source commit
-  `3f2621820ffefae59cbe48b350f5f8f6ec8a6da5`; no dependency on the legacy directory.
-- Compiled both programs with Solana 1.18.26 / platform-tools v1.41 in WSL.
-  SBF output and generated keypairs are outside the checkout. The transceiver
-  binary SHA-256 was `502201f082480f826c204aaf3fa8027b220ab1127613088ed7e2034de559d82f`;
-  manager was `9c0ec1d0978319772eb991a7767e3a6bcd7b5edfeeb790bed7225b4ff677a1ba`.
-  These are local test builds, not approved production binaries.
-- Added pinned Node CI setup, a Linux SBF build job and a full-history Gitleaks job.
-- Local validation: 121 Node tests plus two protocol vectors passed on Windows
-  (Node 24.18.0) and WSL (pinned Node 22.23.2). WSL Rust: 52 Solana-workspace
-  tests and 22 Native-crate tests passed, zero failures or skips. The measured
-  Solana total is 52; previous status entries reporting 53 must not be used as
-  the current test total.
-- Gitleaks 8.24.3: 137 existing commits and the working diff passed. npm audit:
-  zero reported vulnerabilities. Provenance covers every tracked file and both
-  new files; no upstream source was copied into Git.
-- The first real local run reached the funding-wallet step and failed. Corrected
-  local coinbase maturity, fallback fee and transaction-index prerequisites.
-  A subsequent run executed a real Native deposit, real A+B FROST Taproot reserve
-  sweep, Native broadcast and finalized reserve observation without a per-transfer
-  approval. It reached Solana setup, then returned
-  `LOCALNET_SOLANA_SIGNATURE_WAITING_FOR_FINALITY`.
-- Full Native-to-Solana E2E remains INCOMPLETE. Next: bounded, idempotent Solana
-  finality waiting, actual mint/claim execution, and reconciliation. Phase 09 has
-  not started. Production signing, broadcasting and Mainnet remain disabled.
+- Bounded same-signature setup/receipt/claim finality waiting is implemented.
+- The invalid oversized bundle was removed. A packet-sized receipt transaction
+  shares the exact canonical bytes with two Ed25519 verification instructions;
+  a separate finalized-receipt claim/mint transaction preserves replay identity.
+  Both fit 1232 bytes; compute budget 600000 units is LOCALNET-only.
+- Transactions are persisted before broadcast. Retry uses immutable request
+  snapshots and known signatures. Lost-response/reopened-journal tests avoid
+  a second receipt broadcast; persisted integrity HARD_STOP does not clear.
+- Actual entrypoints enforce pause, hard-stop, local activation/environment,
+  recipient binding and expiry. Test CPI bypass is cfg(test)-only.
+- The observer checks account program ownership, PDA, freshness, Mint layout,
+  exact supply, decimals, PDA mint authority and no freeze authority. It reports
+  RPC_OBSERVATION, not independent chain validation.
+- A real Native REGTEST + Agave 4.2.2 local-validator flow completed: Native user
+  payment, node-accepted FROST A+B Taproot sweep, reserve finality, separate
+  Ed25519 attestations, receipt, finalized mint, and exact reconciliation.
+  Finalized reserve and actual Mint supply both measured 100000000 atomic units.
+  There was no per-transfer KingPepe Team approval.
+- Solana host Rust 1.89.0, solana-program 3.0.0, SPL Token interface 2.0.0,
+  Agave 4.2.2 / builder 4.1.0 / platform-tools v1.54 replace the affected 1.18
+  graph. Traditional SPL Token and the economic ABI are unchanged.
+- cargo-audit 0.22.2: five lockfiles, zero vulnerabilities, one unmaintained
+  bincode 1.3.3 warning (RUSTSEC-2025-0141). No ignored advisory. npm audit: zero.
+  License metadata checks cover five Cargo graphs and two npm dependencies;
+  seven original crates are unpublished and reference the proprietary LICENSE.
+  This is not an external legal/source audit or distributable-artifact audit.
+- CI now includes the actual daemon-backed deposit flow and Rust advisory/license
+  checks. Runtime output, keys and workspace artifacts are not uploaded.
+- Stale AGENTS/readiness summaries were consolidated; historical evidence below
+  is not proof of this newer source.
 
-## Current phase
+Measured tests: 132 Node tests + two vectors on Windows and WSL; 56 Solana Rust
+tests + 22 Native supporting-crate tests in WSL. Formatting/clippy passed.
+Zero failures/skips in these measured suites; two SBF builds and real deposit
+E2E passed. Native Windows SBF, Windows service ACL/protected storage, full
+failure matrix, withdrawal E2E, Devnet and fresh-clone reproducibility: NOT_RUN.
+
+Phase 08 is still incomplete. Next: exact-SHA CI, then temporary-deposit
+recovery/race coverage, initialization authorization, complete Native evidence
+wiring and real-daemon failure/replay/restart tests. The local deposit uses an
+isolated FROST-controlled P2TR test intent; this run does not prove user CSV
+recovery. File-journal tests do not prove production fsync, authenticated
+storage, fencing or rollback guarantees. Production observers remain BLOCKED.
+Phase 09 has not started; productionReady=false; Mainnet activation DISABLED.
+
+## Historical stage records (superseded where noted above)
 
 - `PHASE 08` - Automatic Native to Solana local end-to-end
 - Branch: `main`
@@ -68,13 +88,13 @@ The preceding evidence commit `85d988ea176708e45129e4a48a488384376dd147` passed
 - CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34276946620`
 - CI status: PASS
 
-## Current blockers
+## Historical blockers (not current)
 
 - Phase 08 is blocked because the local environment does not provide `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, or `anchor`.
 - Current Solana crates have deterministic non-production localnet Program IDs, economic ABI decoding, source-level account execution, SPL Token CPI construction, a localnet-only deposit-claim observer, a bundled localnet transaction-plan builder that includes Ed25519 attestations, transceiver receipt creation, and bridge claim/mint, plus a localnet adapter that connects signed bundled planning to durable submission. Real local-validator execution remains untested because required localnet executables are missing.
 - Full Native FROST signature aggregation, witness broadcast, Native node acceptance, local end-to-end flows, Devnet, production configuration, external review, and activation remain later phases.
 
-## Latest local validation
+## Historical local validation
 
 - `python .github/scripts/guardrails.py`: PASS
 - `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL

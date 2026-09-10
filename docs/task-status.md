@@ -1,13 +1,24 @@
 # KingPepe Native - Solana Bridge Task Status
 
-Current handoff (2026-09-10), Phase 08: isolated pinned Native tools built;
-both Solana programs compiled to SBF and loaded by a real local validator.
-The Native node accepted/finalized the A+B FROST reserve sweep. Full E2E still
-waits for Solana setup finality. This source increment awaits commit/push/CI;
-use the source-SHA-bound workflow result, not this text, as publication evidence.
-Local results: 121 Node tests + 2 vectors on Windows and WSL; 52 Solana Rust tests
-and 22 Native Rust tests in WSL; zero failures/skips in those suites. Full E2E:
-INCOMPLETE. See `docs/development-status.md` for exact scope and the next step.
+Current handoff (2026-09-10), Phase 08: real Native-to-Solana local happy path
+passes with Agave 4.2.2 and node-accepted FROST A+B. Finalized Native reserve
+and actual SPL Mint supply both equal 100000000 atomic units. Two packet-sized
+receipt/claim transactions replace the invalid oversized bundle. Mainnet stays
+disabled. This integration increment awaits its own commit/push/CI.
+
+Preceding source `cb7b44544f8c3935ddc8065eee5d67ee220afee2`, message
+`fix(phase-08): isolate pinned SBF builds and validate real native sweep`, was
+pushed to PRIVATE origin/main; all four jobs passed at
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34432312954.
+
+Latest local suites: 132 Node tests + 2 vectors on Windows and WSL; 56 Solana
+Rust tests + 22 Native supporting-crate tests in WSL. No failures/skips in these
+suites. All five Rust dependency audits report zero vulnerabilities and one
+unmaintained dependency warning in the Solana graph; npm reports zero.
+See `docs/development-status.md` for scope, remaining Phase 08 recovery/evidence/
+initialization/failure-test gaps and the next step. Phase 09 has not started.
+
+The records below are historical; their test totals and blockers are not current.
 
 - 2026-09-07: Phase 01 completed and published:
   - Privacy status verified; repository `kingpepe2/KingPepe-Native-Solana_Bridge` is PRIVATE.

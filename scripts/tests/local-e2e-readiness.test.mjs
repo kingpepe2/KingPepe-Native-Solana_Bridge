@@ -80,7 +80,7 @@ test("fake complete toolchain and deployable fixture reports READY", () => {
           'crate-type = ["cdylib", "lib"]',
           "",
           "[dependencies]",
-          'solana-program = "1.18.26"',
+          'solana-program = "=3.0.0"',
           "",
         ].join("\n"),
       );

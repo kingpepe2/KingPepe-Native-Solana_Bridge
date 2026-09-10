@@ -1,6 +1,32 @@
 # Solana Program Boundary
 
-## Phase 05 implementation
+## Current Phase 08 update
+
+Both direct Rust programs compile to SBF and execute the real local deposit
+path. The historical Phase 05 model description below is not a complete
+on-chain security certification. Initialization authorization needs further
+review before Phase 08 security completion.
+
+The transceiver requires the actual current instruction from the real
+Instructions sysvar. Two preceding Ed25519 instructions use strict self-indexed
+signature/key fields and cross-reference the same canonical bytes in that
+transceiver instruction. Wrong indexes, offsets, current program, bytes or
+attester identities fail. Receipt creation and later claim/mint are separate
+packet-sized transactions; a persistent claim PDA prevents replay.
+
+Actual bridge deposit/withdrawal paths enforce local activation, pause/hard-stop
+and environment gates. Deposits enforce Clock validity and exact recipient
+token-account binding. Production activation remains unreachable. Tests may
+bypass token CPI only in cfg(test); the SBF entrypoint always performs the CPI.
+Solana-program 3.0.0 and SPL Token interface 2.0.0 retain traditional SPL Token.
+No Token-2022 behavior or alternate minter is introduced.
+
+The local deposit run validates bridge PDA Mint authority, zero initial supply,
+freeze authority None, and the finalized 100000000 atomic-unit Mint supply.
+Withdrawal daemon E2E, complete security cases and production deployment are
+not certified by this run. No Anchor-generated IDL is claimed.
+
+## Historical Phase 05 implementation
 
 Phase 05 replaces the placeholder bridge and transceiver crates with Rust
 program-boundary logic:
@@ -31,7 +57,7 @@ program-boundary logic:
   - Keeps burned withdrawals as unpaid liabilities until later settlement.
   - Keeps Mainnet activation disabled.
 
-## Boundary limits
+## Historical Phase 05 boundary limits
 
 This phase is not a production SBF/Anchor deployment:
 

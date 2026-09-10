@@ -1,3 +1,4 @@
+import { setTimeout as delay } from "node:timers/promises";
 import {
   bytesToHex,
   decodeCanonicalBridgeMessage,
@@ -6,9 +7,10 @@ import {
   normalizeHex,
 } from "../../shared/protocol/canonical-message.mjs";
 import { DEPOSIT_STATES } from "./automatic-deposit-pipeline.mjs";
-import { SolanaDepositClaimSubmitter } from "./solana-deposit-claim-submitter.mjs";
+import { InMemorySolanaDepositClaimJournal, SolanaDepositClaimSubmitter } from "./solana-deposit-claim-submitter.mjs";
 import {
-  prepareSignedLocalnetSolanaDepositClaimBundleTransaction,
+  base58Encode,
+  prepareSignedLocalnetSolanaDepositReceiptTransaction,
   prepareSignedLocalnetSolanaDepositClaimTransaction,
 } from "./solana-deposit-claim-transaction-plan.mjs";
 
@@ -24,64 +26,162 @@ export class LocalnetSolanaDepositClaimBridge {
   #feePayerSigner;
   #blockhashSource;
   #submitter;
+  #rpcClient;
+  #journal;
+  #receiptJournal;
 
   constructor(options) {
     const value = requireObject(options, "options");
     this.#config = normalizeLocalnetBridgeConfig(value.config);
     this.#feePayerSigner = requireObject(value.feePayerSigner, "feePayerSigner");
     this.#blockhashSource = value.blockhashSource ?? value.rpcClient;
+    this.#rpcClient = value.rpcClient;
+    this.#journal = value.journal ?? new InMemorySolanaDepositClaimJournal();
+    this.#receiptJournal = value.receiptJournal ?? new InMemorySolanaDepositClaimJournal();
+    if (this.#receiptJournal === this.#journal) throw new Error("LocalnetSolanaSeparateStageJournalsRequired");
     this.#submitter =
       value.submitter ??
       new SolanaDepositClaimSubmitter({
         config: submitterConfig(this.#config),
         rpcClient: requireObject(value.rpcClient, "rpcClient"),
         claimObserver: value.claimObserver,
-        journal: value.journal,
+        journal: this.#journal,
       });
   }
 
   async submitDepositClaim(request) {
-    const normalized = normalizeDepositClaimBridgeRequest(this.#config, request);
-    let latestBlockhash;
+    // Snapshot before the first await: callers cannot mutate authorization data
+    // while blockhash, receipt, or finalized account observations are in flight.
+    const normalized = normalizeDepositClaimBridgeRequest(this.#config, structuredClone(request));
+    let receiptRequest;
     try {
-      latestBlockhash = await resolveLatestBlockhash(this.#blockhashSource, normalized);
-    } catch {
+      receiptRequest = await this.#prepare(normalized, this.#receiptJournal, true);
+    } catch (error) {
+      if (error.message !== "SolanaLatestBlockhashUnavailable") throw error;
       return bridgeDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "SOLANA_LATEST_BLOCKHASH_UNAVAILABLE", normalized);
     }
+    const receiptResult = await this.#submitReceipt(receiptRequest);
+    if (receiptResult.state !== DEPOSIT_STATES.COMPLETED) return receiptResult;
 
-    const signedPlan = await prepareSignedLocalnetSolanaDepositClaimBundleTransaction({
-      environment: this.#config.environment,
-      cluster: this.#config.cluster,
-      managerProgramIdHex: this.#config.managerProgramIdHex,
-      transceiverProgramIdHex: this.#config.transceiverProgramIdHex,
-      mintHex: this.#config.mintHex,
-      tokenProgramIdHex: this.#config.tokenProgramIdHex,
-      feePayerBase58: this.#config.feePayerBase58,
-      feePayerHex: this.#config.feePayerHex,
-      recipientTokenAccountHex: normalized.solanaRecipientHex,
+    let claimRequest;
+    try {
+      claimRequest = await this.#prepare(normalized, this.#journal, false);
+    } catch (error) {
+      if (error.message !== "SolanaLatestBlockhashUnavailable") throw error;
+      return bridgeDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "SOLANA_LATEST_BLOCKHASH_UNAVAILABLE", normalized);
+    }
+    return this.#poll(
+      () => this.#submitter.submitDepositClaim(claimRequest),
+      "SOLANA_MINT_WAITING_FOR_FINALITY",
+    );
+  }
+
+  async #prepare(request, journal, receiptOnly) {
+    const existing = journal.get(request.operationIdHex);
+    if (existing !== undefined) {
+      for (const field of ["operationIdHex", "messageDigestHex", "encodedMessageHex", "amountAtomic", "solanaRecipientHex"]) {
+        if (existing.prepared[field] !== request[field]) throw new Error("LocalnetSolanaPreparedOperationConflict");
+      }
+      return Object.freeze({ ...request, ...existing.prepared });
+    }
+    let latestBlockhash;
+    try {
+      latestBlockhash = await resolveLatestBlockhash(this.#blockhashSource, request);
+    } catch {
+      throw new Error("SolanaLatestBlockhashUnavailable");
+    }
+    const prepare = receiptOnly
+      ? prepareSignedLocalnetSolanaDepositReceiptTransaction
+      : prepareSignedLocalnetSolanaDepositClaimTransaction;
+    const plan = await prepare({
+      ...this.#config,
+      recipientTokenAccountHex: request.solanaRecipientHex,
       recentBlockhashBase58: latestBlockhash.blockhash,
       lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-      encodedMessageHex: normalized.encodedMessageHex,
-      attestations: normalized.attestations,
+      encodedMessageHex: request.encodedMessageHex,
+      attestations: request.attestations,
       feePayerSigner: this.#feePayerSigner,
     });
-    assertPlanMatchesRequest(signedPlan, normalized);
-
-    return this.#submitter.submitDepositClaim({
+    assertPlanMatchesRequest(plan, request);
+    const prepared = {
       ...request,
-      operationIdHex: normalized.operationIdHex,
-      encodedMessageHex: normalized.encodedMessageHex,
-      messageDigestHex: normalized.messageDigestHex,
-      amountAtomic: normalized.amountAtomic,
-      solanaRecipientHex: normalized.solanaRecipientHex,
-      preparedTransactionBase64: signedPlan.preparedTransactionBase64,
-      recentBlockhash: signedPlan.recentBlockhashBase58,
-      lastValidBlockHeight: signedPlan.lastValidBlockHeight,
-      depositClaimAccountBase58: signedPlan.pdas.depositClaim.addressBase58,
-      mintAccountBase58: signedPlan.mintBase58,
-      maxRetries: normalized.maxRetries,
-      transactionPlan: publicTransactionPlan(signedPlan),
-    });
+      preparedTransactionBase64: plan.preparedTransactionBase64,
+      preparedTransactionFingerprintHex: plan.preparedTransactionFingerprintHex,
+      recentBlockhash: plan.recentBlockhashBase58,
+      lastValidBlockHeight: plan.lastValidBlockHeight,
+      depositClaimAccountBase58: plan.pdas.depositClaim.addressBase58,
+      mintAccountBase58: plan.mintBase58,
+    };
+    // Each stage has a distinct journal; both retain the economic operation ID.
+    journal.persistPrepared(prepared);
+    return Object.freeze(prepared);
+  }
+
+  async #submitReceipt(request) {
+    const existing = this.#receiptJournal.get(request.operationIdHex);
+    if ([DEPOSIT_STATES.COMPLETED, DEPOSIT_STATES.REJECTED, DEPOSIT_STATES.HARD_STOP].includes(existing.state)) {
+      return structuredClone(existing.result);
+    }
+    const bytes = Buffer.from(request.preparedTransactionBase64, "base64");
+    const signature = base58Encode(bytes.subarray(1, 65));
+    if (existing.submittedSignature !== undefined && existing.submittedSignature !== signature) {
+      throw new Error("LocalnetSolanaReceiptSignatureConflict");
+    }
+    let blockHeight;
+    let status;
+    try {
+      blockHeight = BigInt(await this.#rpcClient.getBlockHeight());
+      status = await this.#rpcClient.getSignatureStatus(signature);
+    } catch {
+      return bridgeDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "SOLANA_RECEIPT_STATUS_UNAVAILABLE", request);
+    }
+    if (status == null) {
+      if (blockHeight > BigInt(request.lastValidBlockHeight)) {
+        return bridgeDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "SOLANA_RECEIPT_OUTCOME_UNKNOWN_AFTER_BLOCKHASH_EXPIRY", request);
+      }
+      // Save the known signed transaction identity before exposing bytes to RPC.
+      this.#receiptJournal.recordSubmitted(request.operationIdHex, signature);
+      try {
+        await this.#rpcClient.sendTransaction(request.preparedTransactionBase64, {
+          encoding: "base64", maxRetries: request.maxRetries, skipPreflight: false,
+        });
+      } catch {
+        // A lost response is not proof of failure. Query this exact signature;
+        // a subsequent call may only rebroadcast these same persisted bytes.
+      }
+    }
+    return this.#poll(async () => {
+      let observed;
+      try {
+        observed = await this.#rpcClient.getSignatureStatus(signature);
+      } catch {
+        return bridgeDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "SOLANA_RECEIPT_STATUS_UNAVAILABLE", request);
+      }
+      if (observed != null && !Object.hasOwn(observed, "err")) {
+        return bridgeDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "SOLANA_RECEIPT_EXECUTION_STATUS_MISSING", request);
+      }
+      if (observed?.err !== null && observed?.err !== undefined) {
+        const result = bridgeDecision(DEPOSIT_STATES.REJECTED, "SOLANA_RECEIPT_TRANSACTION_FAILED", request);
+        this.#receiptJournal.recordTerminal(request.operationIdHex, result);
+        return result;
+      }
+      if (!observed || observed.confirmationStatus !== "finalized") {
+        return bridgeDecision(DEPOSIT_STATES.WAITING_FOR_FINALITY, "SOLANA_RECEIPT_WAITING_FOR_FINALITY", request);
+      }
+      const result = bridgeDecision(DEPOSIT_STATES.COMPLETED, "SOLANA_RECEIPT_FINALIZED", request);
+      this.#receiptJournal.recordCompleted(request.operationIdHex, result);
+      return result;
+    }, "SOLANA_RECEIPT_WAITING_FOR_FINALITY");
+  }
+
+  async #poll(evaluate, waitingReason) {
+    let result;
+    for (let attempt = 0; attempt < this.#config.finalityPollAttempts; attempt += 1) {
+      result = await evaluate();
+      if (result.reason !== waitingReason) return result;
+      if (attempt + 1 < this.#config.finalityPollAttempts) await delay(this.#config.finalityPollDelayMs);
+    }
+    return result;
   }
 }
 
@@ -104,12 +204,9 @@ export async function prepareLocalnetSolanaDepositClaimRequest(config, request, 
     encodedMessageHex: normalized.encodedMessageHex,
     feePayerSigner: requireObject(options.feePayerSigner, "feePayerSigner"),
   };
-  const signedPlan = Array.isArray(normalized.attestations)
-    ? await prepareSignedLocalnetSolanaDepositClaimBundleTransaction({
-      ...planConfig,
-      attestations: normalized.attestations,
-    })
-    : await prepareSignedLocalnetSolanaDepositClaimTransaction(planConfig);
+  // This builder submits only the manager claim. The on-chain transceiver
+  // receipt must already exist; its absence cannot be bypassed by this helper.
+  const signedPlan = await prepareSignedLocalnetSolanaDepositClaimTransaction(planConfig);
   assertPlanMatchesRequest(signedPlan, normalized);
   return Object.freeze({
     ...request,
@@ -149,6 +246,8 @@ function normalizeLocalnetBridgeConfig(config) {
     keyEpoch: checkedU32(value.keyEpoch, "keyEpoch"),
     acceptedObservationTrust: value.acceptedObservationTrust ?? ["LOCAL_VALIDATION"],
     maxRetries: checkedSmallInteger(value.maxRetries ?? 0, "maxRetries"),
+    finalityPollAttempts: checkedPollSetting(value.finalityPollAttempts ?? 120, 1, 240),
+    finalityPollDelayMs: checkedPollSetting(value.finalityPollDelayMs ?? 250, 0, 1000),
   });
 }
 
@@ -331,6 +430,13 @@ function normalizeBase58Like(value, label) {
 function checkedU32(value, label) {
   if (!Number.isInteger(value) || value < 0 || value > 0xffff_ffff) {
     throw new Error(`${label}:ExpectedU32`);
+  }
+  return value;
+}
+
+function checkedPollSetting(value, minimum, maximum) {
+  if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
+    throw new Error("LocalnetSolanaFinalityPollSettingInvalid");
   }
   return value;
 }

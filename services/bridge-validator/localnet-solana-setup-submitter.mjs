@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import {
   hexToBytes,
   isHash32Hex,
@@ -190,6 +191,16 @@ export function createLocalnetSolanaSetupSubmitter(options) {
 }
 
 async function finalizedSignatureStatusOrDependency(rpcClient, signature, request) {
+  let result;
+  for (let attempt = 0; attempt < request.finalityPollAttempts; attempt += 1) {
+    result = await signatureStatusDecision(rpcClient, signature, request);
+    if (result.reason !== "LOCALNET_SOLANA_SIGNATURE_WAITING_FOR_FINALITY") return result;
+    if (attempt + 1 < request.finalityPollAttempts) await delay(request.finalityPollDelayMs);
+  }
+  return result;
+}
+
+async function signatureStatusDecision(rpcClient, signature, request) {
   let status;
   try {
     status = await rpcClient.getSignatureStatus(signature);
@@ -363,6 +374,8 @@ function normalizeSetupSubmitterConfig(config) {
       "feePayerAirdropLamports",
     ),
     maxRetries: checkedSmallInteger(value.maxRetries ?? DEFAULT_MAX_RETRIES, "maxRetries"),
+    finalityPollAttempts: checkedPollSetting(value.finalityPollAttempts ?? 120, 1, 240),
+    finalityPollDelayMs: checkedPollSetting(value.finalityPollDelayMs ?? 250, 0, 1000),
   });
 }
 
@@ -403,6 +416,8 @@ function normalizeSetupRequest(config, request) {
       "feePayerAirdropLamports",
     ),
     maxRetries: checkedSmallInteger(value.maxRetries ?? config.maxRetries, "maxRetries"),
+    finalityPollAttempts: config.finalityPollAttempts,
+    finalityPollDelayMs: config.finalityPollDelayMs,
     feePayerSigner: requireObject(value.feePayerSigner, "feePayerSigner"),
     mintSigner: requireObject(value.mintSigner, "mintSigner"),
     recipientTokenAccountSigner: requireObject(value.recipientTokenAccountSigner, "recipientTokenAccountSigner"),
@@ -521,6 +536,13 @@ function canonicalUintDecimalLike(value, label) {
 function checkedU8(value, label) {
   if (!Number.isInteger(value) || value < 0 || value > 0xff) {
     throw new Error(`${label}:ExpectedU8`);
+  }
+  return value;
+}
+
+function checkedPollSetting(value, minimum, maximum) {
+  if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
+    throw new Error("LocalnetSolanaFinalityPollSettingInvalid");
   }
   return value;
 }

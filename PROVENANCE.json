@@ -3,6 +3,17 @@
   "generatedAt": "2026-09-10T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
   "purpose": "file-by-file provenance classification for local tracked content",
+  "phase08Review": {
+    "filesBefore": 152,
+    "filesAfter": 154,
+    "filesDeleted": 0,
+    "filesMoved": 0,
+    "newFiles": [".github/scripts/dependency-license-audit.mjs", "scripts/tests/dependency-license-audit.test.mjs"],
+    "consolidation": "Removed duplicate fee-payer signing code and oversized bundle implementation; condensed stale AGENTS/readiness summaries while retaining stage evidence in status documents.",
+    "dependencyChanges": "Replaced solana-program 1.18.26 and spl-token 4.0.0 graph with solana-program 3.0.0 / spl-token-interface 2.0.0, added explicit system-interface and sysvar test APIs; removed obsolete zeroize_derive pins.",
+    "terminologyReview": "Case-insensitive project-role terminology reviewed. Solana account ownership terms are SOLANA_PROTOCOL_TERM; tar --no-same-owner is THIRD_PARTY_TERM. No project governance role uses that terminology.",
+    "sourceImports": "No upstream source implementation or legacy files imported in this increment. Existing BIP-341 public vector material retains DERIVED_FROM_THIRD_PARTY classification and BSD-3-Clause attribution/terms."
+  },
   "provenancePolicy": {
     "originalCodeLicense": "Proprietary (Copyright (c) 2026 KingPepe Team)",
     "provenanceClassifications": [
@@ -15,6 +26,16 @@
     ]
   },
   "trackedFiles": [
+    {
+      "path": ".github/scripts/dependency-license-audit.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Declared dependency-license metadata and proprietary local-package boundary validation; not third-party source copying or external legal review."
+    },
+    {
+      "path": "scripts/tests/dependency-license-audit.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original negative tests for missing/changed license metadata, dependency source and local publication boundary."
+    },
     {
       "path": "scripts/local-e2e-toolchain.json",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",

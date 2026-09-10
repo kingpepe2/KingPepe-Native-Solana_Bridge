@@ -18,6 +18,7 @@ import {
 import { LocalnetSolanaDepositClaimBridge } from "../services/bridge-validator/localnet-solana-deposit-claim-bridge.mjs";
 import {
   SolanaLocalRpcClient,
+  FileBackedSolanaDepositClaimJournal,
 } from "../services/bridge-validator/solana-deposit-claim-submitter.mjs";
 import { SolanaDepositClaimObserver } from "../services/solana-observer/solana-deposit-claim-observer.mjs";
 import {
@@ -725,8 +726,9 @@ export async function submitLocalnetSolanaDepositClaim({
         managerProgramIdHex: config.bridgeProgramIdHex,
         transceiverProgramIdHex: config.transceiverProgramIdHex,
         mintHex: config.mintHex,
+        nativeDecimals: config.nativeDecimals,
       },
-      rpcClient: rpc,
+      endpoint: `http://127.0.0.1:${requireObject(plan, "plan").ports.solanaRpcPort}`,
     });
   const bridge = new LocalnetSolanaDepositClaimBridge({
     config: {
@@ -741,13 +743,16 @@ export async function submitLocalnetSolanaDepositClaim({
       feePayerHex: setupContext.feePayerHex,
       policyEpoch: config.policyEpoch,
       keyEpoch: config.keyEpoch,
-      acceptedObservationTrust: ["LOCAL_VALIDATION"],
+      // This isolated harness trusts its own disposable validator RPC. It is
+      // explicitly RPC observation, not a production chain-verification source.
+      acceptedObservationTrust: ["RPC_OBSERVATION"],
       maxRetries: config.solanaMaxRetries,
     },
     feePayerSigner: setupContext.feePayerSigner,
     rpcClient: rpc,
     claimObserver: observer,
-    journal,
+    journal: journal ?? new FileBackedSolanaDepositClaimJournal({ root: path.join(config.stateRoot, "solana-claim-journal"), repoRoot: plan.repoRoot }),
+    receiptJournal: new FileBackedSolanaDepositClaimJournal({ root: path.join(config.stateRoot, "solana-receipt-journal"), repoRoot: plan.repoRoot }),
   });
   return bridge.submitDepositClaim(request);
 }
@@ -1234,7 +1239,10 @@ function reconcileLocalNativeToSolana({ flowConfig, deposit, finalizedReserveSwe
     throw new Error("LocalNativeToSolanaReconciliationRequiresCompletedClaim");
   }
   const canonicalReserve = BigInt(finalized.reserveAmountAtomic);
-  const mintedSupply = BigInt(mintedAmountAtomic);
+  // Supply is read from the finalized Mint account, never inferred from the
+  // requested credit. This harness starts from zero supply and one operation.
+  const mintedSupply = BigInt(canonicalUintDecimal(claim.mintSupplyAtomic, "observedMintSupplyAtomic"));
+  if (mintedSupply !== BigInt(mintedAmountAtomic)) throw new Error("LocalNativeToSolanaUnexpectedMintSupply");
   const authorizedUnmintedCredits = 0n;
   const otherUnsettledBridgeLiabilities = 0n;
   const coverageRequired = mintedSupply + authorizedUnmintedCredits + otherUnsettledBridgeLiabilities;

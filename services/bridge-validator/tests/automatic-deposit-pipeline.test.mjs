@@ -30,7 +30,7 @@ import {
   FileBackedSolanaDepositClaimJournal,
   InMemorySolanaDepositClaimJournal,
 } from "../solana-deposit-claim-submitter.mjs";
-import { base58Encode } from "../solana-deposit-claim-transaction-plan.mjs";
+import { base58Encode, findProgramAddress } from "../solana-deposit-claim-transaction-plan.mjs";
 import { SolanaDepositClaimObserver } from "../../solana-observer/solana-deposit-claim-observer.mjs";
 import {
   FROST_SIGNING_INTENT_PROTOCOL,
@@ -379,7 +379,7 @@ function localnetBridgeConfigForPipeline(config, feePayer) {
     feePayerBase58: feePayer.publicKeyBase58,
     policyEpoch: config.policyEpoch,
     keyEpoch: config.keyEpoch,
-    acceptedObservationTrust: ["LOCAL_VALIDATION"],
+    acceptedObservationTrust: ["RPC_OBSERVATION"],
     maxRetries: 0,
   };
 }
@@ -406,6 +406,13 @@ function depositClaimAccountBase64ForMessage(message) {
 
 function splMintAccountWithoutFreezeBase64() {
   const bytes = Buffer.alloc(82);
+  const config = baseConfig();
+  const authority = findProgramAddress([Buffer.from("kingpepe-mint-authority"), Buffer.from(config.deployment.mint, "hex")], Buffer.from(config.deployment.managerProgramId, "hex"));
+  bytes.writeUInt32LE(1, 0);
+  Buffer.from(authority.hex, "hex").copy(bytes, 4);
+  bytes.writeBigUInt64LE(250000000n, 36);
+  bytes[44] = 8;
+  bytes[45] = 1;
   bytes.writeUInt32LE(0, 46);
   return bytes.toString("base64");
 }
@@ -427,6 +434,7 @@ class FakeIntegratedLocalnetSolanaRpc {
     this.latestBlockhashCalls = 0;
     this.sendCalls = [];
     this.statusCalls = [];
+    this.submittedSignatures = new Set();
     this.transactionCalls = [];
     this.accountInfoCalls = [];
   }
@@ -450,11 +458,14 @@ class FakeIntegratedLocalnetSolanaRpc {
 
   async sendTransaction(preparedTransactionBase64, options) {
     this.sendCalls.push({ preparedTransactionBase64, options });
+    this.submittedSignatures.add(base58Encode(Buffer.from(preparedTransactionBase64, "base64").subarray(1, 65)));
     return this.solanaSignature;
   }
 
   async getSignatureStatus(solanaSignature) {
     this.statusCalls.push(solanaSignature);
+    if (!this.submittedSignatures.has(solanaSignature) &&
+        !(solanaSignature === this.solanaSignature && this.sendCalls.length > 0)) return null;
     return {
       slot: 88,
       confirmationStatus: "finalized",
@@ -480,14 +491,18 @@ class FakeIntegratedLocalnetSolanaRpc {
     this.accountInfoCalls.push(addressBase58);
     if (addressBase58 === this.expectedDepositClaimAccountBase58) {
       return {
+        context: { slot: 88 },
         value: {
+          owner: base58Encode(Buffer.from(baseConfig().deployment.managerProgramId, "hex")), executable: false,
           data: [this.claimAccountBase64, "base64"],
         },
       };
     }
     if (addressBase58 === this.expectedMintAccountBase58) {
       return {
+        context: { slot: 88 },
         value: {
+          owner: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", executable: false,
           data: [this.mintAccountBase64, "base64"],
         },
       };
@@ -621,8 +636,9 @@ test("automatic Native to Solana pipeline submits through localnet Solana bridge
     assert.equal(result.solanaSignature, rpc.solanaSignature);
     assert.equal(result.mintedAmountAtomic, "250000000");
     assert.equal(runtime.pipeline.ledgerSnapshot().mintedSupply, "250000000");
-    assert.equal(rpc.sendCalls.length, 1);
-    assert.deepEqual(rpc.statusCalls, [rpc.solanaSignature]);
+    assert.equal(rpc.sendCalls.length, 2);
+    const receiptSignature = base58Encode(Buffer.from(rpc.sendCalls[0].preparedTransactionBase64, "base64").subarray(1, 65));
+    assert.deepEqual(rpc.statusCalls, [receiptSignature, receiptSignature, rpc.solanaSignature]);
     assert.deepEqual(rpc.transactionCalls, [rpc.solanaSignature]);
     assert.deepEqual(rpc.accountInfoCalls, [
       expectedPrepared.depositClaimAccountBase58,
@@ -726,8 +742,9 @@ test("automatic Native to Solana pipeline uses Native reserve sweep adapters and
         verbose: true,
       },
     ]);
-    assert.equal(solanaRpc.sendCalls.length, 1);
-    assert.deepEqual(solanaRpc.statusCalls, [solanaRpc.solanaSignature]);
+    assert.equal(solanaRpc.sendCalls.length, 2);
+    const receiptSignature = base58Encode(Buffer.from(solanaRpc.sendCalls[0].preparedTransactionBase64, "base64").subarray(1, 65));
+    assert.deepEqual(solanaRpc.statusCalls, [receiptSignature, receiptSignature, solanaRpc.solanaSignature]);
     assert.deepEqual(solanaRpc.transactionCalls, [solanaRpc.solanaSignature]);
     assert.deepEqual(solanaRpc.accountInfoCalls, [
       expectedPrepared.depositClaimAccountBase58,
@@ -873,7 +890,7 @@ test("restart after Native sweep broadcast resumes without duplicate broadcast o
       assert.equal(secondResult.reason, "ALL_REQUIRED_CHECKS_PASSED");
       assert.equal(secondResult.mintedAmountAtomic, operation.deposit.amountAtomic);
       assert.deepEqual(secondNativeRpc.sendCalls, []);
-      assert.equal(solanaRpc.sendCalls.length, 1);
+      assert.equal(solanaRpc.sendCalls.length, 2);
       assert.equal(secondRuntime.pipeline.ledgerSnapshot().mintedSupply, operation.deposit.amountAtomic);
       assert.doesNotMatch(JSON.stringify(secondResult), /WAITING_FOR_ADMIN_APPROVAL/u);
     } finally {
