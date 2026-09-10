@@ -1,6 +1,74 @@
 # KingPepe Native - Solana Bridge Development Status
 
-## Current Phase 08 DKG transcript and durable handoff (2026-09-10)
+## Current Phase 08 recovery validation (2026-09-10)
+
+Validated HEAD: `f3166cded981ee92f63841e7ea09f9ed948ad7ea`; latest implementation:
+`0133a6cc7f22bf880249a72a62502aa4bf3a638b`. PRIVATE origin/main matched HEAD;
+no active source work was discarded. A Windows/WSL provenance diff was only
+line-ending normalization, not a semantic edit. No implementation, dependencies,
+toolchain pins, services or production configuration changed during validation.
+
+Required tools already existed outside Git. Their archive pins and extracted
+Node/selected Agave executable contents were checked; Native source matched its
+pinned archive and upstream commit/tree, and its build targets were rerun.
+Selected versions: Native 31.1.0; Agave/validator 4.2.2; cargo-build-sbf 4.1.0,
+platform-tools v1.54; Solana host Rust/Cargo 1.89.0; Native supporting crates
+nightly-2023-10-29; Node 24.21.0/npm 11.19.0/SQLite 3.53.4. WSL 2.4.12.0,
+Ubuntu 24.04 on WSL2. Anchor CLI is NOT_REQUIRED: these are direct SBF programs,
+not Anchor-generated IDLs. No base tool installation or global PATH/default
+change was needed. Locked npm dependencies were reinstalled with scripts disabled.
+
+Default Windows Node/npm were 24.18.0/11.16.0; default WSL Node/npm were
+18.19.1/9.2.0, and system Rust/Cargo 1.75.0 cannot replace the pinned toolchains.
+The exact Node guard explains LocalLedgerPinnedRuntimeRequired under those
+defaults. It was not weakened. Process-local tool selection made the full suites
+pass: Windows 476 Node tests and two vectors; WSL 476 Node tests, two vectors,
+64 Solana plus 29 Native Rust tests. Check/fmt/all-targets/all-features clippy PASS.
+Both npm audits found zero vulnerabilities; all five Rust lockfiles and declared
+license metadata passed their gates. The bincode unmaintained advisory remains
+reported without suppression. Native Windows Rust and service ACL tests NOT_RUN.
+
+A new isolated REGTEST/local-validator run rebuilt both SBF programs and passed
+all 55 existing real-chain checks (22 security, 7 CSV, 4 wallet PSBT, 10 races,
+7 claim retries, 5 accounting). Deposit, raw Native validation, real FROST A+B
+sweep, broadcast/finality, separate Ed25519 attestations, verified receipt,
+claim consumption, mint finality and reconciliation reached COMPLETED with
+ALL_REQUIRED_CHECKS_PASSED. Reserve and supply each 100000000 atomic; pending
+credits zero. No per-transfer KingPepe Team approval. SOLANA_DEPOSIT_CLAIM_PENDING
+is an intermediate diagnostic, not an unconditional blocker. This remains local
+validating-node RPC observation, not independent production chain validation.
+
+Additional required program-boundary coverage exposed a failure, separate from
+the 55 passing deposit checks: a fresh, correctly derived withdrawal-record PDA
+causes the actual validator preflight to reject the request with RPC -32002,
+InstructionError [0, IllegalOwner]. Record absent; token balance and supply
+unchanged; no burn and no Native payout. The current withdrawal handler requires
+program ownership and allocation before executing, but has no record-creation
+path. Host fixtures preallocate that account and do not prove the real lifecycle.
+Supplemental validator check: 0 PASS / 1 FAIL. The first diagnostic was
+inconclusive because the adapter did not expose this instruction-error detail;
+it is not counted as PASS. A fresh rerun inspected the actual RPC error and
+required finality/record creation for success. No implementation fix was made
+while exact-SHA CI remains account-blocked; this defect must be fixed and covered
+by a persistent chain regression before Phase 09. Other requested account/burn
+cases without real-validator coverage remain NOT_RUN, not inferred from fixtures.
+
+[Exact-HEAD CI run 34504537667, attempt 2](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34504537667)
+was explicitly rerun. All four jobs were rejected before any step: CI tests
+NOT_RUN, account-level execution BLOCKED; zero artifacts. No billing, spending,
+privacy, runner or security-gate settings changed. Account details stay outside
+source. Current/staged/outgoing and all 162 existing commits scanned without
+findings; 180-file provenance coverage and nine JSON files validated. No detected
+runtime keypairs, wallets, databases or real environment files inside the checkout.
+
+Deposit scope: IMPLEMENTED_AND_LOCALLY_VALIDATED_BUT_CI_BLOCKED. Full Phase 08:
+INCOMPLETE, not certified, also carrying the failed supplemental program check.
+Phase 09 NOT_STARTED. Restore Actions through KingPepe Team, verify exact-SHA CI,
+then repair the withdrawal-record lifecycle and remaining state/service/security
+dependencies. Mainnet DISABLED; productionReady=false. This entry records the
+SHA above; its documentation commit's own SHA/CI belongs in external evidence.
+
+## Prior Phase 08 DKG transcript and durable handoff (2026-09-10)
 
 PUBLISHED / LOCALLY_TESTED / CI_BLOCKED. Source
 `0133a6cc7f22bf880249a72a62502aa4bf3a638b`, message

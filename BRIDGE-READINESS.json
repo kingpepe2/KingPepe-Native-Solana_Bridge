@@ -9,8 +9,9 @@
   "currentPhase": "PHASE_08",
   "publicationBlocker": {
     "code": "GITHUB_ACTIONS_ACCOUNT_EXECUTION_BLOCKED",
-    "sourceSha": "0133a6cc7f22bf880249a72a62502aa4bf3a638b",
-    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34503594802",
+    "sourceSha": "f3166cded981ee92f63841e7ea09f9ed948ad7ea",
+    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34504537667",
+    "runAttempt": 2,
     "githubRunConclusion": "failure",
     "ciTests": "NOT_RUN_ALL_FOUR_JOBS_REJECTED_BEFORE_START",
     "workflowState": "active",
@@ -32,8 +33,9 @@
     "correction": "ee011923da423475c4ccae3c9685d8a1ce257f23 requires seven plus both named stopped-worker checks; CI 34472369148 all four jobs PASS and zero artifacts."
   },
   "latestCiFailure": {
-    "sourceSha": "0133a6cc7f22bf880249a72a62502aa4bf3a638b",
-    "url": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34503594802",
+    "sourceSha": "f3166cded981ee92f63841e7ea09f9ed948ad7ea",
+    "url": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34504537667",
+    "runAttempt": 2,
     "reason": "Account-level execution restriction; all four jobs rejected before any step. CI tests NOT_RUN, not a source-test failure.",
     "correction": "BLOCKED_REQUIRES_KINGPEPE_TEAM_ACTION"
   },
@@ -86,6 +88,7 @@
     "frostTranscriptReview": "LOCAL_INNER_TRANSCRIPTS_CHECKED_AUTHENTICATED_DKG_TRANSPORT_AND_DURABLE_SERVICE_FENCING_STILL_REQUIRED",
     "frostRustCrate": "SUPPORTING_POLICY_STATE_MODEL_ONLY",
     "solanaPrograms": "SBF_AND_DEPOSIT_HAPPY_PATH_TESTED_LOCALNET_ONLY",
+    "freshWithdrawalRecord": "REAL_VALIDATOR_PREFLIGHT_FAIL_ILLEGAL_OWNER_MISSING_PDA_CREATION_NO_BURN",
     "attestations": "PROJECT_ATTESTED_2_OF_2_ED25519",
     "nativeProofReserveRecovery": "RAW_HEADER_MERKLE_SIGNER_ATTESTER_LOCAL_E2E_TESTED_USER_RECOVERY_INCOMPLETE",
     "nativeEvidenceSourceTrust": "RAW_HEADERS_VERIFIED_CANONICAL_CHAIN_AND_UTXO_FROM_CONFIGURED_VALIDATING_NODE_RPC",
@@ -101,8 +104,8 @@
     "productionServices": "NOT_INSTALLED"
   },
   "localValidation": {
-    "sourceSha": "0133a6cc7f22bf880249a72a62502aa4bf3a638b",
-    "sourceScope": "Repeated against this clean published SHA after CI execution was blocked; later changes are continuity documentation only and do not inherit a CI pass.",
+    "sourceSha": "f3166cded981ee92f63841e7ea09f9ed948ad7ea",
+    "sourceScope": "Fresh recovery rerun against this HEAD with verified process-local tools; implementation remains 0133a6cc7f22bf880249a72a62502aa4bf3a638b. Later continuity documentation does not inherit a CI pass. Supplemental withdrawal-record probe failed separately from passing Node/Rust/deposit suites.",
     "windows": {
       "nodeTestsPass": 476,
       "dkgHandoffRegressionsIncluded": 18,
@@ -168,9 +171,32 @@
       "perTransferTeamApproval": false,
       "solanaToNative": "NOT_RUN"
     },
-    "failures": 0,
+    "supplementalWithdrawalRecord": {
+      "status": "FAIL",
+      "pass": 0,
+      "fail": 1,
+      "execution": "REAL_LOCAL_VALIDATOR_PREFLIGHT",
+      "rpcCode": -32002,
+      "instructionError": [0, "IllegalOwner"],
+      "recordCreated": false,
+      "tokensBurned": false,
+      "nativePayout": "NOT_RUN_PHASE_09_NOT_STARTED",
+      "cause": "Fresh PDA required to already be allocated and program-owned; withdrawal handler has no record-creation path.",
+      "firstDiagnostic": "INCONCLUSIVE_NOT_COUNTED_PASS_RPC_DETAIL_WAS_NOT_EXPOSED_BY_ADAPTER",
+      "persistentRegressionAndFix": "NOT_IMPLEMENTED_CI_ACCOUNT_BLOCKED"
+    },
+    "recoveryToolchain": {
+      "status": "EXISTING_PINNED_EXTERNAL_TOOLS_VERIFIED_AND_SELECTED_PER_PROCESS",
+      "baseInstallations": 0,
+      "lockedNodeDependenciesReinstalled": true,
+      "globalConfigurationChanged": false,
+      "anchorCli": "NOT_REQUIRED_DIRECT_SBF_PROGRAMS",
+      "defaultRuntimeMismatch": "WINDOWS_NODE_24_18_0_NPM_11_16_0_WSL_NODE_18_19_1_NPM_9_2_0_NOT_PROJECT_PINS",
+      "rustQuality": "ALL_FIVE_WORKSPACES_CHECK_FMT_ALL_TARGETS_ALL_FEATURES_CLIPPY_PASS"
+    },
+    "failures": 1,
     "skips": 0,
-    "scope": "Counts cover executed suites only, not the unimplemented full test matrix."
+    "scope": "Existing Node/Rust and 55 real deposit checks have zero failures; one supplemental fresh withdrawal-record validator check failed. Unimplemented/unexecuted program cases and full service tests are NOT_RUN, not PASS."
   },
   "audit": {
     "npmVulnerabilities": 0,
@@ -190,6 +216,8 @@
     "externalReview": "NOT_RUN"
   },
   "phase08Remaining": [
+    "Resolve account-level CI execution through KingPepe Team and verify the exact current SHA; do not bypass gates or start Phase 09",
+    "Fix fresh withdrawal-record PDA creation and add a persistent real-validator burn/record regression; current preflight rejects IllegalOwner without burning or creating a record",
     "Implement authenticated confidential DKG transport and complete service recovery; local transcript/handoff tests, V2 volatile nonce/SIGKILL and synchronous both-peer abort do not establish durable global fencing, protected storage or memory-snapshot/clone rollback assurance. Review the explicitly unaudited upstream FROST component; local binding is not evidence truth or state authentication",
     "Implement and test post-mint deep-reorg hard stops; ten pre-mint race/fork checks pass but are not compensation or production finality assurance",
     "Configure production Native evidence sources; current raw-header/Merkle integration is REGTEST-only with explicit local-node UTXO trust",

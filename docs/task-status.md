@@ -1,6 +1,36 @@
 # KingPepe Native - Solana Bridge Task Status
 
-## Current Phase 08 DKG transcript and durable handoff (2026-09-10)
+## Current Phase 08 recovery validation (2026-09-10)
+
+Source HEAD `f3166cded981ee92f63841e7ea09f9ed948ad7ea`, implementation
+`0133a6cc7f22bf880249a72a62502aa4bf3a638b`; PRIVATE origin/main matched HEAD.
+Existing external pinned development tools verified; no base installation,
+global configuration, implementation or dependency changes. Wrong default Node
+versions explain the exact-runtime error; use the pinned process-local runtime.
+Anchor CLI NOT_REQUIRED for the actual direct SBF build.
+
+Fresh validation: Windows/WSL each 476 Node tests and two vectors PASS; WSL
+93 Rust tests, check/fmt/all-features clippy, audits and both SBF builds PASS.
+Fresh real deposit reaches COMPLETED, verified mint and reconciliation, with all
+55 existing chain checks PASS and no per-transfer Team approval. The claim-pending
+diagnostic is not an unconditional blocker. Current tree/history scans found no
+leaks across 162 commits; exact provenance still covers 180 files.
+
+Supplemental real-validator fresh withdrawal-record test: 0 PASS / 1 FAIL,
+IllegalOwner; no record created or tokens burned. The handler requires an already
+allocated program-owned PDA without creating it. This is not a passing atomic
+burn test. An initial incomplete diagnostic is not counted as PASS. A fresh
+probe confirmed the RPC error; the fix/persistent chain regression remains open.
+
+[CI 34504537667 attempt 2](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34504537667)
+still rejected all four jobs before execution: NOT_RUN. BLOCKER:
+GITHUB_ACTIONS_ACCOUNT_EXECUTION_BLOCKED. No account/gate/privacy changes or
+production actions. Deposit scope is locally validated but CI-blocked; full
+Phase 08 INCOMPLETE, Phase 09 NOT_STARTED. Next: KingPepe Team restores Actions,
+exact-SHA CI verification, then withdrawal-record lifecycle and remaining Phase 08
+security dependencies. See [current evidence](development-status.md#current-phase-08-recovery-validation-2026-09-10).
+
+## Prior Phase 08 DKG transcript and durable handoff (2026-09-10)
 
 BLOCKED: GITHUB_ACTIONS_ACCOUNT_EXECUTION_BLOCKED.
 Source `0133a6cc7f22bf880249a72a62502aa4bf3a638b`, message
@@ -36,7 +66,7 @@ deletions/moves or dependency/license changes. No production actions. Phase 08
 INCOMPLETE; Phase 09 NOT_STARTED; Mainnet DISABLED. Protected/authenticated storage,
 confidential authenticated IPC, signer leases, global fencing/recovery and external
 review remain open. Next: complete this increment's gates, then those dependencies.
-See [detailed evidence](development-status.md#current-phase-08-dkg-transcript-and-durable-handoff-2026-09-10).
+See [detailed evidence](development-status.md#prior-phase-08-dkg-transcript-and-durable-handoff-2026-09-10).
 
 ## Previous Phase 08 volatile nonce and signer restart (verified source)
 

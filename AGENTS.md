@@ -25,6 +25,23 @@
 ## Current phase
 
 PHASE 08 INCOMPLETE. Phase 09 NOT_STARTED.
+Latest recovery validation used HEAD f3166cded981ee92f63841e7ea09f9ed948ad7ea,
+whose implementation is 0133a6cc7f22bf880249a72a62502aa4bf3a638b. No implementation
+or toolchain pins changed. Existing external pinned tools were verified and
+selected per process; default Windows/WSL Node versions do not satisfy the
+ledger's exact-runtime guard. Anchor CLI is not required by the direct SBF build.
+Windows/WSL each reran 476 Node tests and two vectors; WSL reran 93 Rust tests,
+check/fmt/all-features-clippy and audits. Both SBF builds and 55 fresh real deposit
+checks PASS; claim/mint/reconciliation reached COMPLETED without Team approval.
+Supplemental real-validator fresh withdrawal-record probe FAILS with IllegalOwner:
+the handler requires an allocated program-owned PDA but does not create it.
+No record or burn occurred. Do not count host burn fixtures as this chain test.
+CI 34504537667 attempt 2 still rejected all four jobs before execution (NOT_RUN).
+Do not certify the full phase or start Phase 09. Restore CI through KingPepe Team,
+then fix/test the withdrawal-record PDA lifecycle and remaining Phase 08 security
+dependencies. This continuity update does not change implementation or activation.
+See the current recovery entry in docs/development-status.md for exact evidence.
+
 Last verified source: 86ecdd921cdee867fbc882bfe8bc5c5e90e6a37c, private push and
 all four exact-SHA CI jobs PASS:
 https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34499581191

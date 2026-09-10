@@ -3,6 +3,15 @@
   "generatedAt": "2026-09-10T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
   "purpose": "file-by-file provenance classification for local tracked content",
+  "phase08RecoveryRevalidationReview": {
+    "filesBefore": 180,
+    "filesAfter": 180,
+    "sourceSha": "f3166cded981ee92f63841e7ea09f9ed948ad7ea",
+    "changes": "Status, continuity and readiness only: fresh pinned-runtime validation, successful local deposit, failed supplemental validator withdrawal-record probe and repeated exact-HEAD CI execution blocker. No implementation, dependency, toolchain-pin or license change.",
+    "sourceImports": "None; existing verified external tools reused. Temporary diagnostic code and operational test material are not source imports.",
+    "filesDeleted": 0,
+    "filesMoved": 0
+  },
   "phase08CiContinuityReview": {
     "filesBefore": 180,
     "filesAfter": 180,
