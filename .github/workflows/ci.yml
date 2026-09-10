@@ -57,10 +57,16 @@ jobs:
           export PATH="${tool_root}/solana-release/bin:${PATH}"
           mkdir -p "${HOME}/.cache/solana" "${tool_root}/output"
           # Both the compiler-generated keypairs and Cargo output stay outside Git.
+          platform_tools=$(jq -r .solana.platformToolsVersion scripts/local-e2e-toolchain.json)
           for program in kingpepe-transceiver kingpepe-bridge; do
-            cargo-build-sbf --manifest-path "solana/programs/${program}/Cargo.toml" \
-              --sbf-out-dir "${tool_root}/output" --tools-version "$(jq -r .solana.platformToolsVersion scripts/local-e2e-toolchain.json)" \
-              -- --locked --jobs 2 --target-dir "${tool_root}/build/${program}"
+            # Host metadata must select solana/rust-toolchain.toml, not the
+            # older Native supporting-crate toolchain at the repository root.
+            (
+              cd solana
+              cargo-build-sbf --manifest-path "programs/${program}/Cargo.toml" \
+                --sbf-out-dir "${tool_root}/output" --tools-version "${platform_tools}" \
+                -- --locked --jobs 2 --target-dir "${tool_root}/build/${program}"
+            )
           done
           test -s "${tool_root}/output/kingpepe_transceiver.so"
           test -s "${tool_root}/output/kingpepe_bridge.so"

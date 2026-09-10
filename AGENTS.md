@@ -26,7 +26,10 @@
 ## Current phase and evidence
 
 PHASE 08: real local Native-to-Solana happy-path integration is now exercised.
-The new increment awaits its own source-SHA-bound CI result. The preceding
+Integration bfc704c561fcf47e9625c7aff6c8bb72b1997ba7 was pushed; CI run
+34437324660 failed because the SBF job ran metadata with the root Native Cargo
+toolchain. The corrective workflow builds from solana/ and awaits exact-SHA CI.
+The preceding
 commit cb7b44544f8c3935ddc8065eee5d67ee220afee2 passed all four jobs:
 https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34432312954
 
