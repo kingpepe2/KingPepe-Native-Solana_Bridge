@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { validateRuntimeFile, validateRuntimeStateRoot as validateStateRootOutsideRepo } from "../../shared/runtime-path-boundary.mjs";
 import {
   bytesToHex,
   decodeCanonicalBridgeMessage,
@@ -393,7 +394,7 @@ export class FileBackedDepositJournal {
 
   constructor(options) {
     const value = requireObject(options, "options");
-    this.#repoRoot = path.resolve(value.repoRoot);
+    this.#repoRoot = value.repoRoot;
     this.#root = validateStateRootOutsideRepo(value.root, this.#repoRoot, "Deposit pipeline journal root");
     mkdirSync(this.#root, { recursive: true });
   }
@@ -475,11 +476,11 @@ export class FileBackedDepositJournal {
   }
 
   #entryPath(operationIdHex) {
-    return path.join(this.#root, `${normalizeHash32(operationIdHex, "operationIdHex")}.json`);
+    return validateRuntimeFile(path.join(this.#root, `${normalizeHash32(operationIdHex, "operationIdHex")}.json`), this.#repoRoot);
   }
 
   #outpointIndexPath() {
-    return path.join(this.#root, "deposit-outpoints.json");
+    return validateRuntimeFile(path.join(this.#root, "deposit-outpoints.json"), this.#repoRoot);
   }
 
   #readOutpointIndex() {
@@ -506,8 +507,9 @@ export class FileBackedDepositJournal {
   }
 
   #writeJson(target, value) {
-    mkdirSync(this.#root, { recursive: true });
+    validateRuntimeFile(target, this.#repoRoot);
     const temp = `${target}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`;
+    validateRuntimeFile(temp, this.#repoRoot);
     writeFileSync(temp, `${JSON.stringify(value, null, 2)}\n`, {
       encoding: "utf8",
       flag: "wx",
@@ -1030,16 +1032,6 @@ function assertSameJournalEntry(existing, operationIdHex, depositOutpointText, e
   ) {
     throw new Error("DepositOperationReplayAltered");
   }
-}
-
-function validateStateRootOutsideRepo(root, repoRoot, label) {
-  if (typeof root !== "string" || root.length === 0) throw new Error(`${label}:Required`);
-  const resolved = path.resolve(root);
-  const relative = path.relative(path.resolve(repoRoot), resolved);
-  if (relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))) {
-    throw new Error(`${label}:InsideRepositoryRejected`);
-  }
-  return resolved;
 }
 
 function checkedAdd(left, right) {

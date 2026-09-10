@@ -2,7 +2,55 @@
 
 ## Current Phase 08 integration evidence (2026-09-10)
 
-Current accounting correction is UNPUBLISHED / LOCALLY_TESTED. The deposit
+Current runtime-path increment is UNPUBLISHED / LOCALLY_TESTED. A read-only
+probe reproduced acceptance of a source child named `..runtime` by the old
+prefix check; no state or keys were created by that probe. The common guard
+now checks path components, existing parents, filesystem identities and file
+types. It always protects the actual checkout, with any caller-supplied root
+as an additional boundary. Linked roots/parents, hard-linked/nonregular leaves,
+source ancestors, broad roots, relative paths and unsupported namespaces fail
+closed. FROST, deposit/sweep/claim journals, Native cookies and local run planning
+use this guard. File access rechecks paths; disappeared store directories do
+not silently reset themselves. An unused recursive FROST deletion method and
+duplicate path helpers were removed after repository-wide usage review.
+
+Windows and WSL each: 230 Node tests + two vectors PASS. The 40 new real-filesystem
+tests include junction/link substitution, hard links, missing directories,
+case aliases under actual filesystem semantics and source-root substitution.
+All test data stays in isolated external temporary roots. Initial focused run:
+38 PASS / 2 FAIL because two nonregular-file fixtures reached the source-ancestor
+guard first. Their layout was corrected to exercise the intended specific
+rejection; no security guard was weakened. Final suites: zero failures/skips.
+WSL: 64 Solana + 29 Native Rust tests, fmt/clippy and both SBF builds PASS. A fresh
+real REGTEST/local-validator run completes the automatic deposit and all 22
+security + seven CSV + four wallet PSBT + ten pre-mint race + five claim-worker
+retry checks. Final reserve and SPL supply each equal 100000000 atomic, without
+per-transfer team approval. This is not full-service restart or a withdrawal
+E2E result. Five Rust audits and npm audit find
+no known vulnerabilities; the bincode maintenance warning remains. Declared
+dependency-license metadata passes.
+
+Provenance: 169 -> 171 tracked files; two original code/test additions, no source
+imports, dependency/license changes, file deletions or moves. No operational data
+was removed. Publication still requires current/staged/outgoing secret scans,
+private push and all exact-SHA CI jobs. No runtime/build artifacts are uploaded.
+
+These are path safety checks, not authenticated journals, atomic file-open
+security against concurrent replacement, complete mount-alias detection,
+service ACL enforcement or protection against privileged host compromise.
+Durable credit restoration, global hard stops, fencing, rollback/power-loss
+assurance and full-service restart/reconciliation remain open. Phase 08 remains
+INCOMPLETE; Phase 09 NOT_STARTED; Mainnet DISABLED.
+
+### Previous accounting correction (verified source)
+
+Source `4018556befe8485c6e374404dfc6ef1cce647455`, message
+`fix(phase-08): conserve pending credits and make ledger failures atomic`, is
+pushed privately; [all four exact-SHA CI jobs PASS](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34457447371).
+Current/staged/outgoing source and all 149 commits scanned clean; zero workflow
+artifacts were uploaded. The following 190-test evidence belongs to that SHA.
+
+The published accounting correction is LOCALLY_AND_CI_TESTED. The deposit
 ledger now binds credits to the full canonical message and reserve allocation,
 one deployment, operation IDs and permanent in-memory backing markers. Exact
 pending and minted retries are idempotent; different recipients, amounts,
@@ -38,9 +86,9 @@ does not prove durable pending-credit recovery or full-service restart.
 Five Rust audits and npm audit find no known vulnerabilities; the bincode
 unmaintained warning remains. Declared license metadata passes. No dependencies,
 source imports, files added/deleted/moved or licenses changed; all 169 tracked
-files retain provenance. Current source and all 148 existing commits scan clean.
-Staged/outgoing scans, reviewed private push and exact-SHA CI are required before
-publication is verified. No runtime/build artifacts are uploaded.
+files retain provenance. Its current/staged/outgoing source and all 149 commits
+scanned clean; reviewed private push and exact-SHA CI passed as recorded above.
+No runtime/build artifacts were uploaded.
 
 Open dependencies: durable operation/credit journal and reconciliation before
 signing resumes, global persistent hard stops, authenticated/fenced storage,

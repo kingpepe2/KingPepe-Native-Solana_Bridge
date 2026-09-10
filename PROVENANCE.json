@@ -95,6 +95,19 @@
     "terminologyReview": "No new project-role naming violations. Existing Solana protocol and third-party terms remain unchanged.",
     "scope": "In-memory accounting correction, not durable credit recovery, authenticated journals, full service restart or external review."
   },
+  "phase08RuntimePathReview": {
+    "filesBefore": 169,
+    "filesAfter": 171,
+    "filesDeleted": 0,
+    "filesMoved": 0,
+    "newFiles": ["shared/runtime-path-boundary.mjs", "scripts/tests/runtime-path-boundary.test.mjs"],
+    "changes": "Original common filesystem boundary for FROST state, three journals, Native RPC cookies and local runtime planning. Forty filesystem tests use isolated temporary roots and no operational keys. Actual checkout protection cannot be disabled by a caller-supplied root.",
+    "cleanup": "Consolidated repeated lexical containment/resolution checks and removed an unused recursive FROST state deletion method after repository-wide call-site review. No operational data deleted or moved.",
+    "sourceImports": "Node 22.23.2 path/fs API definitions consulted as reference only; no upstream code copied. Existing licenses and notices retained.",
+    "dependencyChanges": "None",
+    "terminologyReview": "No new KingPepe project-role naming violations; existing Solana/SPL account terms preserved.",
+    "scope": "Runtime path validation is not authenticated persistence, OS service isolation, atomic race-proof file opening, full rollback detection or host-compromise protection."
+  },
   "provenancePolicy": {
     "originalCodeLicense": "Proprietary (Copyright (c) 2026 KingPepe Team)",
     "provenanceClassifications": [
@@ -107,6 +120,16 @@
     ]
   },
   "trackedFiles": [
+    {
+      "path": "shared/runtime-path-boundary.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original shared component-aware runtime path checks with existing-parent resolution, linked-file rejection and filesystem identity comparison. Node APIs used without copied implementation."
+    },
+    {
+      "path": "scripts/tests/runtime-path-boundary.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original real-filesystem boundary regressions on isolated external temporary roots. Public markers and ephemeral cookie fixture only; no operational shares or upstream code."
+    },
     {
       "path": "solana/tests/local-claim-retry.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",

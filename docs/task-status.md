@@ -1,6 +1,45 @@
 # KingPepe Native - Solana Bridge Task Status
 
-Current unpublished Phase 08 increment: exact, idempotent, failure-atomic
+Current unpublished Phase 08 increment: shared runtime filesystem boundary.
+The reproduced ..name containment defect is rejected without creating anything
+in source. The actual checkout remains protected when repoRoot is omitted or
+substituted. Linked paths, hard links, nonregular leaves, broad/source-ancestor
+roots and unsupported namespaces are rejected. Four stores, Native cookies and
+local runtime configuration share the checks; file access revalidates and does
+not silently recreate a missing store directory. Removed duplicated helpers
+and an unused recursive FROST deletion method, not operational data.
+
+Windows/WSL each: 230 Node tests + two vectors PASS, including 40 filesystem
+regressions. WSL: 93 Rust tests and fmt/clippy PASS. Initial focused run was
+38 PASS / 2 FAIL: two fixtures hit the source-ancestor guard before the intended
+file-type guard. Corrected fixture layout, retained strict rejection assertions;
+final suites have zero failures/skips. Both SBF builds and a fresh real automatic
+deposit pass, along with 22 security + seven CSV + four wallet PSBT + ten pre-mint
+race + five claim-worker retry checks. Reserve/supply each 100000000 atomic, no
+per-transfer team approval; not full-service restart or withdrawal E2E evidence.
+Five Rust audits and npm audit report no known vulnerabilities; bincode's
+unmaintained warning remains. Declared dependency licenses pass. Provenance:
+169 -> 171 files, two original additions, no imports/dependency changes/moves or
+file deletions. Current/staged/outgoing scans, private push and exact-SHA CI are
+still required for this increment. No artifacts uploaded.
+
+Path prechecks do not prove service ACLs, authenticated storage, race-proof file
+access, mount/clone detection or rollback safety. Next: validate/publish this
+boundary correction, then persistent credit liabilities and restart
+reconciliation, authenticated/fenced journals, durable global hard stops and
+post-mint reorg response. Phase 08 INCOMPLETE, Phase 09 NOT_STARTED, Mainnet
+DISABLED. No production state or services changed.
+
+### Previous accounting correction (verified source)
+
+Source `4018556befe8485c6e374404dfc6ef1cce647455`, message
+`fix(phase-08): conserve pending credits and make ledger failures atomic`, pushed
+privately; all four exact-SHA CI jobs PASS:
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34457447371.
+Its current/staged/outgoing source and all 149 commits scanned clean. Zero
+workflow artifacts were uploaded. The following 190-test evidence is historical.
+
+The verified accounting increment implements exact, idempotent, failure-atomic
 accounting. Canonical-message/allocation-bound in-memory credits survive pending
 mint/attester failures without double counting; mint settlement requires exact
 positive u64 values and the same credit. The zero project fee guard runs before
@@ -18,15 +57,15 @@ corrected to assert the actual explicit thrown rejection and retained credit.
 All existing gates remain enabled. Audits find no known vulnerabilities;
 bincode's unmaintained warning is retained. Declared license metadata passes.
 Provenance remains 169 files; no source imports/dependency changes/deletions/moves.
-Current source and all 148 existing commits scan clean. Staged/outgoing review,
-private push and exact-SHA CI remain required; no artifacts are uploaded.
+Its current/staged/outgoing source and all 149 commits scanned clean. Reviewed
+private push and exact-SHA CI passed; no artifacts were uploaded.
 
 Previous source `4e4885a85c93b0ab9473b451b90fe9575bde51c8`, message
 `fix(phase-08): persist and recover signed Solana claims`, pushed privately;
 all four CI jobs PASS:
 https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34454048203.
-Its current/staged/outgoing source and all 148 commits scanned clean. Next:
-publish/verify accounting correction, then persist credit liabilities before
+Its current/staged/outgoing source and all 148 commits scanned clean. Next at
+that checkpoint was the now-published accounting correction, then persistence before
 downstream failures and reconcile safely on restart; finish authenticated/fenced
 journals, durable global hard stops and post-mint reorg checks. Phase 08 remains
 incomplete, Phase 09 NOT_STARTED, Mainnet DISABLED. No production work performed.

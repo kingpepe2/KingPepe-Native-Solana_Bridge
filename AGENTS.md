@@ -26,11 +26,28 @@
 ## Current phase and evidence
 
 PHASE 08: real local Native-to-Solana happy-path integration is now exercised.
-Claim-retry increment 4e4885a85c93b0ab9473b451b90fe9575bde51c8 is pushed privately;
+Accounting increment 4018556befe8485c6e374404dfc6ef1cce647455 is pushed privately;
 all four exact-SHA CI jobs PASS:
-https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34454048203
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34457447371
+Its current/staged/outgoing source and all 149 commits scanned clean; zero
+workflow artifacts were uploaded. This does not certify newer source changes.
 
-The current accounting correction is unpublished. Windows/WSL each: 190 Node
+Current unpublished increment: runtime filesystem boundary. The shared guard
+protects the actual checkout even if callers omit/substitute repoRoot, rejects
+misleading ..name children, source ancestors, linked components, hard-linked or
+nonregular files, broad roots and unsupported namespaces. Four stores and the
+Native cookie reader recheck file paths on access. Local runtime planning uses
+the same boundary. No silent directory recreation during store access. The
+unused recursive FROST state deletion method was removed after usage review.
+Windows/WSL each pass 230 Node tests (including 40 new filesystem tests) and two
+vectors; WSL passes 93 Rust tests, fmt/clippy, both SBF builds and a fresh real
+automatic deposit with all 22/7/4/10/5 security/recovery/retry checks. See status
+files for scope and publication results. Provenance: 169 -> 171 tracked files,
+no imports/dependency changes/file deletions/moves. Path checks are NOT service
+ACLs, authenticated storage, atomic race-proof opens or complete mount/clone
+detection. Do not claim full-service restart or production isolation from them.
+
+Previous accounting correction: Windows/WSL each: 190 Node
 tests + two vectors PASS; WSL: 93 Rust tests and fmt/clippy PASS. Canonical
 operation/allocation-bound credits prevent duplicate pending credit and exact
 mint settlement rejects negative/inexact amounts. Finalized backing is credited
@@ -44,7 +61,8 @@ and all 22/7/4/10/5 security/recovery/retry checks, with both SBF rebuilds. The
 real harness's single-operation reconciliation is distinct from the new
 source-level ledger retry tests. Do not skip Phase 08 storage/reconciliation gates.
 
-Previous signed-claim retry evidence below belongs to the verified SHA above.
+Historical signed-claim evidence below belongs to
+4e4885a85c93b0ab9473b451b90fe9575bde51c8, not the current unpublished increment.
 It validates the entire signed canonical claim packet and saves its actual
 signature before send. RPC signature substitution hard-stops. Missing/malformed
 execution status or height cannot authorize broadcasting or mint completion.

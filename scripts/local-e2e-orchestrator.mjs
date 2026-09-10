@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { validateRuntimeStateRoot } from "../shared/runtime-path-boundary.mjs";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -95,8 +96,8 @@ export function createLocalE2ePlan(options = {}) {
       "kingpepe_transceiver.so",
     ),
   });
-  validatePathOutsideRepo(paths.nativeDatadir, repoRoot, "Native REGTEST datadir");
-  validatePathOutsideRepo(paths.solanaLedger, repoRoot, "Solana local-validator ledger");
+  validateRuntimeStateRoot(paths.nativeDatadir, repoRoot, "Native REGTEST datadir");
+  validateRuntimeStateRoot(paths.solanaLedger, repoRoot, "Solana local-validator ledger");
 
   const readiness =
     options.readiness ??
@@ -285,12 +286,7 @@ export function readLocalnetProgramIds(repoRoot) {
 }
 
 export function validateLocalE2eRunRoot(runRoot, repoRoot) {
-  const normalized = validateAbsolutePath(runRoot, "Local E2E run root");
-  validatePathOutsideRepo(resolveExistingParents(normalized), resolveExistingParents(repoRoot), "Local E2E run root");
-  if (normalized === path.parse(normalized).root || normalized === path.resolve(os.homedir())) {
-    throw new Error("Local E2E run root must be a dedicated directory");
-  }
-  return normalized;
+  return validateRuntimeStateRoot(runRoot, repoRoot, "Local E2E run root");
 }
 
 export function initializeLocalE2eRunRoot(plan) {
@@ -327,26 +323,6 @@ function validateAbsolutePath(value, label) {
     throw new Error(`${label} must be an absolute path`);
   }
   return path.resolve(value);
-}
-
-function validatePathOutsideRepo(value, repoRoot, label) {
-  if (isSameOrInside(path.resolve(repoRoot), path.resolve(value)) ||
-      isSameOrInside(path.resolve(value), path.resolve(repoRoot))) {
-    throw new Error(`${label} must be outside the source repository`);
-  }
-}
-
-function resolveExistingParents(value) {
-  const absolute = path.resolve(value);
-  if (existsSync(absolute)) return realpathSync(absolute);
-  const parent = path.dirname(absolute);
-  if (parent === absolute) throw new Error("Local E2E path cannot be resolved");
-  return path.join(resolveExistingParents(parent), path.basename(absolute));
-}
-
-function isSameOrInside(parent, candidate) {
-  const relative = path.relative(parent, candidate);
-  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
 function validateSolanaProgramId(value, label) {

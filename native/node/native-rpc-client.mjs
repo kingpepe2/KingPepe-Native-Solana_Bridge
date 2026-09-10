@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import path from "node:path";
+import { validateRuntimeFile } from "../../shared/runtime-path-boundary.mjs";
 
 export const NATIVE_RPC_ADAPTER_PROTOCOL =
   "KINGPEPE_NATIVE_SOLANA_BRIDGE/NATIVE_RPC_ADAPTER/V1";
@@ -282,9 +282,11 @@ export function normalizeEndpoint(endpoint, options = {}) {
 export function readAuthorizationHeaderFromCookieFile(cookieFile, repoRoot = undefined) {
   if (cookieFile === undefined || cookieFile === null || cookieFile === "") return undefined;
   if (typeof cookieFile !== "string") throw new Error("NativeRpcAuthCookieFileInvalid");
-  const resolved = path.resolve(cookieFile);
-  if (repoRoot !== undefined && isPathInside(resolved, path.resolve(repoRoot))) {
-    throw new Error("NativeRpcAuthCookieInsideRepositoryRejected");
+  let resolved;
+  try { resolved = validateRuntimeFile(cookieFile, repoRoot); }
+  catch (error) {
+    if (error.message.includes("InsideRepositoryRejected")) throw new Error("NativeRpcAuthCookieInsideRepositoryRejected");
+    throw new Error("NativeRpcAuthCookiePathRejected");
   }
   let line;
   try {
@@ -392,9 +394,4 @@ function isLoopbackHostname(hostname) {
     normalized === "0:0:0:0:0:0:0:1" ||
     /^127(?:\.[0-9]{1,3}){3}$/u.test(normalized)
   );
-}
-
-function isPathInside(candidate, root) {
-  const relative = path.relative(root, candidate);
-  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }

@@ -15,8 +15,8 @@
   },
   "evidenceScope": "Current local integration increment; its CI result must be checked at the exact source SHA. Earlier per-component CI booleans were historical, not proof of this tree.",
   "previousVerifiedSource": {
-    "sha": "4e4885a85c93b0ab9473b451b90fe9575bde51c8",
-    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34454048203",
+    "sha": "4018556befe8485c6e374404dfc6ef1cce647455",
+    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34457447371",
     "status": "PASS"
   },
   "sourceState": {
@@ -32,6 +32,8 @@
     "postMintDeepReorgResponse": "NOT_RUN_COMPLETE_SERVICE_E2E",
     "provenance": "FILE_BY_FILE_REVIEWED",
     "repositoryPrivacy": "VERIFIED_PRIVATE",
+    "runtimePathBoundary": "COMMON_CHECKOUT_LINK_FILE_TYPE_GUARDS_AND_40_REAL_FILESYSTEM_TESTS_PASS_WINDOWS_WSL",
+    "runtimePathLimitations": "NOT_OS_ACL_ISOLATION_ATOMIC_RACE_PROOF_FILE_ACCESS_OR_COMPLETE_MOUNT_ALIAS_PROTECTION",
     "canonicalMessages": "IMPLEMENTED_AND_TESTED_LOCALLY",
     "accounting": "CANONICAL_OPERATION_BOUND_IN_MEMORY_CREDITS_AND_FAILURE_ATOMIC_RUST_PRIMITIVES_TESTED",
     "pendingCreditRetry": "SOURCE_LEVEL_SYNC_ASYNC_TESTED_NOT_DURABLE_RESTART_ACCOUNTING",
@@ -55,13 +57,15 @@
   },
   "localValidation": {
     "windows": {
-      "nodeTestsPass": 190,
+      "nodeTestsPass": 230,
+      "runtimePathTestsIncluded": 40,
       "protocolVectorsPass": 2,
       "nativeSbf": "NOT_RUN_NOT_SUPPORTED",
       "serviceAclProtectedStorage": "NOT_RUN"
     },
     "wsl": {
-      "nodeTestsPass": 190,
+      "nodeTestsPass": 230,
+      "runtimePathTestsIncluded": 40,
       "protocolVectorsPass": 2,
       "solanaRustTestsPass": 64,
       "nativeRustTestsPass": 29,
@@ -115,7 +119,8 @@
     "Configure production Native evidence sources; current raw-header/Merkle integration is REGTEST-only with explicit local-node UTXO trust",
     "Review remaining account and source-validation dependencies",
     "Exercise full-service restart beyond the tested signed-claim worker crashes; persist unminted credit liabilities and complete authenticated/fenced journal and rollback guarantees",
-    "Persist global integrity hard stops; current in-memory accounting and per-adapter journals do not establish complete bridge-wide restart safety"
+    "Persist global integrity hard stops; current in-memory accounting and per-adapter journals do not establish complete bridge-wide restart safety",
+    "Enforce service ACLs, protected storage and authenticated IPC; path prechecks do not close hostile filesystem race or privileged mount/host-compromise boundaries"
   ],
   "readinessGates": {
     "SOURCE_COMPLETE": "IMPLEMENTED_BUT_INCOMPLETE",

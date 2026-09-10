@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
+import { isSameOrInside, resolveExistingParents, validateRuntimeStateRoot } from "../shared/runtime-path-boundary.mjs";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { ed25519 } from "@noble/curves/ed25519.js";
@@ -2256,12 +2257,13 @@ function sanitizeFlowForReport(flow, plan) {
 }
 
 function validateStateRoot({ stateRoot, repoRoot, runRoot }) {
-  const resolved = path.resolve(stateRoot);
-  const repo = path.resolve(repoRoot);
-  const run = path.resolve(runRoot);
-  if (isSameOrInside(repo, resolved)) {
-    throw new Error("LocalNativeToSolanaStateRootInsideRepositoryRejected");
+  let resolved;
+  try { resolved = validateRuntimeStateRoot(stateRoot, repoRoot); }
+  catch (error) {
+    if (error.message.includes("InsideRepositoryRejected")) throw new Error("LocalNativeToSolanaStateRootInsideRepositoryRejected");
+    throw error;
   }
+  const run = resolveExistingParents(runRoot);
   if (!isSameOrInside(run, resolved)) {
     throw new Error("LocalNativeToSolanaStateRootOutsideRunRootRejected");
   }
@@ -2487,11 +2489,6 @@ function requireObject(value, label) {
 
 function sha256Hex(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
-}
-
-function isSameOrInside(parent, candidate) {
-  const relative = path.relative(parent, candidate);
-  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
 if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {

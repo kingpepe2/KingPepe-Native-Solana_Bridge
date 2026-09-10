@@ -1,5 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { validateRuntimeFile, validateRuntimeStateRoot } from "../../../shared/runtime-path-boundary.mjs";
 
 export const FROST_STATE_FORMAT = "kingpepe-native-solana-frost-state/v1";
 
@@ -7,20 +8,14 @@ export class FileBackedFrostStateStore {
   #root;
   #file;
   #signerId;
+  #repoRoot;
 
   constructor(options) {
     this.#signerId = options.signerId;
-    this.#root = path.resolve(options.root);
-    if (!path.isAbsolute(this.#root)) throw new Error("FROST state root must be absolute");
-    if (options.repoRoot !== undefined) {
-      const repoRoot = path.resolve(options.repoRoot);
-      const relative = path.relative(repoRoot, this.#root);
-      if (relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))) {
-        throw new Error("FROST runtime state root must be outside the source repository");
-      }
-    }
+    this.#repoRoot = options.repoRoot;
+    this.#root = validateRuntimeStateRoot(options.root, this.#repoRoot, "FROST state root");
     mkdirSync(this.#root, { recursive: true, mode: 0o700 });
-    this.#file = path.join(this.#root, "frost-signer-state.json");
+    this.#file = validateRuntimeFile(path.join(this.#root, "frost-signer-state.json"), this.#repoRoot);
   }
 
   get root() {
@@ -28,6 +23,7 @@ export class FileBackedFrostStateStore {
   }
 
   load() {
+    validateRuntimeFile(this.#file, this.#repoRoot);
     if (!existsSync(this.#file)) return initialSignerState(this.#signerId);
     const parsed = JSON.parse(readFileSync(this.#file, "utf8"));
     validateStateEnvelope(parsed, this.#signerId);
@@ -36,14 +32,10 @@ export class FileBackedFrostStateStore {
 
   save(state) {
     validateStateEnvelope(state, this.#signerId);
-    mkdirSync(this.#root, { recursive: true, mode: 0o700 });
-    const tmp = path.join(this.#root, `.${process.pid}.${Date.now()}.tmp`);
-    writeFileSync(tmp, `${JSON.stringify(state, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+    validateRuntimeFile(this.#file, this.#repoRoot);
+    const tmp = validateRuntimeFile(path.join(this.#root, `.${process.pid}.${Date.now()}.tmp`), this.#repoRoot);
+    writeFileSync(tmp, `${JSON.stringify(state, null, 2)}\n`, { encoding: "utf8", mode: 0o600, flag: "wx", flush: true });
     renameSync(tmp, this.#file);
-  }
-
-  destroyForTestOnly() {
-    rmSync(this.#root, { recursive: true, force: true });
   }
 }
 

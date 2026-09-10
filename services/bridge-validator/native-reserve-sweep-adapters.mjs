@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { validateRuntimeFile, validateRuntimeStateRoot as validateStateRootOutsideRepo } from "../../shared/runtime-path-boundary.mjs";
 import { RPC_OBSERVATION, SOURCE_READY, decimalCoinsToAtomic } from "../../native/node/native-rpc-client.mjs";
 import {
   REQUIRED_FROST_SIGNERS,
@@ -209,7 +210,7 @@ export class FileBackedNativeReserveSweepJournal {
 
   constructor(options) {
     const value = requireObject(options, "options");
-    this.#repoRoot = path.resolve(value.repoRoot);
+    this.#repoRoot = value.repoRoot;
     this.#root = validateStateRootOutsideRepo(value.root, this.#repoRoot, "Native reserve sweep journal root");
     mkdirSync(this.#root, { recursive: true });
   }
@@ -267,12 +268,13 @@ export class FileBackedNativeReserveSweepJournal {
   }
 
   #entryPath(operationIdHex) {
-    return path.join(this.#root, `${normalizeHash32(operationIdHex, "operationIdHex")}.json`);
+    return validateRuntimeFile(path.join(this.#root, `${normalizeHash32(operationIdHex, "operationIdHex")}.json`), this.#repoRoot);
   }
 
   #write(operationIdHex, entry) {
     const target = this.#entryPath(operationIdHex);
     const temp = `${target}.${process.pid}.tmp`;
+    validateRuntimeFile(temp, this.#repoRoot);
     writeFileSync(temp, `${JSON.stringify(entry, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
     renameSync(temp, target);
   }
@@ -527,16 +529,6 @@ function checkedPositiveInteger(value, label) {
 function checkedNonNegativeInteger(value, label) {
   if (!Number.isSafeInteger(value) || value < 0) throw new Error(`${label}:ExpectedNonNegativeInteger`);
   return value;
-}
-
-function validateStateRootOutsideRepo(root, repoRoot, label) {
-  if (typeof root !== "string" || root.length === 0) throw new Error(`${label}:Required`);
-  const resolved = path.resolve(root);
-  const relative = path.relative(repoRoot, resolved);
-  if (relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))) {
-    throw new Error(`${label}:InsideRepositoryRejected`);
-  }
-  return resolved;
 }
 
 function requireObject(value, label) {
