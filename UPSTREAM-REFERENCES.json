@@ -1,5 +1,16 @@
 {
-  "generatedAt": "2026-09-07T00:00:00Z",
+  "generatedAt": "2026-09-10T00:00:00Z",
+  "phase08DevelopmentTools": {
+    "agaveRelease": "https://github.com/anza-xyz/agave/releases/tag/v4.2.2",
+    "solanaProgramCrate": "3.0.0",
+    "splTokenInterfaceCrate": "2.0.0",
+    "cargoBuildSbf": "4.1.0",
+    "platformTools": "v1.54",
+    "hostRust": "1.89.0",
+    "use": "Pinned local validator/SBF build and public API integration; no upstream source implementation copied.",
+    "archiveIntegrity": "scripts/local-e2e-toolchain.json",
+    "productionApproval": false
+  },
   "primaryReference": {
     "project": "wormhole-foundation/native-token-transfers",
     "referenceType": "technical-comparison",
@@ -13,7 +24,7 @@
     "referenceType": "consensus-parameter-and-format-reference",
     "selectedCommit": "3f2621820ffefae59cbe48b350f5f8f6ec8a6da5",
     "selectedTree": "33d550b0c2bec33ede7e6d73cd44afbbe18dea8b",
-    "verificationSource": "read-only recovery material in config/networks/kingpepe-mainnet.json and config/networks/kingpepe-regtest.json",
+    "verificationSource": "Recovery facts cross-checked against the exact upstream source commit/tree and checksum-verified archive; daemon/CLI built and exercised in isolated REGTEST.",
     "phase06Use": "KingPepe Native genesis, decimals, PoW, difficulty, chainwork, activation, address, transaction, and header format facts",
     "phase08Use": "KingPepe REGTEST 8-decimal atomic units, coinbase maturity 20, Taproot activation, and Bech32 HRP rkpepe for disposable local FROST Taproot deposit/fee/reserve intent generation",
     "status": "reference-facts-only-no-git-history-import"

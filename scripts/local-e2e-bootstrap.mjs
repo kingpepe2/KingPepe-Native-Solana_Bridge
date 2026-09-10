@@ -10,6 +10,7 @@ import {
   READY_TO_RUN_LOCAL_E2E,
   REQUIRED_KINGPEPE_REGTEST_VERSION,
   REQUIRED_SOLANA_VERSION,
+  REQUIRED_SBF_BUILDER_VERSION,
   sanitizePlanForReport,
 } from "./local-e2e-orchestrator.mjs";
 
@@ -80,9 +81,10 @@ export async function withLocalE2eInfrastructure(options = {}, runFlow = async (
       expectedSubstring: REQUIRED_KINGPEPE_REGTEST_VERSION,
       checks,
     });
-    for (const command of ["solana", "solana-test-validator", "cargo-build-sbf"]) {
+    for (const command of ["solana", "solana-test-validator"]) {
       await runVersionCheck({ executor, commandPaths, command, expectedSubstring: REQUIRED_SOLANA_VERSION, checks });
     }
+    await runVersionCheck({ executor, commandPaths, command: "cargo-build-sbf", expectedSubstring: REQUIRED_SBF_BUILDER_VERSION, checks });
     for (const command of plan.commands.filter((entry) => entry.step.startsWith("BUILD_SBF_"))) {
       await runPlanCommand({ executor, commandPaths, command, checks, timeoutMs: options.commandTimeoutMs ?? 600_000 });
     }

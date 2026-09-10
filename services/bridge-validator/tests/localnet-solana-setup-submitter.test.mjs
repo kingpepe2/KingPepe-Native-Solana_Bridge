@@ -69,6 +69,8 @@ function fixture(overrides = {}) {
     solanaRpcPort: 8899,
     feePayerAirdropLamports: "5000000000",
     maxRetries: 0,
+    finalityPollAttempts: 1,
+    finalityPollDelayMs: 0,
     ...overrides.config,
   };
   const request = {
@@ -211,6 +213,37 @@ test("localnet setup submitter rejects duplicate attesters and transaction failu
   }).submitSetup(failed.request);
   assert.equal(rejected.state, LOCALNET_SOLANA_SETUP_REJECTED);
   assert.equal(rejected.reason, "LOCALNET_SOLANA_TRANSACTION_REJECTED");
+});
+
+test("setup polls the same signatures without repeating airdrop or setup broadcast", async () => {
+  const fx = fixture({ config: { finalityPollAttempts: 4 } });
+  const rpc = new FakeSetupRpc({ recentBlockhash: fx.recentBlockhash.base58 });
+  const observed = new Map();
+  rpc.getSignatureStatus = async (signature) => {
+    const count = (observed.get(signature) ?? 0) + 1;
+    observed.set(signature, count);
+    return { slot: 90, confirmationStatus: count < 3 ? "confirmed" : "finalized", err: null };
+  };
+  const result = await new LocalnetSolanaSetupSubmitter({ config: fx.config, rpcClient: rpc }).submitSetup(fx.request);
+  assert.equal(result.state, LOCALNET_SOLANA_SETUP_COMPLETED);
+  assert.deepEqual([...observed.values()], [3, 3]);
+  assert.equal(rpc.airdropCalls.length, 1);
+  assert.equal(rpc.sendCalls.length, 1);
+});
+
+test("exhausting finality polls never approves a missing signature or sends setup", async () => {
+  const fx = fixture({ config: { finalityPollAttempts: 3 } });
+  const rpc = new FakeSetupRpc({ recentBlockhash: fx.recentBlockhash.base58 });
+  let calls = 0;
+  rpc.getSignatureStatus = async () => { calls += 1; return null; };
+  const result = await new LocalnetSolanaSetupSubmitter({ config: fx.config, rpcClient: rpc }).submitSetup(fx.request);
+  assert.equal(result.state, LOCALNET_SOLANA_SETUP_WAITING_FOR_DEPENDENCY);
+  assert.equal(calls, 3);
+  assert.equal(rpc.airdropCalls.length, 1);
+  assert.equal(rpc.sendCalls.length, 0);
+  assert.throws(() => new LocalnetSolanaSetupSubmitter({
+    config: { ...fx.config, finalityPollAttempts: 0 }, rpcClient: rpc,
+  }), /PollSettingInvalid/);
 });
 
 class FakeSetupRpc {

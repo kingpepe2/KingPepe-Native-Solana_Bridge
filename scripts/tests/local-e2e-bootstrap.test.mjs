@@ -140,7 +140,7 @@ test("bootstrap requires SBF build artifacts before starting validators", async 
 
 test("bootstrap rejects SDK and validator version substitutions before building", async () => {
   for (const step of ["CHECK_SOLANA_VERSION", "CHECK_SOLANA_TEST_VALIDATOR_VERSION", "CHECK_CARGO_BUILD_SBF_VERSION"]) {
-    const executor = new FakeExecutor({ outputs: new Map([[step, "Solana 1.18.260"]]) });
+    const executor = new FakeExecutor({ outputs: new Map([[step, "Solana 4.2.20"]]) });
     const result = await runLocalE2eBootstrap({ plan: readyPlan(), executor });
     assert.equal(result.reason, BLOCKED_LOCAL_E2E_VERSION_MISMATCH);
     assert(!executor.calls.some((entry) => entry.startsWith("BUILD_SBF_")));
@@ -218,8 +218,9 @@ function defaultOutput(step) {
   if (step === "CHECK_KINGPEPED_VERSION" || step === "CHECK_KINGPEPE_CLI_VERSION") {
     return "KingPepe Core version v31.1.0";
   }
-  if (["CHECK_SOLANA_VERSION", "CHECK_SOLANA_TEST_VALIDATOR_VERSION", "CHECK_CARGO_BUILD_SBF_VERSION"].includes(step)) {
-    return "Solana 1.18.26";
+  if (["CHECK_SOLANA_VERSION", "CHECK_SOLANA_TEST_VALIDATOR_VERSION"].includes(step)) {
+    return "Solana 4.2.2";
   }
+  if (step === "CHECK_CARGO_BUILD_SBF_VERSION") return "solana-cargo-build-sbf 4.1.0";
   return `${step} ok`;
 }

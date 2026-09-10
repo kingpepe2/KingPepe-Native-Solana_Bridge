@@ -1,165 +1,86 @@
 # AGENTS
 
-## Project authority
+## Authority and safety boundaries
 
-- Project: KingPepe Native - Solana Bridge
-- Operating model: `INDEPENDENT_PROJECT_OPERATED_BRIDGE`
-- Governance role: `KINGPEPE_TEAM_GOVERNANCE`
-- Backing model: 1:1 Native reserve backing with explicit reserve/liability accounting.
-- Signing model: software FROST, exact `2-of-2` with `requiredParticipants = [A, B]`
-- Deployment topology: same-host, project-controlled (`SINGLE_HOST_PROJECT_CONTROLLED_FROST`)
-- Mainnet activation: `DISABLED` (authoritative for this repository)
-- `productionReady = false`
-- `mainnetActivation = DISABLED`
-- `productionSigningAuthorized = false`
-- `productionBroadcastAuthorized = false`
+- Project: KingPepe Native - Solana Bridge; governance: KINGPEPE_TEAM_GOVERNANCE.
+- Source repository must remain PRIVATE. Original source is proprietary; retain
+  third-party licenses and file-by-file PROVENANCE.json entries.
+- Exact software FROST A+B, 2-of-2, on one KingPepe Team-controlled host is the
+  approved topology. No second signing computer or 1-of-2 fallback is required.
+- Normal valid transfers are automatic after user wallet authorization and
+  one-time activation; no per-transfer KingPepe Team approval queue.
+- Mainnet activation DISABLED; productionReady=false;
+  productionSigningAuthorized=false; productionBroadcastAuthorized=false.
+- No production provisioning, service installation, signing, broadcasting,
+  deployment or activation without the applicable gates and authorization.
+- Legacy recovery material is read-only. Do not import old Git history.
+- Keys, nonce/session state, operational databases, logs, deployment identities
+  and real machine-specific configuration belong outside the checkout.
+- Public README remains minimal. Templates use placeholder references only.
+- Review project-role terminology; preserve official Solana account.owner and
+  third-party API terminology.
+- Preserve unrelated changes. Stage explicit files; scan working/staged files
+  and EVERY outgoing commit before pushing. Recheck repository privacy.
+- Never weaken a failing security gate or bypass GitHub protections.
 
-## Core constraints retained in code and operations
+## Current phase and evidence
 
-- Same-host FROST A and FROST B are approved and documented. Physical dual-host is not required.
-- Normal bridge transfers are automated and must not require per-transfer KingPepe Team approval.
-- FROST A/B, attestation services, coordinator, observers, and relayers are separate service roles.
-- No production secrets are permitted in source, documentation, commit history, or artifacts.
-- Secret-bearing runtime state and operational keys are external to this repository and loaded only from private deployment configuration.
+PHASE 08: real local Native-to-Solana happy-path integration is now exercised.
+The new increment awaits its own source-SHA-bound CI result. The preceding
+commit cb7b44544f8c3935ddc8065eee5d67ee220afee2 passed all four jobs:
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34432312954
 
-## Current phase status
+A pinned Native REGTEST node accepted real FROST A+B Taproot sweep signatures;
+the Agave local validator verified two Ed25519 attestations, created a receipt,
+then minted exactly 100000000 atomic units. Finalized reserve and observed SPL
+Mint supply matched, without a per-transfer approval.
 
-- Current implementation phase: `PHASE 08 - Automatic Native to Solana local end-to-end`
-- Objective: connect the automated local Native-to-Solana deposit path using validated Native reserve transitions, project attestations, Solana mint receipt consumption, and reconciliation while keeping live activation disabled outside local testing.
-- Required authority: `KINGPEPE_TEAM_GOVERNANCE`
+This does NOT prove the complete bridge is finished. Phase 08 security
+dependencies still need review: recoverable temporary-deposit scripts and
+recovery races, full evidence-source wiring, initialization authorization,
+failure/restart scenarios and durable storage guarantees. Phase 09 has not
+started. Production observers, configuration, review and activation are absent.
+Never relabel RPC_OBSERVATION as independent chain validation.
 
-## Authoritative status files
+The Node FROST runtime uses pinned @noble/curves schnorr_FROST. The native/frost
+Rust crate is supporting policy/state-model code, NOT the Native cryptographic
+signer. Ed25519 is only for project attestations.
 
-- `AGENTS.md`
-- `docs/development-status.md`
-- `docs/task-status.md` (historical)
-- `BRIDGE-READINESS.json`
-- `PROVENANCE.json`
-- `.github/workflows/ci.yml`
+## Build and test
 
-## Phase 01 safe commands
+Use scripts/local-e2e-toolchain.json and docs/deployment/local-e2e-build.md.
+Solana host Rust: 1.89.0; Native supporting crates: nightly-2023-10-29.
+SBF: pinned Agave 4.2.2, bundled cargo-build-sbf 4.1.0, platform-tools v1.54.
+These are direct solana-program crates, not Anchor-generated programs.
 
-- `python .github/scripts/guardrails.py`
-- `git status`
-- `git remote -v`
-- `git branch --show-current`
-- `Get-Content -Raw PROVENANCE.json` (local provenance verification)
+Safe checks:
+- npm ci --ignore-scripts
+- npm test
+- npm audit --audit-level=low
+- python .github/scripts/guardrails.py
+- node .github/scripts/dependency-license-audit.mjs
+- In solana/: cargo fmt --check --all
+- In solana/: cargo clippy --locked --workspace --all-targets -- -D warnings
+- In solana/: cargo test --locked --workspace
+- For each native/{frost,proof,reserve,recovery}/Cargo.toml: cargo test --locked
+  --manifest-path <manifest>; also run fmt --check and clippy -- -D warnings.
+- npm run doctor:local-e2e; npm run local:e2e:native-to-solana
+  only with the pinned isolated REGTEST/local-validator tools and an external,
+  fresh KINGPEPE_LOCAL_E2E_ROOT. Generated SBF keypairs also stay external.
+- CI runs cargo-audit against all five lockfiles without ignored advisories.
+  bincode 1.3.3 has a retained, reported unmaintained warning, not a clean bill
+  of health or production approval.
 
-## Phase 02 safe commands
+Latest measured local suites: 132 Node tests plus two vectors on Windows and
+WSL; 56 Solana Rust tests and 22 Native supporting-crate tests in WSL.
+Windows service/ACL/protected-storage and native Windows SBF tests are NOT_RUN.
+Do not reuse these counts as evidence after code changes without rerunning.
 
-- `python .github/scripts/guardrails.py`
-- `cd solana && cargo check --locked --workspace --all-targets`
-- `cargo check --locked --manifest-path native/frost/Cargo.toml`
-- `cargo test --locked --manifest-path native/frost/Cargo.toml`
-- Stage intended files explicitly after review.
-- `git status`
-- `git diff --name-only`
+## Continuity
 
-## Phase 02 phase notes
-
-- Added initial non-empty structure directories and configuration schema templates under:
-  - `solana/ts`, `solana/tests`, `solana/fuzz`, `solana/scripts`
-  - `native/proof`, `native/reserve`, `native/recovery`
-  - `config`, `deployment`, `db-backup`, `shared`, `cli`, `app`, `scripts`, `monitoring`, `tests`
-- Pinned toolchain and dependency versions in manifest files.
-- Added locked dependency files for the current Solana and native Rust workspaces.
-- Removed the phase-02 Ed25519 placeholder dependency from the native runtime to keep CI compatible with the pinned toolchain.
-- Kept all sensitive runtime data and live credentials outside repository scope.
-- Updated source comparison records: `UPSTREAM-REFERENCES.json`, `docs/architecture/ntt-comparison.md`.
-- The Rust crate remains supporting policy/state scaffold. Phase 04 Native signatures are implemented in the Node FROST runtime.
-
-## Phase 03 phase notes
-
-- Keep message authorization binary and canonical; do not use JSON as an economic authorization encoding.
-- Use exact integer accounting only.
-- Keep production readiness false and Mainnet activation disabled.
-
-## Phase 04 phase notes
-
-- Do not treat Ed25519 attestation or phase-02 deterministic Rust test shares as FROST.
-- KingPepe Native signing evidence from read-only recovery material identifies the required path as Taproot/BIP340.
-- The Phase 04 runtime uses pinned `@noble/curves` `2.3.0` `schnorr_FROST`.
-- Phase 04 implementation commit: `3494ebf70f9a432bd786ea17ca73a1177d8bf66d`
-- Phase 04 CI: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34281044175` PASS
-- Required local checks:
-  - `npm ci --ignore-scripts`
-  - `npm run test:frost`
-  - `npm audit --audit-level=low`
-- Keep all generated test key material outside the repository.
-
-## Phase 05 phase notes
-
-- Bridge manager must not accept caller-provided proof flags.
-- Transceiver owns attestation verification and receipts but must not hold mint authority.
-- Mint authority must be a bridge PDA; freeze authority remains none.
-- Production activation remains disabled.
-
-## Phase 06 phase notes
-
-- Native proof/reserve/recovery crates validate KingPepe Native headers, PoW,
-  difficulty, chainwork, transactions, Merkle proofs, UTXO observations,
-  reserve sweeps, and temporary-deposit recovery eligibility.
-- Temporary recoverable deposits do not authorize minting.
-- CI verified Phase 06 at `836b8e62e2c87fe8b2d3df48f7fc54466206b646`.
-
-## Phase 07 phase notes
-
-- Attestation uses Ed25519 project attestations, not FROST.
-- Attestation keys remain separate from Native FROST shares and outside the
-  repository.
-- Transceiver instruction parsing binds Solana Ed25519 verifier instructions to
-  the exact canonical message bytes.
-- Solana observer logic must distinguish RPC observation from local validation
-  and must `HARD_STOP` on unauthorized program, binary, upgrade-authority, Mint,
-  or mint-authority changes.
-- CI verified Phase 07 at `d17ba8fe61d20a88d4206f72d68a010a2d146524`.
-
-## Phase 08 phase notes
-
-- Phase 08 has a source-level automatic Native-to-Solana deposit pipeline
-  boundary in `services/bridge-validator/automatic-deposit-pipeline.mjs`.
-- The pipeline uses existing real FROST A+B signing, project attestation,
-  canonical messages, adapter boundaries, replay checks, and exact BigInt
-  accounting. It has no per-transfer KingPepe Team approval state.
-- Required local executables were not available in the checked environment:
-  `kingpeped`, `kingpepe-cli`, `solana`, `solana-test-validator`, and `anchor`.
-- Current Solana crates include deterministic non-production localnet Program
-  IDs and validate-only economic ABI decoding. Solana economic execution is
-  still disabled, so they are not ready for a real local-validator E2E flow.
-- Do not mark Native-to-Solana local E2E as passed until a disposable
-  KingPepe regtest node and Solana local validator execute the full automated
-  deposit flow without per-transfer KingPepe Team approval.
-- Current local source-boundary check:
-  - `npm run test:bridge-validator`
-- Current local E2E readiness check:
-  - `npm run test:local-e2e-readiness`
-  - `npm run doctor:local-e2e` reports
-    `BLOCKED_LOCAL_INFRASTRUCTURE_MISSING` until the required localnet
-    executables exist and Solana economic instruction execution is implemented.
-- Phase 08 local E2E readiness gate commit:
-  `6f22309770f3a2f85c96093bcf8af10b47065f31`
-- Phase 08 local E2E readiness gate CI:
-  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34293107931` PASS
-- Phase 08 source-boundary implementation commit:
-  `09e42e6856312a0c617eb9c14a0312012263722a`
-- Phase 08 source-boundary CI:
-  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34292181114` PASS
-- Phase 08 fail-closed Solana entrypoint shell commit:
-  `7eafd8a38d346dcb018005a7357a0012a84b0e0c`
-- Phase 08 fail-closed Solana entrypoint shell CI:
-  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34295554332` PASS
-- Phase 08 validate-only Solana ABI status:
-  instruction decoding and malformed/trailing-data rejection are implemented
-  locally; account execution and SPL CPI remain disabled.
-- Phase 08 validate-only Solana ABI commit:
-  `201c5bdc2a2fb65601331b58115e0a7543179e12`
-- Phase 08 validate-only Solana ABI CI:
-  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34298518315` PASS.
-- Phase 08 mint-authority PDA correction:
-  the bridge manager now derives the mint authority with Solana
-  `Pubkey::find_program_address` seeds and exposes the bump for future account
-  initialization.
-- Phase 08 mint-authority PDA correction commit:
-  `94da519e7a50ea6692c445cfd307beb0fa491347`
-- Phase 08 mint-authority PDA correction CI:
-  `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34299827083` PASS.
+Authoritative files: docs/development-status.md (current evidence and history),
+docs/task-status.md (stage/commit history), BRIDGE-READINESS.json,
+PROVENANCE.json, UPSTREAM-REFERENCES.json, .github/workflows/ci.yml.
+Historical passing tests do not certify a newer tree. Commit/push each coherent
+validated increment, verify CI for the exact SHA, record failures/corrections,
+and resolve Phase 08 dependencies before moving to Phase 09.

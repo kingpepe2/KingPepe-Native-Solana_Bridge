@@ -13,6 +13,7 @@ export const BLOCKED_LOCAL_E2E = "BLOCKED_LOCAL_INFRASTRUCTURE_MISSING";
 const toolchain = JSON.parse(readFileSync(new URL("./local-e2e-toolchain.json", import.meta.url), "utf8"));
 export const REQUIRED_KINGPEPE_REGTEST_VERSION = toolchain.native.version;
 export const REQUIRED_SOLANA_VERSION = toolchain.solana.version;
+export const REQUIRED_SBF_BUILDER_VERSION = toolchain.solana.sbfBuilderVersion;
 export const REQUIRED_SBF_TOOLS_VERSION = toolchain.solana.platformToolsVersion;
 
 export const ALLOWED_REGTEST_CLI_COMMANDS = Object.freeze(

@@ -1,4 +1,5 @@
 import { bytesToHex, isHash32Hex, normalizeHex } from "../../shared/protocol/canonical-message.mjs";
+import { base58Encode, findProgramAddress, DEPOSIT_CLAIM_PDA_SEED_PREFIX, MINT_AUTHORITY_PDA_SEED_PREFIX } from "../bridge-validator/solana-deposit-claim-transaction-plan.mjs";
 
 export const SOLANA_DEPOSIT_CLAIM_OBSERVER_PROTOCOL =
   "KINGPEPE_NATIVE_SOLANA_BRIDGE/SOLANA_DEPOSIT_CLAIM_OBSERVER/V1";
@@ -6,7 +7,7 @@ export const SOLANA_DEPOSIT_CLAIM_RPC_PROTOCOL =
   "KINGPEPE_NATIVE_SOLANA_BRIDGE/SOLANA_DEPOSIT_CLAIM_RPC/V1";
 
 const LOCALNET = "localnet";
-const LOCAL_VALIDATION = "LOCAL_VALIDATION";
+const RPC_OBSERVATION = "RPC_OBSERVATION";
 const FINALIZED = "finalized";
 const DEPOSIT_CLAIM_MAGIC = "KPBCLM01";
 const DEPOSIT_CLAIM_VERSION = 1;
@@ -18,6 +19,7 @@ const SPL_FREEZE_AUTHORITY_VALUE_OFFSET = 50;
 const ALLOWED_RPC_METHODS = new Set(["getTransaction", "getSlot", "getAccountInfo"]);
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 const BASE58_PATTERN = /^[1-9A-HJ-NP-Za-km-z]{32,128}$/u;
+const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 
 export class SolanaDepositClaimObserver {
   #config;
@@ -41,15 +43,23 @@ export class SolanaDepositClaimObserver {
     }
 
     const request = normalizeSolanaDepositClaimObservationRequest(input, this.#config);
+    const manager = Buffer.from(this.#config.managerProgramIdHex, "hex");
+    const mint = Buffer.from(this.#config.mintHex, "hex");
+    const expectedClaim = findProgramAddress([Buffer.from(DEPOSIT_CLAIM_PDA_SEED_PREFIX), Buffer.from(request.operationIdHex, "hex")], manager);
+    if (request.depositClaimAccountBase58 !== expectedClaim.base58 || request.mintAccountBase58 !== base58Encode(mint)) {
+      throw integrityError("SOLANA_DEPOSIT_ACCOUNT_ADDRESS_MISMATCH");
+    }
     const transaction = await this.#rpcClient.getTransaction(request.solanaSignature);
     if (!transaction) {
       throw new Error("SolanaDepositClaimTransactionUnavailable");
     }
     const slot = normalizeSlot(transaction.slot, "transaction.slot");
     const transactionMeta = requireObject(transaction.meta, "transaction.meta");
+    if (!Object.hasOwn(transactionMeta, "err")) throw new Error("SolanaDepositClaimTransactionStatusMissing");
     const rootSlot = normalizeSlot(await this.#rpcClient.getFinalizedSlot(), "rootSlot");
 
     const claimAccount = await this.#rpcClient.getAccountInfo(request.depositClaimAccountBase58);
+    validateAccountBoundary(claimAccount, base58Encode(manager), slot);
     const claimRecord = decodeDepositClaimAccountBase64(extractBase64AccountData(claimAccount, "depositClaimAccount"));
     if (claimRecord.operationIdHex !== request.operationIdHex) {
       throw new Error("SolanaDepositClaimObservedOperationMismatch");
@@ -58,11 +68,16 @@ export class SolanaDepositClaimObserver {
       throw new Error("SolanaDepositClaimObservedMessageDigestMismatch");
     }
     const mintAccount = await this.#rpcClient.getAccountInfo(request.mintAccountBase58);
+    validateAccountBoundary(mintAccount, TOKEN_PROGRAM, slot);
     const mintRecord = decodeSplMintAccountBase64(extractBase64AccountData(mintAccount, "mintAccount"));
+    const expectedAuthority = findProgramAddress([Buffer.from(MINT_AUTHORITY_PDA_SEED_PREFIX), mint], manager);
+    if (mintRecord.mintAuthorityHex !== expectedAuthority.hex || mintRecord.decimals !== this.#config.nativeDecimals) {
+      throw integrityError("SOLANA_MINT_AUTHORITY_OR_PRECISION_MISMATCH");
+    }
 
     return Object.freeze({
       protocol: SOLANA_DEPOSIT_CLAIM_OBSERVER_PROTOCOL,
-      trust: LOCAL_VALIDATION,
+      trust: RPC_OBSERVATION,
       cluster: this.#config.cluster,
       slot: slot.toString(),
       rootSlot: rootSlot.toString(),
@@ -78,6 +93,9 @@ export class SolanaDepositClaimObserver {
       mint: Object.freeze({
         addressHex: this.#config.mintHex,
         freezeAuthorityHex: mintRecord.freezeAuthorityHex,
+        mintAuthorityHex: mintRecord.mintAuthorityHex,
+        supplyAtomic: mintRecord.supplyAtomic,
+        decimals: mintRecord.decimals,
       }),
       depositClaim: Object.freeze({
         operationIdHex: claimRecord.operationIdHex,
@@ -221,17 +239,25 @@ export function decodeSplMintAccountBase64(base64Data) {
 
 export function decodeSplMintAccountBytes(input) {
   const bytes = asUint8Array(input, "mintAccount");
-  if (bytes.length < SPL_MINT_ACCOUNT_LENGTH) {
+  if (bytes.length !== SPL_MINT_ACCOUNT_LENGTH) {
     throw new Error(`SplMintAccountInvalidLength:${bytes.length}`);
   }
   const freezeAuthorityTag = readU32LE(bytes, SPL_FREEZE_AUTHORITY_TAG_OFFSET);
+  const authorityTag = readU32LE(bytes, 0);
+  if (![0, 1].includes(authorityTag) || bytes[45] !== 1) throw new Error("SplMintAccountInvalidInitializationOrAuthorityTag");
+  const fields = {
+    mintAuthorityHex: authorityTag === 0 ? null : bytesToHex(bytes.slice(4, 36)),
+    supplyAtomic: readU64LE(bytes, 36).toString(),
+    decimals: bytes[44],
+  };
   if (freezeAuthorityTag === 0) {
-    return Object.freeze({ freezeAuthorityHex: null });
+    return Object.freeze({ ...fields, freezeAuthorityHex: null });
   }
   if (freezeAuthorityTag !== 1) {
     throw new Error("SplMintAccountInvalidFreezeAuthorityTag");
   }
   return Object.freeze({
+    ...fields,
     freezeAuthorityHex: bytesToHex(
       bytes.slice(SPL_FREEZE_AUTHORITY_VALUE_OFFSET, SPL_FREEZE_AUTHORITY_VALUE_OFFSET + 32),
     ),
@@ -248,6 +274,7 @@ function normalizeSolanaDepositClaimObserverConfig(config) {
     managerProgramIdHex: normalizeHashLike(config.managerProgramIdHex, "managerProgramIdHex"),
     transceiverProgramIdHex: normalizeHashLike(config.transceiverProgramIdHex, "transceiverProgramIdHex"),
     mintHex: normalizeHashLike(config.mintHex, "mintHex"),
+    nativeDecimals: checkedDecimals(config.nativeDecimals ?? 8),
     depositClaimAccountBase58:
       config.depositClaimAccountBase58 === undefined
         ? undefined
@@ -271,6 +298,28 @@ function normalizeSolanaDepositClaimObservationRequest(input, config) {
     ),
     mintAccountBase58: normalizeBase58(input.mintAccountBase58 ?? config.mintAccountBase58, "mintAccountBase58"),
   });
+}
+
+function checkedDecimals(value) {
+  if (!Number.isInteger(value) || value < 0 || value > 18) throw new Error("SolanaObserverDecimalsInvalid");
+  return value;
+}
+
+function integrityError(code) {
+  const error = new Error(code);
+  error.integrityCode = code;
+  return error;
+}
+
+function validateAccountBoundary(envelope, expectedProgram, transactionSlot) {
+  const account = envelope?.value;
+  if (!account) throw new Error("SolanaObservedAccountMissing");
+  if (account.owner !== expectedProgram || account.executable !== false) {
+    throw integrityError("SOLANA_DEPOSIT_ACCOUNT_PROGRAM_MISMATCH");
+  }
+  if (normalizeSlot(envelope.context?.slot, "accountContextSlot") < transactionSlot) {
+    throw new Error("SolanaObservedAccountSnapshotStale");
+  }
 }
 
 function extractBase64AccountData(accountInfo, label) {

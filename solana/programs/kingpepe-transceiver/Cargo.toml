@@ -2,6 +2,8 @@
 name = "kingpepe-transceiver"
 version = "0.1.0"
 edition = "2021"
+publish = false
+license-file = "../../../LICENSE"
 
 [lib]
 name = "kingpepe_transceiver"
@@ -13,6 +15,9 @@ no-entrypoint = []
 
 [dependencies]
 bridge-messages = { path = "../../modules/bridge-messages" }
-solana-program = "=1.18.26"
+solana-program = "=3.0.0"
+solana-system-interface = { version = "=2.0.0", features = ["bincode"] }
 thiserror = "1.0.69"
-zeroize_derive = "=1.4.2"
+
+[dev-dependencies]
+solana-instructions-sysvar = "=3.0.1"

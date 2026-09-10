@@ -3,6 +3,7 @@ name = "kingpepe_native_recovery"
 version = "0.1.0"
 edition = "2021"
 publish = false
+license-file = "../../LICENSE"
 
 [dependencies]
 kingpepe_native_proof = { path = "../proof" }

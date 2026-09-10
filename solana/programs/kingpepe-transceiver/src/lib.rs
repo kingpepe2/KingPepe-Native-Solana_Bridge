@@ -19,13 +19,15 @@ use solana_program::{
     program::invoke_signed,
     program_error::ProgramError,
     pubkey::Pubkey,
-    system_instruction, system_program,
     sysvar::{
-        instructions::{load_instruction_at_checked, ID as INSTRUCTIONS_SYSVAR_ID},
+        instructions::{
+            load_current_index_checked, load_instruction_at_checked, ID as INSTRUCTIONS_SYSVAR_ID,
+        },
         rent::Rent,
         Sysvar,
     },
 };
+use solana_system_interface::{instruction as system_instruction, program as system_program};
 use thiserror::Error;
 
 declare_id!("AkqLGFTy43D9cLjHRTQGpRGb2uWA8nuVyGb2bJYHKCrN");
@@ -193,10 +195,7 @@ impl TransceiverConfig {
             return Err(TransceiverError::InvalidConfig);
         }
         if self.authorized_attesters[0] == self.authorized_attesters[1]
-            || self
-                .authorized_attesters
-                .iter()
-                .any(|key| *key == [0u8; 32])
+            || self.authorized_attesters.contains(&[0u8; 32])
         {
             return Err(TransceiverError::InvalidAttesterSet);
         }
@@ -334,6 +333,65 @@ impl TransceiverProgram {
             .iter()
             .map(|instruction| {
                 parse_ed25519_instruction(instruction, &encoded, digest, message.key_epoch)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        self.verify_message(message, &observations)
+    }
+
+    /// Validate views loaded from the real instructions sysvar. A compact verifier
+    /// references the canonical bytes in this top-level transceiver instruction;
+    /// it never authorizes a caller-selected slice or a digest in place of them.
+    pub fn verify_message_from_transaction_instructions(
+        &mut self,
+        message: &CanonicalBridgeMessage,
+        instructions: &[SolanaInstructionView],
+        current: &SolanaInstructionView,
+    ) -> Result<Hash32, TransceiverError> {
+        if instructions.len() != 2 {
+            return Err(TransceiverError::ThresholdNotMet);
+        }
+        let indexes = [
+            instructions[0].instruction_index,
+            instructions[1].instruction_index,
+        ];
+        let expected_current = TransceiverInstruction::VerifyMessageFromEd25519 {
+            message: Box::new(message.clone()),
+            ed25519_instruction_indexes: indexes,
+        }
+        .encode()
+        .map_err(|_| TransceiverError::InvalidMessage)?;
+        if current.program_id != self.config.transceiver_program_id
+            || current.data != expected_current
+            || indexes[0] == indexes[1]
+            || indexes
+                .iter()
+                .any(|index| *index >= current.instruction_index)
+        {
+            return Err(TransceiverError::InvalidEd25519InstructionOffsets);
+        }
+        let encoded = message
+            .encode()
+            .map_err(|_| TransceiverError::InvalidMessage)?;
+        let digest = message
+            .message_digest()
+            .map_err(|_| TransceiverError::InvalidMessage)?;
+        let observations = instructions
+            .iter()
+            .map(|instruction| {
+                if instruction.data.len()
+                    == ED25519_INSTRUCTION_HEADER_LENGTH
+                        + ED25519_SIGNATURE_LENGTH
+                        + ED25519_PUBLIC_KEY_LENGTH
+                {
+                    parse_shared_message_ed25519_instruction(
+                        instruction,
+                        current.instruction_index,
+                        digest,
+                        message.key_epoch,
+                    )
+                } else {
+                    parse_ed25519_instruction(instruction, &encoded, digest, message.key_epoch)
+                }
             })
             .collect::<Result<Vec<_>, _>>()?;
         self.verify_message(message, &observations)
@@ -504,6 +562,9 @@ fn process_verify_message_accounts(
         load_ed25519_instruction(instructions_sysvar, ed25519_instruction_indexes[0])?;
     let second_instruction =
         load_ed25519_instruction(instructions_sysvar, ed25519_instruction_indexes[1])?;
+    let current_index = load_current_index_checked(instructions_sysvar)
+        .map_err(|_| EntrypointError::InvalidInstructionsSysvar)?;
+    let current_instruction = load_ed25519_instruction(instructions_sysvar, current_index)?;
 
     let mut transceiver = TransceiverProgram::initialize(config)?;
     if !account_data_is_zero(receipt_account)? {
@@ -516,9 +577,10 @@ fn process_verify_message_accounts(
             .insert(existing.message_digest, existing);
     }
 
-    let verified_digest = transceiver.verify_message_from_ed25519_instructions(
+    let verified_digest = transceiver.verify_message_from_transaction_instructions(
         &message,
         &[first_instruction, second_instruction],
+        &current_instruction,
     )?;
     let receipt = transceiver
         .receipt(&verified_digest)
@@ -879,7 +941,13 @@ fn parse_ed25519_instruction(
         .checked_add(message_data_size)
         .ok_or(TransceiverError::InvalidEd25519InstructionOffsets)?;
 
-    if signature_end > data.len() || public_key_end > data.len() || message_end > data.len() {
+    if signature_offset < ED25519_INSTRUCTION_HEADER_LENGTH
+        || public_key_offset < ED25519_INSTRUCTION_HEADER_LENGTH
+        || message_data_offset < ED25519_INSTRUCTION_HEADER_LENGTH
+        || signature_end > data.len()
+        || public_key_end > data.len()
+        || message_end > data.len()
+    {
         return Err(TransceiverError::InvalidEd25519InstructionOffsets);
     }
     if ranges_overlap(
@@ -912,6 +980,43 @@ fn parse_ed25519_instruction(
         .expect("public key length checked");
     Ok(AttestationObservation {
         attester,
+        message_digest: expected_digest,
+        key_epoch,
+        instruction_index: instruction.instruction_index,
+    })
+}
+
+fn parse_shared_message_ed25519_instruction(
+    instruction: &SolanaInstructionView,
+    current_index: u16,
+    expected_digest: Hash32,
+    key_epoch: u32,
+) -> Result<AttestationObservation, TransceiverError> {
+    if instruction.program_id != ED25519_PROGRAM_ID {
+        return Err(TransceiverError::InvalidEd25519Program);
+    }
+    let data = &instruction.data;
+    let signature_offset = ED25519_INSTRUCTION_HEADER_LENGTH;
+    let public_key_offset = signature_offset + ED25519_SIGNATURE_LENGTH;
+    if data.len() != public_key_offset + ED25519_PUBLIC_KEY_LENGTH || data[0] != 1 || data[1] != 0 {
+        return Err(TransceiverError::InvalidEd25519Instruction);
+    }
+    // Signature and key must be local, non-overlapping, and fill the entire
+    // verifier payload. Only the message may reference the current instruction.
+    if read_u16_le(data, 2)? as usize != signature_offset
+        || read_u16_le(data, 4)? != instruction.instruction_index
+        || read_u16_le(data, 6)? as usize != public_key_offset
+        || read_u16_le(data, 8)? != instruction.instruction_index
+        || read_u16_le(data, 10)? != 1
+        || read_u16_le(data, 12)? as usize != MESSAGE_LENGTH
+        || read_u16_le(data, 14)? != current_index
+    {
+        return Err(TransceiverError::InvalidEd25519InstructionOffsets);
+    }
+    Ok(AttestationObservation {
+        attester: data[public_key_offset..]
+            .try_into()
+            .expect("length checked"),
         message_digest: expected_digest,
         key_epoch,
         instruction_index: instruction.instruction_index,
@@ -1177,6 +1282,7 @@ mod tests {
     use bridge_messages::{
         DeploymentIdentity, DepositClaimFields, MessageEpochs, NativeOutpoint, ValidityWindow,
     };
+    use solana_instructions_sysvar::store_current_index_checked;
     use solana_program::sysvar::instructions::{construct_instructions_data, BorrowedInstruction};
 
     fn h(byte: u8) -> [u8; 32] {
@@ -1294,11 +1400,45 @@ mod tests {
             data,
             account_owner,
             false,
-            0,
         )
     }
 
-    fn instructions_sysvar_account(instructions: &[SolanaInstructionView]) -> AccountInfo<'static> {
+    fn current_instruction(message: &CanonicalBridgeMessage) -> SolanaInstructionView {
+        SolanaInstructionView {
+            program_id: message.deployment.transceiver_program_id,
+            instruction_index: 2,
+            data: TransceiverInstruction::VerifyMessageFromEd25519 {
+                message: Box::new(message.clone()),
+                ed25519_instruction_indexes: [0, 1],
+            }
+            .encode()
+            .unwrap(),
+        }
+    }
+
+    fn shared_ed25519_instruction(
+        attester: PubkeyBytes,
+        message: &CanonicalBridgeMessage,
+        index: u16,
+    ) -> SolanaInstructionView {
+        let mut view = ed25519_instruction(attester, message, index);
+        view.data.truncate(
+            ED25519_INSTRUCTION_HEADER_LENGTH
+                + ED25519_SIGNATURE_LENGTH
+                + ED25519_PUBLIC_KEY_LENGTH,
+        );
+        view.data[10..12].copy_from_slice(&1u16.to_le_bytes());
+        view.data[14..16].copy_from_slice(&2u16.to_le_bytes());
+        view
+    }
+
+    fn instructions_sysvar_account(
+        instructions: &[SolanaInstructionView],
+        message: &CanonicalBridgeMessage,
+    ) -> AccountInfo<'static> {
+        let mut all = instructions.to_vec();
+        all.push(current_instruction(message));
+        let instructions = &all;
         let program_ids = instructions
             .iter()
             .map(|instruction| Pubkey::new_from_array(instruction.program_id))
@@ -1312,10 +1452,12 @@ mod tests {
                 data: &instruction.data,
             })
             .collect::<Vec<_>>();
+        let mut data = construct_instructions_data(&borrowed);
+        store_current_index_checked(&mut data, 2).unwrap();
         test_account(
             INSTRUCTIONS_SYSVAR_ID,
             solana_program::sysvar::id(),
-            construct_instructions_data(&borrowed),
+            data,
             false,
             false,
         )
@@ -1461,7 +1603,8 @@ mod tests {
         let initialize = TransceiverInstruction::Initialize(config.clone())
             .encode()
             .unwrap();
-        process_instruction_accounts(&id(), &[config_account.clone()], &initialize).unwrap();
+        process_instruction_accounts(&id(), std::slice::from_ref(&config_account), &initialize)
+            .unwrap();
         assert_eq!(
             read_transceiver_config_account(&config_account)
                 .unwrap()
@@ -1469,7 +1612,7 @@ mod tests {
             config
         );
         assert_eq!(
-            process_instruction_accounts(&id(), &[config_account.clone()], &initialize),
+            process_instruction_accounts(&id(), std::slice::from_ref(&config_account), &initialize),
             Err(EntrypointError::AccountAlreadyInitialized)
         );
 
@@ -1477,7 +1620,7 @@ mod tests {
         let digest = message.message_digest().unwrap();
         let first = ed25519_instruction(config.authorized_attesters[0], &message, 0);
         let second = ed25519_instruction(config.authorized_attesters[1], &message, 1);
-        let instructions_sysvar = instructions_sysvar_account(&[first, second]);
+        let instructions_sysvar = instructions_sysvar_account(&[first, second], &message);
         let receipt_key = Pubkey::new_from_array(derive_verified_receipt_pda(
             &config.transceiver_program_id,
             &digest,
@@ -1532,7 +1675,7 @@ mod tests {
         let message = message(&config);
         let first = ed25519_instruction(config.authorized_attesters[0], &message, 0);
         let second = ed25519_instruction(config.authorized_attesters[1], &message, 1);
-        let instructions_sysvar = instructions_sysvar_account(&[first, second]);
+        let instructions_sysvar = instructions_sysvar_account(&[first, second], &message);
         let wrong_receipt = test_account(
             Pubkey::new_unique(),
             id(),
@@ -1624,6 +1767,74 @@ mod tests {
         assert_eq!(receipt.operation_id, msg.operation_id);
         assert_eq!(receipt.attesters[0], config.authorized_attesters[0]);
         assert_eq!(receipt.attesters[1], config.authorized_attesters[1]);
+    }
+
+    #[test]
+    fn shared_message_requires_two_distinct_authorized_signers() {
+        let config = config();
+        let msg = message(&config);
+        let first = shared_ed25519_instruction(config.authorized_attesters[0], &msg, 0);
+        let second = shared_ed25519_instruction(config.authorized_attesters[1], &msg, 1);
+        let verify = |instructions: &[SolanaInstructionView]| {
+            TransceiverProgram::initialize(config.clone())
+                .unwrap()
+                .verify_message_from_transaction_instructions(
+                    &msg,
+                    instructions,
+                    &current_instruction(&msg),
+                )
+        };
+        assert_eq!(
+            verify(&[first.clone(), second.clone()]),
+            Ok(msg.message_digest().unwrap())
+        );
+        assert!(verify(std::slice::from_ref(&first)).is_err());
+        assert!(verify(&[second]).is_err());
+        let duplicate = shared_ed25519_instruction(config.authorized_attesters[0], &msg, 1);
+        assert!(verify(&[first.clone(), duplicate]).is_err());
+        assert!(verify(&[first.clone(), first]).is_err());
+    }
+
+    #[test]
+    fn shared_message_rejects_all_header_offset_and_context_substitutions() {
+        let config = config();
+        let msg = message(&config);
+        let first = shared_ed25519_instruction(config.authorized_attesters[0], &msg, 0);
+        let second = shared_ed25519_instruction(config.authorized_attesters[1], &msg, 1);
+        let current = current_instruction(&msg);
+        let verify = |a: &SolanaInstructionView, c: &SolanaInstructionView| {
+            TransceiverProgram::initialize(config.clone())
+                .unwrap()
+                .verify_message_from_transaction_instructions(&msg, &[a.clone(), second.clone()], c)
+        };
+        for offset in 0..ED25519_INSTRUCTION_HEADER_LENGTH {
+            let mut bad = first.clone();
+            bad.data[offset] ^= 1;
+            assert!(verify(&bad, &current).is_err(), "offset {offset}");
+        }
+        let mut wrong_program = first.clone();
+        wrong_program.program_id = [0; 32];
+        assert!(verify(&wrong_program, &current).is_err());
+        let mut trailing = first.clone();
+        trailing.data.push(0);
+        assert!(verify(&trailing, &current).is_err());
+        let mut short = first.clone();
+        short.data.pop();
+        assert!(verify(&short, &current).is_err());
+        for offset in 0..current.data.len() {
+            let mut substituted = current.clone();
+            substituted.data[offset] ^= 1;
+            assert!(
+                verify(&first, &substituted).is_err(),
+                "context byte {offset}"
+            );
+        }
+        let mut wrong_program = current.clone();
+        wrong_program.program_id = [0; 32];
+        assert!(verify(&first, &wrong_program).is_err());
+        let mut future_verifier = current.clone();
+        future_verifier.instruction_index = 1;
+        assert!(verify(&first, &future_verifier).is_err());
     }
 
     #[test]

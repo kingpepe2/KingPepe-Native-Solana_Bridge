@@ -31,11 +31,14 @@ const ED25519_SIGNATURE_LENGTH = 64;
 const ED25519_PUBLIC_KEY_LENGTH = 32;
 const INSTRUCTIONS_SYSVAR_ID_BASE58 = "Sysvar1nstructions1111111111111111111111111";
 const SYSTEM_PROGRAM_ID_BASE58 = "11111111111111111111111111111111";
+const COMPUTE_BUDGET_PROGRAM_ID_BASE58 = "ComputeBudget111111111111111111111111111111";
+export const LOCALNET_DEPOSIT_COMPUTE_UNIT_LIMIT = 600_000;
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const BASE58_INDEX = new Map(Array.from(BASE58_ALPHABET, (character, index) => [character, index]));
 const BASE58_PATTERN = /^[1-9A-HJ-NP-Za-km-z]{32,128}$/u;
 const UINT_DECIMAL = /^(0|[1-9][0-9]*)$/u;
 const SOLANA_PDA_MARKER = Buffer.from("ProgramDerivedAddress", "utf8");
+export const SOLANA_MAX_TRANSACTION_BYTES = 1232;
 
 export function buildLocalnetSolanaDepositClaimTransactionPlan(config) {
   const normalized = normalizePlanConfig(config);
@@ -70,6 +73,8 @@ export function buildLocalnetSolanaDepositClaimTransactionPlan(config) {
     accountMeta("tokenProgram", normalized.tokenProgram, false, false),
     accountMeta("transceiverProgram", normalized.transceiverProgram, false, false),
     accountMeta("managerProgram", normalized.managerProgram, false, false),
+    accountMeta("systemProgram", pubkeyFromBytes(base58Decode(SYSTEM_PROGRAM_ID_BASE58), "systemProgram"), false, false),
+    accountMeta("computeBudgetProgram", pubkeyFromBytes(base58Decode(COMPUTE_BUDGET_PROGRAM_ID_BASE58), "computeBudgetProgram"), false, false),
   ];
   requireUniqueAccountKeys(accountKeys);
 
@@ -79,7 +84,7 @@ export function buildLocalnetSolanaDepositClaimTransactionPlan(config) {
   ]);
   const compiledInstruction = Object.freeze({
     programIdIndex: 9,
-    accountIndexes: Object.freeze([1, 2, 5, 3, 4, 6, 7, 8]),
+    accountIndexes: Object.freeze([1, 2, 5, 3, 4, 6, 7, 8, 0, 10]),
     dataBase64: Buffer.from(instructionData).toString("base64"),
     dataHex: bytesToHex(instructionData),
   });
@@ -118,7 +123,7 @@ export function buildLocalnetSolanaDepositClaimTransactionPlan(config) {
   });
 }
 
-export function buildLocalnetSolanaDepositClaimBundleTransactionPlan(config) {
+export function buildLocalnetSolanaDepositReceiptTransactionPlan(config) {
   const normalized = normalizePlanConfig(config);
   const decodedMessage = decodeCanonicalBridgeMessage(normalized.encodedMessageBytes);
   validateDepositClaimMessageDomain(normalized, decodedMessage);
@@ -159,25 +164,19 @@ export function buildLocalnetSolanaDepositClaimBundleTransactionPlan(config) {
   const accountKeys = [
     accountMeta("feePayer", normalized.feePayer, true, true),
     accountMeta("verifiedReceipt", verifiedReceipt, false, true),
-    accountMeta("bridgeState", bridgeState, false, true),
-    accountMeta("depositClaim", depositClaim, false, true),
-    accountMeta("mint", normalized.mint, false, true),
-    accountMeta("recipientTokenAccount", normalized.recipientTokenAccount, false, true),
     accountMeta("transceiverConfig", transceiverConfig, false, false),
     accountMeta("instructionsSysvar", instructionsSysvar, false, false),
-    accountMeta("mintAuthorityPda", mintAuthority, false, false),
-    accountMeta("tokenProgram", normalized.tokenProgram, false, false),
     accountMeta("systemProgram", systemProgram, false, false),
     accountMeta("ed25519Program", ed25519Program, false, false),
     accountMeta("transceiverProgram", normalized.transceiverProgram, false, false),
-    accountMeta("managerProgram", normalized.managerProgram, false, false),
+    accountMeta("computeBudgetProgram", pubkeyFromBytes(base58Decode(COMPUTE_BUDGET_PROGRAM_ID_BASE58), "computeBudgetProgram"), false, false),
   ];
   requireUniqueAccountKeys(accountKeys);
 
   const attestationInstructions = attestations.map((attestation, index) =>
     Object.freeze({
       role: `ed25519Attestation${index + 1}`,
-      programIdIndex: 11,
+      programIdIndex: 5,
       accountIndexes: Object.freeze([]),
       dataBase64: Buffer.from(
         encodeEd25519VerifierInstruction({
@@ -207,31 +206,20 @@ export function buildLocalnetSolanaDepositClaimBundleTransactionPlan(config) {
   ]);
   const transceiverInstruction = Object.freeze({
     role: "transceiverVerifyMessageFromEd25519",
-    programIdIndex: 12,
-    accountIndexes: Object.freeze([6, 1, 7, 0, 10]),
+    programIdIndex: 6,
+    accountIndexes: Object.freeze([2, 1, 3, 0, 4]),
     dataBase64: Buffer.from(transceiverInstructionData).toString("base64"),
     dataHex: bytesToHex(transceiverInstructionData),
-  });
-  const bridgeInstructionData = concatBytes([
-    Uint8Array.of(BRIDGE_INSTRUCTION_ACCEPT_DEPOSIT_CLAIM),
-    normalized.encodedMessageBytes,
-  ]);
-  const bridgeInstruction = Object.freeze({
-    role: "bridgeAcceptDepositClaim",
-    programIdIndex: 13,
-    accountIndexes: Object.freeze([2, 3, 1, 4, 5, 8, 9, 12, 0, 10]),
-    dataBase64: Buffer.from(bridgeInstructionData).toString("base64"),
-    dataHex: bytesToHex(bridgeInstructionData),
   });
   const compiledInstructions = Object.freeze([
     ...attestationInstructions,
     transceiverInstruction,
-    bridgeInstruction,
+    computeBudgetInstruction(7),
   ]);
   const messageBytes = encodeLegacyMessageWithInstructions({
     accountKeys: accountKeys.map((account) => account.bytes),
     recentBlockhash: normalized.recentBlockhash.bytes,
-    readonlyUnsignedAccounts: 8,
+    readonlyUnsignedAccounts: 6,
     compiledInstructions,
   });
 
@@ -239,7 +227,7 @@ export function buildLocalnetSolanaDepositClaimBundleTransactionPlan(config) {
     protocol: SOLANA_DEPOSIT_CLAIM_TRANSACTION_PLAN_PROTOCOL,
     environment: LOCALNET,
     cluster: LOCALNET,
-    bundle: "ED25519_ATTESTATIONS_TRANSCEIVER_RECEIPT_BRIDGE_CLAIM",
+    bundle: "ED25519_ATTESTATIONS_TRANSCEIVER_RECEIPT",
     operationIdHex: decodedMessage.operationIdHex,
     messageDigestHex: decodedMessage.messageDigestHex,
     amountAtomic: decodedMessage.amountAtomic.toString(),
@@ -259,7 +247,7 @@ export function buildLocalnetSolanaDepositClaimBundleTransactionPlan(config) {
       verifiedReceipt: publicPda(verifiedReceipt),
     }),
     instructions: compiledInstructions,
-    instruction: bridgeInstruction,
+    instruction: transceiverInstruction,
     messageBase64: Buffer.from(messageBytes).toString("base64"),
     messageFingerprintHex: sha256Hex(messageBytes),
     preparedTransactionBase64: undefined,
@@ -268,7 +256,14 @@ export function buildLocalnetSolanaDepositClaimBundleTransactionPlan(config) {
 }
 
 export async function prepareSignedLocalnetSolanaDepositClaimTransaction(config) {
-  const plan = buildLocalnetSolanaDepositClaimTransactionPlan(config);
+  return signTransactionPlan(buildLocalnetSolanaDepositClaimTransactionPlan(config), config);
+}
+
+export async function prepareSignedLocalnetSolanaDepositReceiptTransaction(config) {
+  return signTransactionPlan(buildLocalnetSolanaDepositReceiptTransactionPlan(config), config);
+}
+
+async function signTransactionPlan(plan, config) {
   const signer = requireObject(config?.feePayerSigner, "feePayerSigner");
   const signerPublicKey = normalizePubkeyPair(
     {
@@ -286,6 +281,11 @@ export async function prepareSignedLocalnetSolanaDepositClaimTransaction(config)
   }
 
   const messageBytes = Buffer.from(plan.messageBase64, "base64");
+  // Include shortvec signature count and the one fee-payer signature before
+  // invoking the signer. Oversized packets must never reach the RPC transport.
+  if (1 + ED25519_SIGNATURE_LENGTH + messageBytes.length > SOLANA_MAX_TRANSACTION_BYTES) {
+    throw new Error("SolanaTransactionPacketLimitExceeded");
+  }
   const signature = asBytes(await signer.sign(messageBytes), "feePayerSignature");
   if (signature.length !== 64) {
     throw new Error("SolanaDepositClaimSignatureLengthInvalid");
@@ -307,48 +307,6 @@ export async function prepareSignedLocalnetSolanaDepositClaimTransaction(config)
     preparedTransactionFingerprintHex: sha256Hex(transactionBytes),
   });
 }
-
-export async function prepareSignedLocalnetSolanaDepositClaimBundleTransaction(config) {
-  const plan = buildLocalnetSolanaDepositClaimBundleTransactionPlan(config);
-  const signer = requireObject(config?.feePayerSigner, "feePayerSigner");
-  const signerPublicKey = normalizePubkeyPair(
-    {
-      feePayerSignerPublicKeyBase58: signer.publicKeyBase58,
-      feePayerSignerPublicKeyHex: signer.publicKeyHex,
-    },
-    "feePayerSignerPublicKeyBase58",
-    "feePayerSignerPublicKeyHex",
-  );
-  if (signerPublicKey.base58 !== plan.feePayerBase58) {
-    throw new Error("SolanaDepositClaimFeePayerSignerMismatch");
-  }
-  if (typeof signer.sign !== "function") {
-    throw new Error("SolanaDepositClaimSignerMissingSignFunction");
-  }
-
-  const messageBytes = Buffer.from(plan.messageBase64, "base64");
-  const signature = asBytes(await signer.sign(messageBytes), "feePayerSignature");
-  if (signature.length !== 64) {
-    throw new Error("SolanaDepositClaimSignatureLengthInvalid");
-  }
-  if (!ed25519.verify(signature, messageBytes, signerPublicKey.bytes)) {
-    throw new Error("SolanaDepositClaimSignatureVerificationFailed");
-  }
-
-  const transactionBytes = concatBytes([shortvecEncode(1), signature, messageBytes]);
-  return Object.freeze({
-    ...plan,
-    signatures: Object.freeze([
-      Object.freeze({
-        publicKeyBase58: plan.feePayerBase58,
-        signatureBase58: base58Encode(signature),
-      }),
-    ]),
-    preparedTransactionBase64: Buffer.from(transactionBytes).toString("base64"),
-    preparedTransactionFingerprintHex: sha256Hex(transactionBytes),
-  });
-}
-
 export function findProgramAddress(seeds, programIdBytes) {
   const programId = asPubkeyBytes(programIdBytes, "programId");
   for (let bump = 255; bump >= 0; bump -= 1) {
@@ -490,8 +448,8 @@ function encodeLegacyMessage({ accountKeys, recentBlockhash, compiledInstruction
   return encodeLegacyMessageWithInstructions({
     accountKeys,
     recentBlockhash,
-    readonlyUnsignedAccounts: 5,
-    compiledInstructions: [compiledInstruction],
+    readonlyUnsignedAccounts: 7,
+    compiledInstructions: [compiledInstruction, computeBudgetInstruction(11)],
   });
 }
 
@@ -509,6 +467,16 @@ function encodeLegacyMessageWithInstructions({
     shortvecEncode(compiledInstructions.length),
     ...compiledInstructions.map(encodeCompiledInstruction),
   ]);
+}
+
+function computeBudgetInstruction(programIdIndex) {
+  const data = Buffer.alloc(5);
+  data[0] = 2; // Compute Budget: SetComputeUnitLimit, little-endian u32.
+  data.writeUInt32LE(LOCALNET_DEPOSIT_COMPUTE_UNIT_LIMIT, 1);
+  return Object.freeze({
+    role: "localnetComputeUnitLimit", programIdIndex, accountIndexes: Object.freeze([]),
+    dataBase64: data.toString("base64"), dataHex: data.toString("hex"),
+  });
 }
 
 function encodeCompiledInstruction(instruction) {
@@ -634,7 +602,9 @@ function encodeEd25519VerifierInstruction({
   const message = asBytes(messageBytes, "messageBytes");
   const signatureOffset = ED25519_INSTRUCTION_HEADER_LENGTH;
   const publicKeyOffset = signatureOffset + ED25519_SIGNATURE_LENGTH;
-  const messageOffset = publicKeyOffset + ED25519_PUBLIC_KEY_LENGTH;
+  // Both verifiers sign the exact canonical bytes starting after the tag of
+  // transceiver instruction 2. Do not duplicate the 514-byte message per key.
+  const messageOffset = 1;
   return concatBytes([
     Uint8Array.of(1, 0),
     u16Le(signatureOffset),
@@ -643,10 +613,9 @@ function encodeEd25519VerifierInstruction({
     u16Le(instructionIndex),
     u16Le(messageOffset),
     u16Le(message.length),
-    u16Le(instructionIndex),
+    u16Le(2),
     signature,
     publicKey,
-    message,
   ]);
 }
 

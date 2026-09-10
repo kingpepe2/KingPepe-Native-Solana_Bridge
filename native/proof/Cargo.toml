@@ -3,6 +3,7 @@ name = "kingpepe_native_proof"
 version = "0.1.0"
 edition = "2021"
 publish = false
+license-file = "../../LICENSE"
 
 [dependencies]
 num-bigint = "0.4.6"

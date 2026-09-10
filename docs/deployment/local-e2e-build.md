@@ -9,21 +9,21 @@ confirmed against the source repository, independently of the recovery notes.
 Its source and required third-party notices stay together outside this checkout.
 No legacy files or history are required to build the test node.
 
-Use Linux or WSL with Node 22.23.2 and the pinned Rust toolchain. Build the
+Use Linux or WSL with Node 22.23.2, Rust 1.89.0 for Solana host tests and
+nightly-2023-10-29 for the Native supporting crates. Build the
 referenced KingPepe source in an external build directory using CMake/Ninja,
 with wallet support enabled, GUI/tests/IPC/external signing disabled, and the
 `kingpeped` and `kingpepe-cli` targets selected. This produces test executables;
 it does not change or launch an existing Native node.
 
-Use Solana CLI and `cargo-build-sbf` 1.18.26 with platform-tools v1.41 for this
-local compatibility test. The release archive's checksum must match the pin.
-This archived SDK is not approved here for production deployment. These programs
+Use Agave CLI/validator 4.2.2 and its bundled `cargo-build-sbf` 4.1.0 with
+platform-tools v1.54. The release archive's checksum must match the pin.
+These local test tools are not production approval. These programs
 use `solana-program` directly, so their build invokes `cargo-build-sbf` directly.
 Anchor is not an executable dependency; `Anchor.toml` supplies the local Program
 ID mapping. No Anchor IDL generation is claimed by this build.
 
-The 1.18.26 compiler expects its normal external Solana cache directory to exist
-when selecting an explicit tools version. Provision the pinned compiler tools
+Provision the normal external Solana compiler cache and pinned compiler tools
 before running the test and disable rustup self-update. Never run installers
 that select an unpinned latest version.
 
@@ -62,6 +62,17 @@ its own transaction index, and uses a local-only funding-wallet fallback fee of
 0.00001000 Native per kB. The runner mines coinbase maturity plus one block before
 funding the deposit. These settings never authorize production fees or funds.
 
-Tool references: [Solana 1.18.26 release](https://github.com/solana-labs/solana/releases/tag/v1.18.26),
-[SBF output behavior](https://github.com/solana-labs/solana/blob/v1.18.26/sdk/cargo-build-sbf/src/main.rs),
+The deposit flow uses a finalized attestation receipt transaction followed by
+an atomic claim/mint transaction. Shared canonical bytes avoid an oversized
+packet; both are bounded to 1232 bytes. The explicit 600000-unit compute budget
+is LOCALNET-only. Receipt and claim journals stay external. The observer reports
+RPC_OBSERVATION from the isolated validator, not independent chain validation.
+
+Run `node .github/scripts/dependency-license-audit.mjs` after locked installation.
+CI also verifies the pinned cargo-audit binary and audits all five Cargo.lock
+files. The retained bincode unmaintained warning remains visible. No advisory
+ignore or production activation exception is added.
+
+Tool references: [Agave 4.2.2 release](https://github.com/anza-xyz/agave/releases/tag/v4.2.2),
+[SBF builder](https://github.com/anza-xyz/cargo-build-sbf),
 [Native source pin](https://github.com/kingpepe2/king-pepe-source-code/tree/3f2621820ffefae59cbe48b350f5f8f6ec8a6da5).

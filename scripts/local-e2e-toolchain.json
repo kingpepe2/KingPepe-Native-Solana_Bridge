@@ -5,11 +5,12 @@
     "linuxArchiveSha256": "d60acfe00a2932254bb0ad20e01b0d74397a0875595de719654b214f4b03f307"
   },
   "solana": {
-    "version": "1.18.26",
-    "platformToolsVersion": "v1.41",
-    "linuxArchiveUrl": "https://github.com/solana-labs/solana/releases/download/v1.18.26/solana-release-x86_64-unknown-linux-gnu.tar.bz2",
-    "linuxArchiveSha256": "10246c7f446006036192d81d859e761bcb3e7d1f40059bf27a56e1c29b0dbc40",
-    "selection": "Matches the existing locked solana-program 1.18.26 dependency; isolated local validation only, not a production toolchain approval."
+    "version": "4.2.2",
+    "sbfBuilderVersion": "4.1.0",
+    "platformToolsVersion": "v1.54",
+    "linuxArchiveUrl": "https://github.com/anza-xyz/agave/releases/download/v4.2.2/solana-release-x86_64-unknown-linux-gnu.tar.bz2",
+    "linuxArchiveSha256": "5fc8684f7430038105fde953d4308ed56addf627f658daa61709f345448247ee",
+    "selection": "Stable Agave local validator and bundled SBF builder for the solana-program 3.0.0 / SPL Token interface 2.0.0 API graph. Replaces the inherited 1.18 dependency graph with a known curve25519-dalek advisory. Local validation only; not production approval."
   },
   "native": {
     "version": "v31.1.0",
@@ -26,6 +27,11 @@
     "version": "8.24.3",
     "linuxArchiveSha256": "9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c",
     "checksumSource": "https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_checksums.txt"
+  },
+  "cargoAudit": {
+    "version": "0.22.2",
+    "linuxArchiveSha256": "ab28a1bdb54db4d5d8ad5981cf1f959410370b3d28250dbd35f6a44248620e39",
+    "linuxArchiveUrl": "https://github.com/rustsec/rustsec/releases/download/cargo-audit/v0.22.2/cargo-audit-x86_64-unknown-linux-gnu-v0.22.2.tgz"
   },
   "integrityNotes": "Archive hashes pin the bytes fetched over HTTPS from official release/source endpoints. Node and Gitleaks archives were also compared with official checksum lists. These checks do not constitute an independent audit or release-signature attestation."
 }
