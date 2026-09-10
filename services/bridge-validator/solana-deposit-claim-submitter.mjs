@@ -16,6 +16,7 @@ import {
 } from "../attesters/attestation-service.mjs";
 import { DEPOSIT_STATES } from "./automatic-deposit-pipeline.mjs";
 import { verifySignedLocalnetSolanaDepositClaimTransaction } from "./solana-deposit-claim-transaction-plan.mjs";
+import { preserveOperationHardStop, readOperationHardStop } from "../../shared/operation-hard-stop.mjs";
 
 export const SOLANA_DEPOSIT_CLAIM_SUBMITTER_PROTOCOL =
   "KINGPEPE_NATIVE_SOLANA_BRIDGE/SOLANA_DEPOSIT_CLAIM_SUBMITTER/V1";
@@ -74,16 +75,8 @@ export class SolanaDepositClaimSubmitter {
       return submitterDecision(DEPOSIT_STATES.HARD_STOP, "SOLANA_DEPOSIT_SUBMITTER_LOCALNET_ONLY", normalized);
     }
 
-    const completed = this.#journal.completed(normalized.operationIdHex);
-    if (completed !== undefined) {
-      assertSamePrepared(completed.prepared, normalized);
-      return structuredClone(completed.result);
-    }
-    const terminal = this.#journal.get(normalized.operationIdHex);
-    if (terminal?.state === DEPOSIT_STATES.HARD_STOP || terminal?.state === DEPOSIT_STATES.REJECTED) {
-      assertSamePrepared(terminal.prepared, normalized);
-      return structuredClone(terminal.result);
-    }
+    const terminal = this.#terminal(normalized);
+    if (terminal !== undefined) return terminal;
 
     const prepared = this.#journal.persistPrepared({
       protocol: SOLANA_DEPOSIT_CLAIM_SUBMITTER_PROTOCOL,
@@ -112,13 +105,17 @@ export class SolanaDepositClaimSubmitter {
     try {
       priorStatus = await this.#rpcClient.getSignatureStatus(solanaSignature);
     } catch {
-      return submitterDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "SOLANA_RPC_STATUS_UNAVAILABLE", normalized, { solanaSignature });
+      return this.#terminal(normalized) ?? submitterDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "SOLANA_RPC_STATUS_UNAVAILABLE", normalized, { solanaSignature });
     }
+    const statusTerminal = this.#terminal(normalized);
+    if (statusTerminal !== undefined) return statusTerminal;
     if (priorStatus !== null) {
       return this.#evaluateStatus(solanaSignature, normalized, priorStatus);
     }
 
     const currentBlockHeight = await this.#getBlockHeightOrDependency(normalized);
+    const heightTerminal = this.#terminal(normalized);
+    if (heightTerminal !== undefined) return heightTerminal;
     if (typeof currentBlockHeight !== "bigint") {
       return currentBlockHeight;
     }
@@ -142,10 +139,12 @@ export class SolanaDepositClaimSubmitter {
         skipPreflight: false,
       });
     } catch (error) {
-      return submitterDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "SOLANA_RPC_SEND_FAILED", normalized, {
+      return this.#terminal(normalized) ?? submitterDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "SOLANA_RPC_SEND_FAILED", normalized, {
         solanaSignature, ...sanitizedRpcDiagnostic(error),
       });
     }
+    const sendTerminal = this.#terminal(normalized);
+    if (sendTerminal !== undefined) return sendTerminal;
     if (signature !== solanaSignature) {
       const stopped = submitterDecision(DEPOSIT_STATES.HARD_STOP, "SOLANA_RPC_SUBMITTED_SIGNATURE_MISMATCH", normalized);
       this.#journal.recordTerminal(normalized.operationIdHex, stopped);
@@ -159,7 +158,7 @@ export class SolanaDepositClaimSubmitter {
     try {
       status = await this.#rpcClient.getSignatureStatus(solanaSignature);
     } catch {
-      return submitterDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "SOLANA_RPC_STATUS_UNAVAILABLE", normalized, {
+      return this.#terminal(normalized) ?? submitterDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "SOLANA_RPC_STATUS_UNAVAILABLE", normalized, {
         solanaSignature,
       });
     }
@@ -167,8 +166,12 @@ export class SolanaDepositClaimSubmitter {
   }
 
   async #evaluateStatus(solanaSignature, normalized, status) {
+    const terminal = this.#terminal(normalized);
+    if (terminal !== undefined) return terminal;
     if (status === null) {
       const currentBlockHeight = await this.#getBlockHeightOrDependency(normalized);
+      const heightTerminal = this.#terminal(normalized);
+      if (heightTerminal !== undefined) return heightTerminal;
       if (typeof currentBlockHeight !== "bigint") {
         return currentBlockHeight;
       }
@@ -218,6 +221,8 @@ export class SolanaDepositClaimSubmitter {
         mintAccountBase58: normalized.mintAccountBase58,
       });
     } catch (error) {
+      const observerTerminal = this.#terminal(normalized);
+      if (observerTerminal !== undefined) return observerTerminal;
       if (["SOLANA_DEPOSIT_ACCOUNT_ADDRESS_MISMATCH", "SOLANA_DEPOSIT_ACCOUNT_PROGRAM_MISMATCH", "SOLANA_MINT_AUTHORITY_OR_PRECISION_MISMATCH"].includes(error.integrityCode)) {
         const result = submitterDecision(DEPOSIT_STATES.HARD_STOP, error.integrityCode, normalized);
         this.#journal.recordTerminal(normalized.operationIdHex, result);
@@ -227,6 +232,9 @@ export class SolanaDepositClaimSubmitter {
         solanaSignature,
       });
     }
+
+    const observerTerminal = this.#terminal(normalized);
+    if (observerTerminal !== undefined) return observerTerminal;
 
     const observationResult = validateDepositClaimObservation(this.#config, normalized, solanaSignature, status, observation);
     if (observationResult.state !== DEPOSIT_STATES.VERIFIED_READY) {
@@ -245,6 +253,17 @@ export class SolanaDepositClaimSubmitter {
     });
     this.#journal.recordCompleted(normalized.operationIdHex, completed);
     return completed;
+  }
+
+  #terminal(normalized) {
+    const entry = this.#journal.get(normalized.operationIdHex);
+    const stopped = readOperationHardStop(entry?.state, entry?.result);
+    if (stopped !== undefined || entry?.state === DEPOSIT_STATES.REJECTED || entry?.state === DEPOSIT_STATES.COMPLETED) {
+      if (entry.result?.state !== entry.state) throw new Error("SolanaDepositClaimTerminalRecordInvalid");
+      assertSamePrepared(entry.prepared, normalized);
+      return stopped ?? structuredClone(entry.result);
+    }
+    return undefined;
   }
 
   async #getBlockHeightOrDependency(normalized) {
@@ -417,6 +436,7 @@ export class InMemorySolanaDepositClaimJournal {
 
   recordSubmitted(operationIdHex, solanaSignature) {
     const entry = this.#requireEntry(operationIdHex);
+    preserveOperationHardStop(entry.state, entry.result);
     const signature = normalizeSolanaSignature(solanaSignature);
     if (entry.submittedSignature !== undefined && entry.submittedSignature !== signature) {
       throw new Error("SolanaDepositClaimSubmittedSignatureConflict");
@@ -431,12 +451,14 @@ export class InMemorySolanaDepositClaimJournal {
 
   recordCompleted(operationIdHex, result) {
     const entry = this.#requireEntry(operationIdHex);
+    preserveOperationHardStop(entry.state, entry.result);
     entry.state = DEPOSIT_STATES.COMPLETED;
     entry.result = structuredClone(result);
   }
 
   recordTerminal(operationIdHex, result) {
     const entry = this.#requireEntry(operationIdHex);
+    if (preserveOperationHardStop(entry.state, entry.result, result)) return;
     entry.state = result.state;
     entry.result = structuredClone(result);
   }
@@ -489,6 +511,7 @@ export class FileBackedSolanaDepositClaimJournal {
 
   recordSubmitted(operationIdHex, solanaSignature) {
     const entry = this.#requireEntry(operationIdHex);
+    preserveOperationHardStop(entry.state, entry.result);
     const signature = normalizeSolanaSignature(solanaSignature);
     if (entry.submittedSignature !== undefined && entry.submittedSignature !== signature) {
       throw new Error("SolanaDepositClaimSubmittedSignatureConflict");
@@ -501,6 +524,7 @@ export class FileBackedSolanaDepositClaimJournal {
 
   recordCompleted(operationIdHex, result) {
     const entry = this.#requireEntry(operationIdHex);
+    preserveOperationHardStop(entry.state, entry.result);
     entry.state = DEPOSIT_STATES.COMPLETED;
     entry.result = structuredClone(result);
     this.#write(operationIdHex, entry);
@@ -508,6 +532,7 @@ export class FileBackedSolanaDepositClaimJournal {
 
   recordTerminal(operationIdHex, result) {
     const entry = this.#requireEntry(operationIdHex);
+    if (preserveOperationHardStop(entry.state, entry.result, result)) return;
     entry.state = result.state;
     entry.result = structuredClone(result);
     this.#write(operationIdHex, entry);

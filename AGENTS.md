@@ -25,18 +25,22 @@
 ## Current phase
 
 PHASE 08 INCOMPLETE. Phase 09 NOT_STARTED.
-Last verified source: 60b873a001fb8b72a3d56daa27cea31b1943c8ef, private push and
+Last verified source: 2de96942d7da69466a6130cb55804916171e4976, private push and
 all four exact-SHA CI jobs PASS:
-https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34461051003
-Its current/staged/outgoing source and all 150 commits scanned clean; zero
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34466302475
+Its current/staged/outgoing source and all 151 commits scanned clean; zero
 workflow artifacts were uploaded. That evidence does not certify newer source.
 
-Current unpublished increment: authenticated local pending-credit journal.
-The real harness persists verified finalized backing before Solana setup or
-attestation can fail, reopens pending credit, then persists/reopens finalized
-mint settlement after observer/reconciliation checks. It reuses the exact
-accounting model; no duplicate economic-policy implementation or SQLite addon.
-Node 24.21.0 / npm 11.19.0 / bundled SQLite 3.53.4 are now required. The SQLite
+Current unpublished increment: absorbing local operation/ledger hard stops.
+Sweep/claim/pipeline retries return the stored stop; late callbacks and journal
+writes cannot clear it. Pipeline boundaries recheck journal/ledger status before
+further signing/broadcast and retain pending credit on contradictory mint results.
+Forty-five new Node regressions pass, including real file/database reopen and
+controlled callback races. Full Windows/WSL suites each pass 318 Node tests and
+two vectors; WSL passes 93 Rust tests and audits. See development-status for the
+separate fresh real-chain and publication evidence. No global restart/fencing
+claim follows from these cooperating-worker guards.
+Node 24.21.0 / npm 11.19.0 / bundled SQLite 3.53.4 are required. The SQLite
 API remains release-candidate stability 1.2, not production approval.
 See docs/development-status.md for current measured tests and publication state.
 

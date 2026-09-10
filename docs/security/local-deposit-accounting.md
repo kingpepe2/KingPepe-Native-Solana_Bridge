@@ -37,6 +37,26 @@ Auxiliary SQLite paths also reject links/nonregular files and have size bounds.
 
 ## What the tests do and do not establish
 
+Deposit pipeline, Native sweep and Solana claim journals preserve a recorded
+HARD_STOP across cooperating-worker retries and file reopen. Exact repetition
+is idempotent; late submitted/completed/waiting results cannot clear the stop or
+replace its reason. The pipeline checks the journal and exact/authenticated
+ledger at authorization boundaries, including after asynchronous dependencies
+and between attesters. Unknown ledger status rejects execution. Dependency
+HARD_STOP is never transformed into a retryable wait. A shared stopped credit
+ledger blocks new operations in replacement pipeline instances using it.
+
+These controls cannot cancel a signature or transaction already handed off.
+An observed outcome arriving after a stop needs reconciliation; it does not
+authorize a retry, refund, remint or clearing the stop. Accounting stays unchanged
+while stopped, so pending credit may temporarily differ from later chain outcomes
+until a reviewed recovery process establishes the correct state. The lightweight
+JSON operation journals remain unauthenticated and unfenced; flushing their files
+does not prove directory-metadata power-loss survival. The common guard is not
+an operating-system-wide stop, cross-process atomic transaction or defense against
+deletion/substitution/rollback of all relevant state. No automatic stop-reset API
+or per-transfer team approval queue is added.
+
 SQLite EXCLUSIVE mode fences cooperating connections/processes on the tested
 local filesystems. DELETE journal mode and synchronous EXTRA are required and
 read back. Database close finalizes the bounded cached statements. These runtime
