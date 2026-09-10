@@ -68,6 +68,14 @@ packet; both are bounded to 1232 bytes. The explicit 600000-unit compute budget
 is LOCALNET-only. Receipt and claim journals stay external. The observer reports
 RPC_OBSERVATION from the isolated validator, not independent chain validation.
 
+`node solana/tests/local-deposit-security.mjs` additionally runs real recovery
+and failure tests. The claim-retry helper deliberately exits disposable workers
+before send and after validator acceptance, waits for actual last-valid block
+height expiry, and reopens the signed-claim journal without providing keys.
+Allow several additional minutes for the real validator to advance. It does not
+fake an expired height or claim complete service/power-loss recovery. Worker
+inputs and all journal data remain local; CI reports only sanitized results.
+
 Run `node .github/scripts/dependency-license-audit.mjs` after locked installation.
 CI also verifies the pinned cargo-audit binary and audits all five Cargo.lock
 files. The retained bincode unmaintained warning remains visible. No advisory

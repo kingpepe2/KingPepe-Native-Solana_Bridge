@@ -14,6 +14,7 @@ import {
   verifyProjectAttestation,
 } from "../attesters/attestation-service.mjs";
 import { DEPOSIT_STATES } from "./automatic-deposit-pipeline.mjs";
+import { verifySignedLocalnetSolanaDepositClaimTransaction } from "./solana-deposit-claim-transaction-plan.mjs";
 
 export const SOLANA_DEPOSIT_CLAIM_SUBMITTER_PROTOCOL =
   "KINGPEPE_NATIVE_SOLANA_BRIDGE/SOLANA_DEPOSIT_CLAIM_SUBMITTER/V1";
@@ -100,8 +101,20 @@ export class SolanaDepositClaimSubmitter {
     });
     assertSamePrepared(prepared, normalized);
 
-    if (prepared.submittedSignature !== undefined) {
-      return this.#observeSubmitted(prepared.submittedSignature, normalized);
+    const solanaSignature = normalized.solanaSignature;
+    if (prepared.submittedSignature !== undefined && prepared.submittedSignature !== solanaSignature) {
+      throw new Error("SolanaDepositClaimSubmittedSignatureConflict");
+    }
+    // The signed packet already contains the transaction identity. Query that
+    // identity even after expiry or a crash before the send response was saved.
+    let priorStatus;
+    try {
+      priorStatus = await this.#rpcClient.getSignatureStatus(solanaSignature);
+    } catch {
+      return submitterDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "SOLANA_RPC_STATUS_UNAVAILABLE", normalized, { solanaSignature });
+    }
+    if (priorStatus !== null) {
+      return this.#evaluateStatus(solanaSignature, normalized, priorStatus);
     }
 
     const currentBlockHeight = await this.#getBlockHeightOrDependency(normalized);
@@ -109,11 +122,17 @@ export class SolanaDepositClaimSubmitter {
       return currentBlockHeight;
     }
     if (currentBlockHeight > BigInt(normalized.lastValidBlockHeight)) {
-      return submitterDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "SOLANA_BLOCKHASH_EXPIRED_BEFORE_SUBMIT", normalized, {
+      return submitterDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY,
+        prepared.submittedSignature === undefined ? "SOLANA_BLOCKHASH_EXPIRED_BEFORE_SUBMIT" :
+          "SOLANA_SUBMITTED_TRANSACTION_OUTCOME_UNKNOWN_AFTER_BLOCKHASH_EXPIRY", normalized, {
+        solanaSignature,
         currentBlockHeight: currentBlockHeight.toString(),
       });
     }
 
+    // Persist before exposing bytes to RPC. A crash here may only lead to a
+    // rebroadcast of these identical bytes, never a new blockhash/operation.
+    this.#journal.recordSubmitted(normalized.operationIdHex, solanaSignature);
     let signature;
     try {
       signature = await this.#rpcClient.sendTransaction(normalized.preparedTransactionBase64, {
@@ -122,10 +141,15 @@ export class SolanaDepositClaimSubmitter {
         skipPreflight: false,
       });
     } catch (error) {
-      return submitterDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "SOLANA_RPC_SEND_FAILED", normalized, sanitizedRpcDiagnostic(error));
+      return submitterDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "SOLANA_RPC_SEND_FAILED", normalized, {
+        solanaSignature, ...sanitizedRpcDiagnostic(error),
+      });
     }
-    const solanaSignature = normalizeSolanaSignature(signature);
-    this.#journal.recordSubmitted(normalized.operationIdHex, solanaSignature);
+    if (signature !== solanaSignature) {
+      const stopped = submitterDecision(DEPOSIT_STATES.HARD_STOP, "SOLANA_RPC_SUBMITTED_SIGNATURE_MISMATCH", normalized);
+      this.#journal.recordTerminal(normalized.operationIdHex, stopped);
+      return stopped;
+    }
     return this.#observeSubmitted(solanaSignature, normalized);
   }
 
@@ -138,8 +162,11 @@ export class SolanaDepositClaimSubmitter {
         solanaSignature,
       });
     }
+    return this.#evaluateStatus(solanaSignature, normalized, status);
+  }
 
-    if (status === null || status === undefined) {
+  async #evaluateStatus(solanaSignature, normalized, status) {
+    if (status === null) {
       const currentBlockHeight = await this.#getBlockHeightOrDependency(normalized);
       if (typeof currentBlockHeight !== "bigint") {
         return currentBlockHeight;
@@ -154,20 +181,24 @@ export class SolanaDepositClaimSubmitter {
       });
     }
 
-    if (status.err !== null && status.err !== undefined) {
+    if (!status || typeof status !== "object" || Array.isArray(status) ||
+        !Object.hasOwn(status, "err") || status.err === undefined ||
+        !Number.isSafeInteger(status.slot) || status.slot < 0 ||
+        !["processed", "confirmed", "finalized"].includes(status.confirmationStatus)) {
+      return submitterDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "SOLANA_EXECUTION_STATUS_MALFORMED", normalized, { solanaSignature });
+    }
+    if (status.confirmationStatus !== "finalized") {
+      return submitterDecision(DEPOSIT_STATES.WAITING_FOR_FINALITY, "SOLANA_MINT_WAITING_FOR_FINALITY", normalized, {
+        solanaSignature, confirmationStatus: status.confirmationStatus,
+      });
+    }
+    if (status.err !== null) {
       const result = submitterDecision(DEPOSIT_STATES.REJECTED, "SOLANA_DEPOSIT_TRANSACTION_FAILED", normalized, {
         solanaSignature,
         solanaError: "REDACTED",
       });
       this.#journal.recordTerminal(normalized.operationIdHex, result);
       return result;
-    }
-
-    if (status.confirmationStatus !== "finalized") {
-      return submitterDecision(DEPOSIT_STATES.WAITING_FOR_FINALITY, "SOLANA_MINT_WAITING_FOR_FINALITY", normalized, {
-        solanaSignature,
-        confirmationStatus: status.confirmationStatus ?? "unknown",
-      });
     }
 
     if (this.#claimObserver === undefined) {
@@ -217,7 +248,7 @@ export class SolanaDepositClaimSubmitter {
 
   async #getBlockHeightOrDependency(normalized) {
     try {
-      return BigInt(await this.#rpcClient.getBlockHeight());
+      return BigInt(canonicalUintDecimalLike(await this.#rpcClient.getBlockHeight(), "blockHeight"));
     } catch {
       return submitterDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "SOLANA_RPC_BLOCK_HEIGHT_UNAVAILABLE", normalized);
     }
@@ -315,7 +346,7 @@ export class SolanaLocalRpcClient {
   }
 
   async getBlockHeight() {
-    return BigInt(await this.call("getBlockHeight", [{ commitment: "finalized" }]));
+    return BigInt(canonicalUintDecimalLike(await this.call("getBlockHeight", [{ commitment: "finalized" }]), "blockHeight"));
   }
 
   async getLatestBlockhash() {
@@ -496,7 +527,9 @@ export class FileBackedSolanaDepositClaimJournal {
     mkdirSync(this.#root, { recursive: true });
     const target = this.#entryPath(operationIdHex);
     const temp = `${target}.${process.pid}.tmp`;
-    writeFileSync(temp, `${JSON.stringify(entry, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
+    // Flush file contents before rename. This is not authenticated/fenced
+    // storage or proof of directory-metadata survival through power loss.
+    writeFileSync(temp, `${JSON.stringify(entry, null, 2)}\n`, { encoding: "utf8", flag: "wx", flush: true });
     renameSync(temp, target);
   }
 }
@@ -605,7 +638,7 @@ function normalizeSubmitterConfig(config) {
     mintHex: normalizeHash32(value.mintHex, "mintHex"),
     policyEpoch: checkedU32(value.policyEpoch, "policyEpoch"),
     keyEpoch: checkedU32(value.keyEpoch, "keyEpoch"),
-    acceptedObservationTrust: value.acceptedObservationTrust ?? ["LOCAL_VALIDATION"],
+    acceptedObservationTrust: Object.freeze([...(value.acceptedObservationTrust ?? ["LOCAL_VALIDATION"])]),
   });
 }
 
@@ -632,21 +665,25 @@ function normalizeDepositClaimRequest(config, request) {
   }
 
   validateProjectAttestations(value, encodedMessageHex, message);
+  const preparedTransactionBase64 = normalizePreparedTransactionBase64(value.preparedTransactionBase64);
+  const recentBlockhash = normalizeBase58Like(value.recentBlockhash, "recentBlockhash");
+  const identity = verifySignedLocalnetSolanaDepositClaimTransaction({
+    ...config, preparedTransactionBase64, encodedMessageHex, recipientTokenAccountHex: solanaRecipientHex,
+    recentBlockhashBase58: recentBlockhash, lastValidBlockHeight: value.lastValidBlockHeight,
+  });
+  for (const field of ["depositClaimAccountBase58", "mintAccountBase58"]) {
+    if (value[field] !== undefined && value[field] !== identity[field]) throw new Error("SolanaClaimPacketAccountMismatch");
+  }
   return Object.freeze({
     operationIdHex,
     messageDigestHex,
     encodedMessageHex,
     amountAtomic,
     solanaRecipientHex,
-    preparedTransactionBase64: normalizePreparedTransactionBase64(value.preparedTransactionBase64),
-    recentBlockhash: normalizeBase58Like(value.recentBlockhash, "recentBlockhash"),
+    preparedTransactionBase64,
+    recentBlockhash,
     lastValidBlockHeight: canonicalUintDecimal(value.lastValidBlockHeight, "lastValidBlockHeight"),
-    depositClaimAccountBase58:
-      value.depositClaimAccountBase58 === undefined
-        ? undefined
-        : normalizeBase58Like(value.depositClaimAccountBase58, "depositClaimAccountBase58"),
-    mintAccountBase58:
-      value.mintAccountBase58 === undefined ? undefined : normalizeBase58Like(value.mintAccountBase58, "mintAccountBase58"),
+    ...identity,
     maxRetries: checkedSmallInteger(value.maxRetries ?? 0, "maxRetries"),
     message,
   });

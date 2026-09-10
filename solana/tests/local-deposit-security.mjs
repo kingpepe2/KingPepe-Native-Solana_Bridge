@@ -8,6 +8,7 @@ import { createLocalNativeEvidenceVerifier } from "../../scripts/local-native-ev
 import { testLocalNativeRecovery } from "./local-native-recovery.mjs";
 import { testRecoveryPsbtWithNativeWallet } from "./local-recovery-psbt.mjs";
 import { testLocalRecoveryRaces } from "./local-recovery-races.mjs";
+import { testLocalClaimProcessRetry } from "./local-claim-retry.mjs";
 import { verifyRegtestSweepSignatures } from "../../native/node/native-raw-evidence.mjs";
 import { parseNativeTransactionHex } from "../../native/node/native-taproot-transaction.mjs";
 import { combineProjectAttestations } from "../../services/attesters/attestation-service.mjs";
@@ -22,6 +23,7 @@ export async function runLocalDepositSecurityE2e(repoRoot) {
   let recovery;
   let recoveryPsbt;
   let recoveryRaces;
+  let claimRetry;
   let reserveVerificationInput;
   const result = await runLocalNativeToSolanaE2e({
     repoRoot,
@@ -96,7 +98,9 @@ export async function runLocalDepositSecurityE2e(repoRoot) {
         tapscriptSpends: reserveVerificationInput.tapscriptSpends, reserveScriptHex: reserveVerificationInput.reserveScriptHex }),
       /RAW_NATIVE_SWEEP_SIGNATURE_INVALID/u);
       passed.push("FINALIZED_WITNESS_TAMPERING_REJECTED");
-      const completed = await submitLocalnetSolanaDepositClaim(context);
+      const retriedClaim = await testLocalClaimProcessRetry(context);
+      const completed = retriedClaim.completed;
+      claimRetry = retriedClaim.evidence;
       if (completed.state !== "COMPLETED") return completed;
       const retry = await submitLocalnetSolanaDepositClaim(context);
       assert.equal(retry.state, "COMPLETED", "COMPLETED_RETRY_STATE_CHANGED");
@@ -219,7 +223,7 @@ export async function runLocalDepositSecurityE2e(repoRoot) {
     }
     passed.push("RECOVERABLE_DEPOSIT_TO_DISTINCT_RESERVE_VERIFIED");
   }
-  return { ...result, localRecovery: recovery, localRecoveryPsbt: recoveryPsbt, localRecoveryRaces: recoveryRaces,
+  return { ...result, localRecovery: recovery, localRecoveryPsbt: recoveryPsbt, localRecoveryRaces: recoveryRaces, localClaimRetry: claimRetry,
     localSecurity: { passed, pass: passed.length, fail: result.state === "COMPLETED" && passed.length === 22 ? 0 : 1,
     scope: "Real raw Native evidence/policy rejection, local-validator deposit, idempotent retry, backing replay and domain checks; not complete adversarial coverage." } };
 }
