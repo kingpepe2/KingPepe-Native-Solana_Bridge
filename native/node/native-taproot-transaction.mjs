@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { tapLeafHashHex, verifyTaprootControlBlock } from "./native-tapscript.mjs";
 import {
   bytesToHex,
   hashJson,
@@ -55,10 +56,15 @@ export function createLocalTaprootSighashEvidence(input) {
     throw new Error("NativeTaprootSighashFeeMismatch");
   }
 
-  const sighash = taprootKeyPathSighashDefault({
+  const tapscriptSpend = value.tapscriptSpend;
+  if (tapscriptSpend !== undefined) {
+    verifyTaprootControlBlock({ ...tapscriptSpend, scriptPubKeyHex: signingSpentOutput.scriptPubKeyHex });
+  }
+  const sighash = (tapscriptSpend === undefined ? taprootKeyPathSighashDefault : taprootScriptPathSighashDefault)({
     transaction,
     spentOutputs,
     inputIndex: signingInputIndex,
+    ...(tapscriptSpend === undefined ? {} : { scriptHex: tapscriptSpend.scriptHex }),
   });
   const outputCommitments = transaction.outputs.map((output, index) =>
     sha256Hex(Buffer.concat([uint32LE(index), serializeTransactionOutput(output)])),
@@ -85,6 +91,9 @@ export function createLocalTaprootSighashEvidence(input) {
     taprootSigMsgWithEpochHex: sighash.sigMsgWithEpochHex,
     proofFingerprintHex: normalizeHash32(value.proofFingerprintHex, "proofFingerprintHex"),
     signingInputIndex,
+    ...(tapscriptSpend === undefined ? {} : { tapscriptSpend: Object.freeze({
+      scriptHex: tapscriptSpend.scriptHex, controlBlockHex: tapscriptSpend.controlBlockHex,
+    }) }),
     recipientScriptPubKeyHex: reserveOutput.output.scriptPubKeyHex,
     changeScriptPubKeyHex: expectedChangeScriptPubKeyHex ?? reserveOutput.output.scriptPubKeyHex,
     changeAtomic,
@@ -110,17 +119,29 @@ export function createLocalTaprootSighashEvidence(input) {
 export function createLocalTaprootSighashEvidences(input) {
   const value = requireObject(input, "input");
   const transaction = parseNativeTransactionHex(value.unsignedNativeTransactionHex);
+  if (value.tapscriptSpends !== undefined && (!Array.isArray(value.tapscriptSpends) || value.tapscriptSpends.length !== transaction.inputs.length)) {
+    throw new Error("NativeTaprootScriptSpendsLengthMismatch");
+  }
   return Object.freeze(
     transaction.inputs.map((_, index) =>
       createLocalTaprootSighashEvidence({
         ...value,
         signingInputIndex: index,
+        tapscriptSpend: value.tapscriptSpends?.[index],
       }),
     ),
   );
 }
 
 export function taprootKeyPathSighashDefault(input) {
+  return taprootDefaultSighash(input, 0);
+}
+
+export function taprootScriptPathSighashDefault(input) {
+  return taprootDefaultSighash(input, 1);
+}
+
+function taprootDefaultSighash(input, expectedExtension) {
   const value = requireObject(input, "input");
   const transaction =
     typeof value.transaction === "string"
@@ -135,13 +156,19 @@ export function taprootKeyPathSighashDefault(input) {
   if (hashType !== SIGHASH_DEFAULT) {
     throw new Error("NativeTaprootSighashOnlyDefaultSupported");
   }
-  const extFlag = checkedNonNegativeSafeInteger(value.extFlag ?? 0, "extFlag");
-  if (extFlag !== 0) {
+  const extFlag = checkedNonNegativeSafeInteger(value.extFlag ?? expectedExtension, "extFlag");
+  if (extFlag !== expectedExtension) {
     throw new Error("NativeTaprootSighashExtensionsUnsupported");
   }
   if (value.annex !== undefined) {
     throw new Error("NativeTaprootSighashAnnexUnsupported");
   }
+  if (value.codeSeparatorPosition !== undefined && value.codeSeparatorPosition !== 0xffff_ffff) {
+    throw new Error("NativeTaprootCodeSeparatorUnsupported");
+  }
+  const extension = extFlag === 0 ? Buffer.alloc(0) : Buffer.concat([
+    Buffer.from(tapLeafHashHex(value.scriptHex), "hex"), Buffer.of(0), uint32LE(0xffff_ffff),
+  ]);
 
   const precomputed = taprootPrecomputedHashes(transaction, spentOutputs);
   const sigMsg = Buffer.concat([
@@ -153,12 +180,12 @@ export function taprootKeyPathSighashDefault(input) {
     hexToBuffer(precomputed.shaScriptPubKeys, "shaScriptPubKeys"),
     hexToBuffer(precomputed.shaSequences, "shaSequences"),
     hexToBuffer(precomputed.shaOutputs, "shaOutputs"),
-    Buffer.of(0),
+    Buffer.of(extFlag * 2),
     uint32LE(inputIndex),
   ]);
-  const sigMsgWithEpoch = Buffer.concat([Buffer.of(0), sigMsg]);
+  const sigMsgWithEpoch = Buffer.concat([Buffer.of(0), sigMsg, extension]);
   return Object.freeze({
-    protocol: `${LOCAL_NATIVE_TAPROOT_TRANSACTION_PROTOCOL}/KEY_PATH_SIGHASH_DEFAULT`,
+    protocol: `${LOCAL_NATIVE_TAPROOT_TRANSACTION_PROTOCOL}/${extFlag === 0 ? "KEY_PATH" : "SCRIPT_PATH"}_SIGHASH_DEFAULT`,
     hashType,
     extFlag,
     inputIndex,
@@ -296,6 +323,11 @@ export function parseNativeTransactionHex(rawTransactionHex) {
 }
 
 export function attachKeyPathTaprootWitnesses(input) {
+  if (input?.tapscriptSpends !== undefined) throw new Error("NativeTaprootKeyPathAttachmentRejectsScripts");
+  return attachTaprootWitnesses(input);
+}
+
+export function attachTaprootWitnesses(input) {
   const value = requireObject(input, "input");
   const transaction = parseNativeTransactionHex(value.unsignedNativeTransactionHex);
   if (transaction.hasWitness) {
@@ -304,9 +336,16 @@ export function attachKeyPathTaprootWitnesses(input) {
   if (!Array.isArray(value.signatures) || value.signatures.length !== transaction.inputs.length) {
     throw new Error("NativeTaprootWitnessSignaturesLengthMismatch");
   }
+  if (value.tapscriptSpends !== undefined && (!Array.isArray(value.tapscriptSpends) || value.tapscriptSpends.length !== transaction.inputs.length)) {
+    throw new Error("NativeTaprootScriptSpendsLengthMismatch");
+  }
+  const spentOutputs = value.tapscriptSpends === undefined ? undefined : normalizeSpentOutputs(value.spentOutputs, transaction.inputs.length);
   const witnessStacks = value.signatures.map((signature, index) => {
     const signatureBytes = normalizeTaprootSignature(signature, `signatures[${index}]`);
-    return Object.freeze([signatureBytes]);
+    const scriptSpend = value.tapscriptSpends?.[index];
+    if (scriptSpend === undefined) return Object.freeze([signatureBytes]);
+    verifyTaprootControlBlock({ ...scriptSpend, scriptPubKeyHex: spentOutputs[index].scriptPubKeyHex });
+    return Object.freeze([signatureBytes, Buffer.from(scriptSpend.scriptHex, "hex"), Buffer.from(scriptSpend.controlBlockHex, "hex")]);
   });
   const rawSignedTransaction = serializeNativeTransactionParts({
     version: transaction.version,
@@ -321,7 +360,7 @@ export function attachKeyPathTaprootWitnesses(input) {
     throw new Error("NativeTaprootWitnessAttachmentTxidChanged");
   }
   return Object.freeze({
-    protocol: `${LOCAL_NATIVE_TAPROOT_TRANSACTION_PROTOCOL}/KEY_PATH_WITNESS_ATTACHMENT`,
+    protocol: `${LOCAL_NATIVE_TAPROOT_TRANSACTION_PROTOCOL}/${value.tapscriptSpends === undefined ? "KEY_PATH" : "MIXED_TAPROOT"}_WITNESS_ATTACHMENT`,
     state: "SIGNED_WITNESS_ATTACHED",
     rawSignedTransactionHex: signed.rawHex,
     txidHex: signed.txidHex,

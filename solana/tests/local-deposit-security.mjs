@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runLocalNativeToSolanaE2e, submitLocalnetSolanaDepositClaim } from "../../scripts/local-e2e-native-to-solana.mjs";
 import { createLocalNativeEvidenceVerifier } from "../../scripts/local-native-evidence-verifier.mjs";
+import { testLocalNativeRecovery } from "./local-native-recovery.mjs";
 import { combineProjectAttestations } from "../../services/attesters/attestation-service.mjs";
 import { SolanaLocalRpcClient } from "../../services/bridge-validator/solana-deposit-claim-submitter.mjs";
 import { prepareSignedLocalnetSolanaDepositReceiptTransaction } from "../../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs";
@@ -14,6 +15,7 @@ import { bytesToHex, decodeCanonicalBridgeMessage, encodeCanonicalBridgeMessage 
 
 export async function runLocalDepositSecurityE2e(repoRoot) {
   const passed = [];
+  let recovery;
   const result = await runLocalNativeToSolanaE2e({
     repoRoot,
     nativeEvidenceVerifierFactory: async (options) => {
@@ -156,6 +158,7 @@ export async function runLocalDepositSecurityE2e(repoRoot) {
       assert.equal(mint.supplyAtomic, completed.mintSupplyAtomic, "SUPPLY_CHANGED_AFTER_REPLAY");
       assert.equal(mint.freezeAuthorityHex, null, "FREEZE_AUTHORITY_CHANGED");
       passed.push("MINT_SUPPLY_UNCHANGED_AFTER_REPLAY");
+      recovery = await testLocalNativeRecovery(context);
       return completed;
     },
   });
@@ -177,7 +180,7 @@ export async function runLocalDepositSecurityE2e(repoRoot) {
     }
     passed.push("BOTH_SIGNERS_AND_ATTESTERS_VALIDATE_RAW_EVIDENCE");
   }
-  return { ...result, localSecurity: { passed, pass: passed.length, fail: result.state === "COMPLETED" && passed.length === 17 ? 0 : 1,
+  return { ...result, localRecovery: recovery, localSecurity: { passed, pass: passed.length, fail: result.state === "COMPLETED" && passed.length === 17 ? 0 : 1,
     scope: "Real raw Native evidence/policy rejection, local-validator deposit, idempotent retry, backing replay and domain checks; not complete adversarial coverage." } };
 }
 
