@@ -31,12 +31,16 @@ https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34466302
 Its current/staged/outgoing source and all 151 commits scanned clean; zero
 workflow artifacts were uploaded. That evidence does not certify newer source.
 
-Current unpublished increment: absorbing local operation/ledger hard stops.
+Absorbing-stop source 2bdff8f1687085d63de8c628ae12a4f2efed163e was pushed
+privately. CI 34470295877 completed the real deposit and all 55 checks but failed
+because the workflow still required five rather than seven claim-worker checks.
+Do NOT label that SHA all-CI-pass. Current unpublished correction requires all
+seven and both named stopped-worker checks, with six executable CI-gate tests.
 Sweep/claim/pipeline retries return the stored stop; late callbacks and journal
 writes cannot clear it. Pipeline boundaries recheck journal/ledger status before
 further signing/broadcast and retain pending credit on contradictory mint results.
 Forty-five new Node regressions pass, including real file/database reopen and
-controlled callback races. Full Windows/WSL suites each pass 318 Node tests and
+controlled callback races. With six CI-gate tests, Windows/WSL each pass 324 Node tests and
 two vectors; WSL passes 93 Rust tests and audits. See development-status for the
 separate fresh real-chain and publication evidence. No global restart/fencing
 claim follows from these cooperating-worker guards.
@@ -62,6 +66,12 @@ Canonical choice/UTXO and Solana observation trust the configured local validati
 nodes. RPC_OBSERVATION is not independent proof or a production observer.
 Production observation, service ACLs/protected storage/IPC, full restart,
 global hard stops, post-mint deep-reorg response and external review remain open.
+Read-only review also reproduced matching Mainnet policy approval and mutation
+of the exposed authorization Map (no keys/signing/network). Close these local
+signer-policy boundaries next, after the CI correction passes. The pinned
+upstream FROST code is explicitly unaudited; never claim broader library audit
+coverage applies to it. The approved same-host topology is not the cause of
+these blockers. See docs/security/software-frost.md.
 
 ## Build and validation
 

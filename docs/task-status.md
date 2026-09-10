@@ -3,16 +3,24 @@
 ## Current Phase 08 absorbing-stop correction (2026-09-10)
 
 Implemented locally: absorbing operation/ledger stops, late-response guards and
-pre-authorization status checks. Windows/WSL each 318 Node tests + two vectors
+pre-authorization status checks. Windows/WSL each 324 Node tests + two vectors
 PASS; WSL 93 Rust tests, fmt/clippy and audits PASS. Forty-five Node regressions
 added; final focused suite 100/100 PASS. Fresh real-chain deposit, both SBF builds
 and 55 integration/security checks PASS; reserve and supply each 100000000 atomic,
-pending credit zero. Current source and all 151 existing commits scan clean.
-Staged/outgoing scans, private push and exact-SHA CI are pending. No production actions. For the full
+pending credit zero. Current source and all 152 existing commits scan clean.
+Source 2bdff8f1687085d63de8c628ae12a4f2efed163e was pushed privately;
+[CI failed on an obsolete five-check requirement](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34470295877)
+despite the real flow and all seven claim-worker checks passing. The unpublished
+correction requires seven and both named stop tests; six executable gate tests
+pass. A second fresh real-chain run also passes all 55 checks. Corrective
+staged/outgoing scans, private push and exact-SHA CI are pending.
+No production actions. For the full
 test scope, corrected failures and limitations see
 [development status](development-status.md#current-phase-08-absorbing-stop-correction-2026-09-10).
 Phase 08 INCOMPLETE; Phase 09 NOT_STARTED. Next: validate/publish this correction,
-then continue the unresolved Phase 08 recovery/fencing/reconciliation boundaries.
+then close the reproduced local signer-policy Mainnet/configuration-mutation gaps
+and continue Phase 08 recovery/fencing/reconciliation. No keys/signing/network
+were involved in the policy diagnostics; the upstream FROST component is unaudited.
 
 ## Previous authenticated credit increment (verified source)
 

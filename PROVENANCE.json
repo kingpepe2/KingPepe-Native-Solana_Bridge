@@ -3,6 +3,16 @@
   "generatedAt": "2026-09-10T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
   "purpose": "file-by-file provenance classification for local tracked content",
+  "phase08StopCiCorrectionReview": {
+    "filesBefore": 176,
+    "filesAfter": 177,
+    "newFiles": ["scripts/tests/ci-local-e2e-contract.test.mjs"],
+    "filesDeleted": 0,
+    "filesMoved": 0,
+    "changes": "Correct obsolete CI claim-check count without bypassing rejection gates; add original tests executing the actual workflow acceptance contract; record failed-SHA evidence and known unaudited dependency/policy boundaries.",
+    "sourceImports": "None. Upstream versioned README consulted for its FROST audit disclaimer; no implementation copied or derived.",
+    "dependencyChanges": "None; pinned versions, lockfiles and licenses unchanged."
+  },
   "phase08AbsorbingStopReview": {
     "filesBefore": 175,
     "filesAfter": 176,
@@ -144,6 +154,11 @@
     ]
   },
   "trackedFiles": [
+    {
+      "path": "scripts/tests/ci-local-e2e-contract.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original executable validation-contract regressions for the checked-in CI script. External report fixtures, no keys or economic operations; not blockchain E2E evidence."
+    },
     {
       "path": "shared/operation-hard-stop.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",

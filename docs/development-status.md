@@ -3,6 +3,16 @@
 ## Current Phase 08 absorbing-stop correction (2026-09-10)
 
 UNPUBLISHED / LOCALLY_TESTED, including a fresh real-chain run.
+The absorbing-stop implementation was published as
+`2bdff8f1687085d63de8c628ae12a4f2efed163e`, message
+`fix(phase-08): preserve integrity stops across retries and late responses`.
+[CI failed](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34470295877):
+the real flow completed and all 55 checks passed, but the workflow still required
+the previous count of five claim-worker checks instead of seven. Its other three
+jobs passed. The current corrective increment requires seven and both named stop
+checks. Six tests execute the actual workflow validation code to verify acceptance
+and rejection; they are CI-contract tests, not additional blockchain evidence.
+No bridge economic code or security requirement was weakened by this correction.
 Read-only, in-memory reproduction on the preceding source returned HARD_STOP
 then BROADCAST on retry, with two transport callback calls. No keys, node or
 network were involved in that diagnostic. Ten new focused regressions initially
@@ -17,10 +27,10 @@ A stopped authenticated ledger blocks a replacement pipeline and new operations
 using that ledger. Missing or unknown ledger status fails closed. Ordinary
 dependency waits and safe identical retries remain automatic.
 
-Windows and WSL each: 318 Node tests + two vectors PASS, zero failures/skips.
+Windows and WSL each: 324 Node tests + two vectors PASS, zero failures/skips.
 The 45 added regressions exercise actual file/SQLite reopen, immutable decisions,
 late successful/failed responses and cooperative callback races with modeled
-chain adapters. Focused suite: 100/100 PASS. Four intermediate race assertions
+chain adapters; six more cover the CI gate. Focused suite: 100/100 PASS. Four intermediate race assertions
 incorrectly expected zero prior sends during claim observation (96 PASS / 4 FAIL);
 the fixture observes only after one send. Assertions now preserve that earlier
 send count and require no new send after the stop. No security requirement was
@@ -36,13 +46,21 @@ use the real signed claim packet and real validator absence checks; reopening
 the stopped probe cannot observe/send or accept late completion. This is not
 a claim of a complete global stop or cancellation of an earlier network send.
 Final reserve and SPL supply are each 100000000 atomic, pending credit zero;
-no per-transfer team approval. All existing 151 commits and current source
+no per-transfer team approval. A second fresh run after the CI-contract correction
+also passes both SBF builds and all 55 checks with the same final totals.
+All existing 152 commits and current source
 scan clean. Staged/outgoing scans, private publication and exact-SHA CI are
 pending. No dependency, toolchain or license change; no source/operational files
-deleted or moved. Provenance: 175 -> 176 files, one original shared stop guard.
+deleted or moved. Provenance: 175 -> 176 files for the shared stop guard, then
+176 -> 177 for the corrective CI-gate regression test file.
 Mainnet DISABLED; Phase 08 INCOMPLETE; Phase 09 NOT_STARTED. Next dependencies
 include authenticated/fenced signer state, full service restart, the
 broadcast-to-credit persistence gap and bridge-wide reconciliation/hard stops.
+Separate read-only policy diagnostics reproduced approval of matching Mainnet
+configuration and mutation of the exposed authorization Map. No keys, signing
+or network were involved. Those signer-policy defects remain open for the next
+increment; upstream FROST audit coverage also remains unresolved, as disclosed
+in [software FROST](security/software-frost.md).
 See [local boundary and limitations](security/local-deposit-accounting.md).
 
 ## Previous authenticated credit increment (verified source)
