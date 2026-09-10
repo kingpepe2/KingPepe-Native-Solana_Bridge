@@ -68,6 +68,9 @@ function fixture(overrides = {}) {
       environment: "localnet",
       cluster: "localnet",
       solanaDeploymentHex: h("solana-localnet-deployment"),
+      protocolId: 1,
+      nativeNetwork: 8_000_111,
+      nativeGenesisHex: h("test-native-genesis"),
       managerProgramIdBase58: LOCALNET_MANAGER_PROGRAM_ID_BASE58,
       transceiverProgramIdBase58: LOCALNET_TRANSCEIVER_PROGRAM_ID_BASE58,
       mintBase58: mint.publicKeyBase58,
@@ -177,19 +180,22 @@ test("localnet setup plan initializes mint, recipient token account, transceiver
   assert.equal(bytesToHex(initializeAccount.subarray(1)), recipientTokenAccountOwner.hex);
 
   const transceiver = dataFor(plan, "transceiverInitialize");
-  assert.equal(transceiver.length, 198);
+  assert.equal(transceiver.length, 238);
   assert.equal(transceiver[0], TRANSCEIVER_INSTRUCTION_INITIALIZE);
   assert.equal(base58Encode(transceiver.subarray(1, 33)), LOCALNET_TRANSCEIVER_PROGRAM_ID_BASE58);
   assert.equal(base58Encode(transceiver.subarray(33, 65)), LOCALNET_MANAGER_PROGRAM_ID_BASE58);
   assert.equal(base58Encode(transceiver.subarray(65, 97)), config.mintBase58);
   assert.equal(bytesToHex(transceiver.subarray(97, 129)), config.solanaDeploymentHex);
-  assert.equal(bytesToHex(transceiver.subarray(129, 161)), attesterA.publicKeyHex);
-  assert.equal(bytesToHex(transceiver.subarray(161, 193)), attesterB.publicKeyHex);
-  assert.equal(transceiver[193], 1);
-  assert.equal(transceiver.readUInt32LE(194), 1);
+  assert.equal(transceiver.readUInt32LE(129), config.protocolId);
+  assert.equal(transceiver.readUInt32LE(133), config.nativeNetwork);
+  assert.equal(bytesToHex(transceiver.subarray(137, 169)), config.nativeGenesisHex);
+  assert.equal(bytesToHex(transceiver.subarray(169, 201)), attesterA.publicKeyHex);
+  assert.equal(bytesToHex(transceiver.subarray(201, 233)), attesterB.publicKeyHex);
+  assert.equal(transceiver[233], 1);
+  assert.equal(transceiver.readUInt32LE(234), 1);
 
   const bridge = dataFor(plan, "bridgeInitialize");
-  assert.equal(bridge.length, 257);
+  assert.equal(bridge.length, 208);
   assert.equal(bridge[0], BRIDGE_INSTRUCTION_INITIALIZE);
   assert.equal(bridge[1], 0);
   assert.equal(base58Encode(bridge.subarray(2, 34)), LOCALNET_MANAGER_PROGRAM_ID_BASE58);
@@ -200,13 +206,9 @@ test("localnet setup plan initializes mint, recipient token account, transceiver
   assert.equal(bytesToHex(bridge.subarray(162, 194)), plan.pdas.mintAuthority.addressHex);
   assert.equal(bridge[194], 8);
   assert.equal(bridge[195], 8);
-  assert.equal(bridge[196], 0);
-  assert.equal(bytesToHex(bridge.subarray(197, 229)), "00".repeat(32));
-  assert.equal(bridge.readBigUInt64LE(229), 0n);
-  assert.equal(bridge.readBigUInt64LE(237), 0n);
-  assert.equal(bridge.readUInt32LE(245), 1);
-  assert.equal(bridge.readUInt32LE(249), 1);
-  assert.deepEqual([...bridge.subarray(253, 257)], [0, 0, 0, 0]);
+  assert.equal(bridge.readUInt32LE(196), 1);
+  assert.equal(bridge.readUInt32LE(200), 1);
+  assert.deepEqual([...bridge.subarray(204, 208)], [0, 0, 0, 0]);
 });
 
 test("localnet setup planner signs with fee payer, mint, and recipient token account signers in account order", async () => {
@@ -214,6 +216,7 @@ test("localnet setup planner signs with fee payer, mint, and recipient token acc
   const plan = await prepareSignedLocalnetSolanaSetupTransaction(config);
   const message = Buffer.from(plan.messageBase64, "base64");
   const transaction = Buffer.from(plan.preparedTransactionBase64, "base64");
+  assert.ok(transaction.length <= 1232);
 
   assert.equal(plan.signatures.length, 3);
   assert.deepEqual(
@@ -226,6 +229,16 @@ test("localnet setup planner signs with fee payer, mint, and recipient token acc
     const signature = base58Decode(plan.signatures[index].signatureBase58);
     const publicKey = base58Decode(plan.signatures[index].publicKeyBase58);
     assert.ok(ed25519.verify(signature, message, publicKey));
+  }
+});
+
+test("localnet setup requires explicit nonzero Native and protocol domains", () => {
+  for (const overrides of [
+    { protocolId: undefined }, { protocolId: 0 },
+    { nativeNetwork: undefined }, { nativeNetwork: 0 },
+    { nativeGenesisHex: undefined }, { nativeGenesisHex: "00".repeat(32) },
+  ]) {
+    assert.throws(() => buildLocalnetSolanaSetupTransactionPlan(fixture(overrides).config));
   }
 });
 

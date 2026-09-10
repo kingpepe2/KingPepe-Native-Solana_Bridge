@@ -26,11 +26,10 @@
 ## Current phase and evidence
 
 PHASE 08: real local Native-to-Solana happy-path integration is now exercised.
-Corrective commit 507c94f39b1f91630baf22824ca4094e3f99d5b6 was pushed to PRIVATE
-origin/main and passed all four jobs, including the actual local deposit:
-https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34437591936
-It fixed the SBF host-toolchain selection failure on bfc704c561fcf47e9625c7aff6c8bb72b1997ba7.
-The current security increment needs its own exact-SHA CI before certification.
+Security commit 95d00b19026dd56320cc012f580802bff6300fc0 was pushed to PRIVATE
+origin/main and passed all four jobs, including real deposit/retry/backing replay:
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34439119240
+The current Native-domain binding increment needs its own exact-SHA CI.
 
 A pinned Native REGTEST node accepted real FROST A+B Taproot sweep signatures;
 the Agave local validator verified two Ed25519 attestations, created a receipt,
@@ -40,10 +39,14 @@ also prove completed-operation retry is idempotent, newly signed reuse of a
 consumed outpoint is rejected by validator preflight, and supply stays unchanged.
 Permanent backing PDAs omit nonce/epochs. Initial enrollment requires the exact
 Mint identity's signature; this is not SPL mint authority or normal approval.
+Transceiver configuration now binds protocol ID, Native network and genesis;
+three additional real-validator substitution tests pass with valid signatures.
+Initialization omits mandatory zero/None fields to keep the setup packet bounded;
+old initialization bytes and old unbound Transceiver config are rejected.
 
 This does NOT prove the complete bridge is finished. Phase 08 security
 dependencies still need review: recoverable temporary-deposit scripts and
-recovery races, full evidence-source wiring, on-chain Native genesis binding,
+recovery races, full evidence-source wiring, remaining account/source validation,
 failure/restart scenarios and durable storage guarantees. Phase 09 has not
 started. Production observers, configuration, review and activation are absent.
 Never relabel RPC_OBSERVATION as independent chain validation.
@@ -74,13 +77,13 @@ Safe checks:
   only with the pinned isolated REGTEST/local-validator tools and an external,
   fresh KINGPEPE_LOCAL_E2E_ROOT. Generated SBF keypairs also stay external.
 - node solana/tests/local-deposit-security.mjs uses the same isolated tools/root
-  and runs the real deposit plus three local-validator security checks.
+  and runs the real deposit plus six local-validator security checks.
 - CI runs cargo-audit against all five lockfiles without ignored advisories.
   bincode 1.3.3 has a retained, reported unmaintained warning, not a clean bill
   of health or production approval.
 
-Latest measured local suites: 133 Node tests plus two vectors on Windows and
-WSL; 56 Solana Rust tests and 22 Native supporting-crate tests in WSL.
+Latest measured local suites: 134 Node tests plus two vectors on Windows and
+WSL; 58 Solana Rust tests and 22 Native supporting-crate tests in WSL.
 Windows service/ACL/protected-storage and native Windows SBF tests are NOT_RUN.
 Do not reuse these counts as evidence after code changes without rerunning.
 
