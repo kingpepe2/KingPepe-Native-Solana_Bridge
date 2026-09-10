@@ -41,6 +41,28 @@ export function buildRegtestRecoverableDeposit({ nativeGenesisHex, depositCommit
     sweep: output.first, recovery: output.second, canonicalReserveScriptPubKeyHex });
 }
 
+// Each authorizing role rebuilds against its expected deployment/recipient and
+// FROST identity. Coordinator-supplied script metadata is not authorization.
+export function validateRegtestRecoverableDepositIntent({ intent, policy, depositScriptPubKeyHex,
+  reserveScriptPubKeyHex, frostPublicKeyHex, userRecoveryPublicKeyHex, csvDelayBlocks }) {
+  const rebuilt = buildRegtestRecoverableDeposit({ ...policy, nativeGenesisHex: intent.nativeGenesisHex,
+    depositCommitmentHex: deriveRegtestDepositCommitment(intent), frostPublicKeyHex, userRecoveryPublicKeyHex, csvDelayBlocks });
+  for (const field of ["protocol", "localOnly", "productionReady", "nativeGenesisHex", "depositCommitmentHex",
+    "frostPublicKeyHex", "userRecoveryPublicKeyHex", "csvDelayBlocks", "scriptPubKeyHex", "outputPublicKeyHex",
+    "internalPublicKeyHex", "merkleRootHex", "canonicalReserveScriptPubKeyHex"]) {
+    if (rebuilt[field] !== policy[field]) throw new Error("RecoveryDepositIntentSubstituted");
+  }
+  for (const branch of ["sweep", "recovery"]) {
+    for (const field of ["scriptHex", "controlBlockHex", "leafHashHex"]) {
+      if (rebuilt[branch][field] !== policy[branch]?.[field]) throw new Error("RecoveryDepositIntentSubstituted");
+    }
+  }
+  if (depositScriptPubKeyHex !== rebuilt.scriptPubKeyHex || reserveScriptPubKeyHex !== rebuilt.canonicalReserveScriptPubKeyHex) {
+    throw new Error("RecoveryDepositIntentSubstituted");
+  }
+  return rebuilt;
+}
+
 // Offline preparation does not assert current UTXO availability or maturity and
 // never signs/broadcasts. Those conditions must be established before broadcast.
 export function prepareRegtestRecoveryTransaction({ depositPolicy, fundingTransactionHex, outputIndex,

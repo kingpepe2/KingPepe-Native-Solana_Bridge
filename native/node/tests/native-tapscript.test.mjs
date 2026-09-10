@@ -2,10 +2,11 @@
 // Public generator-point fixtures only; not operational wallet identities.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { secp256k1 } from "@noble/curves/secp256k1.js";
+import { secp256k1, schnorr } from "@noble/curves/secp256k1.js";
 import { bridgeNumsPublicKeyHex, tapLeafHashHex, verifyTaprootControlBlock } from "../native-tapscript.mjs";
-import { REGTEST_GENESIS } from "../native-raw-evidence.mjs";
-import { buildRegtestRecoverableDeposit, deriveRegtestDepositCommitment, prepareRegtestRecoveryTransaction } from "../../recovery/taproot-deposit.mjs";
+import { REGTEST_GENESIS, verifyRegtestSweepSignatures } from "../native-raw-evidence.mjs";
+import { buildRegtestRecoverableDeposit, deriveRegtestDepositCommitment, prepareRegtestRecoveryTransaction,
+  validateRegtestRecoverableDepositIntent } from "../../recovery/taproot-deposit.mjs";
 import { attachTaprootWitnesses, createLocalTaprootSighashEvidence, parseNativeTransactionHex,
   taprootKeyPathSighashDefault, taprootScriptPathSighashDefault } from "../native-taproot-transaction.mjs";
 
@@ -140,4 +141,52 @@ test("offline recovery preparation binds the actual output and authorized fees w
     { feeAtomic: "5670", maximumFeeAtomic: "6000" }]) {
     assert.throws(() => prepareRegtestRecoveryTransaction({ ...options, ...patch }), /Recovery/u);
   }
+});
+
+test("each authorizing role must reconstruct the deposit against expected intent, recovery key and reserve", () => {
+  const expectedIntent = intent();
+  const policy = buildRegtestRecoverableDeposit({ ...config(), depositCommitmentHex: deriveRegtestDepositCommitment(expectedIntent) });
+  const expected = { intent: expectedIntent, policy, depositScriptPubKeyHex: policy.scriptPubKeyHex,
+    reserveScriptPubKeyHex: policy.canonicalReserveScriptPubKeyHex, frostPublicKeyHex: frost,
+    userRecoveryPublicKeyHex: recovery, csvDelayBlocks: 12 };
+  assert.deepEqual(validateRegtestRecoverableDepositIntent(expected), policy);
+  for (const field of ["recipientHex", "solanaDeploymentHex", "managerProgramIdHex", "transceiverProgramIdHex", "mintHex", "nonceHex"]) {
+    assert.throws(() => validateRegtestRecoverableDepositIntent({ ...expected, intent: { ...expectedIntent, [field]: h("ff") } }), /Substituted/u);
+  }
+  for (const field of ["protocolId", "nativeNetwork", "policyEpoch", "keyEpoch"]) {
+    assert.throws(() => validateRegtestRecoverableDepositIntent({ ...expected, intent: { ...expectedIntent, [field]: 2 } }), /Substituted/u);
+  }
+  for (const patch of [{ intent: { ...expectedIntent, amountAtomic: "1" } }, { csvDelayBlocks: 13 },
+    { depositScriptPubKeyHex: policy.canonicalReserveScriptPubKeyHex }, { reserveScriptPubKeyHex: policy.scriptPubKeyHex },
+    { userRecoveryPublicKeyHex: pointX(secp256k1.Point.BASE.double().double()) },
+    { policy: { ...policy, sweep: policy.recovery } }, { policy: { ...policy, productionReady: true } }]) {
+    assert.throws(() => validateRegtestRecoverableDepositIntent({ ...expected, ...patch }), /Substituted/u);
+  }
+});
+
+test("finalized sweep witness signatures are checked even when a modified witness keeps the same txid", () => {
+  // Fresh single-key cryptographic verification fixture, not a FROST/node test.
+  const secret = schnorr.utils.randomSecretKey();
+  try {
+    const publicKey = Buffer.from(schnorr.getPublicKey(secret)).toString("hex");
+    const policy = buildRegtestRecoverableDeposit({ ...config(), frostPublicKeyHex: publicKey });
+    const raw = `0200000001${h("08")}0000000000ffffffff018813000000000000225120${publicKey}00000000`;
+    const spentOutputs = [{ amountAtomic: "6000", scriptPubKeyHex: policy.scriptPubKeyHex }];
+    const hash = taprootScriptPathSighashDefault({ transaction: raw, spentOutputs, inputIndex: 0, scriptHex: policy.sweep.scriptHex });
+    const signature = Buffer.from(schnorr.sign(Buffer.from(hash.sigHashHex, "hex"), secret)).toString("hex");
+    const attached = attachTaprootWitnesses({ unsignedNativeTransactionHex: raw, spentOutputs, signatures: [signature], tapscriptSpends: [policy.sweep] });
+    const sweep = parseNativeTransactionHex(attached.rawSignedTransactionHex);
+    const expected = { sweep, inputs: spentOutputs, tapscriptSpends: [policy.sweep], reserveScriptHex: policy.canonicalReserveScriptPubKeyHex };
+    assert.deepEqual(verifyRegtestSweepSignatures(expected), { scriptPathInputs: 1, keyPathInputs: 0 });
+    assert.throws(() => verifyRegtestSweepSignatures({ ...expected, sweep: { inputs: [] }, inputs: [], tapscriptSpends: [] }), /WITNESS_INVALID/u);
+    for (const index of [0, 1, 2]) {
+      const changed = structuredClone(sweep); changed.inputs[0].witness[index][0] ^= 1;
+      assert.equal(changed.txidHex, sweep.txidHex);
+      assert.throws(() => verifyRegtestSweepSignatures({ ...expected, sweep: changed }), /RAW_NATIVE_SWEEP_/u);
+    }
+    for (const patch of [{ tapscriptSpends: undefined }, { tapscriptSpends: [policy.recovery] },
+      { reserveScriptHex: `5120${recovery}` }, { inputs: [{ ...spentOutputs[0], amountAtomic: "6001" }] }]) {
+      assert.throws(() => verifyRegtestSweepSignatures({ ...expected, ...patch }), /RAW_NATIVE_SWEEP_/u);
+    }
+  } finally { secret.fill(0); }
 });

@@ -25,6 +25,7 @@ export const ALLOWED_REGTEST_CLI_COMMANDS = Object.freeze(
     "getblockchaininfo",
     "getblockhash",
     "getblockheader",
+    "getaddressinfo",
     "getnewaddress",
     "getrawtransaction",
     "gettxout",

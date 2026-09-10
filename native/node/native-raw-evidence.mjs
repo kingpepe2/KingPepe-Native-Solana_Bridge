@@ -4,7 +4,10 @@
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import path from "node:path";
-import { createLocalTaprootSighashEvidences, parseNativeTransactionHex } from "./native-taproot-transaction.mjs";
+import { schnorr } from "@noble/curves/secp256k1.js";
+import { createLocalTaprootSighashEvidences, parseNativeTransactionHex,
+  taprootKeyPathSighashDefault, taprootScriptPathSighashDefault } from "./native-taproot-transaction.mjs";
+import { verifyTaprootControlBlock } from "./native-tapscript.mjs";
 
 export const REGTEST_GENESIS = "352a1a62f7880d325da6d3fe2e62272cd0ce735a7ba003eae4fb59d2a175a8b9";
 export const MAX_RAW_EVIDENCE_BYTES = 8_000_000;
@@ -123,8 +126,8 @@ export class LocalNativeEvidenceVerifier {
   #executable;
   constructor({ rpc, executable }) { this.#rpc = rpc; this.#executable = executable; }
 
-  async verifySweepSigning({ inputs, minimumConfirmations, unsignedTransactionHex, reserveAmountAtomic, feeAtomic, reserveScriptHex, intent }) {
-    const expected = structuredClone({ inputs, minimumConfirmations, unsignedTransactionHex, reserveAmountAtomic, feeAtomic, reserveScriptHex, intent });
+  async verifySweepSigning({ inputs, minimumConfirmations, unsignedTransactionHex, reserveAmountAtomic, feeAtomic, reserveScriptHex, intent, tapscriptSpends }) {
+    const expected = structuredClone({ inputs, minimumConfirmations, unsignedTransactionHex, reserveAmountAtomic, feeAtomic, reserveScriptHex, intent, tapscriptSpends });
     const verified = await this.verifyInputs(expected);
     const tx = parseNativeTransactionHex(expected.unsignedTransactionHex);
     const inputIds = expected.inputs.map((input) => `${input.txid}:${input.vout}`);
@@ -137,6 +140,7 @@ export class LocalNativeEvidenceVerifier {
       proofFingerprintHex: verified.digestHex, reserveAmountAtomic: expected.reserveAmountAtomic,
       nativeMinerFeeAtomic: expected.feeAtomic, expectedRecipientScriptPubKeyHex: expected.reserveScriptHex,
       expectedChangeScriptPubKeyHex: expected.reserveScriptHex,
+      tapscriptSpends: expected.tapscriptSpends,
     });
     const evidence = evidences[expected.intent.signingInputIndex];
     if (!evidence || expected.intent.purpose !== "RESERVE_SWEEP" || expected.intent.nativeNetwork !== "regtest"
@@ -178,8 +182,8 @@ export class LocalNativeEvidenceVerifier {
     return Object.freeze({ ...verified, utxoTrust: "CONFIGURED_LOCAL_VALIDATING_NODE_RPC_OBSERVATION" });
   }
 
-  async verifyReserve({ deposit, feeInputs, sweepTxid, reserveVout, reserveScriptHex, feeAtomic, minimumConfirmations }) {
-    const expected = structuredClone({ deposit, feeInputs, sweepTxid, reserveVout, reserveScriptHex, feeAtomic, minimumConfirmations });
+  async verifyReserve({ deposit, feeInputs, sweepTxid, reserveVout, reserveScriptHex, feeAtomic, minimumConfirmations, tapscriptSpends }) {
+    const expected = structuredClone({ deposit, feeInputs, sweepTxid, reserveVout, reserveScriptHex, feeAtomic, minimumConfirmations, tapscriptSpends });
     if (!Array.isArray(expected.feeInputs) || expected.feeInputs.length > MAX_TRANSACTIONS - 2) throw new Error("RAW_NATIVE_COUNT_INVALID");
     const inputs = [expected.deposit, ...expected.feeInputs];
     const bundle = await collectRegtestEvidence({ rpc: this.#rpc,
@@ -203,12 +207,51 @@ export class LocalNativeEvidenceVerifier {
     const output = sweep.outputs[0];
     if (output.amountAtomic !== expected.deposit.amountAtomic || output.scriptPubKeyHex !== expected.reserveScriptHex
       || total - atomic(output.amountAtomic) !== atomic(expected.feeAtomic)) throw new Error("RAW_NATIVE_SWEEP_VALUE_MISMATCH");
+    const witnessSignatures = verifyRegtestSweepSignatures({ sweep, inputs, tapscriptSpends: expected.tapscriptSpends,
+      reserveScriptHex: expected.reserveScriptHex });
     const utxo = await this.#rpc.getUtxoObservation({ txid: sweep.txidHex, vout: 0, decimals: 8, includeMempool: true });
     if (!utxo.unspent || utxo.coinbase || utxo.bestBlockHash !== verified.tipHash
       || utxo.valueAtomic !== output.amountAtomic || utxo.scriptPubKeyHex !== output.scriptPubKeyHex
       || utxo.confirmations < expected.minimumConfirmations) throw new Error("RAW_NATIVE_RESERVE_NOT_AVAILABLE");
-    return Object.freeze({ ...verified, utxoTrust: "CONFIGURED_LOCAL_VALIDATING_NODE_RPC_OBSERVATION" });
+    return Object.freeze({ ...verified, witnessSignatures, utxoTrust: "CONFIGURED_LOCAL_VALIDATING_NODE_RPC_OBSERVATION" });
   }
+}
+
+// Verify actual witness bytes separately: a legacy txid alone does not commit
+// its witness. This is not full Native script/block validation or a UTXO proof.
+export function verifyRegtestSweepSignatures({ sweep, inputs, tapscriptSpends, reserveScriptHex }) {
+  if (typeof reserveScriptHex !== "string" || !/^5120[0-9a-f]{64}$/u.test(reserveScriptHex)
+    || !Array.isArray(inputs) || inputs.length < 1 || inputs.length > MAX_TRANSACTIONS || inputs.length !== sweep.inputs.length
+    || (tapscriptSpends !== undefined && (!Array.isArray(tapscriptSpends) || tapscriptSpends.length !== inputs.length))) {
+    throw new Error("RAW_NATIVE_SWEEP_WITNESS_INVALID");
+  }
+  const publicKey = Buffer.from(reserveScriptHex.slice(4), "hex");
+  const spentOutputs = inputs.map(({ amountAtomic, scriptPubKeyHex }) => ({ amountAtomic, scriptPubKeyHex }));
+  let scriptPathInputs = 0;
+  for (const [index, input] of sweep.inputs.entries()) {
+    const script = tapscriptSpends?.[index];
+    if (input.witness.length !== (script === undefined ? 1 : 3) || input.witness[0]?.length !== 64) {
+      throw new Error("RAW_NATIVE_SWEEP_WITNESS_INVALID");
+    }
+    if (script === undefined) {
+      if (spentOutputs[index].scriptPubKeyHex !== reserveScriptHex) throw new Error("RAW_NATIVE_SWEEP_WITNESS_INVALID");
+    } else {
+      if (!/^20[0-9a-f]{64}7520[0-9a-f]{64}ac$/u.test(script.scriptHex)
+        || script.scriptHex.slice(-66, -2) !== reserveScriptHex.slice(4)
+        || Buffer.from(input.witness[1]).toString("hex") !== script.scriptHex
+        || Buffer.from(input.witness[2]).toString("hex") !== script.controlBlockHex) {
+        throw new Error("RAW_NATIVE_SWEEP_WITNESS_INVALID");
+      }
+      verifyTaprootControlBlock({ ...script, scriptPubKeyHex: spentOutputs[index].scriptPubKeyHex });
+      scriptPathInputs++;
+    }
+    const hash = (script === undefined ? taprootKeyPathSighashDefault : taprootScriptPathSighashDefault)({
+      transaction: sweep, spentOutputs, inputIndex: index, ...(script === undefined ? {} : { scriptHex: script.scriptHex }) });
+    if (!schnorr.verify(Uint8Array.from(input.witness[0]), Buffer.from(hash.sigHashHex, "hex"), publicKey)) {
+      throw new Error("RAW_NATIVE_SWEEP_SIGNATURE_INVALID");
+    }
+  }
+  return Object.freeze({ scriptPathInputs, keyPathInputs: inputs.length - scriptPathInputs });
 }
 
 function hex(value, length, maximum = length) {
