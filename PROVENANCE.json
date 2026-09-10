@@ -3,6 +3,18 @@
   "generatedAt": "2026-09-10T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
   "purpose": "file-by-file provenance classification for local tracked content",
+  "phase08AbsorbingStopReview": {
+    "filesBefore": 175,
+    "filesAfter": 176,
+    "filesDeleted": 0,
+    "filesMoved": 0,
+    "newFiles": ["shared/operation-hard-stop.mjs"],
+    "changes": "Original common absorbing-stop guard, operation-journal retry/late-write protection, pipeline ledger boundary checks, exact-ledger stop state, race/reopen tests and an isolated stopped-worker probe using a real local claim packet.",
+    "sourceImports": "None. Uses the existing Node standard library; no upstream implementation copied or derived. Existing third-party notices and licenses preserved.",
+    "dependencyChanges": "None; toolchain and npm/Cargo lockfiles unchanged.",
+    "terminologyReview": "No KingPepe project-role use of prohibited terminology in the increment; official Solana and third-party terms preserved.",
+    "scope": "Cooperating local workers and authenticated local credit ledger only, not a complete bridge-wide integrity stop, service fencing or rollback guarantee. No operational data deleted, moved or published."
+  },
   "phase08AuthenticatedCreditReview": {
     "filesBefore": 171,
     "filesAfter": 175,
@@ -132,6 +144,11 @@
     ]
   },
   "trackedFiles": [
+    {
+      "path": "shared/operation-hard-stop.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original absorbing-stop decision guard shared by deposit, sweep and claim journals. Node standard-library deep equality; no third-party source copied."
+    },
     {
       "path": ".npmrc",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",

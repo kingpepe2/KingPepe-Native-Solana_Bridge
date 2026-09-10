@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -14,6 +14,7 @@ import {
   AutomaticNativeToSolanaDepositPipeline,
   DEPOSIT_STATES,
   ExactDepositLedger,
+  InMemoryDepositJournal,
   FileBackedDepositJournal,
   buildDepositClaimMessage,
 } from "../automatic-deposit-pipeline.mjs";
@@ -45,6 +46,9 @@ import {
   runTwoPartyDkg,
 } from "../../../native/frost/index.mjs";
 import { RPC_OBSERVATION, SOURCE_READY } from "../../../native/node/native-rpc-client.mjs";
+import { REGTEST_GENESIS } from "../../../native/node/native-raw-evidence.mjs";
+import { AuthenticatedLocalDepositLedger } from "../local-deposit-ledger.mjs";
+import { preserveOperationHardStop, readOperationHardStop } from "../../../shared/operation-hard-stop.mjs";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
 const ZERO_HASH = "00".repeat(32);
@@ -348,8 +352,9 @@ function createPipeline(overrides = {}) {
     reserveVerifier,
     solanaBridge,
     journal: overrides.journal,
+    ledger: overrides.ledger,
   });
-  return { config, operation, frost, nativeRelayer, reserveVerifier, solanaBridge, pipeline };
+  return { config, operation, frost, attesters: [attesterA, attesterB], nativeRelayer, reserveVerifier, solanaBridge, pipeline };
 }
 
 function feePayerKeypairForPipelineTest() {
@@ -1010,7 +1015,217 @@ for (const asyncAdapters of [false, true]) {
       assert.equal(runtime.pipeline.ledgerSnapshot().mintedSupply, "0");
     } finally { runtime.frost.cleanup(); }
   });
+
+  test(`${mode} a recorded pipeline hard stop blocks retry before FROST or broadcast`, async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-pipeline-stop-"));
+    const journal = new FileBackedDepositJournal({ root, repoRoot: REPO_ROOT });
+    let mintCalls = 0;
+    const runtime = createPipeline({ asyncAdapters, journal, solanaBridge: {
+      submitDepositClaim(request) { mintCalls++; return { state: DEPOSIT_STATES.COMPLETED,
+        mintedAmountAtomic: mintCalls === 1 ? 250000000 : request.amountAtomic }; },
+    } });
+    try {
+      const stopped = await process(runtime);
+      assert.equal(stopped.state, DEPOSIT_STATES.HARD_STOP);
+      runtime.frost.coordinator.signAutomatically = () => { throw new Error("SigningMustNotResumeAfterHardStop"); };
+      assert.deepEqual(await process(runtime), stopped);
+      assert.equal(runtime.nativeRelayer.broadcasts.length, 1);
+      assert.equal(mintCalls, 1);
+      const reopened = new FileBackedDepositJournal({ root, repoRoot: REPO_ROOT });
+      const id = runtime.operation.reserveSweep.signingIntent.operationId;
+      assert.throws(() => reopened.record(id, DEPOSIT_STATES.OBSERVED, "RETRY"), /HardStop/u);
+      assert.throws(() => reopened.finish(id, { ...stopped, state: DEPOSIT_STATES.COMPLETED }), /HardStop/u);
+      assert.deepEqual(reopened.finish(id, stopped), stopped);
+    } finally { runtime.frost.cleanup(); rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test(`${mode} a stopped accounting ledger blocks a fresh operation before signing`, async () => {
+    const ledger = new ExactDepositLedger();
+    ledger.hardStop("ECONOMIC_CONTRADICTION");
+    const runtime = createPipeline({ asyncAdapters, ledger });
+    try {
+      runtime.frost.coordinator.signAutomatically = () => { throw new Error("SigningMustNotStartWithStoppedLedger"); };
+      const result = await process(runtime);
+      assert.equal(result.state, DEPOSIT_STATES.HARD_STOP);
+      assert.equal(runtime.nativeRelayer.broadcasts.length, 0);
+      assert.equal(runtime.solanaBridge.submissions.length, 0);
+    } finally { runtime.frost.cleanup(); }
+  });
+
+  test(`${mode} a Native adapter integrity stop is not downgraded to dependency waiting`, async () => {
+    let calls = 0;
+    const runtime = createPipeline({ asyncAdapters, nativeRelayer: {
+      broadcastReserveSweep() { calls++; return { state: DEPOSIT_STATES.HARD_STOP, reason: "NATIVE_INTEGRITY_STOP" }; },
+    } });
+    try {
+      const stopped = await process(runtime);
+      assert.equal(stopped.state, DEPOSIT_STATES.HARD_STOP);
+      assert.deepEqual(await process(runtime), stopped);
+      assert.equal(calls, 1);
+      assert.equal(runtime.solanaBridge.submissions.length, 0);
+    } finally { runtime.frost.cleanup(); }
+  });
+
+  test(`${mode} a Solana adapter integrity stop retains the credit and blocks all retries`, async () => {
+    const ledger = new ExactDepositLedger();
+    let calls = 0;
+    const runtime = createPipeline({ asyncAdapters, ledger, solanaBridge: {
+      submitDepositClaim() { calls++; return { state: DEPOSIT_STATES.HARD_STOP, reason: "SOLANA_INTEGRITY_STOP" }; },
+    } });
+    try {
+      const stopped = await process(runtime);
+      assert.equal(stopped.state, DEPOSIT_STATES.HARD_STOP);
+      assert.equal(stopped.reason, "SOLANA_INTEGRITY_STOP");
+      runtime.frost.coordinator.signAutomatically = () => { throw new Error("SigningMustNotResume"); };
+      assert.deepEqual(await process(runtime), stopped);
+      assert.equal(calls, 1);
+      assert.deepEqual(ledger.status(), { state: DEPOSIT_STATES.HARD_STOP, reason: "SOLANA_INTEGRITY_STOP" });
+      assert.equal(ledger.snapshot().authorizedUnmintedCredits, "250000000");
+      assert.equal(ledger.snapshot().mintedSupply, "0");
+    } finally { runtime.frost.cleanup(); }
+  });
+
+  for (const boundary of ["frost", "attester"]) {
+    test(`${mode} a stop raised during ${boundary} blocks the next privileged action`, async () => {
+      const ledger = new ExactDepositLedger();
+      const runtime = createPipeline({ asyncAdapters, ledger });
+      try {
+        const [target, method] = boundary === "frost" ? [runtime.frost.coordinator, "signAutomatically"] : [runtime.attesters[0], "signDepositCredit"];
+        const original = target[method].bind(target);
+        target[method] = (...args) => { const result = original(...args); ledger.hardStop("INTEGRITY_STOP_DURING_SIGNING"); return result; };
+        runtime.attesters[1].signDepositCredit = () => { throw new Error("SecondAttesterMustNotRun"); };
+        const stopped = await process(runtime);
+        assert.equal(stopped.state, DEPOSIT_STATES.HARD_STOP);
+        assert.equal(stopped.reason, "INTEGRITY_STOP_DURING_SIGNING");
+        assert.equal(runtime.nativeRelayer.broadcasts.length, boundary === "frost" ? 0 : 1);
+        assert.equal(runtime.solanaBridge.submissions.length, 0);
+        assert.deepEqual(await process(runtime), stopped);
+      } finally { runtime.frost.cleanup(); }
+    });
+  }
+
+  test(`${mode} unknown ledger status cannot authorize signing`, async () => {
+    const ledger = new ExactDepositLedger();
+    ledger.status = () => ({ state: "UNKNOWN" });
+    const runtime = createPipeline({ asyncAdapters, ledger });
+    try {
+      runtime.frost.coordinator.signAutomatically = () => { throw new Error("SigningMustNotStart"); };
+      await assert.rejects(async () => process(runtime), /DepositLedgerStatusUnavailable/u);
+      assert.equal(runtime.nativeRelayer.broadcasts.length, 0);
+      assert.equal(runtime.solanaBridge.submissions.length, 0);
+    } finally { runtime.frost.cleanup(); }
+  });
 }
+
+for (const boundary of ["native", "reserve", "mint"]) {
+  test(`async pipeline rechecks a reopened journal after pending ${boundary} response`, async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-pipeline-late-stop-"));
+    const journal = new FileBackedDepositJournal({ root, repoRoot: REPO_ROOT });
+    const ledger = new ExactDepositLedger();
+    const runtime = createPipeline({ asyncAdapters: true, journal, ledger });
+    try {
+      const [target, method] = { native: [runtime.nativeRelayer, "broadcastReserveSweep"],
+        reserve: [runtime.reserveVerifier, "verifyFinalizedReserveSweep"], mint: [runtime.solanaBridge, "submitDepositClaim"] }[boundary];
+      const original = target[method].bind(target);
+      const entered = Promise.withResolvers();
+      const response = Promise.withResolvers();
+      target[method] = async (...args) => { const value = await original(...args); entered.resolve(value); return response.promise; };
+      const pending = runtime.pipeline.processDepositAsync(runtime.operation, 1_700_000_600);
+      const value = await entered.promise;
+      const id = runtime.operation.reserveSweep.signingIntent.operationId;
+      const stopped = { state: DEPOSIT_STATES.HARD_STOP, reason: "PIPELINE_INTEGRITY_STOP", operationIdHex: id };
+      const writer = new FileBackedDepositJournal({ root, repoRoot: REPO_ROOT });
+      writer.finish(id, stopped);
+      response.resolve(value);
+      assert.deepEqual(await pending, stopped);
+      runtime.frost.coordinator.signAutomatically = () => { throw new Error("SigningMustNotResume"); };
+      assert.deepEqual(await runtime.pipeline.processDepositAsync(runtime.operation, 1_700_000_600), stopped);
+      assert.deepEqual(ledger.status(), { state: DEPOSIT_STATES.HARD_STOP, reason: stopped.reason });
+      assert.equal(runtime.solanaBridge.submissions.length, boundary === "mint" ? 1 : 0);
+      assert.equal(ledger.snapshot().mintedSupply, "0");
+      if (boundary === "mint") assert.equal(ledger.snapshot().authorizedUnmintedCredits, "250000000");
+    } finally { runtime.frost.cleanup(); rmSync(root, { recursive: true, force: true }); }
+  });
+}
+
+test("authenticated ledger stop survives pipeline replacement and blocks another operation", async () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-pipeline-ledger-stop-"));
+  const config = baseConfig();
+  config.deployment.nativeGenesis = REGTEST_GENESIS;
+  const options = { root, repoRoot: REPO_ROOT, environment: "localnet",
+    deploymentHex: ledgerCredit({}, config).encodedMessageHex.slice(24, 360),
+    journalIdHex: h("pipeline-stop-journal"), authenticationKey: randomBytes(32) };
+  let ledger;
+  const runtimes = [];
+  try {
+    ledger = AuthenticatedLocalDepositLedger.createLocal(options);
+    const first = createPipeline({ config, ledger, solanaBridge: {
+      submitDepositClaim() { return { state: DEPOSIT_STATES.HARD_STOP, reason: "SOLANA_INTEGRITY_STOP" }; },
+    } });
+    runtimes.push(first);
+    assert.equal(first.pipeline.processDeposit(first.operation, 1_700_000_600).state, DEPOSIT_STATES.HARD_STOP);
+    const checkpoint = ledger.checkpoint();
+    ledger.close();
+    ledger = AuthenticatedLocalDepositLedger.openLocal({ ...options, minimumCheckpoint: checkpoint });
+    const second = createPipeline({ config, ledger, operation: { deposit: { depositOutpoint: outpoint("new-operation-after-stop") } } });
+    runtimes.push(second);
+    second.frost.coordinator.signAutomatically = () => { throw new Error("SigningMustNotStartWithRestoredStop"); };
+    const stopped = await second.pipeline.processDepositAsync(second.operation, 1_700_000_600);
+    assert.equal(stopped.state, DEPOSIT_STATES.HARD_STOP);
+    assert.equal(stopped.reason, "SOLANA_INTEGRITY_STOP");
+    assert.equal(second.nativeRelayer.broadcasts.length, 0);
+    assert.equal(second.solanaBridge.submissions.length, 0);
+    assert.equal(ledger.snapshot().authorizedUnmintedCredits, "250000000");
+    assert.equal(ledger.snapshot().mintedSupply, "0");
+    assert.deepEqual(ledger.checkpoint(), checkpoint);
+  } finally {
+    for (const runtime of runtimes) runtime.frost.cleanup();
+    ledger?.close(); options.authenticationKey.fill(0); rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("ledger hard stop is absorbing, immutable and inherited by a fork without economic changes", () => {
+  const ledger = new ExactDepositLedger();
+  const credit = ledgerCredit();
+  ledger.recordValidatedDeposit(credit);
+  const before = ledger.snapshot();
+  ledger.hardStop("ECONOMIC_CONTRADICTION");
+  ledger.hardStop("ECONOMIC_CONTRADICTION");
+  assert.throws(() => ledger.hardStop("RETRY"), /LedgerHardStop/u);
+  assert.throws(() => ledger.recordMint({ ...credit, mintedAmountAtomic: "250000000" }), /LedgerHardStop/u);
+  assert.throws(() => ledger.recordValidatedDeposit(credit), /LedgerHardStop/u);
+  assert.throws(() => { ledger.status().state = "OPEN_IN_MEMORY_ACCOUNTING_ONLY"; }, TypeError);
+  const fork = ledger.fork();
+  assert.deepEqual(fork.status(), ledger.status());
+  assert.throws(() => fork.recordValidatedDeposit(credit), /LedgerHardStop/u);
+  assert.deepEqual(ledger.snapshot(), before);
+  assert.deepEqual(fork.snapshot(), before);
+});
+
+test("memory pipeline journal returns immutable copies and requires a complete stop decision", () => {
+  const journal = new InMemoryDepositJournal();
+  const credit = ledgerCredit();
+  const { decodedMessage } = buildDepositClaimMessage(baseConfig(), operationWithComputedId(baseConfig()));
+  const id = decodedMessage.operationIdHex;
+  journal.reserveOperation(id, decodedMessage.depositOutpointText, credit.encodedMessageHex);
+  assert.throws(() => journal.record(id, DEPOSIT_STATES.HARD_STOP, "INTEGRITY_STOP"), /HardStopDecisionRequired/u);
+  const stopped = { state: DEPOSIT_STATES.HARD_STOP, reason: "INTEGRITY_STOP", operationIdHex: id };
+  journal.finish(id, stopped);
+  journal.stopped(id).reason = "CHANGED";
+  assert.deepEqual(journal.stopped(id), stopped);
+  assert.throws(() => journal.record(id, DEPOSIT_STATES.OBSERVED, "RETRY"), /HardStop/u);
+  assert.throws(() => journal.finish(id, { ...stopped, reason: "CHANGED" }), /HardStop/u);
+  assert.deepEqual(journal.finish(id, stopped), stopped);
+});
+
+test("inconsistent hard-stop markers fail closed and cannot be overwritten", () => {
+  for (const [state, decision] of [[DEPOSIT_STATES.HARD_STOP, undefined],
+    ["SUBMITTED", { state: DEPOSIT_STATES.HARD_STOP, reason: "INTEGRITY_STOP" }],
+    [DEPOSIT_STATES.HARD_STOP, { state: DEPOSIT_STATES.HARD_STOP }]]) {
+    assert.throws(() => readOperationHardStop(state, decision), /HardStopRecordInvalid/u);
+    assert.throws(() => preserveOperationHardStop(state, decision, { state: "COMPLETED" }), /HardStopRecordInvalid/u);
+  }
+});
 
 test("unapproved project fee is rejected before any Native signing or transfer", () => {
   const runtime = createPipeline({ operation: { deposit: { projectBridgeFeeAtomic: "1" } } });

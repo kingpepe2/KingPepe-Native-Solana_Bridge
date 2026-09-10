@@ -38,6 +38,27 @@ export async function testLocalClaimProcessRetry(context) {
         mintHex: config.mintHex, nativeDecimals: config.nativeDecimals, policyEpoch: config.policyEpoch,
         keyEpoch: config.keyEpoch, acceptedObservationTrust: ["RPC_OBSERVATION"] } };
     const signature = base58Encode(Buffer.from(request.preparedTransactionBase64, "base64").subarray(1, 65));
+    // Isolated stopped-worker probe, not a bridge-wide stop or a reset of the
+    // normal flow's journal. It holds the real signed local-validator packet
+    // but must return its persisted stop without any observer/RPC callback.
+    const stoppedRoot = path.join(config.stateRoot, "solana-stopped-claim-probe");
+    const stoppedJournal = new FileBackedSolanaDepositClaimJournal({ root: stoppedRoot, repoRoot: plan.repoRoot });
+    stoppedJournal.persistPrepared(journal().get(operationId).prepared);
+    const stopDecision = { state: "HARD_STOP", reason: "TEST_INTEGRITY_STOP", operationIdHex: operationId };
+    stoppedJournal.recordTerminal(operationId, stopDecision);
+    const stoppedInput = { ...input, journalRoot: stoppedRoot };
+    const stoppedWorker = await runWorker("stopped", stoppedInput);
+    assert.equal(stoppedWorker.code, 0, "STOPPED_CLAIM_WORKER_FAILED");
+    assert.deepEqual(JSON.parse(stoppedWorker.output), stopDecision);
+    assert.equal(await rpc.getSignatureStatus(signature), null);
+    assert.equal(await rpc.getAccountInfo(request.depositClaimAccountBase58), null);
+    passed.push("STOPPED_CLAIM_WORKER_REOPEN_DOES_NOT_OBSERVE_OR_SEND");
+    assert.throws(() => stoppedJournal.recordSubmitted(operationId, signature), /HardStop/u);
+    assert.throws(() => stoppedJournal.recordCompleted(operationId, { state: "COMPLETED", solanaSignature: signature }), /HardStop/u);
+    const stillStopped = await runWorker("stopped", stoppedInput);
+    assert.equal(stillStopped.code, 0);
+    assert.deepEqual(JSON.parse(stillStopped.output), stopDecision);
+    passed.push("LATE_COMPLETION_CANNOT_CLEAR_STOPPED_CLAIM_JOURNAL");
     const before = await runWorker("before-send", input);
     assert.equal(before.code, BEFORE_SEND_EXIT, "CLAIM_WORKER_DID_NOT_EXIT_BEFORE_SEND");
     const saved = journal().get(operationId);
@@ -86,9 +107,9 @@ export async function testLocalClaimProcessRetry(context) {
   } };
   const completed = await submitLocalnetSolanaDepositClaim({ ...context, claimSubmitter });
   assert.equal(completed.state, "COMPLETED");
-  assert.equal(passed.length, 5);
+  assert.equal(passed.length, 7);
   return { completed, evidence: { pass: passed.length, fail: 0, passed,
-    scope: "REGTEST/local-validator signed claim worker crashes and real blockhash expiry; not full service/power-loss recovery or authenticated storage." } };
+    scope: "REGTEST/local-validator signed claim worker crashes, real blockhash expiry and isolated stopped-worker reopen; not a global stop, full service/power-loss recovery or authenticated claim storage." } };
 }
 
 function runWorker(mode, input) {
@@ -113,7 +134,7 @@ function runWorker(mode, input) {
 }
 
 async function worker(mode) {
-  if (!["before-send", "after-send", "resume"].includes(mode)) throw new Error("CLAIM_RETRY_MODE_REJECTED");
+  if (!["before-send", "after-send", "resume", "stopped"].includes(mode)) throw new Error("CLAIM_RETRY_MODE_REJECTED");
   let bytes = 0;
   const chunks = [];
   for await (const chunk of process.stdin) {
@@ -127,9 +148,13 @@ async function worker(mode) {
   assert.equal(input.config.cluster, "localnet");
   const journal = new FileBackedSolanaDepositClaimJournal({ root: input.journalRoot, repoRoot: input.repoRoot });
   const rpc = new SolanaLocalRpcClient({ endpoint: input.endpoint });
+  if (mode === "stopped") {
+    rpc.getSignatureStatus = async () => { throw new Error("STOPPED_CLAIM_MUST_NOT_OBSERVE"); };
+    rpc.getBlockHeight = async () => { throw new Error("STOPPED_CLAIM_MUST_NOT_QUERY"); };
+  }
   const send = rpc.sendTransaction.bind(rpc);
   rpc.sendTransaction = async (packet, options) => {
-    if (mode === "resume") throw new Error("CLAIM_RESUME_MUST_NOT_SEND");
+    if (mode === "resume" || mode === "stopped") throw new Error("CLAIM_RESUME_MUST_NOT_SEND");
     const saved = journal.get(input.request.operationIdHex);
     assert.equal(saved.prepared.preparedTransactionBase64, packet);
     assert.equal(saved.prepared.submittedSignature, base58Encode(Buffer.from(packet, "base64").subarray(1, 65)));
@@ -141,7 +166,7 @@ async function worker(mode) {
   const submitter = new SolanaDepositClaimSubmitter({ config: input.config, rpcClient: rpc, journal,
     claimObserver: new SolanaDepositClaimObserver({ config: input.config, endpoint: input.endpoint }) });
   const result = await submitter.submitDepositClaim(input.request);
-  assert.equal(result.state, "COMPLETED");
+  assert.equal(result.state, mode === "stopped" ? "HARD_STOP" : "COMPLETED");
   process.stdout.write(JSON.stringify(result));
 }
 

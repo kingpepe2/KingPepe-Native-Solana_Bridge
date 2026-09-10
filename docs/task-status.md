@@ -1,8 +1,29 @@
 # KingPepe Native - Solana Bridge Task Status
 
-## Current Phase 08 authenticated credit increment (2026-09-10)
+## Current Phase 08 absorbing-stop correction (2026-09-10)
 
-UNPUBLISHED / LOCALLY_TESTED. The real deposit harness now commits
+Implemented locally: absorbing operation/ledger stops, late-response guards and
+pre-authorization status checks. Windows/WSL each 318 Node tests + two vectors
+PASS; WSL 93 Rust tests, fmt/clippy and audits PASS. Forty-five Node regressions
+added; final focused suite 100/100 PASS. Fresh real-chain deposit, both SBF builds
+and 55 integration/security checks PASS; reserve and supply each 100000000 atomic,
+pending credit zero. Current source and all 151 existing commits scan clean.
+Staged/outgoing scans, private push and exact-SHA CI are pending. No production actions. For the full
+test scope, corrected failures and limitations see
+[development status](development-status.md#current-phase-08-absorbing-stop-correction-2026-09-10).
+Phase 08 INCOMPLETE; Phase 09 NOT_STARTED. Next: validate/publish this correction,
+then continue the unresolved Phase 08 recovery/fencing/reconciliation boundaries.
+
+## Previous authenticated credit increment (verified source)
+
+Source `2de96942d7da69466a6130cb55804916171e4976`, message
+`feat(phase-08): persist authenticated local deposit credits`, pushed privately;
+[all four exact-SHA CI jobs PASS](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34466302475).
+Current/staged/outgoing source and all 151 commits scanned clean; zero workflow
+artifacts were uploaded. The following 273-test/53-check evidence belongs to
+that SHA, not to a newer source revision.
+
+LOCALLY_AND_CI_TESTED. The real deposit harness commits
 the canonical user credit after finalized reserve validation, before Solana
 setup or attestation. It closes/reopens pending credit, retains it on downstream
 failure, and commits/reopens mint settlement only after finalized observation
@@ -48,10 +69,9 @@ new accounting checks. The final auxiliary-path source revision also passes
 a second fresh REGTEST/local-validator run and both SBF rebuilds: all 53 checks
 PASS; canonical reserve and observed SPL supply each equal 100000000 atomic,
 pending credits equal zero after settlement, and no per-transfer approval occurs.
-Current source and all 150 existing commits scanned clean; private-path/IP
-checks, nine JSON parses and exact 175-file provenance coverage PASS. Publication
-still requires staged/outgoing scans, reviewed private push and all four
-exact-SHA CI jobs. No artifacts are uploaded.
+Private-path/IP checks, nine JSON parses and exact 175-file provenance coverage
+PASS. Staged/outgoing/all-history scans, private push and exact-SHA CI passed
+as recorded above. No artifacts were uploaded.
 
 Provenance: 171 -> 175 files; two original code/test files, one original
 engineering document and one build-metadata file. No files deleted/moved or

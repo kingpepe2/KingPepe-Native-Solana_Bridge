@@ -212,6 +212,27 @@ test("Native reserve sweep relayer hard-stops if the node returns a different tx
   assert.equal(rpc.sends.length, 1);
 });
 
+for (const persistent of [false, true]) {
+  test(`${persistent ? "file" : "memory"} Native sweep hard stop survives retry and late journal writes`, async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-sweep-stop-"));
+    try {
+      let journal = persistent ? new FileBackedNativeReserveSweepJournal({ root, repoRoot: REPO_ROOT }) : new InMemoryNativeReserveSweepJournal();
+      const rpc = new FakeNativeRpc({ sendResults: [h("wrong-response"), h("native-sweep-txid")] });
+      const request = relayerRequest();
+      const first = await new NativeReserveSweepRelayer({ rpcClient: rpc, journal }).broadcastReserveSweep(request);
+      assert.equal(first.state, DEPOSIT_STATES.HARD_STOP);
+      if (persistent) journal = new FileBackedNativeReserveSweepJournal({ root, repoRoot: REPO_ROOT });
+      const retry = await new NativeReserveSweepRelayer({ rpcClient: rpc, journal }).broadcastReserveSweep(request);
+      assert.deepEqual(retry, first);
+      assert.equal(rpc.sends.length, 1);
+      assert.throws(() => journal.recordSubmitted(request.operationIdHex, request.expectedNativeSweepTxidHex), /HardStop/u);
+      assert.throws(() => journal.recordTerminal(request.operationIdHex, { ...first, state: DEPOSIT_STATES.BROADCAST }), /Terminal|HardStop/u);
+      journal.recordTerminal(request.operationIdHex, first);
+      assert.deepEqual(journal.get(request.operationIdHex).result, first);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+}
+
 test("Native reserve sweep verifier reports canonical reserve evidence from finalized local RPC observation", async () => {
   const verifier = new NativeReserveSweepVerifier({
     rpcClient: new FakeNativeRpc(),
@@ -228,6 +249,37 @@ test("Native reserve sweep verifier reports canonical reserve evidence from fina
   assert.equal(result.sweepFinalized, true);
   assert.equal(result.amountAtomic, "250000000");
 });
+
+for (const fileBacked of [false, true]) {
+  for (const rejectResponse of [false, true]) {
+    test(`${fileBacked ? "file" : "memory"} Native late ${rejectResponse ? "failure" : "success"} preserves an in-flight integrity stop`, async () => {
+      const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-sweep-late-stop-"));
+      try {
+        const journal = fileBacked ? new FileBackedNativeReserveSweepJournal({ root, repoRoot: REPO_ROOT }) : new InMemoryNativeReserveSweepJournal();
+        const request = relayerRequest();
+        const entered = Promise.withResolvers();
+        const response = Promise.withResolvers();
+        let sends = 0;
+        const rpcClient = { async sendRawTransaction() { sends++; entered.resolve(); return response.promise; } };
+        const relayer = new NativeReserveSweepRelayer({ config: { environment: "localnet" }, rpcClient, journal });
+        const pending = relayer.broadcastReserveSweep(request);
+        await entered.promise;
+        const writer = fileBacked ? new FileBackedNativeReserveSweepJournal({ root, repoRoot: REPO_ROOT }) : journal;
+        const stopped = { state: DEPOSIT_STATES.HARD_STOP, reason: "NATIVE_INTEGRITY_STOP", operationIdHex: request.operationIdHex };
+        writer.recordTerminal(request.operationIdHex, stopped);
+        if (rejectResponse) response.reject(new Error("TestResponseLost"));
+        else response.resolve(request.expectedNativeSweepTxidHex);
+        assert.deepEqual(await pending, stopped);
+        assert.deepEqual(await relayer.broadcastReserveSweep(request), stopped);
+        assert.equal(sends, 1);
+        assert.equal(journal.submitted(request.operationIdHex), undefined);
+        const copy = journal.get(request.operationIdHex);
+        copy.result.state = DEPOSIT_STATES.BROADCAST;
+        assert.deepEqual(journal.get(request.operationIdHex).result, stopped);
+      } finally { rmSync(root, { recursive: true, force: true }); }
+    });
+  }
+}
 
 test("Native reserve sweep verifier waits for finality instead of approving early", async () => {
   const verifier = new NativeReserveSweepVerifier({

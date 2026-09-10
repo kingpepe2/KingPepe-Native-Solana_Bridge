@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { preserveOperationHardStop, readOperationHardStop } from "../../shared/operation-hard-stop.mjs";
 import { validateRuntimeFile, validateRuntimeStateRoot as validateStateRootOutsideRepo } from "../../shared/runtime-path-boundary.mjs";
 import {
   bytesToHex,
@@ -55,6 +56,9 @@ export class AutomaticNativeToSolanaDepositPipeline {
     this.#solanaBridge = requireObject(options.solanaBridge, "solanaBridge");
     this.#journal = options.journal ?? new InMemoryDepositJournal();
     this.#ledger = options.ledger ?? new ExactDepositLedger();
+    for (const method of ["status", "hardStop", "recordValidatedDeposit", "recordMint", "snapshot"]) {
+      if (typeof this.#ledger[method] !== "function") throw new Error("DepositLedgerInterfaceRequired");
+    }
   }
 
   ledgerSnapshot() {
@@ -64,22 +68,25 @@ export class AutomaticNativeToSolanaDepositPipeline {
   processDeposit(operation, nowUnix = undefined) {
     const normalized = normalizeDepositOperation(operation);
     const { encodedMessageHex, decodedMessage, evidenceDigestHex } = buildDepositClaimMessage(this.#config, normalized);
+    this.#journal.reserveOperation(decodedMessage.operationIdHex, decodedMessage.depositOutpointText, encodedMessageHex);
+    const stopped = this.#atBoundary(decodedMessage, encodedMessageHex);
+    if (stopped !== undefined) return stopped;
     const replay = this.#journal.completed(decodedMessage.operationIdHex);
     if (replay !== undefined) {
       this.#journal.assertSameCompleted(decodedMessage.operationIdHex, encodedMessageHex);
       return structuredClone(replay);
     }
-    this.#journal.reserveOperation(decodedMessage.operationIdHex, decodedMessage.depositOutpointText, encodedMessageHex);
-
     const observed = validateObservedDeposit(this.#config, normalized, decodedMessage);
     this.#journal.record(decodedMessage.operationIdHex, DEPOSIT_STATES.OBSERVED, observed.reason);
     if (observed.state !== DEPOSIT_STATES.VERIFIED_READY) {
-      return this.#journal.finish(decodedMessage.operationIdHex, observed);
+      return this.#finish(decodedMessage.operationIdHex, observed);
     }
 
     const preparedSweep = validatePreparedReserveSweep(normalized, decodedMessage);
     this.#journal.record(decodedMessage.operationIdHex, DEPOSIT_STATES.SIGNING, "FROST_A_B_AUTOMATIC_RESERVE_SWEEP");
     const frostResult = this.#frostCoordinator.signAutomatically(preparedSweep.signingIntent);
+    const stopAfterFrost = this.#atBoundary(decodedMessage, encodedMessageHex, frostResult);
+    if (stopAfterFrost !== undefined) return stopAfterFrost;
     if (frostResult.state !== "SIGNED") {
       return this.#journal.finish(
         decodedMessage.operationIdHex,
@@ -101,6 +108,8 @@ export class AutomaticNativeToSolanaDepositPipeline {
       }),
       "nativeRelayer.broadcastReserveSweep",
     );
+    const stopAfterBroadcast = this.#atBoundary(decodedMessage, encodedMessageHex, broadcast);
+    if (stopAfterBroadcast !== undefined) return stopAfterBroadcast;
     if (broadcast.state !== DEPOSIT_STATES.BROADCAST && broadcast.state !== DEPOSIT_STATES.COMPLETED) {
       return this.#journal.finish(
         decodedMessage.operationIdHex,
@@ -122,9 +131,11 @@ export class AutomaticNativeToSolanaDepositPipeline {
       }),
       "reserveVerifier.verifyFinalizedReserveSweep",
     );
+    const stopAfterVerification = this.#atBoundary(decodedMessage, encodedMessageHex, reserveEvidence);
+    if (stopAfterVerification !== undefined) return stopAfterVerification;
     const reserveResult = validateFinalReserveEvidence(this.#config, normalized, decodedMessage, reserveEvidence);
     if (reserveResult.state !== DEPOSIT_STATES.VERIFIED_READY) {
-      return this.#journal.finish(decodedMessage.operationIdHex, reserveResult);
+      return this.#finish(decodedMessage.operationIdHex, reserveResult);
     }
 
     // Finalized backing creates an obligation even if attestation/minting waits.
@@ -138,7 +149,15 @@ export class AutomaticNativeToSolanaDepositPipeline {
       messageDigestHex: decodedMessage.messageDigestHex,
       evidence: reserveResult.attestationEvidence,
     };
-    const attestations = this.#attesters.map((attester) => attester.signDepositCredit(attestationRequest, nowUnix));
+    const attestations = [];
+    for (const attester of this.#attesters) {
+      const stopBeforeAttestation = this.#atBoundary(decodedMessage, encodedMessageHex);
+      if (stopBeforeAttestation !== undefined) return stopBeforeAttestation;
+      const attestation = attester.signDepositCredit(attestationRequest, nowUnix);
+      const stopAfterAttestation = this.#atBoundary(decodedMessage, encodedMessageHex, attestation);
+      if (stopAfterAttestation !== undefined) return stopAfterAttestation;
+      attestations.push(attestation);
+    }
     const combinedAttestation = combineProjectAttestations({
       attestations,
       encodedMessageHex,
@@ -163,6 +182,8 @@ export class AutomaticNativeToSolanaDepositPipeline {
       }),
       "solanaBridge.submitDepositClaim",
     );
+    const stopAfterMint = this.#atBoundary(decodedMessage, encodedMessageHex, minted);
+    if (stopAfterMint !== undefined) return stopAfterMint;
     if (minted.state !== DEPOSIT_STATES.COMPLETED) {
       return this.#journal.finish(
         decodedMessage.operationIdHex,
@@ -172,7 +193,7 @@ export class AutomaticNativeToSolanaDepositPipeline {
       );
     }
     if (!isExactMintAmount(minted.mintedAmountAtomic, decodedMessage.amountAtomic)) {
-      return this.#journal.finish(
+      return this.#finish(
         decodedMessage.operationIdHex,
         flowDecision(DEPOSIT_STATES.HARD_STOP, "SOLANA_MINT_AMOUNT_MISMATCH", decodedMessage),
       );
@@ -197,22 +218,25 @@ export class AutomaticNativeToSolanaDepositPipeline {
   async processDepositAsync(operation, nowUnix = undefined) {
     const normalized = normalizeDepositOperation(operation);
     const { encodedMessageHex, decodedMessage, evidenceDigestHex } = buildDepositClaimMessage(this.#config, normalized);
+    this.#journal.reserveOperation(decodedMessage.operationIdHex, decodedMessage.depositOutpointText, encodedMessageHex);
+    const stopped = this.#atBoundary(decodedMessage, encodedMessageHex);
+    if (stopped !== undefined) return stopped;
     const replay = this.#journal.completed(decodedMessage.operationIdHex);
     if (replay !== undefined) {
       this.#journal.assertSameCompleted(decodedMessage.operationIdHex, encodedMessageHex);
       return structuredClone(replay);
     }
-    this.#journal.reserveOperation(decodedMessage.operationIdHex, decodedMessage.depositOutpointText, encodedMessageHex);
-
     const observed = validateObservedDeposit(this.#config, normalized, decodedMessage);
     this.#journal.record(decodedMessage.operationIdHex, DEPOSIT_STATES.OBSERVED, observed.reason);
     if (observed.state !== DEPOSIT_STATES.VERIFIED_READY) {
-      return this.#journal.finish(decodedMessage.operationIdHex, observed);
+      return this.#finish(decodedMessage.operationIdHex, observed);
     }
 
     const preparedSweep = validatePreparedReserveSweep(normalized, decodedMessage);
     this.#journal.record(decodedMessage.operationIdHex, DEPOSIT_STATES.SIGNING, "FROST_A_B_AUTOMATIC_RESERVE_SWEEP");
     const frostResult = this.#frostCoordinator.signAutomatically(preparedSweep.signingIntent);
+    const stopAfterFrost = this.#atBoundary(decodedMessage, encodedMessageHex, frostResult);
+    if (stopAfterFrost !== undefined) return stopAfterFrost;
     if (frostResult.state !== "SIGNED") {
       return this.#journal.finish(
         decodedMessage.operationIdHex,
@@ -234,6 +258,8 @@ export class AutomaticNativeToSolanaDepositPipeline {
       }),
       "nativeRelayer.broadcastReserveSweep",
     );
+    const stopAfterBroadcast = this.#atBoundary(decodedMessage, encodedMessageHex, broadcast);
+    if (stopAfterBroadcast !== undefined) return stopAfterBroadcast;
     if (broadcast.state !== DEPOSIT_STATES.BROADCAST && broadcast.state !== DEPOSIT_STATES.COMPLETED) {
       return this.#journal.finish(
         decodedMessage.operationIdHex,
@@ -255,9 +281,11 @@ export class AutomaticNativeToSolanaDepositPipeline {
       }),
       "reserveVerifier.verifyFinalizedReserveSweep",
     );
+    const stopAfterVerification = this.#atBoundary(decodedMessage, encodedMessageHex, reserveEvidence);
+    if (stopAfterVerification !== undefined) return stopAfterVerification;
     const reserveResult = validateFinalReserveEvidence(this.#config, normalized, decodedMessage, reserveEvidence);
     if (reserveResult.state !== DEPOSIT_STATES.VERIFIED_READY) {
-      return this.#journal.finish(decodedMessage.operationIdHex, reserveResult);
+      return this.#finish(decodedMessage.operationIdHex, reserveResult);
     }
 
     const credit = Object.freeze({
@@ -270,7 +298,15 @@ export class AutomaticNativeToSolanaDepositPipeline {
       messageDigestHex: decodedMessage.messageDigestHex,
       evidence: reserveResult.attestationEvidence,
     };
-    const attestations = this.#attesters.map((attester) => attester.signDepositCredit(attestationRequest, nowUnix));
+    const attestations = [];
+    for (const attester of this.#attesters) {
+      const stopBeforeAttestation = this.#atBoundary(decodedMessage, encodedMessageHex);
+      if (stopBeforeAttestation !== undefined) return stopBeforeAttestation;
+      const attestation = attester.signDepositCredit(attestationRequest, nowUnix);
+      const stopAfterAttestation = this.#atBoundary(decodedMessage, encodedMessageHex, attestation);
+      if (stopAfterAttestation !== undefined) return stopAfterAttestation;
+      attestations.push(attestation);
+    }
     const combinedAttestation = combineProjectAttestations({
       attestations,
       encodedMessageHex,
@@ -295,6 +331,8 @@ export class AutomaticNativeToSolanaDepositPipeline {
       }),
       "solanaBridge.submitDepositClaim",
     );
+    const stopAfterMint = this.#atBoundary(decodedMessage, encodedMessageHex, minted);
+    if (stopAfterMint !== undefined) return stopAfterMint;
     if (minted.state !== DEPOSIT_STATES.COMPLETED) {
       return this.#journal.finish(
         decodedMessage.operationIdHex,
@@ -304,7 +342,7 @@ export class AutomaticNativeToSolanaDepositPipeline {
       );
     }
     if (!isExactMintAmount(minted.mintedAmountAtomic, decodedMessage.amountAtomic)) {
-      return this.#journal.finish(
+      return this.#finish(
         decodedMessage.operationIdHex,
         flowDecision(DEPOSIT_STATES.HARD_STOP, "SOLANA_MINT_AMOUNT_MISMATCH", decodedMessage),
       );
@@ -325,6 +363,43 @@ export class AutomaticNativeToSolanaDepositPipeline {
       }),
     );
   }
+
+  #ledgerStatus() {
+    const status = this.#ledger.status();
+    if (!["OPEN_IN_MEMORY_ACCOUNTING_ONLY", "OPEN_LOCAL_ACCOUNTING_ONLY", DEPOSIT_STATES.HARD_STOP].includes(status?.state)) {
+      throw new Error("DepositLedgerStatusUnavailable");
+    }
+    return status;
+  }
+
+  #finish(operationIdHex, result) {
+    if (result.state === DEPOSIT_STATES.HARD_STOP && this.#ledgerStatus().state !== DEPOSIT_STATES.HARD_STOP) {
+      // Persist the ledger stop first. If either store rejects a write, throw;
+      // there is no fallback to an open journal or a dependency-wait decision.
+      this.#ledger.hardStop(safeStopCode(result.reason));
+    }
+    return this.#journal.finish(operationIdHex, result);
+  }
+
+  #atBoundary(message, encodedMessageHex, dependency = undefined) {
+    const stopped = this.#journal.stopped(message.operationIdHex);
+    if (stopped !== undefined) {
+      this.#journal.assertSameCompleted(message.operationIdHex, encodedMessageHex);
+      return this.#finish(message.operationIdHex, stopped);
+    }
+    const status = this.#ledgerStatus();
+    if (status.state === DEPOSIT_STATES.HARD_STOP) {
+      return this.#finish(message.operationIdHex, flowDecision(DEPOSIT_STATES.HARD_STOP, safeStopCode(status.reason), message));
+    }
+    if (dependency?.state === DEPOSIT_STATES.HARD_STOP || dependency?.state === "GLOBAL_HARD_STOP") {
+      return this.#finish(message.operationIdHex, flowDecision(DEPOSIT_STATES.HARD_STOP, safeStopCode(dependency.reason), message));
+    }
+    return undefined;
+  }
+}
+
+function safeStopCode(reason) {
+  return typeof reason === "string" && /^[A-Z_]{1,64}$/u.test(reason) ? reason : "DEPOSIT_DEPENDENCY_INTEGRITY_STOP";
 }
 
 export class InMemoryDepositJournal {
@@ -333,7 +408,12 @@ export class InMemoryDepositJournal {
 
   completed(operationIdHex) {
     const entry = this.#operations.get(operationIdHex);
-    return entry?.terminal?.state === DEPOSIT_STATES.COMPLETED ? entry.terminal : undefined;
+    return entry?.terminal?.state === DEPOSIT_STATES.COMPLETED ? structuredClone(entry.terminal) : undefined;
+  }
+
+  stopped(operationIdHex) {
+    const terminal = this.#operations.get(operationIdHex)?.terminal;
+    return readOperationHardStop(terminal?.state, terminal);
   }
 
   reserveOperation(operationIdHex, depositOutpointText, encodedMessageHex) {
@@ -360,6 +440,8 @@ export class InMemoryDepositJournal {
 
   record(operationIdHex, state, reason) {
     const entry = this.#requireEntry(operationIdHex);
+    preserveOperationHardStop(entry.terminal?.state, entry.terminal);
+    if (state === DEPOSIT_STATES.HARD_STOP) throw new Error("DepositHardStopDecisionRequired");
     entry.events.push({
       state,
       reason,
@@ -369,8 +451,9 @@ export class InMemoryDepositJournal {
 
   finish(operationIdHex, decision) {
     const entry = this.#requireEntry(operationIdHex);
+    if (preserveOperationHardStop(entry.terminal?.state, entry.terminal, decision)) return structuredClone(entry.terminal);
+    entry.events.push({ state: decision.state, reason: decision.reason, sequence: entry.events.length + 1 });
     entry.terminal = structuredClone(decision);
-    this.record(operationIdHex, decision.state, decision.reason);
     return structuredClone(decision);
   }
 
@@ -404,6 +487,11 @@ export class FileBackedDepositJournal {
     return entry?.terminal?.state === DEPOSIT_STATES.COMPLETED
       ? structuredClone(entry.terminal)
       : undefined;
+  }
+
+  stopped(operationIdHex) {
+    const terminal = this.get(operationIdHex)?.terminal;
+    return readOperationHardStop(terminal?.state, terminal);
   }
 
   get(operationIdHex) {
@@ -442,6 +530,8 @@ export class FileBackedDepositJournal {
 
   record(operationIdHex, state, reason) {
     const entry = this.#requireEntry(operationIdHex);
+    preserveOperationHardStop(entry.terminal?.state, entry.terminal);
+    if (state === DEPOSIT_STATES.HARD_STOP) throw new Error("DepositHardStopDecisionRequired");
     entry.events.push({
       state,
       reason,
@@ -452,6 +542,7 @@ export class FileBackedDepositJournal {
 
   finish(operationIdHex, decision) {
     const entry = this.#requireEntry(operationIdHex);
+    if (preserveOperationHardStop(entry.terminal?.state, entry.terminal, decision)) return structuredClone(entry.terminal);
     entry.terminal = structuredClone(decision);
     entry.events.push({
       state: decision.state,
@@ -513,6 +604,7 @@ export class FileBackedDepositJournal {
     writeFileSync(temp, `${JSON.stringify(value, null, 2)}\n`, {
       encoding: "utf8",
       flag: "wx",
+      flush: true,
     });
     renameSync(temp, target);
   }
@@ -530,10 +622,22 @@ export class ExactDepositLedger {
   #credits = new Map();
   #backing = new Set();
   #allocations = new Set();
+  #stop;
+
+  status() {
+    return Object.freeze({ state: this.#stop === undefined ? "OPEN_IN_MEMORY_ACCOUNTING_ONLY" : DEPOSIT_STATES.HARD_STOP, reason: this.#stop });
+  }
+
+  hardStop(code) {
+    if (typeof code !== "string" || !/^[A-Z_]{1,64}$/u.test(code)) throw new Error("LedgerStopCodeRejected");
+    if (this.#stop !== undefined && this.#stop !== code) throw new Error("LedgerHardStop");
+    this.#stop = code;
+  }
 
   // Accounting only: the caller must first validate actual reserve evidence.
   // These in-memory markers are not durable authorization or chain proofs.
   recordValidatedDeposit(input) {
+    this.#assertOpen();
     const credit = normalizeLedgerCredit(input);
     this.#assertDeployment(credit);
     const existing = this.#credits.get(credit.operationIdHex);
@@ -559,6 +663,7 @@ export class ExactDepositLedger {
   }
 
   recordMint(input) {
+    this.#assertOpen();
     const credit = normalizeLedgerCredit(input);
     this.#assertDeployment(credit);
     const amount = exactLedgerAmount(input.mintedAmountAtomic);
@@ -596,7 +701,12 @@ export class ExactDepositLedger {
     fork.#credits = new Map(this.#credits);
     fork.#backing = new Set(this.#backing);
     fork.#allocations = new Set(this.#allocations);
+    fork.#stop = this.#stop;
     return fork;
+  }
+
+  #assertOpen() {
+    if (this.#stop !== undefined) throw new Error("LedgerHardStop");
   }
 
   #assertDeployment(credit) {

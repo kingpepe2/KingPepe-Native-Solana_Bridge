@@ -1,8 +1,60 @@
 # KingPepe Native - Solana Bridge Development Status
 
-## Current Phase 08 authenticated credit increment (2026-09-10)
+## Current Phase 08 absorbing-stop correction (2026-09-10)
 
-UNPUBLISHED / LOCALLY_TESTED. The real deposit harness now commits
+UNPUBLISHED / LOCALLY_TESTED, including a fresh real-chain run.
+Read-only, in-memory reproduction on the preceding source returned HARD_STOP
+then BROADCAST on retry, with two transport callback calls. No keys, node or
+network were involved in that diagnostic. Ten new focused regressions initially
+failed (55 PASS / 10 FAIL), confirming retry and late-write defects.
+
+The correction makes a recorded integrity stop absorbing in deposit, sweep and
+claim journals. Exact repetition is idempotent; submitted/completed/waiting writes
+cannot overwrite it or its reason. Pipeline execution checks ledger/journal
+status before signing and after dependency callbacks, including between attesters.
+Native/Solana/FROST dependency stops are not downgraded to ordinary waiting.
+A stopped authenticated ledger blocks a replacement pipeline and new operations
+using that ledger. Missing or unknown ledger status fails closed. Ordinary
+dependency waits and safe identical retries remain automatic.
+
+Windows and WSL each: 318 Node tests + two vectors PASS, zero failures/skips.
+The 45 added regressions exercise actual file/SQLite reopen, immutable decisions,
+late successful/failed responses and cooperative callback races with modeled
+chain adapters. Focused suite: 100/100 PASS. Four intermediate race assertions
+incorrectly expected zero prior sends during claim observation (96 PASS / 4 FAIL);
+the fixture observes only after one send. Assertions now preserve that earlier
+send count and require no new send after the stop. No security requirement was
+relaxed. WSL: 64 Solana + 29 Native Rust tests, fmt/clippy, declared-license audit
+and all five Rust audits PASS; npm audit reports zero vulnerabilities. The
+bincode 1.3.3 unmaintained warning remains. Native Windows Cargo/combined-license
+and service ACL/protected-storage integration remain NOT_RUN locally.
+
+Fresh REGTEST/local-validator run and both SBF builds PASS: automatic deposit,
+22 security, seven CSV, four wallet PSBT, ten pre-mint race, seven claim-worker
+and five accounting checks (55 total). Two new isolated stopped-worker probes
+use the real signed claim packet and real validator absence checks; reopening
+the stopped probe cannot observe/send or accept late completion. This is not
+a claim of a complete global stop or cancellation of an earlier network send.
+Final reserve and SPL supply are each 100000000 atomic, pending credit zero;
+no per-transfer team approval. All existing 151 commits and current source
+scan clean. Staged/outgoing scans, private publication and exact-SHA CI are
+pending. No dependency, toolchain or license change; no source/operational files
+deleted or moved. Provenance: 175 -> 176 files, one original shared stop guard.
+Mainnet DISABLED; Phase 08 INCOMPLETE; Phase 09 NOT_STARTED. Next dependencies
+include authenticated/fenced signer state, full service restart, the
+broadcast-to-credit persistence gap and bridge-wide reconciliation/hard stops.
+See [local boundary and limitations](security/local-deposit-accounting.md).
+
+## Previous authenticated credit increment (verified source)
+
+Source `2de96942d7da69466a6130cb55804916171e4976`, message
+`feat(phase-08): persist authenticated local deposit credits`, pushed privately;
+[all four exact-SHA CI jobs PASS](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34466302475).
+Current/staged/outgoing source and all 151 commits scanned clean; zero workflow
+artifacts were uploaded. The following 273-test/53-check evidence belongs to
+that SHA, not to a newer source revision.
+
+LOCALLY_AND_CI_TESTED. The real deposit harness commits
 the canonical user credit after finalized reserve validation, before Solana
 setup or attestation. It closes/reopens pending credit, retains it on downstream
 failure, and commits/reopens mint settlement only after finalized observation
@@ -48,10 +100,9 @@ new accounting checks. The final auxiliary-path source revision also passes
 a second fresh REGTEST/local-validator run and both SBF rebuilds: all 53 checks
 PASS; canonical reserve and observed SPL supply each equal 100000000 atomic,
 pending credits equal zero after settlement, and no per-transfer approval occurs.
-Current source and all 150 existing commits scanned clean; private-path/IP
-checks, nine JSON parses and exact 175-file provenance coverage PASS. Publication
-still requires staged/outgoing scans, reviewed private push and all four
-exact-SHA CI jobs. No artifacts are uploaded.
+Private-path/IP checks, nine JSON parses and exact 175-file provenance coverage
+PASS. Staged/outgoing/all-history scans, private push and exact-SHA CI passed
+as recorded above. No artifacts were uploaded.
 
 Provenance: 171 -> 175 files; two original code/test files, one original
 engineering document and one build-metadata file. No files deleted/moved or

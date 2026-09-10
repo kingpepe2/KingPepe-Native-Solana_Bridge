@@ -10,6 +10,7 @@ import {
 } from "../../native/frost/policy/native-signing-policy.mjs";
 import { isHash32Hex, normalizeHex } from "../../shared/protocol/canonical-message.mjs";
 import { DEPOSIT_STATES } from "./automatic-deposit-pipeline.mjs";
+import { preserveOperationHardStop, readOperationHardStop } from "../../shared/operation-hard-stop.mjs";
 
 export const NATIVE_RESERVE_SWEEP_RELAYER_PROTOCOL =
   "KINGPEPE_NATIVE_SOLANA_BRIDGE/NATIVE_RESERVE_SWEEP_RELAYER/V1";
@@ -37,6 +38,8 @@ export class NativeReserveSweepRelayer {
       return relayerDecision(DEPOSIT_STATES.HARD_STOP, "NATIVE_RESERVE_SWEEP_RELAYER_LOCALNET_ONLY", normalized);
     }
 
+    const stopped = this.#stopped(normalized);
+    if (stopped !== undefined) return stopped;
     const submitted = this.#journal.submitted(normalized.operationIdHex);
     if (submitted !== undefined) {
       assertSamePrepared(submitted.prepared, normalized);
@@ -51,8 +54,13 @@ export class NativeReserveSweepRelayer {
     try {
       txid = normalizeHash32(await this.#rpcClient.sendRawTransaction(normalized.signedNativeTransactionHex), "nativeSweepTxidHex");
     } catch {
-      return relayerDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "NATIVE_RESERVE_SWEEP_BROADCAST_FAILED", normalized);
+      return this.#stopped(normalized) ?? relayerDecision(DEPOSIT_STATES.WAITING_FOR_DEPENDENCY, "NATIVE_RESERVE_SWEEP_BROADCAST_FAILED", normalized);
     }
+
+    // The call may have raced with an integrity stop. A successful late
+    // response is evidence for reconciliation, not permission to clear it.
+    const lateStop = this.#stopped(normalized);
+    if (lateStop !== undefined) return lateStop;
 
     if (normalized.expectedNativeSweepTxidHex !== undefined && txid !== normalized.expectedNativeSweepTxidHex) {
       const result = relayerDecision(DEPOSIT_STATES.HARD_STOP, "NATIVE_RESERVE_SWEEP_TXID_MISMATCH", normalized, {
@@ -66,6 +74,13 @@ export class NativeReserveSweepRelayer {
     return relayerDecision(DEPOSIT_STATES.BROADCAST, "NATIVE_RESERVE_SWEEP_BROADCAST_ACCEPTED", normalized, {
       nativeSweepTxidHex: txid,
     });
+  }
+
+  #stopped(normalized) {
+    const entry = this.#journal.get(normalized.operationIdHex);
+    const stopped = readOperationHardStop(entry?.state, entry?.result);
+    if (stopped !== undefined) assertSamePrepared(entry.prepared, normalized);
+    return stopped;
   }
 }
 
@@ -158,6 +173,10 @@ export class NativeReserveSweepVerifier {
 export class InMemoryNativeReserveSweepJournal {
   #entries = new Map();
 
+  get(operationIdHex) {
+    return structuredClone(this.#entries.get(normalizeHash32(operationIdHex, "operationIdHex")));
+  }
+
   submitted(operationIdHex) {
     const entry = this.#entries.get(normalizeHash32(operationIdHex, "operationIdHex"));
     return entry?.submittedTxidHex === undefined ? undefined : structuredClone(entry);
@@ -182,6 +201,7 @@ export class InMemoryNativeReserveSweepJournal {
 
   recordSubmitted(operationIdHex, nativeSweepTxidHex) {
     const entry = this.#requireEntry(operationIdHex);
+    preserveOperationHardStop(entry.state, entry.result);
     const txid = normalizeHash32(nativeSweepTxidHex, "nativeSweepTxidHex");
     if (entry.submittedTxidHex !== undefined && entry.submittedTxidHex !== txid) {
       throw new Error("NativeReserveSweepSubmittedTxidConflict");
@@ -192,6 +212,7 @@ export class InMemoryNativeReserveSweepJournal {
 
   recordTerminal(operationIdHex, result) {
     const entry = this.#requireEntry(operationIdHex);
+    if (preserveOperationHardStop(entry.state, entry.result, result)) return;
     entry.state = result.state;
     entry.result = structuredClone(result);
   }
@@ -245,6 +266,7 @@ export class FileBackedNativeReserveSweepJournal {
 
   recordSubmitted(operationIdHex, nativeSweepTxidHex) {
     const entry = this.#requireEntry(operationIdHex);
+    preserveOperationHardStop(entry.state, entry.result);
     const txid = normalizeHash32(nativeSweepTxidHex, "nativeSweepTxidHex");
     if (entry.submittedTxidHex !== undefined && entry.submittedTxidHex !== txid) {
       throw new Error("NativeReserveSweepSubmittedTxidConflict");
@@ -256,6 +278,7 @@ export class FileBackedNativeReserveSweepJournal {
 
   recordTerminal(operationIdHex, result) {
     const entry = this.#requireEntry(operationIdHex);
+    if (preserveOperationHardStop(entry.state, entry.result, result)) return;
     entry.state = result.state;
     entry.result = structuredClone(result);
     this.#write(operationIdHex, entry);
@@ -275,7 +298,8 @@ export class FileBackedNativeReserveSweepJournal {
     const target = this.#entryPath(operationIdHex);
     const temp = `${target}.${process.pid}.tmp`;
     validateRuntimeFile(temp, this.#repoRoot);
-    writeFileSync(temp, `${JSON.stringify(entry, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
+    // File flush is not a guarantee of directory-metadata power-loss safety.
+    writeFileSync(temp, `${JSON.stringify(entry, null, 2)}\n`, { encoding: "utf8", flag: "wx", flush: true });
     renameSync(temp, target);
   }
 }

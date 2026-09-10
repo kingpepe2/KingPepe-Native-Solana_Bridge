@@ -285,6 +285,50 @@ class FakeDepositClaimObserver {
   }
 }
 
+for (const fileBacked of [false, true]) {
+  for (const boundary of ["status", "height", "send", "observer"]) {
+    for (const rejectResponse of [false, true]) {
+      test(`${fileBacked ? "file" : "memory"} claim ${boundary} late ${rejectResponse ? "failure" : "success"} cannot clear a stop`, async () => {
+        const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-claim-late-stop-"));
+        try {
+          const fixture = createFixture();
+          const journal = fileBacked ? new FileBackedSolanaDepositClaimJournal({ root, repoRoot: REPO_ROOT }) : new InMemorySolanaDepositClaimJournal();
+          const rpc = new FakeSolanaRpc({ solanaSignature: fixture.solanaSignature,
+            status: boundary === "observer" ? { slot: 88, confirmationStatus: "finalized", err: null } : null });
+          const observer = new FakeDepositClaimObserver(fixture.submitConfig, fixture.request, fixture.solanaSignature);
+          const entered = Promise.withResolvers();
+          const response = Promise.withResolvers();
+          const [target, method] = boundary === "observer" ? [observer, "observeFinalizedDepositClaim"] :
+            [rpc, { status: "getSignatureStatus", height: "getBlockHeight", send: "sendTransaction" }[boundary]];
+          const original = target[method].bind(target);
+          target[method] = async (...args) => {
+            const value = await original(...args);
+            entered.resolve(value);
+            return response.promise;
+          };
+          const submitter = new SolanaDepositClaimSubmitter({ config: fixture.submitConfig, rpcClient: rpc, claimObserver: observer, journal });
+          const pending = submitter.submitDepositClaim(fixture.request);
+          const value = await entered.promise;
+          const writer = fileBacked ? new FileBackedSolanaDepositClaimJournal({ root, repoRoot: REPO_ROOT }) : journal;
+          const stopped = { state: DEPOSIT_STATES.HARD_STOP, reason: "SOLANA_INTEGRITY_STOP", operationIdHex: fixture.request.operationIdHex };
+          writer.recordTerminal(fixture.request.operationIdHex, stopped);
+          const sendsAtStop = rpc.sendCalls.length;
+          if (rejectResponse) response.reject(new Error("TestDependencyUnavailable"));
+          else response.resolve(value);
+          assert.deepEqual(await pending, stopped);
+          assert.deepEqual(await submitter.submitDepositClaim(fixture.request), stopped);
+          assert.deepEqual(journal.get(fixture.request.operationIdHex).result, stopped);
+          assert.equal(rpc.sendCalls.length, sendsAtStop);
+          // This fixture observes the claim only after one send; that earlier
+          // send is not undone by a stop raised during observation.
+          assert.equal(rpc.sendCalls.length, ["send", "observer"].includes(boundary) ? 1 : 0);
+          assert.equal(observer.calls.length, boundary === "observer" ? 1 : 0);
+        } finally { rmSync(root, { recursive: true, force: true }); }
+      });
+    }
+  }
+}
+
 test("Solana deposit submitter finalizes a localnet claim after two attestations and claim observation", async () => {
   const fixture = createFixture();
   const stateRoot = mkdtempSync(path.join(os.tmpdir(), "kingpepe-solana-claim-journal-"));
@@ -611,6 +655,26 @@ test("RPC signature substitution causes a persistent claim hard stop", async () 
   assert.equal(rpc.sendCalls.length, 1);
   assert.equal(observer.calls.length, 0);
 });
+
+for (const persistent of [false, true]) {
+  test(`${persistent ? "file" : "memory"} claim journal never overwrites an integrity stop with a late result`, async () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-claim-stop-"));
+    try {
+      const fixture = createFixture();
+      let journal = persistent ? new FileBackedSolanaDepositClaimJournal({ root, repoRoot: REPO_ROOT }) : new InMemorySolanaDepositClaimJournal();
+      const rpc = new FakeSolanaRpc({ solanaSignature: signature("substituted-response") });
+      const stopped = await new SolanaDepositClaimSubmitter({ config: fixture.submitConfig, rpcClient: rpc, journal }).submitDepositClaim(fixture.request);
+      assert.equal(stopped.state, DEPOSIT_STATES.HARD_STOP);
+      if (persistent) journal = new FileBackedSolanaDepositClaimJournal({ root, repoRoot: REPO_ROOT });
+      const id = fixture.request.operationIdHex;
+      assert.throws(() => journal.recordSubmitted(id, fixture.solanaSignature), /HardStop/u);
+      assert.throws(() => journal.recordCompleted(id, { ...stopped, state: DEPOSIT_STATES.COMPLETED }), /HardStop/u);
+      assert.throws(() => journal.recordTerminal(id, { ...stopped, state: DEPOSIT_STATES.WAITING_FOR_DEPENDENCY }), /Terminal|HardStop/u);
+      journal.recordTerminal(id, stopped);
+      assert.deepEqual(journal.get(id).result, stopped);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+}
 
 test("unavailable or malformed prior execution status never authorizes a send or completion", async () => {
   const fixture = createFixture();
