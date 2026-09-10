@@ -90,6 +90,16 @@ test("collector rejects substituted transaction, block and missing or duplicated
     /RAW_NATIVE_DUPLICATE_TRANSACTION/u);
 });
 
+test("collector identifies unconfirmed transactions without mistaking parser or RPC failure for finality", async () => {
+  await assert.rejects(() => collectRegtestEvidence({ rpc: rpcModel({ getRawTransaction: async () => ({ hex: raw }) }),
+    transactionIds: [txid], minimumConfirmations: 1 }), { message: "RAW_NATIVE_TRANSACTION_UNCONFIRMED" });
+  await assert.rejects(() => collectRegtestEvidence({ rpc: rpcModel({ getRawTransaction: async () => ({ hex: "zz" }) }),
+    transactionIds: [txid], minimumConfirmations: 1 }), { message: "RAW_NATIVE_HEX_INVALID" });
+  const failure = new Error("RPC_TEST_OUTAGE");
+  await assert.rejects(() => collectRegtestEvidence({ rpc: rpcModel({ getRawTransaction: async () => { throw failure; } }),
+    transactionIds: [txid], minimumConfirmations: 1 }), (error) => error === failure);
+});
+
 test("external verifier failures are bounded and redacted; no fallback to a caller verification flag", async () => {
   const executable = path.join(os.tmpdir(), "kingpepe-nonexistent-evidence-binary");
   assert.throws(() => verifyRegtestEvidencePacket({ executable: "relative-tool", packet: Buffer.alloc(0) }), /PATH_REQUIRED/u);

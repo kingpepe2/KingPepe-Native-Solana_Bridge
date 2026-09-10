@@ -66,6 +66,7 @@ export async function collectRegtestEvidence({ rpc, transactionIds, minimumConfi
     const transaction = await rpc.getRawTransaction(txid, true);
     const raw = hex(transaction?.hex, undefined, 4_000_000).toString("hex");
     if (parseNativeTransactionHex(raw).txidHex !== txid) throw new Error("RAW_NATIVE_TRANSACTION_SUBSTITUTED");
+    if (transaction.blockhash === undefined) throw new Error("RAW_NATIVE_TRANSACTION_UNCONFIRMED");
     const blockHash = hex(transaction.blockhash, 32).toString("hex");
     const block = await rpc.getBlock(blockHash, 1);
     const blockHeight = positive(block?.height, MAX_HEADERS);

@@ -22,6 +22,15 @@ const GENESIS = h("kingpepe-regtest-genesis");
 const BEST_BLOCK = h("kingpepe-regtest-best-block");
 const TXID = h("kingpepe-regtest-utxo");
 
+test("ordinary RPC adapter cannot invoke local forced-fork test controls", async () => {
+  let contacted = false;
+  const client = new NativeRpcClient({ fetchFn: async () => { contacted = true; throw new Error("UnexpectedRequest"); } });
+  for (const method of ["invalidateblock", "generateblock", "reconsiderblock"]) {
+    await assert.rejects(client.call(method, []), /NativeRpcMethodNotAllowed/u);
+  }
+  assert.equal(contacted, false);
+});
+
 test("source snapshot uses loopback RPC observation without claiming local validation", async () => {
   const requests = [];
   await withRpcServer(
@@ -168,6 +177,34 @@ test("RPC responses enforce byte bounds, request identity and strict UTF-8 befor
   const invalid = new NativeRpcClient({ fetchFn: async () => new Response(Uint8Array.of(0xff)) });
   await assert.rejects(() => invalid.getBlockchainInfo(), /NativeRpcInvalidUtf8/u);
   assert.throws(() => new NativeRpcClient({ maximumResponseBytes: 16_000_001 }), /NativeRpcResponseLimitTooLarge/u);
+});
+
+test("Native legacy HTTP errors preserve only bounded request-matched numeric RPC codes", async () => {
+  for (const [status, code] of [[400, -32600], [404, -32601], [500, -5]]) {
+    const client = new NativeRpcClient({ fetchFn: async () => new Response(JSON.stringify({ id: 1,
+      result: null, error: { code, message: "UNTRUSTED_DIAGNOSTIC" } }), { status }) });
+    await assert.rejects(client.call("getrawtransaction", [TXID, true]),
+      { message: `NativeRpcRejected:getrawtransaction:${code}` });
+  }
+});
+
+test("HTTP and malformed RPC failures cannot be reclassified as transaction-not-found or success", async () => {
+  const cases = [
+    [500, JSON.stringify({ id: 1, result: true, error: null }), "NativeRpcHttpFailure"],
+    [500, "UNTRUSTED_DIAGNOSTIC", "NativeRpcHttpFailure"],
+    [503, JSON.stringify({ id: 1, error: { code: -5 } }), "NativeRpcHttpFailure"],
+    [401, JSON.stringify({ id: 1, error: { code: -5 } }), "NativeRpcHttpFailure"],
+    [500, JSON.stringify({ id: 2, error: { code: -5 } }), "NativeRpcInvalidEnvelope"],
+    ...[200, 500].flatMap((status) => ["UNTRUSTED_DIAGNOSTIC", {}, 1.5, 0x8000_0000].map((code) =>
+      [status, JSON.stringify({ id: 1, error: { code } }), "NativeRpcInvalidEnvelope"])),
+  ];
+  for (const [status, body, kind] of cases) {
+    const client = new NativeRpcClient({ fetchFn: async () => new Response(body, { status }) });
+    await assert.rejects(client.call("getrawtransaction", [TXID, true]),
+      (error) => error.code === kind && !error.message.includes("UNTRUSTED_DIAGNOSTIC"));
+  }
+  const oversized = new NativeRpcClient({ maximumResponseBytes: 64, fetchFn: async () => new Response("x".repeat(65), { status: 500 }) });
+  await assert.rejects(oversized.getBlockchainInfo(), /NativeRpcResponseTooLarge/u);
 });
 
 async function withRpcServer(callback, options = {}) {

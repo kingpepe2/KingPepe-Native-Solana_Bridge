@@ -55,6 +55,11 @@ Native RPC responses are streamed with a byte limit, strict UTF-8 and matching
 request IDs. The collector rejects wrong genesis/network, unknown/true IBD,
 header/tip mismatch, source changes and substituted raw transaction/block data.
 Economic amounts stay exact integers.
+Native's legacy JSON-RPC errors may use HTTP 400/404/500. Those bounded envelopes
+must match the request ID and contain an integer error code; provider text is
+discarded. A failing HTTP status never yields a successful result. Unconfirmed
+transactions have a distinct failure code. Tests do not treat infrastructure or
+malformed-response failures as evidence of an economic rejection.
 
 Important limitations: raw header/Merkle verification is not full block-script
 validation, independent fork-choice proof or UTXO proof. Canonical-chain selection
@@ -64,8 +69,10 @@ The CLI is REGTEST-only and bounded to short local chains; production evidence
 sources and resource policy remain unconfigured. The normal REGTEST deposit now
 uses the committed recovery script and a real FROST BIP342 sweep to a separate
 reserve. See [recovery construction and scope](../../native/recovery/README.md).
-Competing recovery/sweep transactions, reorgs, production
-storage/fencing and complete failure testing remain Phase 08 gaps.
+Both winner orders and forced pre-mint recovery/sweep forks are exercised by
+ten real-node checks; the verifier rejects disconnected or recovered backing.
+Post-mint deep-reorg response, production storage/fencing and complete failure
+testing remain Phase 08 gaps.
 
 Each role rebuilds the temporary script against the expected deployment, Mint,
 recipient, amount, epochs, intent nonce, Native user recovery public key, FROST

@@ -80,7 +80,11 @@ export class NativeRpcClient {
         }),
         signal: controller.signal,
       });
-      if (!response.ok) {
+      // Native's legacy JSON-RPC endpoint returns structured RPC errors with
+      // HTTP 400/404/500. Parse those bounded envelopes, but never accept a
+      // success result on a failing HTTP status or expose provider error text.
+      const httpFailure = !response.ok;
+      if (httpFailure && ![400, 404, 500].includes(response.status)) {
         await response.body?.cancel();
         throw rpcError("NativeRpcHttpFailure", method, response.status);
       }
@@ -89,14 +93,18 @@ export class NativeRpcClient {
       try {
         envelope = JSON.parse(raw);
       } catch {
-        throw rpcError("NativeRpcInvalidJson", method);
+        throw httpFailure ? rpcError("NativeRpcHttpFailure", method, response.status) : rpcError("NativeRpcInvalidJson", method);
       }
       if (!envelope || typeof envelope !== "object" || Array.isArray(envelope) || envelope.id !== id) {
         throw rpcError("NativeRpcInvalidEnvelope", method);
       }
       if (envelope.error !== null && envelope.error !== undefined) {
-        throw rpcError("NativeRpcRejected", method, envelope.error?.code);
+        const code = envelope.error?.code;
+        if (typeof envelope.error !== "object" || Array.isArray(envelope.error) || !Number.isInteger(code)
+          || code < -0x8000_0000 || code > 0x7fff_ffff) throw rpcError("NativeRpcInvalidEnvelope", method);
+        throw rpcError("NativeRpcRejected", method, code);
       }
+      if (httpFailure) throw rpcError("NativeRpcHttpFailure", method, response.status);
       if (!Object.hasOwn(envelope, "result")) throw rpcError("NativeRpcInvalidEnvelope", method);
       return Object.freeze({
         method,
