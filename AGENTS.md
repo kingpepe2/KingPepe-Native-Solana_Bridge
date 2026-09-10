@@ -25,10 +25,10 @@
 ## Current phase
 
 PHASE 08 INCOMPLETE. Phase 09 NOT_STARTED.
-Last verified source: 39c5fdc9c12affe037232c87d4da5421f9046ada, private push and
+Last verified source: 10e69a3e7756597d511ef836238bdd7fba57c1cd, private push and
 all four exact-SHA CI jobs PASS:
-https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34478411388
-Its current/staged/outgoing source and all 155 commits scanned clean; zero
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34483410772
+Its current/staged/outgoing source and all 156 commits scanned clean; zero
 workflow artifacts were uploaded. That evidence does not certify newer source.
 
 Absorbing-stop source 2bdff8f1687085d63de8c628ae12a4f2efed163e was pushed
@@ -60,7 +60,7 @@ final focused: 54 PASS. Windows/WSL: 371 Node tests (14 new) and two vectors PAS
 WSL 93 Rust tests and audits PASS. Both SBF builds, the fresh real deposit and all
 55 integration checks PASS locally and in exact-SHA CI.
 
-Current unpublished DKG increment: V2 request/context metadata binds localnet,
+The verified DKG increment: V2 request/context metadata binds localnet,
 verified Native REGTEST genesis, Solana deployment, both programs, Mint and key
 epoch. Both participants validate before DKG state access; active-key lookup uses
 the exact context-derived session. Role/index is immutable. Incompatible or
@@ -72,6 +72,16 @@ two vectors, and WSL 93 Rust tests/audits. Real-chain validation and publication
 are recorded in development-status. Do not reuse old test roots
 to bypass the new context check. The local 40-epoch retention ceiling fails
 before adding another epoch; it never deletes retained records automatically.
+
+Current unpublished full-intent enrollment: policy stores the complete normalized
+28-field immutable intent and compares its digest, retaining separate domain,
+caps and stop checks. Missing/extra fields and partial enrollment are rejected;
+the sweep builder preserves the complete intent. Initial focused 83 PASS / 7 FAIL,
+then final focused 146 PASS. Windows/WSL each 406 Node tests (11 new), two vectors
+PASS; WSL 93 Rust tests and audits PASS. Real-chain/scans/publication are tracked
+in development-status. Enrollment is not evidence truth. Participant rejection
+still requires coordinator-wide abort handling for another participant's prior
+reservation; nonce state/protected storage/IPC remain incomplete.
 Node 24.21.0 / npm 11.19.0 / bundled SQLite 3.53.4 are required. The SQLite
 API remains release-candidate stability 1.2, not production approval.
 See docs/development-status.md for current measured tests and publication state.
@@ -98,8 +108,9 @@ Read-only review reproduced matching Mainnet policy approval and exposed Map
 mutation on the preceding source. Current regression-tested changes close these
 configuration/API paths. The current request changes close envelope/intent ID
 and session mismatches. The current DKG changes bind deployment metadata and
-active-key selection, but authenticated inner DKG transcripts/transport, complete
-authorization-intent enrollment and coordinator failure cleanup remain open. The pinned
+active-key selection. Current complete-intent enrollment closes purpose, evidence
+digest and unsigned-transaction identity substitution. Authenticated inner DKG
+transcripts/transport and coordinator failure cleanup remain open. The pinned
 upstream FROST code is explicitly unaudited; never claim broader library audit
 coverage applies to it. The approved same-host topology is not the cause of
 these blockers. See docs/security/software-frost.md.

@@ -28,11 +28,32 @@ These controls protect cooperative API use, not arbitrary hostile code with
 process/host access. Policy enrollment is not proof of chain truth; each signing
 participant still needs its independent configured raw-evidence checks. The
 current in-memory policy is reconstructed from validated evidence, not restored
-from caller JSON. Full authorization-intent enrollment, authenticated inner DKG
-transcripts/transport and coordinator failure cleanup need further hardening.
+from caller JSON. Authenticated inner DKG transcripts/transport and coordinator
+failure cleanup need further hardening.
 Signer-state authentication, service access and
 rollback assurance remain incomplete. No production signing is authorized and
 none of these deficiencies requires a second physical host.
+
+## Complete intent enrollment
+
+The policy now captures the entire normalized 28-field immutable signing intent.
+The intent field set is exact: missing fields and unknown additions are rejected
+before enrollment or request construction. At authorization, the full intent
+digest must match the privately stored snapshot, as well as the independently
+checked policy domain, epoch, amount/fee limits, reserve-change script and stop
+flags. Purpose, proof fingerprint and unsigned-transaction identity cannot be
+substituted while retaining an enrolled request ID and sighash. Public inspection
+records remain frozen copies; no mutable enrollment Map is exposed.
+
+The sweep builder supplies that complete intent instead of manually selecting
+fields. Partial older enrollment records are rejected, not upgraded with guessed
+metadata. The actual Native signature message and existing valid V1 request
+digests are unchanged. A digest match states equality with local policy input;
+it does not prove Native/Solana chain truth or replace each participant's evidence
+validator. A different B policy cannot be overridden by A or the coordinator.
+If A already reserved a nonce before B rejects, coordinated abort and uncertain
+session recovery remain necessary separate work. No production permission,
+protected-state or rollback guarantee follows from this enrollment boundary.
 
 ## Signing-request boundary
 
