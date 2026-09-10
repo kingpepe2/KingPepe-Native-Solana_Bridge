@@ -7,6 +7,64 @@ on:
   pull_request:
 
 jobs:
+  source-history-scan:
+    name: Source history secret scan
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify pinned scanner and scan all commits
+        shell: bash
+        run: |
+          set -euo pipefail
+          tool_root=$(mktemp -d "${RUNNER_TEMP}/kingpepe-gitleaks.XXXXXXXX")
+          curl --fail --location --silent --show-error --max-time 120 \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz \
+            --output "${tool_root}/gitleaks.tar.gz"
+          expected=$(jq -r .gitleaks.linuxArchiveSha256 scripts/local-e2e-toolchain.json)
+          printf '%s  %s\n' "${expected}" "${tool_root}/gitleaks.tar.gz" | sha256sum --check
+          tar -xzf "${tool_root}/gitleaks.tar.gz" -C "${tool_root}" --no-same-owner
+          "${tool_root}/gitleaks" git . --redact=100 --no-banner
+
+  linux-sbf:
+    name: Linux SBF build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Build programs with pinned tools and external output
+        shell: bash
+        run: |
+          set -euo pipefail
+          tool_root=$(mktemp -d "${RUNNER_TEMP}/kingpepe-sbf.XXXXXXXX")
+          url=$(jq -r .solana.linuxArchiveUrl scripts/local-e2e-toolchain.json)
+          expected=$(jq -r .solana.linuxArchiveSha256 scripts/local-e2e-toolchain.json)
+          curl --fail --location --silent --show-error --max-time 300 \
+            "${url}" --output "${tool_root}/solana.tar.bz2"
+          printf '%s  %s\n' "${expected}" "${tool_root}/solana.tar.bz2" | sha256sum --check
+          tar -xjf "${tool_root}/solana.tar.bz2" -C "${tool_root}" --no-same-owner
+          export PATH="${tool_root}/solana-release/bin:${PATH}"
+          mkdir -p "${HOME}/.cache/solana" "${tool_root}/output"
+          # Both the compiler-generated keypairs and Cargo output stay outside Git.
+          for program in kingpepe-transceiver kingpepe-bridge; do
+            cargo-build-sbf --manifest-path "solana/programs/${program}/Cargo.toml" \
+              --sbf-out-dir "${tool_root}/output" --tools-version v1.41 \
+              -- --locked --jobs 2 --target-dir "${tool_root}/target-${program}"
+          done
+          test -s "${tool_root}/output/kingpepe_transceiver.so"
+          test -s "${tool_root}/output/kingpepe_bridge.so"
+          sha256sum "${tool_root}/output/kingpepe_transceiver.so" "${tool_root}/output/kingpepe_bridge.so"
+          test -z "$(find . -path './.git' -prune -o -name '*-keypair.json' -print)"
+
   foundation-guardrails:
     name: Foundation Guardrails
     runs-on: ubuntu-latest
@@ -22,6 +80,10 @@ jobs:
           python-version: "3.11"
       - name: Run local guardrails
         run: python .github/scripts/guardrails.py
+      - name: Pin Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22.23.2"
       - name: Install locked Node dependencies
         run: npm ci --ignore-scripts
       - name: Audit Node dependencies
@@ -108,6 +170,10 @@ jobs:
           python-version: "3.11"
       - name: Run guardrails
         run: python .github/scripts/guardrails.py
+      - name: Pin Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22.23.2"
       - name: Install locked Node dependencies
         run: npm ci --ignore-scripts
       - name: Audit Node dependencies

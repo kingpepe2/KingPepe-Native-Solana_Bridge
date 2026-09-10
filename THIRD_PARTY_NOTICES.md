@@ -40,3 +40,10 @@ This repository tracks selected upstream references for architectural guidance.
     - Use: exact 256-bit target, PoW, difficulty, and chainwork arithmetic
 
 No upstream source files are vendored into this repository in this phase.
+
+Phase 08 build tooling is downloaded separately into isolated local/CI storage.
+The KingPepe Native reference source, Solana SDK, Node, Rust and Gitleaks retain
+their upstream license files there; their sources/binaries are not copied into
+this repository or relicensed by its proprietary LICENSE. Tool and source pins
+are recorded in `scripts/local-e2e-toolchain.json`. Direct SBF command integration
+is original glue code; the upstream compiler is used without source modification.

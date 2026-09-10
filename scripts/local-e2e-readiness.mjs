@@ -1,4 +1,4 @@
-import { accessSync, constants, existsSync, readFileSync } from "node:fs";
+import { accessSync, constants, existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -9,7 +9,7 @@ export const REQUIRED_LOCAL_E2E_EXECUTABLES = Object.freeze([
   "kingpepe-cli",
   "solana",
   "solana-test-validator",
-  "anchor",
+  "cargo-build-sbf",
 ]);
 export const REQUIRED_SOLANA_PROGRAMS = Object.freeze(["kingpepe-bridge", "kingpepe-transceiver"]);
 export const READY = "READY";
@@ -157,6 +157,7 @@ function executableCandidateNames(command, platform, pathExt) {
 
 function isExecutableFile(candidate, platform) {
   try {
+    if (!statSync(candidate).isFile()) return false;
     accessSync(candidate, platform === "win32" ? constants.F_OK : constants.X_OK);
     return true;
   } catch {

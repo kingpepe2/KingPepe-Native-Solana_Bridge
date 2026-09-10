@@ -1,5 +1,39 @@
 # KingPepe Native - Solana Bridge Development Status
 
+## Current Phase 08 local build evidence (2026-09-10)
+
+This increment replaces the missing-tool blocker with actual WSL build and
+partial daemon-backed execution evidence. Publication/CI for this increment are
+pending in this source snapshot; the workflow records the tested source SHA.
+The preceding evidence commit `85d988ea176708e45129e4a48a488384376dd147` passed
+[CI](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34380671767).
+
+- Built Native daemon and CLI from verified source commit
+  `3f2621820ffefae59cbe48b350f5f8f6ec8a6da5`; no dependency on the legacy directory.
+- Compiled both programs with Solana 1.18.26 / platform-tools v1.41 in WSL.
+  SBF output and generated keypairs are outside the checkout. The transceiver
+  binary SHA-256 was `502201f082480f826c204aaf3fa8027b220ab1127613088ed7e2034de559d82f`;
+  manager was `9c0ec1d0978319772eb991a7767e3a6bcd7b5edfeeb790bed7225b4ff677a1ba`.
+  These are local test builds, not approved production binaries.
+- Added pinned Node CI setup, a Linux SBF build job and a full-history Gitleaks job.
+- Local validation: 121 Node tests plus two protocol vectors passed on Windows
+  (Node 24.18.0) and WSL (pinned Node 22.23.2). WSL Rust: 52 Solana-workspace
+  tests and 22 Native-crate tests passed, zero failures or skips. The measured
+  Solana total is 52; previous status entries reporting 53 must not be used as
+  the current test total.
+- Gitleaks 8.24.3: 137 existing commits and the working diff passed. npm audit:
+  zero reported vulnerabilities. Provenance covers every tracked file and both
+  new files; no upstream source was copied into Git.
+- The first real local run reached the funding-wallet step and failed. Corrected
+  local coinbase maturity, fallback fee and transaction-index prerequisites.
+  A subsequent run executed a real Native deposit, real A+B FROST Taproot reserve
+  sweep, Native broadcast and finalized reserve observation without a per-transfer
+  approval. It reached Solana setup, then returned
+  `LOCALNET_SOLANA_SIGNATURE_WAITING_FOR_FINALITY`.
+- Full Native-to-Solana E2E remains INCOMPLETE. Next: bounded, idempotent Solana
+  finality waiting, actual mint/claim execution, and reconciliation. Phase 09 has
+  not started. Production signing, broadcasting and Mainnet remain disabled.
+
 ## Current phase
 
 - `PHASE 08` - Automatic Native to Solana local end-to-end

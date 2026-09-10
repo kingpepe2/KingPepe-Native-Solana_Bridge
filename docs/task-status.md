@@ -1,5 +1,14 @@
 # KingPepe Native - Solana Bridge Task Status
 
+Current handoff (2026-09-10), Phase 08: isolated pinned Native tools built;
+both Solana programs compiled to SBF and loaded by a real local validator.
+The Native node accepted/finalized the A+B FROST reserve sweep. Full E2E still
+waits for Solana setup finality. This source increment awaits commit/push/CI;
+use the source-SHA-bound workflow result, not this text, as publication evidence.
+Local results: 121 Node tests + 2 vectors on Windows and WSL; 52 Solana Rust tests
+and 22 Native Rust tests in WSL; zero failures/skips in those suites. Full E2E:
+INCOMPLETE. See `docs/development-status.md` for exact scope and the next step.
+
 - 2026-09-07: Phase 01 completed and published:
   - Privacy status verified; repository `kingpepe2/KingPepe-Native-Solana_Bridge` is PRIVATE.
   - Commit: `00c4681` and push to `origin/main`.

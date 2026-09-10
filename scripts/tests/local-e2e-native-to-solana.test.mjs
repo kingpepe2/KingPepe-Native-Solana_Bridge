@@ -1068,6 +1068,9 @@ function defaultOutput(step) {
   if (step === "CHECK_KINGPEPED_VERSION" || step === "CHECK_KINGPEPE_CLI_VERSION") {
     return "KingPepe Core version v31.1.0";
   }
+  if (["CHECK_SOLANA_VERSION", "CHECK_SOLANA_TEST_VALIDATOR_VERSION", "CHECK_CARGO_BUILD_SBF_VERSION"].includes(step)) {
+    return "Solana 1.18.26";
+  }
   if (step === "LOCAL_E2E_GET_USER_MINING_ADDRESS") return "bcrt1qkingpepeminingaddress";
   if (step === "LOCAL_E2E_SEND_NATIVE_DEPOSIT") return DEPOSIT_TXID;
   if (step === "LOCAL_E2E_FUND_RESERVE_SWEEP_FEE_INPUT") return FEE_FUNDING_TXID;

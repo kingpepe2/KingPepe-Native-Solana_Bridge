@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "generatedAt": "2026-09-09T00:00:00Z",
+  "generatedAt": "2026-09-10T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
   "purpose": "file-by-file provenance classification for local tracked content",
   "provenancePolicy": {
@@ -16,6 +16,16 @@
   },
   "trackedFiles": [
     {
+      "path": "scripts/local-e2e-toolchain.json",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Pinned isolated development tools and upstream archive integrity references; no deployment identities or state."
+    },
+    {
+      "path": "docs/deployment/local-e2e-build.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Safe local build procedure; direct SBF invocation and external artifact boundary."
+    },
+    {
       "path": ".github/scripts/guardrails.py",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Repository guardrail script developed for local policy enforcement."
@@ -23,7 +33,7 @@
     {
       "path": ".github/workflows/ci.yml",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "CI workflow configuration and job sequencing, including Phase 08 Native node adapter and bridge-validator tests."
+      "notes": "CI workflow configuration, pinned tooling, full-history secret scan and SBF builds. The tar --no-same-owner flag is a THIRD_PARTY_TERM, not a KingPepe governance role."
     },
     {
       "path": ".gitignore",

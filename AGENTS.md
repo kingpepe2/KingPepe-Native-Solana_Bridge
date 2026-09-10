@@ -25,6 +25,17 @@
 ## Current phase status
 
 - Current implementation phase: `PHASE 08 - Automatic Native to Solana local end-to-end`
+- Latest handoff (2026-09-10): the pinned Native source was built in isolated
+  Linux storage; both Solana programs compiled to SBF and both local daemons
+  started. A real A+B FROST reserve sweep was accepted and finalized by the
+  Native REGTEST node. The full flow is still incomplete: the runner returns
+  while waiting for Solana setup finality. Continue Phase 08 by fixing bounded,
+  idempotent finality waiting, then run the complete flow before Phase 09.
+- Current build procedure: `docs/deployment/local-e2e-build.md`. Use WSL/Linux
+  and the pinned tools in `scripts/local-e2e-toolchain.json`. The native Rust
+  programs build with `cargo-build-sbf`; Anchor CLI is no longer required.
+  Keep SBF-generated keypairs and all test runtime state outside the checkout.
+  Earlier missing-executable notes below are historical Windows/PATH results.
 - Objective: connect the automated local Native-to-Solana deposit path using validated Native reserve transitions, project attestations, Solana mint receipt consumption, and reconciliation while keeping live activation disabled outside local testing.
 - Required authority: `KINGPEPE_TEAM_GOVERNANCE`
 

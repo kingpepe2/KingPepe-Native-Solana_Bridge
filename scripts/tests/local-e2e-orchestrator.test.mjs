@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -10,6 +10,7 @@ import {
   buildRegtestDaemonArguments,
   buildSolanaValidatorArguments,
   createLocalE2ePlan,
+  initializeLocalE2eRunRoot,
   sanitizePlanForReport,
   validateLocalE2eRunRoot,
 } from "../local-e2e-orchestrator.mjs";
@@ -29,6 +30,10 @@ test("regtest command builders stay loopback-only and allowlist CLI commands", (
     `-datadir=${path.resolve(datadir)}`,
     "-server=1",
     "-listen=0",
+    "-connect=0",
+    "-dnsseed=0",
+    "-txindex=1",
+    "-fallbackfee=0.00001000",
     "-rpcport=18443",
     "-rpcbind=127.0.0.1",
     "-rpcallowip=127.0.0.1",
@@ -117,17 +122,48 @@ test("fake complete toolchain produces a ready local-only execution plan", () =>
     });
     assert.equal(plan.state, READY_TO_RUN_LOCAL_E2E);
     assert.deepEqual(plan.blockers, []);
-    assert.equal(plan.commands[0].step, "BUILD_SOLANA_PROGRAMS");
-    assert.equal(plan.commands[1].step, "START_SOLANA_LOCAL_VALIDATOR");
-    assert.equal(plan.commands[2].step, "START_KINGPEPE_REGTEST");
-    assert(plan.commands[1].args.includes("--bpf-program"));
-    assert(plan.commands[2].args.includes("-listen=0"));
+    assert.equal(plan.commands[0].step, "BUILD_SBF_KINGPEPE_TRANSCEIVER");
+    assert.equal(plan.commands[1].step, "BUILD_SBF_KINGPEPE_BRIDGE");
+    assert.equal(plan.commands[2].step, "START_SOLANA_LOCAL_VALIDATOR");
+    assert.equal(plan.commands[3].step, "START_KINGPEPE_REGTEST");
+    for (const build of plan.commands.slice(0, 2)) {
+      assert.equal(build.executable, "cargo-build-sbf");
+      assert(build.args.includes("--locked"));
+      assert.equal(build.args[build.args.indexOf("--sbf-out-dir") + 1], plan.paths.sbfOutDir);
+      assert(build.args[build.args.indexOf("--target-dir") + 1].startsWith(runRoot + path.sep));
+    }
+    assert.notEqual(plan.commands[0].args.at(-1), plan.commands[1].args.at(-1));
+    assert(plan.commands[2].args.includes("--bpf-program"));
+    assert(!plan.commands[2].args.includes("--reset"));
+    assert(plan.commands[3].args.includes("-listen=0"));
 
     const report = sanitizePlanForReport(plan);
     assert.equal(report.repoRoot, "${REPO_ROOT}");
     assert.equal(report.runRoot, "${LOCAL_E2E_RUN_ROOT}");
     assert.match(report.paths.nativeDatadir, /^\$\{LOCAL_E2E_RUN_ROOT\}[\\/]/u);
     assert.match(report.commands[0].cwd, /^\$\{REPO_ROOT\}[\\/]/u);
+    assert(!JSON.stringify(report).includes(bin));
+    assert.match(report.paths.bridgeProgramSo, /^\$\{LOCAL_E2E_RUN_ROOT\}[\\/]/u);
+    initializeLocalE2eRunRoot(plan);
+    assert(existsSync(plan.paths.nativeDatadir));
+    assert(existsSync(plan.paths.sbfOutDir));
+    assert.throws(() => initializeLocalE2eRunRoot(plan), /EEXIST/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("run root validation rejects source ancestors and symlink or junction aliases", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-root-boundary-"));
+  try {
+    const repo = path.join(root, "repo");
+    const alias = path.join(root, "alias");
+    mkdirSync(repo);
+    symlinkSync(repo, alias, process.platform === "win32" ? "junction" : "dir");
+    assert.throws(() => validateLocalE2eRunRoot(root, repo), /outside the source repository/u);
+    assert.throws(() => validateLocalE2eRunRoot(path.join(alias, "new-run"), repo), /outside the source repository/u);
+    assert.throws(() => validateLocalE2eRunRoot(path.parse(root).root, repo), /outside|dedicated/u);
+    assert(!existsSync(path.join(repo, "new-run")));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

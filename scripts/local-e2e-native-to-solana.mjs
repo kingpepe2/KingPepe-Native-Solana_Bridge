@@ -350,7 +350,8 @@ export async function executeNativeDepositObservationFlow({
     step: "LOCAL_E2E_MINE_USER_FUNDS",
     wallet: config.userWalletName,
     command: "generatetoaddress",
-    parameters: [String(config.coinbaseMaturityBlocks), miningAddress],
+    // The wallet exposes coinbase funds after maturity plus one block.
+    parameters: [String(config.coinbaseMaturityBlocks + 1), miningAddress],
   });
   const depositTxidHex = normalizeHash32(
     await cli({
