@@ -1,5 +1,20 @@
 # Software FROST A+B
 
+## Review boundary (2026-09-10)
+
+The pinned upstream release explicitly identifies its FROST implementation as
+new and unaudited. Native node acceptance and independent BIP340 verification
+are compatibility evidence, not a security audit of FROST, DKG or this bridge.
+Do not transfer audit claims from other portions of the library to this component.
+See the [upstream FROST warning](https://github.com/paulmillr/noble-curves/blob/2.3.0/README.md#frost-threshold-signatures).
+
+A read-only policy diagnostic also reproduced matching Mainnet-policy approval
+and mutation of the exposed authorized-operation Map. No keys, signing or network
+were used. These local runtime boundaries need correction before the Phase 08
+work can be considered complete. No production signing is authorized. Signer
+state authentication, exclusive service access and rollback assurance also
+remain incomplete. None of these deficiencies requires a second physical host.
+
 ## Phase 04 implementation
 
 The Native signing runtime implements KingPepe Team controlled software FROST with:

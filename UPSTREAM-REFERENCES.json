@@ -112,6 +112,8 @@
       "version": "2.3.0",
       "license": "MIT",
       "use": "Native secp256k1 Taproot/BIP340-compatible FROST implementation and Ed25519 project attestations",
+      "reviewStatus": "FROST is explicitly new and unaudited upstream; local vectors/node acceptance do not confer audit coverage.",
+      "reviewSource": "https://github.com/paulmillr/noble-curves/blob/2.3.0/README.md#frost-threshold-signatures",
       "status": "direct-runtime-dependency"
     },
     {

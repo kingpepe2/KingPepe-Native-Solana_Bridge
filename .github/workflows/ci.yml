@@ -127,7 +127,11 @@ jobs:
             if (r.localRecovery?.pass !== 7 || r.localRecovery?.fail !== 0) process.exit(1);
             if (r.localRecoveryPsbt?.pass !== 4 || r.localRecoveryPsbt?.fail !== 0) process.exit(1);
             if (r.localRecoveryRaces?.pass !== 10 || r.localRecoveryRaces?.fail !== 0) process.exit(1);
-            if (r.localClaimRetry?.pass !== 5 || r.localClaimRetry?.fail !== 0) process.exit(1);
+            if (r.localClaimRetry?.pass !== 7 || r.localClaimRetry?.fail !== 0) process.exit(1);
+            for (const check of ["STOPPED_CLAIM_WORKER_REOPEN_DOES_NOT_OBSERVE_OR_SEND",
+              "LATE_COMPLETION_CANNOT_CLEAR_STOPPED_CLAIM_JOURNAL"]) {
+              if (!r.localClaimRetry.passed.includes(check)) process.exit(1);
+            }
             if (r.localAccounting?.pass !== 5 || r.localAccounting?.fail !== 0) process.exit(1);
             if (f?.depositAccounting?.snapshot?.authorizedUnmintedCredits !== "0") process.exit(1);
             if (f?.depositIntent?.recoverable !== true || f.depositIntent.recoveryAvailableAfterSweep !== false) process.exit(1);
