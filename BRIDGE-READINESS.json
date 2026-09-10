@@ -21,8 +21,8 @@
     "correction": "ee011923da423475c4ccae3c9685d8a1ce257f23 requires seven plus both named stopped-worker checks; CI 34472369148 all four jobs PASS and zero artifacts."
   },
   "previousVerifiedSource": {
-    "sha": "39c5fdc9c12affe037232c87d4da5421f9046ada",
-    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34478411388",
+    "sha": "10e69a3e7756597d511ef836238bdd7fba57c1cd",
+    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34483410772",
     "status": "PASS"
   },
   "sourceState": {
@@ -54,10 +54,11 @@
     "frostPolicyReview": "LOCALNET_REGTEST_PIN_PRIVATE_IMMUTABLE_LOOKUP_33_REGRESSIONS_PREVIOUS_EXACT_SHA_CI_PASS",
     "frostDkgPolicy": "EXPLICIT_LOCAL_DKG_ONLY_CAPABILITY_CANNOT_AUTHORIZE_TRANSACTION_SIGNING",
     "frostSigningRequest": "IMMUTABLE_V1_REQUEST_INTENT_SESSION_BINDING_BEFORE_STATE_ACCESS_14_REGRESSIONS_PREVIOUS_EXACT_SHA_CI_PASS",
-    "frostDkgContext": "IMMUTABLE_V2_DEPLOYMENT_MINT_EPOCH_ROLE_SESSION_AND_ACTIVE_KEY_BINDING_24_NEW_REGRESSIONS_CURRENT_CI_PENDING",
+    "frostDkgContext": "IMMUTABLE_V2_DEPLOYMENT_MINT_EPOCH_ROLE_SESSION_AND_ACTIVE_KEY_BINDING_24_REGRESSIONS_PREVIOUS_EXACT_SHA_CI_PASS",
     "frostDkgState": "INCOMPATIBLE_V1_OR_DEPLOYMENT_REJECTED_NO_MIGRATION_OR_KEY_REPLACEMENT_RETAINED_EPOCHS_BOUNDED_NOT_STATE_AUTHENTICATION",
     "frostDkgEpoch": "DELAYED_OLDER_FINALIZATION_REJECTED_AGAINST_CURRENT_ACTIVE_EPOCH_NOT_INDEPENDENT_ROLLBACK_PROOF",
-    "frostTranscriptReview": "AUTHENTICATED_INNER_DKG_TRANSPORT_FULL_INTENT_ENROLLMENT_AND_FAILURE_RESTART_REQUIRE_HARDENING",
+    "frostIntentEnrollment": "COMPLETE_IMMUTABLE_28_FIELD_INTENT_DIGEST_BINDING_STRICT_FIELDS_11_NEW_REGRESSIONS_CURRENT_CI_PENDING",
+    "frostTranscriptReview": "AUTHENTICATED_INNER_DKG_TRANSPORT_NONCE_ABORT_AND_FAILURE_RESTART_REQUIRE_HARDENING",
     "frostRustCrate": "SUPPORTING_POLICY_STATE_MODEL_ONLY",
     "solanaPrograms": "SBF_AND_DEPOSIT_HAPPY_PATH_TESTED_LOCALNET_ONLY",
     "attestations": "PROJECT_ATTESTED_2_OF_2_ED25519",
@@ -76,7 +77,8 @@
   },
   "localValidation": {
     "windows": {
-      "nodeTestsPass": 395,
+      "nodeTestsPass": 406,
+      "fullIntentEnrollmentRegressionsIncluded": 11,
       "frostDkgRegressionsIncluded": 24,
       "frostRequestRegressionsIncluded": 14,
       "frostPolicyRegressionsIncluded": 33,
@@ -91,7 +93,8 @@
       "serviceAclProtectedStorage": "NOT_RUN"
     },
     "wsl": {
-      "nodeTestsPass": 395,
+      "nodeTestsPass": 406,
+      "fullIntentEnrollmentRegressionsIncluded": 11,
       "frostDkgRegressionsIncluded": 24,
       "frostRequestRegressionsIncluded": 14,
       "frostPolicyRegressionsIncluded": 33,
@@ -152,7 +155,7 @@
     "externalReview": "NOT_RUN"
   },
   "phase08Remaining": [
-    "Harden authenticated inner DKG transcripts/transport, complete authorization-intent enrollment and coordinator failure cleanup; review the explicitly unaudited upstream FROST component. Current local-only policy/request/DKG metadata binding is not state authentication or a hostile-code sandbox",
+    "Harden authenticated inner DKG transcripts/transport, nonce abort/recovery and coordinator failure cleanup; review the explicitly unaudited upstream FROST component. Current local-only complete-intent policy/request/DKG binding is not evidence truth, state authentication or a hostile-code sandbox",
     "Implement and test post-mint deep-reorg hard stops; ten pre-mint race/fork checks pass but are not compensation or production finality assurance",
     "Configure production Native evidence sources; current raw-header/Merkle integration is REGTEST-only with explicit local-node UTXO trust",
     "Review remaining account and source-validation dependencies",

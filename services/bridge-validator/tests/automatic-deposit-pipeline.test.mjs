@@ -179,22 +179,7 @@ function attesterPolicy(config, role, keypair, overrides = {}) {
 
 function createFrostRuntime(config, operation) {
   const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-phase08-frost-"));
-  const auth = {
-    signingRequestId: operation.reserveSweep.signingIntent.signingRequestId,
-    operationId: operation.reserveSweep.signingIntent.operationId,
-    withdrawalId: operation.reserveSweep.signingIntent.withdrawalId,
-    taprootSighashHex: operation.reserveSweep.signingIntent.taprootSighashHex,
-    transactionCommitment: operation.reserveSweep.signingIntent.transactionCommitment,
-    signingInputIndex: operation.reserveSweep.signingIntent.signingInputIndex,
-    recipientScriptPubKeyHex: operation.reserveSweep.signingIntent.recipientScriptPubKeyHex,
-    amountAtomic: operation.reserveSweep.signingIntent.amountAtomic,
-    feeAtomic: operation.reserveSweep.signingIntent.feeAtomic,
-    changeScriptPubKeyHex: operation.reserveSweep.signingIntent.changeScriptPubKeyHex,
-    changeAtomic: operation.reserveSweep.signingIntent.changeAtomic,
-    inputOutpoints: operation.reserveSweep.signingIntent.inputOutpoints,
-    outputCommitments: operation.reserveSweep.signingIntent.outputCommitments,
-    reserveCommitment: operation.reserveSweep.signingIntent.reserveCommitment,
-  };
+  const auth = operation.reserveSweep.signingIntent;
   const policy = createNativeSigningPolicy({
     environment: "localnet",
     nativeNetwork: "regtest",

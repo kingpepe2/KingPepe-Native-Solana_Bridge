@@ -47,6 +47,20 @@ function withTempRoot() {
 function baseAuthorization(overrides = {}) {
   const signingRequestId = h("signing-request");
   return {
+    protocol: FROST_SIGNING_INTENT_PROTOCOL,
+    mode: FROST_SIGNING_MODE,
+    purpose: "WITHDRAWAL",
+    nativeNetwork: "regtest",
+    nativeGenesisHash: REGTEST_GENESIS,
+    solanaDeployment: h("solana-local-deployment"),
+    bridgeProgramId: h("bridge-program-id"),
+    transceiverProgramId: h("transceiver-program-id"),
+    mint: h("kpepe-mint"),
+    keyEpoch: 1,
+    proofFingerprint: h("finalized-withdrawal-proof"),
+    unsignedNativeTransactionId: h("unsigned-native-txid"),
+    pauseWithdrawals: false,
+    hardStop: false,
     signingRequestId,
     operationId: h("operation"),
     withdrawalId: h("withdrawal"),
@@ -66,37 +80,7 @@ function baseAuthorization(overrides = {}) {
 }
 
 function intentFromAuthorization(auth, overrides = {}) {
-  return {
-    protocol: FROST_SIGNING_INTENT_PROTOCOL,
-    mode: FROST_SIGNING_MODE,
-    purpose: "WITHDRAWAL",
-    nativeNetwork: "regtest",
-    nativeGenesisHash: REGTEST_GENESIS,
-    solanaDeployment: h("solana-local-deployment"),
-    bridgeProgramId: h("bridge-program-id"),
-    transceiverProgramId: h("transceiver-program-id"),
-    mint: h("kpepe-mint"),
-    keyEpoch: 1,
-    signingRequestId: auth.signingRequestId,
-    operationId: auth.operationId,
-    withdrawalId: auth.withdrawalId,
-    proofFingerprint: h("finalized-withdrawal-proof"),
-    unsignedNativeTransactionId: h("unsigned-native-txid"),
-    transactionCommitment: auth.transactionCommitment,
-    signingInputIndex: 0,
-    taprootSighashHex: auth.taprootSighashHex,
-    recipientScriptPubKeyHex: auth.recipientScriptPubKeyHex,
-    amountAtomic: auth.amountAtomic,
-    feeAtomic: auth.feeAtomic,
-    changeScriptPubKeyHex: auth.changeScriptPubKeyHex,
-    changeAtomic: auth.changeAtomic,
-    inputOutpoints: auth.inputOutpoints,
-    outputCommitments: auth.outputCommitments,
-    reserveCommitment: auth.reserveCommitment,
-    pauseWithdrawals: false,
-    hardStop: false,
-    ...overrides,
-  };
+  return { ...auth, ...overrides };
 }
 
 function makePolicy(auth, overrides = {}) {
@@ -116,6 +100,116 @@ function makePolicy(auth, overrides = {}) {
     ...overrides,
   });
 }
+
+for (const [field, value] of [["purpose", "RESERVE_MIGRATION"], ["proofFingerprint", h("substituted-proof")],
+  ["unsignedNativeTransactionId", h("substituted-unsigned-tx")]]) {
+  test(`full intent enrollment rejects substitution of ${field}`, () => {
+    const intent = intentFromAuthorization(baseAuthorization());
+    const policy = makePolicy(intent);
+    assert.equal(evaluateNativeSigningPolicy(policy, intent).result, "APPROVED");
+    assert.equal(evaluateNativeSigningPolicy(policy, { ...intent, [field]: value }).result, "REJECTED");
+  });
+}
+
+test("both signers reject substituted full-intent metadata before any nonce reservation", () => {
+  const intent = intentFromAuthorization(baseAuthorization());
+  const runtime = createRuntime({}, makePolicy(intent));
+  try {
+    for (const signer of [runtime.signerA, runtime.signerB]) {
+      for (const changes of [{ purpose: "RESERVE_MIGRATION" }, { proofFingerprint: h("other-proof") },
+        { unsignedNativeTransactionId: h("other-unsigned-tx") }]) {
+        const request = frostRequestFor({ ...intent, ...changes });
+        assert.throws(() => signer.signingCommitment(request), /authorizedOperationExact/u);
+        assert.throws(() => signer.signatureShare(request, []), /authorizedOperationExact/u);
+      }
+    }
+    for (const role of ["frost-a", "frost-b"]) {
+      const state = JSON.parse(readFileSync(path.join(runtime.root, role, "frost-signer-state.json"), "utf8"));
+      assert.equal(state.nonceReservationCounter, "0");
+      assert.equal(Object.keys(state.signing).length, 0);
+    }
+  } finally { runtime.cleanup(); }
+});
+
+test("authorization enrollment requires every complete intent field", () => {
+  const intent = intentFromAuthorization(baseAuthorization());
+  for (const field of Object.keys(intent)) {
+    const incomplete = { ...intent };
+    delete incomplete[field];
+    assert.throws(() => makePolicy(incomplete), /IntentFields/u, field);
+  }
+});
+
+test("intent and authorization reject unknown fields instead of dropping them", () => {
+  const intent = { ...intentFromAuthorization(baseAuthorization()), proofVerified: true };
+  assert.throws(() => validateNativeSigningIntent(intent), /IntentFields/u);
+  assert.throws(() => makePolicy(intent), /IntentFields/u);
+});
+
+test("every normalized intent field is covered by authorization or independent policy guards", () => {
+  const intent = baseAuthorization();
+  const policy = makePolicy(intent);
+  for (const [field, value] of Object.entries(intent)) {
+    let changed;
+    if (Array.isArray(value)) changed = field === "inputOutpoints" ? [...value].reverse() : [...value, h("extra-output")];
+    else if (typeof value === "boolean") changed = true;
+    else if (typeof value === "number") changed = value + 1;
+    else if (field === "purpose") changed = "RESERVE_SWEEP";
+    else if (field === "nativeNetwork") changed = "mainnet";
+    else if (field.endsWith("Atomic")) changed = (BigInt(value) + 1n).toString();
+    else if (field.endsWith("ScriptPubKeyHex")) changed = p2tr(`changed-${field}`);
+    else changed = h(`changed-${field}`);
+    let decision;
+    try { decision = evaluateNativeSigningPolicy(policy, { ...intent, [field]: changed }).result; }
+    catch { decision = "INVALID"; }
+    assert.notEqual(decision, "APPROVED", field);
+  }
+});
+
+test("enrolled purpose and evidence metadata stay detached and immutable", () => {
+  const auth = baseAuthorization();
+  const original = structuredClone(auth);
+  const policy = makePolicy(auth);
+  auth.purpose = "RESERVE_MIGRATION";
+  auth.proofFingerprint = h("changed-proof");
+  auth.unsignedNativeTransactionId = h("changed-unsigned-tx");
+  const enrolled = policy.authorizedOperations[0];
+  assert.equal(nativeSigningIntentDigest(enrolled), nativeSigningIntentDigest(original));
+  for (const field of ["purpose", "proofFingerprint", "unsignedNativeTransactionId"]) {
+    assert.throws(() => { enrolled[field] = auth[field]; }, TypeError);
+  }
+  assert.equal(evaluateNativeSigningPolicy(policy, original).result, "APPROVED");
+  assert.equal(evaluateNativeSigningPolicy(policy, auth).result, "REJECTED");
+});
+
+test("metadata substitution is rejected before independent evidence callbacks", async () => {
+  let calls = 0;
+  const validate = async (intent) => { calls += 1; return { digestHex: intent.proofFingerprint }; };
+  const runtime = createRuntime({ A: validate, B: validate });
+  try {
+    const intent = intentFromAuthorization(runtime.auth);
+    await assert.rejects(runtime.coordinator.signAutomaticallyWithNativeEvidence({ ...intent, proofFingerprint: h("unapproved-proof") }),
+      /authorizedOperationExact/u);
+    assert.equal(calls, 0);
+    assert.equal((await runtime.coordinator.signAutomaticallyWithNativeEvidence(intent)).state, "SIGNED");
+    assert.equal(calls, 2);
+  } finally { runtime.cleanup(); }
+});
+
+test("one participant's different enrollment cannot be overruled by the coordinator", () => {
+  const runtime = createRuntime();
+  try {
+    const signerB = new NativeFrostSigner({ signerId: REQUIRED_FROST_SIGNERS[1], index: 1,
+      policy: makePolicy(baseAuthorization({ proofFingerprint: h("B-approved-other-proof") })),
+      stateStore: new FileBackedFrostStateStore({ signerId: REQUIRED_FROST_SIGNERS[1], root: path.join(runtime.root, "frost-b"), repoRoot: REPO_ROOT }) });
+    const coordinator = new NativeFrostCoordinator({ signers: [runtime.signerA, signerB], publicPackage: runtime.epoch.publicPackage,
+      aggregateTweakedXOnlyPublicKey: runtime.epoch.aggregateTweakedXOnlyPublicKey });
+    assert.throws(() => coordinator.signAutomatically(intentFromAuthorization(runtime.auth)), /authorizedOperationExact/u);
+    const b = JSON.parse(readFileSync(path.join(runtime.root, "frost-b", "frost-signer-state.json"), "utf8"));
+    assert.equal(b.nonceReservationCounter, "0");
+    // A may already have reserved a nonce; coordinator-wide abort is separate work.
+  } finally { runtime.cleanup(); }
+});
 
 function dkgContextFixture(overrides = {}) {
   return { protocol: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_KEY_CONTEXT/V2", environment: "localnet",
@@ -327,7 +421,7 @@ test("DKG state substitutions are rejected without replacing existing test mater
 test("new local key epoch selects its exact DKG session while retaining the earlier epoch", () => {
   const runtime = createRuntime();
   try {
-    const policy = makePolicy(runtime.auth, { keyEpoch: 2 });
+    const policy = makePolicy({ ...runtime.auth, keyEpoch: 2 }, { keyEpoch: 2 });
     const signers = REQUIRED_FROST_SIGNERS.map((signerId, index) => new NativeFrostSigner({ signerId, index, policy,
       stateStore: new FileBackedFrostStateStore({ signerId, root: path.join(runtime.root, index === 0 ? "frost-a" : "frost-b"), repoRoot: REPO_ROOT }) }));
     const epoch = runTwoPartyDkg(signers, { epoch: 2 });
@@ -496,7 +590,7 @@ test("policy and intent epochs are bounded to positive u32", () => {
     assert.throws(() => makePolicy(baseAuthorization(), { keyEpoch }), /positive u32/u);
     assert.throws(() => validateNativeSigningIntent(intentFromAuthorization(baseAuthorization(), { keyEpoch })), /positive u32/u);
   }
-  const auth = baseAuthorization();
+  const auth = baseAuthorization({ keyEpoch: 0xffff_ffff });
   assert.equal(evaluateNativeSigningPolicy(makePolicy(auth, { keyEpoch: 0xffff_ffff }),
     intentFromAuthorization(auth, { keyEpoch: 0xffff_ffff })).result, "APPROVED");
 });

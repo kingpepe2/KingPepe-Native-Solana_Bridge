@@ -3,6 +3,17 @@
   "generatedAt": "2026-09-10T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
   "purpose": "file-by-file provenance classification for local tracked content",
+  "phase08FullIntentEnrollmentReview": {
+    "filesBefore": 179,
+    "filesAfter": 179,
+    "newFiles": [],
+    "filesDeleted": 0,
+    "filesMoved": 0,
+    "changes": "Original complete normalized 28-field immutable signing-intent enrollment/digest comparison, strict intent field set, sweep integration and 11 new regressions. Removed superseded partial normalization/matching and manual subset construction; fixtures now enroll complete public synthetic intents.",
+    "sourceImports": "None. Existing original canonical intent validation/hash helpers reused; no cryptographic primitive or third-party source copied or modified.",
+    "dependencyChanges": "None; pinned dependencies, toolchains, lockfiles and third-party notices unchanged.",
+    "scope": "Policy/input equality, not evidence truth, authenticated storage/transport or complete nonce failure/recovery. No production material created, moved or deleted."
+  },
   "phase08DkgBindingReview": {
     "filesBefore": 178,
     "filesAfter": 179,

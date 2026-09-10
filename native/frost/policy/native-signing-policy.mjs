@@ -16,6 +16,12 @@ const MAX_POLICY_OPERATIONS = 256;
 const MAX_INTENT_INPUTS = 256;
 const MAX_INTENT_OUTPUTS = 256;
 const MAX_SCRIPT_BYTES = 10_000;
+const INTENT_FIELDS = Object.freeze(["protocol", "mode", "purpose", "nativeNetwork", "nativeGenesisHash",
+  "solanaDeployment", "bridgeProgramId", "transceiverProgramId", "mint", "keyEpoch", "signingRequestId",
+  "operationId", "withdrawalId", "proofFingerprint", "unsignedNativeTransactionId", "transactionCommitment",
+  "signingInputIndex", "taprootSighashHex", "recipientScriptPubKeyHex", "amountAtomic", "feeAtomic",
+  "changeScriptPubKeyHex", "changeAtomic", "inputOutpoints", "outputCommitments", "reserveCommitment",
+  "pauseWithdrawals", "hardStop"]);
 const authorizationSnapshots = new WeakMap();
 const localDkgPolicies = new WeakSet();
 
@@ -87,7 +93,9 @@ export function createNativeSigningPolicy(options) {
   const context = localPolicyContext(options);
   const authorizedOperations = new Map();
   for (const operation of dataArray(options.authorizedOperations, MAX_POLICY_OPERATIONS, "authorized operations")) {
-    const normalized = normalizeAuthorization(operation);
+    // Enroll the entire immutable intent, not a hand-maintained economic subset.
+    // Enrollment is local policy input; independent chain verification is still required.
+    const normalized = validateNativeSigningIntent(operation);
     if (authorizedOperations.has(normalized.signingRequestId)) throw new Error("NativeSigningPolicyDuplicateRequest");
     authorizedOperations.set(normalized.signingRequestId, normalized);
   }
@@ -153,28 +161,6 @@ export function assertNativeFrostRuntimePolicy(policy) {
   return policy;
 }
 
-function normalizeAuthorization(value) {
-  value = dataRecord(value, "authorization");
-  const normalized = {
-    signingRequestId: assertHashHex(value.signingRequestId, "authorized signing request ID"),
-    operationId: assertHashHex(value.operationId, "authorized operation ID"),
-    withdrawalId: assertHashHex(value.withdrawalId, "authorized withdrawal ID"),
-    taprootSighashHex: assertHashHex(value.taprootSighashHex, "authorized Taproot sighash"),
-    transactionCommitment: assertHashHex(value.transactionCommitment, "authorized transaction commitment"),
-    signingInputIndex: checkedNonNegativeIndex(value.signingInputIndex, "authorized signing input index"),
-    recipientScriptPubKeyHex: checkedScript(value.recipientScriptPubKeyHex, "authorized recipient scriptPubKey"),
-    amountAtomic: canonicalUintDecimal(value.amountAtomic, "authorized amount"),
-    feeAtomic: canonicalUintDecimal(value.feeAtomic, "authorized fee"),
-    changeScriptPubKeyHex: checkedScript(value.changeScriptPubKeyHex, "authorized change scriptPubKey"),
-    changeAtomic: canonicalUintDecimal(value.changeAtomic, "authorized change"),
-    inputOutpoints: normalizeOutpoints(value.inputOutpoints),
-    outputCommitments: normalizeHashList(value.outputCommitments, "authorized output commitment"),
-    reserveCommitment: assertHashHex(value.reserveCommitment, "authorized reserve commitment"),
-  };
-  validateEconomicShape(normalized);
-  return Object.freeze(normalized);
-}
-
 function checkedSafeEpoch(value, label) {
   if (!Number.isInteger(value) || value < 1 || value > 0xffff_ffff) throw new Error(`${label} must be a positive u32`);
   return value;
@@ -182,6 +168,10 @@ function checkedSafeEpoch(value, label) {
 
 export function validateNativeSigningIntent(intent) {
   intent = dataRecord(intent, "intent");
+  const fields = Object.keys(intent);
+  if (fields.length !== INTENT_FIELDS.length || fields.some((field) => !INTENT_FIELDS.includes(field))) {
+    throw new Error("NativeSigningIntentFields");
+  }
   if (intent?.protocol !== FROST_SIGNING_INTENT_PROTOCOL) throw new Error("wrong Native FROST signing protocol");
   if (intent.mode !== FROST_SIGNING_MODE) throw new Error("wrong Native FROST signing mode");
   if (!["WITHDRAWAL", "RESERVE_SWEEP", "RESERVE_MIGRATION"].includes(intent.purpose)) {
@@ -306,6 +296,7 @@ export function nativeSigningIntentDigest(intent) {
 export function evaluateNativeSigningPolicy(policy, intent) {
   assertNativeSigningPolicy(policy);
   const normalized = validateNativeSigningIntent(intent);
+  const intentDigest = sha256Canonical(normalized);
   const amount = BigInt(normalized.amountAtomic);
   const fee = BigInt(normalized.feeAtomic);
   const authorization = authorizationSnapshots.get(policy).get(normalized.signingRequestId);
@@ -323,33 +314,15 @@ export function evaluateNativeSigningPolicy(policy, intent) {
     feeWithinPolicy: fee <= policy.maxFeeAtomic,
     reserveChangeScriptExact: normalized.changeScriptPubKeyHex === policy.reserveScriptPubKeyHex,
     authorizedOperationPresent: authorization !== undefined,
-    authorizedOperationExact: authorization === undefined ? false : authorizationMatches(authorization, normalized),
+    authorizedOperationExact: authorization !== undefined && sha256Canonical(authorization) === intentDigest,
   };
   const failed = Object.entries(checks).filter(([, ok]) => !ok).map(([name]) => name);
   return Object.freeze({
     result: failed.length === 0 ? "APPROVED" : "REJECTED",
-    intentDigest: sha256Canonical(normalized),
+    intentDigest,
     checks: Object.freeze(checks),
     failed: Object.freeze(failed),
   });
-}
-
-function authorizationMatches(authorization, intent) {
-  return (
-    authorization.operationId === intent.operationId &&
-    authorization.withdrawalId === intent.withdrawalId &&
-    authorization.taprootSighashHex === intent.taprootSighashHex &&
-    authorization.transactionCommitment === intent.transactionCommitment &&
-    authorization.signingInputIndex === intent.signingInputIndex &&
-    authorization.recipientScriptPubKeyHex === intent.recipientScriptPubKeyHex &&
-    authorization.amountAtomic === intent.amountAtomic &&
-    authorization.feeAtomic === intent.feeAtomic &&
-    authorization.changeScriptPubKeyHex === intent.changeScriptPubKeyHex &&
-    authorization.changeAtomic === intent.changeAtomic &&
-    authorization.reserveCommitment === intent.reserveCommitment &&
-    canonicalJson(authorization.inputOutpoints) === canonicalJson(intent.inputOutpoints) &&
-    canonicalJson(authorization.outputCommitments) === canonicalJson(intent.outputCommitments)
-  );
 }
 
 export function assertNativeSigningApproved(policy, intent) {

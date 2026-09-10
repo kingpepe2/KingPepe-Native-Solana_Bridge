@@ -1,8 +1,64 @@
 # KingPepe Native - Solana Bridge Development Status
 
-## Current Phase 08 DKG deployment and active-key binding (2026-09-10)
+## Current Phase 08 complete signing-intent enrollment (2026-09-10)
 
-UNPUBLISHED / LOCALLY_TESTED, including the final fresh real-chain rerun.
+UNPUBLISHED / LOCALLY_TESTED, including fresh real-chain validation. Policy now
+enrolls the complete normalized immutable 28-field intent, not a selected subset.
+Its digest must match in addition to the existing independent domain, epoch,
+amount/fee caps, reserve-change, pause and hard-stop checks. Missing or extra
+intent fields fail closed; there is no partial-record compatibility fallback.
+The real reserve-sweep preparation preserves the full validated intent for both
+single and batch policy creation. Superseded partial normalization/matching and
+manual subset builders were removed. Actual Native sighash/ciphersuite, valid
+request transcript, exact A+B participation and automatic approval model remain
+unchanged.
+
+Read-only synthetic diagnostics first showed purpose, evidence fingerprint and
+unsigned-transaction identity substitutions remaining APPROVED. No keys/signing
+or network were used in those diagnostics. Seven new regressions reproduced the
+gaps (83 PASS / 7 FAIL), including participant rejection, incomplete enrollment,
+unknown fields and discarded sweep metadata. Final focused signer/policy/sweep/
+pipeline suites: 146 PASS. Windows/WSL each 406 Node tests (11 new) and two vectors
+PASS; WSL 64 Solana + 29 Native Rust tests, fmt/clippy, five lockfile audits and
+declared-license metadata PASS. No failures/skips in final executed suites.
+npm reports zero vulnerabilities; bincode 1.3.3 unmaintained warning is retained.
+Native Windows Cargo/combined-license and service ACL/protected-secret tests
+remain NOT_RUN locally. The fresh REGTEST/local-validator deposit and both SBF
+builds PASS: real A+B Native-accepted sweep signatures, separate Ed25519
+attestations, actual SPL mint and all 55 checks (22 security, seven CSV, four
+wallet PSBT, ten pre-mint races, seven claim-worker and five accounting).
+Canonical reserve and observed supply each 100000000 atomic; pending credits
+zero. No per-transfer team approval. Withdrawal E2E and full multi-service
+restart remain NOT_RUN. Current source and all 156 existing commits scanned
+clean; exact 179-file provenance, nine JSON parses, private-path/IP checks and
+new terminology review PASS. Staged/outgoing scans, private publication and
+exact-SHA CI are pending.
+
+Enrollment is a cooperative policy boundary, not cryptographic proof that chain
+data is true. Each signer retains its configured raw-evidence check. If A has
+reserved a nonce and B rejects its own different enrollment, no aggregate is
+produced; coordinator-wide abort/uncertain-session handling is still incomplete.
+Authenticated/fenced state, DKG peer transport, service recovery, global stops,
+post-mint deep-reorg response and production observation remain open. Upstream
+FROST is explicitly unaudited. Mainnet DISABLED; no production actions.
+
+Provenance remains exactly 179 files: no additions/deletions/moves, dependency,
+toolchain, license or third-party/legacy source imports. Original fixture updates
+use complete public synthetic intents; valid epoch tests explicitly enroll their
+matching epoch rather than weakening checks. Phase 08 INCOMPLETE; Phase 09
+NOT_STARTED. Next: validate/publish this increment, then nonce/session failure
+handling and durable state/reconciliation dependencies.
+
+## Previous Phase 08 DKG deployment and active-key binding (verified source)
+
+Source `10e69a3e7756597d511ef836238bdd7fba57c1cd`, message
+`fix(phase-08): bind FROST DKG and active keys to deployments`, privately pushed;
+[all four exact-SHA CI jobs PASS](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34483410772).
+CI confirms the real deposit and all 55 checks, reserve/supply each 100000000
+atomic. Current/staged/outgoing source and all 156 commits scanned clean; zero
+workflow artifacts. The 395-test evidence below belongs to that SHA.
+
+LOCALLY_AND_CI_TESTED, including the final fresh real-chain rerun.
 Original V2 DKG metadata binds the explicit
 local environment, verified Native REGTEST genesis, Solana deployment, Manager,
 Transceiver, Mint and positive-u32 key epoch. Both participants validate the exact
@@ -43,10 +99,10 @@ actual SPL mint and all 55 checks (22 security, seven CSV, four wallet PSBT, ten
 pre-mint races, seven claim-worker and five accounting). Canonical reserve and
 observed supply each 100000000 atomic; pending credits zero. No per-transfer
 team approval. Withdrawal E2E and full multi-service restart remain NOT_RUN.
-Private publication is pending.
+Private publication and exact-SHA CI passed as recorded above.
 Current source and all 155 existing commits scanned clean; exact 179-file
 provenance, nine JSON parses and private-path/IP checks PASS. Staged/outgoing
-scans and exact-SHA CI remain pending.
+scans and the complete 156-commit history scan passed before the private push.
 
 Provenance 178 -> 179: one original DKG metadata module, superseded inline DKG
 request validation/construction and unused imports removed. No source files

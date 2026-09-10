@@ -5,6 +5,7 @@ import { REGTEST_GENESIS } from "../../../native/node/native-raw-evidence.mjs";
 import {
   FROST_SIGNING_INTENT_PROTOCOL,
   FROST_SIGNING_MODE,
+  nativeSigningIntentDigest,
 } from "../../../native/frost/index.mjs";
 import {
   LOCAL_NATIVE_RESERVE_SWEEP_SIGNING_INTENT_PROTOCOL,
@@ -118,6 +119,16 @@ test("validated fee-funding input sighash evidence produces a distinct FROST sig
   assert.equal(prepared.signingIntent.signingInputIndex, 1);
   assert.equal(prepared.authorizedOperation.signingInputIndex, 1);
   assert.equal(prepared.signerPolicyDecision.result, "APPROVED");
+});
+
+test("reserve-sweep authorization retains the complete validated signing intent", () => {
+  const prepared = prepareLocalNativeReserveSweepSigningIntent(baseInput());
+  assert.equal(Object.keys(prepared.authorizedOperation).length, Object.keys(prepared.signingIntent).length);
+  assert.equal(nativeSigningIntentDigest(prepared.authorizedOperation), prepared.signingIntentDigestHex);
+  assert.equal(prepared.authorizedOperation.purpose, "RESERVE_SWEEP");
+  assert.equal(prepared.authorizedOperation.proofFingerprint, prepared.signingIntent.proofFingerprint);
+  assert.equal(prepared.authorizedOperation.unsignedNativeTransactionId, prepared.signingIntent.unsignedNativeTransactionId);
+  assert.equal(Object.isFrozen(prepared.authorizedOperation), true);
 });
 
 test("missing or unvalidated Native sighash evidence cannot produce a signing intent", () => {

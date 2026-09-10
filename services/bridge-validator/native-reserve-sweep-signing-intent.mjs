@@ -102,22 +102,7 @@ export function prepareLocalNativeReserveSweepSigningIntent(input) {
     pauseWithdrawals: false,
     hardStop: false,
   });
-  const authorizedOperation = Object.freeze({
-    signingRequestId: signingIntent.signingRequestId,
-    operationId: signingIntent.operationId,
-    withdrawalId: signingIntent.withdrawalId,
-    taprootSighashHex: signingIntent.taprootSighashHex,
-    transactionCommitment: signingIntent.transactionCommitment,
-    signingInputIndex: signingIntent.signingInputIndex,
-    recipientScriptPubKeyHex: signingIntent.recipientScriptPubKeyHex,
-    amountAtomic: signingIntent.amountAtomic,
-    feeAtomic: signingIntent.feeAtomic,
-    changeScriptPubKeyHex: signingIntent.changeScriptPubKeyHex,
-    changeAtomic: signingIntent.changeAtomic,
-    inputOutpoints: signingIntent.inputOutpoints,
-    outputCommitments: signingIntent.outputCommitments,
-    reserveCommitment: signingIntent.reserveCommitment,
-  });
+  const authorizedOperation = signingIntent;
   const signerPolicy = createNativeSigningPolicy({
     environment: "localnet",
     nativeNetwork: config.nativeNetworkName,

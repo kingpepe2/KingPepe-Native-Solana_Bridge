@@ -1,6 +1,35 @@
 # KingPepe Native - Solana Bridge Task Status
 
-## Current Phase 08 DKG deployment and active-key binding (2026-09-10)
+## Current Phase 08 complete signing-intent enrollment (2026-09-10)
+
+Implemented locally: full immutable 28-field intent enrollment/digest matching,
+strict missing/extra-field rejection, complete sweep authorization and removal
+of partial subset builders/matching. Domain/cap/stop guards and independent
+participant validation remain. Initial focused 83 PASS / 7 FAIL; final focused
+146 PASS. Windows/WSL each 406 Node tests (11 new) plus two vectors PASS; WSL
+93 Rust tests, fmt/clippy/audits PASS. Both SBF builds and the fresh real Native
+REGTEST/Solana local-validator deposit PASS all 55 checks. Canonical reserve and
+observed supply each 100000000 atomic; pending credits zero, no per-transfer
+team approval. Withdrawal E2E and full service restart remain NOT_RUN. Current
+source and all 156 commits scan clean; exact 179-file provenance, nine JSON
+parses and private-path/IP checks PASS. Staged/outgoing scans, private push and
+exact-SHA CI pending.
+
+Provenance remains 179 files; no additions/deletions/moves, dependency/license
+changes or production actions. Phase 08 INCOMPLETE; Phase 09 NOT_STARTED; Mainnet DISABLED. Enrollment
+is not chain proof, nonce recovery or authenticated/fenced service state.
+Next: finish this increment's gates, then coordinator failure/nonce handling and
+remaining durable recovery/reconciliation dependencies.
+See [detailed evidence](development-status.md#current-phase-08-complete-signing-intent-enrollment-2026-09-10).
+
+## Previous Phase 08 DKG deployment and active-key binding (verified source)
+
+Source `10e69a3e7756597d511ef836238bdd7fba57c1cd`, message
+`fix(phase-08): bind FROST DKG and active keys to deployments`, privately pushed;
+[all four exact-SHA CI jobs PASS](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34483410772).
+Exact-SHA CI confirms the real deposit and all 55 checks. Current/staged/outgoing
+source and all 156 commits scanned clean; zero uploaded artifacts. The following
+395-test evidence belongs to that SHA.
 
 Implemented locally: immutable V2 DKG context/session metadata, exact deployment
 and active-key selection, immutable participant roles, all-round request checks
@@ -14,14 +43,15 @@ fresh real E2E passed 55 checks; the final fresh rerun and both SBF builds also
 PASS all 55 checks. Reserve/supply each 100000000 atomic, pending credits zero,
 no per-transfer team approval. This is not a withdrawal E2E result. Current source
 and all 155 commits scan clean; 179-file provenance, nine JSON parses and private
-path/IP checks PASS. Staged/outgoing scans, private push and exact-SHA CI pending.
+path/IP checks PASS. Staged/outgoing/all-156-commit scans, private push and
+exact-SHA CI passed as recorded above.
 
 Provenance 178 -> 179 files, one original module, no file deletions/moves,
 dependency/license changes or production actions. Phase 08 INCOMPLETE;
 Phase 09 NOT_STARTED; Mainnet DISABLED. These are structural/context guards, not
 authenticated storage/transport or nonce rollback guarantees. Next: finish the
 increment's gates, then full intent enrollment and nonce/state/restart hardening.
-See [detailed evidence](development-status.md#current-phase-08-dkg-deployment-and-active-key-binding-2026-09-10).
+See [detailed evidence](development-status.md#previous-phase-08-dkg-deployment-and-active-key-binding-verified-source).
 
 ## Previous Phase 08 signing-request binding (verified source)
 
