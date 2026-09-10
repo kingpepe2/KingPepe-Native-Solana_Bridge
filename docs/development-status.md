@@ -1,8 +1,57 @@
 # KingPepe Native - Solana Bridge Development Status
 
-## Current Phase 08 coordinated nonce abort (2026-09-10)
+## Current Phase 08 explicit signer-state lifecycle (2026-09-10)
 
-UNPUBLISHED / LOCALLY_TESTED. Synchronous coordinator failures during commitments,
+UNPUBLISHED / LOCALLY_TESTED. Fresh isolated state creation now
+requires an explicit genuine localnet/REGTEST policy and exact A/B role. It creates
+only an empty envelope with exclusive file creation; competing setup processes
+cannot overwrite it. The constructor can prepare an empty external directory but
+does not initialize state. Load/save reject a missing file instead of inventing
+an initial signer. Save also rejects malformed, incompatible or wrong-role current
+state, checks canonical u64 counters and dictionary types, and rechecks before
+rename. JSON parse and I/O errors omit private source excerpts and paths.
+
+Fresh DKG setup and tests use the explicit API; actual transaction signers reopen
+the already enrolled state. Existing V1 state is preserved, not migrated or
+replaced. Initial focused regressions: 111 PASS / 11 FAIL. After implementation,
+214 focused checks PASS. Final Windows/WSL each 442 Node tests (13 new) and two
+vectors PASS; WSL 64 Solana + 29 Native Rust tests, fmt/clippy, five lockfile
+audits and declared-license metadata PASS. No final executed failures/skips.
+npm reports zero vulnerabilities; the bincode 1.3.3 unmaintained warning remains.
+Native Windows Cargo/combined-license and service ACL/protected-secret tests
+remain NOT_RUN locally. Both SBF builds and a fresh real REGTEST/local-validator
+deposit PASS: Native-node-accepted A+B sweep, separately keyed attestations,
+actual SPL mint and reconciliation. All 55 checks PASS (22 security, seven CSV,
+four wallet PSBT, ten pre-mint races, seven claim-worker and five accounting).
+Reserve/supply each 100000000 atomic, pending credits zero, no per-transfer team
+approval. Withdrawal E2E and full multi-service restart remain NOT_RUN.
+
+Provenance remains 179 files, no additions/deletions/moves or dependency/license
+changes. No legacy/upstream implementation imported. Existing original policy
+and path guards and Node APIs are reused. All runtime material remains external.
+Current-source and all-158-history-commit secret scans PASS; exact 179-file
+provenance, nine JSON parses, private-path/IP and added terminology checks PASS.
+Staged/outgoing scans, private publication and exact-SHA CI are pending. Phase 08 INCOMPLETE;
+Phase 09 NOT_STARTED; Mainnet DISABLED; no production actions.
+
+This is local lifecycle protection, not ongoing signer exclusivity, authenticated
+state, atomic concurrent-update fencing, power-loss proof or nonce restart safety.
+V1 RESERVED secret nonces still persist. Rechecks do not close hostile filesystem
+races; failed updates may leave temporary files outside source. Next: validate
+and publish this increment, then volatile nonce/uncertain-session restart safety
+and remaining durable service/reconciliation dependencies.
+
+## Previous Phase 08 coordinated nonce abort (verified source)
+
+Source `ab79614f3a39fc495a8e4a9deda9754289d60a75`, message
+`fix(phase-08): abort failed FROST sessions across both signers`, privately pushed;
+[all four exact-SHA CI jobs PASS](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34491098042).
+CI confirms 429 Node tests, 93 Rust tests and two vectors per platform, both SBF
+builds, the real deposit and all 55 checks. Current/staged/outgoing source and
+all 158 history commits scan clean; zero uploaded artifacts. This evidence belongs
+to that SHA, not newer source.
+
+LOCALLY_AND_CI_TESTED. Synchronous coordinator failures during commitments,
 share collection, envelope validation or aggregation now attempt cleanup on both
 A and B, even when a call may have saved state and then lost its response. Abort
 accepts the full immutable validated V1 signing request, not a bare session ID.
@@ -48,14 +97,14 @@ credits zero, no per-transfer team approval. Withdrawal E2E and full service
 restart remain NOT_RUN. The final fresh rerun after the counter-type fix passed
 the same 55 checks and both SBF builds. Current source and all 157 existing
 commits scanned clean; exact 179-file provenance, nine JSON parses and private
-path/IP/terminology checks PASS. Staged/outgoing scans, private publication and
-exact-SHA CI pending.
+path/IP/terminology checks PASS. Staged/outgoing/all-158-commit scans, private
+publication and exact-SHA CI passed as recorded above.
 
 Provenance remains 179 files; no additions/deletions/moves, dependency/toolchain/
 license changes or third-party/legacy implementation imports. Existing original
 request/policy helpers and pinned cryptographic APIs are reused. Mainnet DISABLED;
-no production actions. Phase 08 INCOMPLETE; Phase 09 NOT_STARTED. Next: complete
-private publication, then uncertain nonce restart and durable state/reconciliation/
+no production actions. Phase 08 INCOMPLETE; Phase 09 NOT_STARTED. Next: uncertain
+nonce restart and durable state/reconciliation/
 service dependencies.
 
 ## Previous Phase 08 complete signing-intent enrollment (verified source)

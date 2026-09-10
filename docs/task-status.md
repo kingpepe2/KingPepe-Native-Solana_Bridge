@@ -1,6 +1,34 @@
 # KingPepe Native - Solana Bridge Task Status
 
-## Current Phase 08 coordinated nonce abort (2026-09-10)
+## Current Phase 08 explicit signer-state lifecycle (2026-09-10)
+
+Implemented locally: explicit local-policy-gated exclusive creation of an empty
+role-bound envelope; missing/corrupt/foreign existing state stops ordinary load,
+save, signer reopen and signing. No automatic keys or repair. Fixed JSON/I/O
+errors omit paths/content. Fresh setup uses creation; signing reopens enrolled
+state. Initial focused 111 PASS / 11 FAIL, then 214 focused PASS. Windows/WSL each
+442 Node tests (13 new), two vectors PASS; WSL 93 Rust tests, fmt/clippy/audits PASS.
+Both SBF builds and the fresh real REGTEST/local-validator deposit PASS all 55
+checks; reserve/supply each 100000000 atomic and pending credits zero. No normal
+per-transfer team approval. Withdrawal E2E and full service restart remain NOT_RUN.
+Current/all-158-history scans, 179-file provenance, nine JSON parses and private
+path/IP/terminology checks PASS. Staged/outgoing scans/private push/exact-SHA CI pending.
+
+Provenance remains 179 files, no additions/deletions/moves, dependency/license
+changes or production actions. Phase 08 INCOMPLETE; Phase 09 NOT_STARTED;
+Mainnet DISABLED. Exclusive creation is not a running signer lease or atomic
+update fence; authentication, protected storage and nonce restart remain open.
+Next: finish validation/publication, then volatile nonce and restart safety.
+See [detailed evidence](development-status.md#current-phase-08-explicit-signer-state-lifecycle-2026-09-10).
+
+## Previous Phase 08 coordinated nonce abort (verified source)
+
+Source `ab79614f3a39fc495a8e4a9deda9754289d60a75`, message
+`fix(phase-08): abort failed FROST sessions across both signers`, privately pushed;
+[all four exact-SHA CI jobs PASS](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34491098042).
+CI confirms 429 Node tests, 93 Rust tests and two vectors per platform, both SBF
+builds, the real deposit and 55 checks. Current/staged/outgoing/all-158-history
+commit scans clean; zero artifacts. Evidence below belongs to that source.
 
 Implemented locally: bound abort requests/receipts, current-state/tombstone
 consistency, both-peer cleanup after coordinator failures, signed-share
@@ -13,15 +41,15 @@ tests, fmt/clippy/audits PASS. Both SBF builds and fresh real deposit PASS all
 55 checks. Reserve/supply each 100000000 atomic, pending credit zero, no
 per-transfer team approval; these include the final reruns after both fixes.
 Current source/all-157-commit scans, exact 179-file provenance, nine JSON parses
-and private-path/IP checks PASS. Staged/outgoing scans/private push/exact-SHA CI
-pending.
+and private-path/IP checks PASS. Staged/outgoing/all-158-commit scans, private push
+and exact-SHA CI passed as recorded above.
 
 Provenance remains 179 files, no additions/deletions/moves or dependency/license
 changes. Phase 08 INCOMPLETE; Phase 09 NOT_STARTED; Mainnet DISABLED. Instance
 refusal is not durable global fencing, protected storage, restart destruction of
-reserved nonces or rollback assurance. Next: finish these gates, then uncertain
+reserved nonces or rollback assurance. Next: uncertain
 nonce restart and authenticated/fenced state/service dependencies.
-See [detailed evidence](development-status.md#current-phase-08-coordinated-nonce-abort-2026-09-10).
+See [detailed evidence](development-status.md#previous-phase-08-coordinated-nonce-abort-verified-source).
 
 ## Previous Phase 08 complete signing-intent enrollment (verified source)
 

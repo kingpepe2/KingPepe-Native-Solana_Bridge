@@ -3,6 +3,17 @@
   "generatedAt": "2026-09-10T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
   "purpose": "file-by-file provenance classification for local tracked content",
+  "phase08StateLifecycleReview": {
+    "filesBefore": 179,
+    "filesAfter": 179,
+    "newFiles": [],
+    "filesDeleted": 0,
+    "filesMoved": 0,
+    "changes": "Original explicit local capability-gated exclusive signer-envelope creation, fail-closed existing-state load/save, redacted I/O and JSON errors, exact counter/record checks, reviewed fresh-vs-reopen integration and 13 regressions including two real child processes. Removed implicit missing-file initialization.",
+    "sourceImports": "None; existing original policy/path helpers and Node filesystem/process APIs reused. No upstream or legacy implementation copied.",
+    "dependencyChanges": "None; lockfiles, toolchains, licenses and third-party notices preserved.",
+    "scope": "Cooperative local state lifecycle only, not protected storage, atomic concurrent update fencing, ongoing signer exclusivity, nonce restart or rollback assurance. No production data created, moved or deleted."
+  },
   "phase08NonceAbortReview": {
     "filesBefore": 179,
     "filesAfter": 179,
@@ -613,17 +624,17 @@
     {
       "path": "native/frost/state/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "State-management structure notes."
+      "notes": "Local signer-state lifecycle, explicit capability-gated creation, fail-closed reopen and remaining authentication/fencing/restart limitations."
     },
     {
       "path": "native/frost/state/file-state-store.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 04 file-backed signer state boundary that rejects source-tree runtime state."
+      "notes": "Original external signer-state boundary with explicit local-policy-gated exclusive creation, existing-state-only load/save, redacted errors and exact envelope checks; not protected storage or nonce rollback assurance."
     },
     {
       "path": "native/frost/tests/frost_runtime_node.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 04 Node tests for real A+B FROST signatures and nonce safety; generated keys are temporary and outside the repository."
+      "notes": "Original real A+B FROST, policy/request/DKG/abort and local state lifecycle tests including competing setup processes; generated keys remain temporary outside source and are never printed. Full nonce restart/rollback assurance remains unproven."
     },
     {
       "path": "native/frost/tests/signing_runtime_tests.rs",

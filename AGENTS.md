@@ -25,10 +25,10 @@
 ## Current phase
 
 PHASE 08 INCOMPLETE. Phase 09 NOT_STARTED.
-Last verified source: 0a15c4228611a64bba5868a216ca25697eb80580, private push and
+Last verified source: ab79614f3a39fc495a8e4a9deda9754289d60a75, private push and
 all four exact-SHA CI jobs PASS:
-https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34487096912
-Its current/staged/outgoing source and all 157 commits scanned clean; zero
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34491098042
+Its current/staged/outgoing source and all 158 commits scanned clean; zero
 workflow artifacts were uploaded. That evidence does not certify newer source.
 
 Absorbing-stop source 2bdff8f1687085d63de8c628ae12a4f2efed163e was pushed
@@ -82,7 +82,7 @@ PASS; WSL 93 Rust tests and audits PASS. Real-chain/scans/publication are tracke
 in development-status. Enrollment is not evidence truth. Nonce state/protected
 storage/IPC remain incomplete.
 
-Current unpublished nonce-abort increment: synchronous coordinator failures
+The verified nonce-abort increment: synchronous coordinator failures
 attempt bound cleanup on both participants, including lost responses after a
 save. Full validated signing requests are required for abort; local session and
 tombstone consistency are checked without deserializing an active signing key.
@@ -99,6 +99,19 @@ WSL 93 Rust tests/audits, both SBF builds and 55 fresh real-chain checks PASS.
 Scans/publication are recorded in development-status. Reserved nonces still
 persist in local JSON; restart destruction, authenticated/fenced state, protected
 storage and authenticated IPC remain required work.
+
+Current unpublished state-lifecycle increment: only explicit createLocal with a
+genuine local policy creates an empty signer envelope, using exclusive creation.
+Ordinary load/save cannot initialize missing state or overwrite incompatible or
+corrupt state. I/O and JSON parse errors exclude private paths/content. Actual
+local setup sites use creation; transaction signers reopen the enrolled state.
+Initial focused 111 PASS / 11 FAIL; then 214 focused PASS. Windows/WSL each
+442 Node tests (13 new) and two vectors PASS; WSL 93 Rust tests/audits PASS.
+Real-chain validation and publication are recorded in development-status.
+Exclusive creation is not an ongoing signer lease, state authentication, atomic
+concurrent-update fencing or nonce restart safety. Existing V1 state is not
+migrated; reserved secret nonces still persist in local JSON. No production
+configuration, keys or services were created. Next: volatile nonce/restart safety.
 Node 24.21.0 / npm 11.19.0 / bundled SQLite 3.53.4 are required. The SQLite
 API remains release-candidate stability 1.2, not production approval.
 See docs/development-status.md for current measured tests and publication state.

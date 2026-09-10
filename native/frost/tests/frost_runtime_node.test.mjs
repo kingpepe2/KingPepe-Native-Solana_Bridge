@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { createHash } from "node:crypto";
+import { spawn } from "node:child_process";
+import { pathToFileURL } from "node:url";
 import { schnorr } from "@noble/curves/secp256k1.js";
 import {
   FROST_SIGNING_INTENT_PROTOCOL,
@@ -25,6 +27,7 @@ import {
 } from "../index.mjs";
 import { REGTEST_GENESIS } from "../../node/native-raw-evidence.mjs";
 import { validateNativeFrostDkgRequest } from "../policy/dkg-request.mjs";
+import { initialSignerState } from "../state/file-state-store.mjs";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
 
@@ -100,6 +103,190 @@ function makePolicy(auth, overrides = {}) {
     ...overrides,
   });
 }
+
+function stateStoreFixture(t) {
+  const root = withTempRoot();
+  t.after(() => {
+    assert.equal(path.dirname(root), path.resolve(os.tmpdir()));
+    assert(path.basename(root).startsWith("kingpepe-frost-phase04-"));
+    rmSync(root, { recursive: true, force: true });
+  });
+  const options = { signerId: REQUIRED_FROST_SIGNERS[0], root: path.join(root, "frost-a"), repoRoot: REPO_ROOT };
+  return { root, options, file: path.join(options.root, "frost-signer-state.json"), policy: makePolicy(baseAuthorization()) };
+}
+
+test("missing FROST state cannot be read or saved as a fresh signer", t => {
+  const { options, file } = stateStoreFixture(t);
+  const store = new FileBackedFrostStateStore(options);
+  assert.throws(() => store.load(), /FrostStateMissing/u);
+  assert.throws(() => store.save(initialSignerState(options.signerId)), /FrostStateMissing/u);
+  assert.equal(existsSync(file), false);
+  assert.deepEqual(readdirSync(options.root), []);
+});
+
+test("explicit local state creation requires a genuine local runtime policy before filesystem access", t => {
+  const { root, options, policy } = stateStoreFixture(t);
+  for (const unapproved of [undefined, null, {}, { ...policy }, { ...policy, environment: "mainnet" }]) {
+    assert.throws(() => FileBackedFrostStateStore.createLocal({ ...options, policy: unapproved }), /PolicySnapshotRequired/u);
+    assert.deepEqual(readdirSync(root), []);
+  }
+});
+
+test("explicit local state creation creates only an empty role-bound envelope and never overwrites", t => {
+  const { options, file, policy } = stateStoreFixture(t);
+  const store = FileBackedFrostStateStore.createLocal({ ...options, policy });
+  assert.deepEqual(store.load(), JSON.parse(JSON.stringify(initialSignerState(options.signerId))));
+  const original = readFileSync(file);
+  assert.throws(() => FileBackedFrostStateStore.createLocal({ ...options, policy }), /FrostStateAlreadyExists/u);
+  assert.equal(original.equals(readFileSync(file)), true, "Existing local state must remain unchanged");
+  assert.deepEqual(readdirSync(options.root), ["frost-signer-state.json"]);
+});
+
+test("explicit local DKG-only state creation does not grant transaction authorization", t => {
+  const { options } = stateStoreFixture(t);
+  const policy = createLocalNativeDkgPolicy(dkgContextFixture());
+  const store = FileBackedFrostStateStore.createLocal({ ...options, policy });
+  const signer = new NativeFrostSigner({ signerId: options.signerId, index: 0, policy, stateStore: store });
+  assert.throws(() => signer.signingCommitment(frostRequestFor(baseAuthorization())), /PolicySnapshotRequired/u);
+  assert.deepEqual(store.load().dkg, {});
+  assert.deepEqual(store.load().signing, {});
+});
+
+test("explicit creation rejects an unknown role before creating an external directory", t => {
+  const { root, options, policy } = stateStoreFixture(t);
+  for (const signerId of ["A", "B", "coordinator", undefined]) {
+    assert.throws(() => FileBackedFrostStateStore.createLocal({ ...options, policy, signerId }), /FrostStateRoleInvalid/u);
+    assert.deepEqual(readdirSync(root), []);
+  }
+});
+
+test("explicit creation keeps the actual checkout boundary even with a genuine local policy", t => {
+  const { options, policy } = stateStoreFixture(t);
+  assert.throws(() => FileBackedFrostStateStore.createLocal({ ...options, policy, root: REPO_ROOT }), /InsideRepositoryRejected/u);
+});
+
+test("state creation rejects accessors without evaluating them or creating a directory", t => {
+  const { root, options, policy } = stateStoreFixture(t);
+  let reads = 0;
+  Object.defineProperty(options, "policy", { enumerable: true, get() { reads += 1; return policy; } });
+  assert.throws(() => FileBackedFrostStateStore.createLocal(options), /PlainDataRequired/u);
+  assert.equal(reads, 0);
+  assert.deepEqual(readdirSync(root), []);
+});
+
+test("missing enrolled signer file stops reopen and signing without replacing test keys", () => {
+  const runtime = createRuntime();
+  try {
+    const options = { signerId: REQUIRED_FROST_SIGNERS[0], root: path.join(runtime.root, "frost-a"), repoRoot: REPO_ROOT };
+    const store = new FileBackedFrostStateStore(options);
+    const saved = store.load();
+    const file = path.join(options.root, "frost-signer-state.json");
+    const retained = path.join(options.root, "retained-test-state.json");
+    renameSync(file, retained); // Preserve the isolated test material until fixture cleanup.
+    const before = readFileSync(retained);
+    assert.throws(() => store.load(), /FrostStateMissing/u);
+    assert.throws(() => store.save(saved), /FrostStateMissing/u);
+    assert.throws(() => new NativeFrostSigner({ signerId: options.signerId, index: 0, policy: runtime.policy,
+      stateStore: new FileBackedFrostStateStore(options) }), /FrostStateMissing/u);
+    assert.throws(() => runtime.signerA.dkgRound1(runtime.epoch.request), /FrostStateMissing/u);
+    assert.throws(() => runtime.signerA.signingCommitment(frostRequestFor(runtime.auth)), /FrostStateMissing/u);
+    assert.equal(existsSync(file), false);
+    assert.equal(before.equals(readFileSync(retained)), true, "Retained test material must be unchanged");
+    assert.deepEqual(readdirSync(options.root), ["retained-test-state.json"]);
+  } finally { runtime.cleanup(); }
+});
+
+test("corrupt signer JSON is redacted and cannot be replaced through an ordinary save", t => {
+  const { options, file, policy } = stateStoreFixture(t);
+  const store = FileBackedFrostStateStore.createLocal({ ...options, policy });
+  const stale = store.load();
+  const marker = "SYNTHETIC_PRIVATE_CONTENT_MUST_NOT_APPEAR";
+  writeFileSync(file, `{${marker}`, { flag: "w" }); // Synthetic malformed content, never an operational secret.
+  for (const action of [() => store.load(), () => store.save(stale)]) {
+    assert.throws(action, error => error.message === "FrostStateInvalidJson" && !error.stack.includes(marker) &&
+      !error.stack.includes(options.root) && error.cause === undefined);
+  }
+  assert.equal(readFileSync(file, "utf8") === `{${marker}`, true);
+  assert.deepEqual(readdirSync(options.root), ["frost-signer-state.json"]);
+});
+
+test("ordinary save cannot overwrite an incompatible or wrong-role existing state", t => {
+  const { options, file, policy } = stateStoreFixture(t);
+  const store = FileBackedFrostStateStore.createLocal({ ...options, policy });
+  const stale = store.load();
+  for (const changes of [{ format: "unsupported-format" }, { signerId: REQUIRED_FROST_SIGNERS[1] }]) {
+    const raw = JSON.stringify({ ...stale, ...changes });
+    writeFileSync(file, raw);
+    assert.throws(() => store.load(), /state format|state role mismatch/u);
+    assert.throws(() => store.save(stale), /state format|state role mismatch/u);
+    assert.equal(readFileSync(file, "utf8") === raw, true);
+  }
+});
+
+test("FROST state envelope rejects coerced counters and array records before saving", t => {
+  const { options, file, policy } = stateStoreFixture(t);
+  const store = FileBackedFrostStateStore.createLocal({ ...options, policy });
+  const original = readFileSync(file);
+  for (const changes of [{ nonceReservationCounter: 0 }, { nonceReservationCounter: "18446744073709551616" },
+    { dkg: [] }, { signing: [] }, { nonceTombstones: [] }]) {
+    assert.throws(() => store.save({ ...store.load(), ...changes }), /invalid FROST/u);
+    assert.equal(original.equals(readFileSync(file)), true);
+  }
+});
+
+test("two local setup processes cannot both create the same signer envelope", async t => {
+  const { options, file } = stateStoreFixture(t);
+  const storeModule = pathToFileURL(path.join(REPO_ROOT, "native/frost/state/file-state-store.mjs")).href;
+  const policyModule = pathToFileURL(path.join(REPO_ROOT, "native/frost/policy/native-signing-policy.mjs")).href;
+  // No signing material is generated. Only synthetic policy and temporary paths
+  // travel through stdin, and child output is restricted to these fixed markers.
+  const code = `import { FileBackedFrostStateStore } from ${JSON.stringify(storeModule)};
+    import { createLocalNativeDkgPolicy } from ${JSON.stringify(policyModule)};
+    let raw = ''; for await (const chunk of process.stdin) raw += chunk;
+    try { const input = JSON.parse(raw);
+      FileBackedFrostStateStore.createLocal({ ...input.options, policy: createLocalNativeDkgPolicy(input.context) });
+      process.stdout.write('CREATED');
+    } catch (error) { if (error.message === 'FrostStateAlreadyExists') process.stdout.write('EXISTS');
+      else process.exitCode = 1; }`;
+  const create = () => new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ["--input-type=module", "-e", code], { windowsHide: true,
+      stdio: ["pipe", "pipe", "pipe"], timeout: 20_000 });
+    let output = "";
+    let diagnosticBytes = 0;
+    child.stdout.on("data", chunk => { output += chunk; });
+    child.stderr.on("data", chunk => { diagnosticBytes += chunk.length; });
+    child.on("error", () => reject(new Error("LocalStateCreationChildStartFailed")));
+    child.on("close", exitCode => {
+      if (exitCode !== 0 || diagnosticBytes !== 0 || !["CREATED", "EXISTS"].includes(output)) {
+        reject(new Error("LocalStateCreationChildFailed"));
+      } else resolve(output);
+    });
+    child.stdin.on("error", () => reject(new Error("LocalStateCreationChildInputFailed")));
+    child.stdin.end(JSON.stringify({ options, context: dkgContextFixture() }));
+  });
+  assert.deepEqual((await Promise.all([create(), create()])).sort(), ["CREATED", "EXISTS"]);
+  assert.equal(existsSync(file), true);
+  assert.deepEqual(new FileBackedFrostStateStore(options).load().dkg, {});
+  assert.deepEqual(readdirSync(options.root), ["frost-signer-state.json"]);
+});
+
+test("reopening enrolled signer state preserves its key and exact pending signing session", () => {
+  const runtime = createRuntime();
+  try {
+    const request = frostRequestFor(runtime.auth);
+    const a = runtime.signerA.signingCommitment(request);
+    const options = { signerId: REQUIRED_FROST_SIGNERS[0], root: path.join(runtime.root, "frost-a"), repoRoot: REPO_ROOT };
+    const file = path.join(options.root, "frost-signer-state.json");
+    const before = readFileSync(file);
+    assert.throws(() => FileBackedFrostStateStore.createLocal({ ...options, policy: runtime.policy }), /FrostStateAlreadyExists/u);
+    const reopened = new FileBackedFrostStateStore(options);
+    assert.equal(reopened.load().activeEpoch, 1);
+    assert.equal(reopened.load().signing[request.sessionId].state, "RESERVED");
+    assert.equal(before.equals(readFileSync(file)), true, "Reopen must not modify operational state");
+    assert.deepEqual(runtime.signerA.signingCommitment(request), a);
+    assert.equal(runtime.coordinator.signAutomatically(request.intent).state, "SIGNED");
+  } finally { runtime.cleanup(); }
+});
 
 for (const [field, value] of [["purpose", "RESERVE_MIGRATION"], ["proofFingerprint", h("substituted-proof")],
   ["unsignedNativeTransactionId", h("substituted-unsigned-tx")]]) {
@@ -686,12 +873,14 @@ function createRuntime(evidenceValidators = {}, policyOverride) {
   const root = withTempRoot();
   const auth = baseAuthorization();
   const policy = policyOverride ?? makePolicy(auth);
-  const storeA = new FileBackedFrostStateStore({
+  const storeA = FileBackedFrostStateStore.createLocal({
+    policy,
     signerId: REQUIRED_FROST_SIGNERS[0],
     root: path.join(root, "frost-a"),
     repoRoot: REPO_ROOT,
   });
-  const storeB = new FileBackedFrostStateStore({
+  const storeB = FileBackedFrostStateStore.createLocal({
+    policy,
     signerId: REQUIRED_FROST_SIGNERS[1],
     root: path.join(root, "frost-b"),
     repoRoot: REPO_ROOT,

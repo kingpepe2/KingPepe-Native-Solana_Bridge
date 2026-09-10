@@ -198,7 +198,8 @@ function createFrostRuntime(config, operation) {
     signerId: REQUIRED_FROST_SIGNERS[0],
     index: 0,
     policy,
-    stateStore: new FileBackedFrostStateStore({
+    stateStore: FileBackedFrostStateStore.createLocal({
+      policy,
       signerId: REQUIRED_FROST_SIGNERS[0],
       root: path.join(root, "frost-a"),
       repoRoot: REPO_ROOT,
@@ -208,7 +209,8 @@ function createFrostRuntime(config, operation) {
     signerId: REQUIRED_FROST_SIGNERS[1],
     index: 1,
     policy,
-    stateStore: new FileBackedFrostStateStore({
+    stateStore: FileBackedFrostStateStore.createLocal({
+      policy,
       signerId: REQUIRED_FROST_SIGNERS[1],
       root: path.join(root, "frost-b"),
       repoRoot: REPO_ROOT,

@@ -1962,7 +1962,8 @@ export async function createLocalFrostTaprootCustodyContext({ plan, flowConfig }
     signerId: REQUIRED_FROST_SIGNERS[0],
     index: 0,
     policy: dkgPolicy,
-    stateStore: new FileBackedFrostStateStore({
+    stateStore: FileBackedFrostStateStore.createLocal({
+      policy: dkgPolicy,
       signerId: REQUIRED_FROST_SIGNERS[0],
       root: path.join(frostRoot, "frost-a"),
       repoRoot,
@@ -1972,7 +1973,8 @@ export async function createLocalFrostTaprootCustodyContext({ plan, flowConfig }
     signerId: REQUIRED_FROST_SIGNERS[1],
     index: 1,
     policy: dkgPolicy,
-    stateStore: new FileBackedFrostStateStore({
+    stateStore: FileBackedFrostStateStore.createLocal({
+      policy: dkgPolicy,
       signerId: REQUIRED_FROST_SIGNERS[1],
       root: path.join(frostRoot, "frost-b"),
       repoRoot,
