@@ -89,6 +89,30 @@ on restart remains open. Disk-full/response-loss tests inject failures around
 real external file writes, not physical power failures or a filled production
 volume. No production signing or services are authorized by these tests.
 
+## Local state creation and reopen boundary
+
+Fresh local setup explicitly calls `FileBackedFrostStateStore.createLocal` with a
+genuine immutable localnet/REGTEST policy. The capability is checked before any
+filesystem operation. Only exact A/B roles are accepted. Exclusive file creation
+prevents competing setup processes from overwriting the same initial envelope;
+it does not lease the running signer. DKG-only setup does not acquire transaction
+authorization. Signing coordinators reopen the already enrolled state.
+
+Ordinary load/save reject missing, malformed, incompatible or wrong-role state;
+neither creates replacement keys nor repairs the file. Saves check both the new
+envelope and the current file before committing. Nonce counters are canonical
+u64 strings, not coerced Numbers; dictionary fields cannot be arrays. Fixed I/O
+and JSON parse errors omit underlying paths/content. Existing checkout, link and
+file-type checks still apply. Thirteen added regressions include two real setup
+processes, loss of an enrolled file and preserving the original signing session.
+
+No V1 data is migrated or deleted. Reserved secret nonces still persist, so this
+does NOT complete uncertain nonce restart recovery. Rechecks around rename are
+not atomic compare-and-swap or protection from a hostile filesystem race; failed
+updates may retain external temporary state. No authenticated monotonic anchor,
+protected share storage, power-loss proof or ongoing signer exclusivity is
+claimed. These remain separate work and prevent production readiness.
+
 ## Signing-request boundary
 
 The current shared V1 builder and validator snapshot plain data and bind request

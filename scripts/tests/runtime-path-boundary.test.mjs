@@ -8,6 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { FileBackedFrostStateStore, initialSignerState } from "../../native/frost/state/file-state-store.mjs";
+import { REQUIRED_FROST_SIGNERS } from "../../native/frost/policy/native-signing-policy.mjs";
 import { readAuthorizationHeaderFromCookieFile } from "../../native/node/native-rpc-client.mjs";
 import { FileBackedDepositJournal } from "../../services/bridge-validator/automatic-deposit-pipeline.mjs";
 import { FileBackedNativeReserveSweepJournal } from "../../services/bridge-validator/native-reserve-sweep-adapters.mjs";
@@ -20,7 +21,7 @@ const SOURCE_ROOT = path.resolve(import.meta.dirname, "../..");
 const OPERATION_ID = "01".repeat(32); // Public parser fixture, not a signing identity.
 const STORE_TYPES = [
   {
-    name: "FROST", open: options => new FileBackedFrostStateStore({ ...options, signerId: "A" }),
+    name: "FROST", open: options => new FileBackedFrostStateStore({ ...options, signerId: REQUIRED_FROST_SIGNERS[0] }),
     read: store => store.load(), filename: "frost-signer-state.json",
   },
   ...[
@@ -163,14 +164,14 @@ for (const spec of STORE_TYPES) {
     assert.deepEqual(readdirSync(repo), []);
   });
 
-  test(`${spec.name} store can open isolated external state and read an empty journal`, t => {
+  test(`${spec.name} store distinguishes absent external signer state from an empty operation journal`, t => {
     const { root, repo } = fixture(t);
     const state = path.join(root, "state");
     const store = spec.open({ root: state, repoRoot: repo });
     if (spec.name === "FROST") {
-      assert.deepEqual(spec.read(store), initialSignerState("A"));
-      store.save(initialSignerState("A")); // Empty envelope; no keys or nonces generated.
-      assert.equal(spec.read(spec.open({ root: state, repoRoot: repo })).nonceReservationCounter, "0");
+      assert.throws(() => spec.read(store), /FrostStateMissing/u);
+      assert.throws(() => store.save(initialSignerState(REQUIRED_FROST_SIGNERS[0])), /FrostStateMissing/u);
+      assert.deepEqual(readdirSync(state), []);
     } else {
       assert.equal(spec.read(store), undefined);
     }
@@ -183,7 +184,7 @@ for (const spec of STORE_TYPES) {
     const store = spec.open({ root: state, repoRoot: repo });
     rmdirSync(state); // Fresh, empty test directory only.
     assert.throws(() => spec.read(store), /ParentDirectoryMissing/u);
-    if (spec.name === "FROST") assert.throws(() => store.save(initialSignerState("A")), /ParentDirectoryMissing/u);
+    if (spec.name === "FROST") assert.throws(() => store.save(initialSignerState(REQUIRED_FROST_SIGNERS[0])), /ParentDirectoryMissing/u);
     assert(!existsSync(state));
   });
 
@@ -194,7 +195,7 @@ for (const spec of STORE_TYPES) {
     rmdirSync(state);
     linkDirectory(repo, state);
     assert.throws(() => spec.read(store), /InsideRepositoryRejected/u);
-    if (spec.name === "FROST") assert.throws(() => store.save(initialSignerState("A")), /InsideRepositoryRejected/u);
+    if (spec.name === "FROST") assert.throws(() => store.save(initialSignerState(REQUIRED_FROST_SIGNERS[0])), /InsideRepositoryRejected/u);
     assert.deepEqual(readdirSync(repo), []);
   });
 
@@ -206,7 +207,7 @@ for (const spec of STORE_TYPES) {
     writeFileSync(marker, "public marker, deliberately not JSON", { flag: "wx" });
     linkSync(marker, path.join(state, spec.filename));
     assert.throws(() => spec.read(store), /LinkedOrNonRegularFileRejected/u);
-    if (spec.name === "FROST") assert.throws(() => store.save(initialSignerState("A")), /LinkedOrNonRegularFileRejected/u);
+    if (spec.name === "FROST") assert.throws(() => store.save(initialSignerState(REQUIRED_FROST_SIGNERS[0])), /LinkedOrNonRegularFileRejected/u);
     assert.equal(readFileSync(marker, "utf8"), "public marker, deliberately not JSON");
   });
 
