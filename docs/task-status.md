@@ -1,12 +1,32 @@
 # KingPepe Native - Solana Bridge Task Status
 
+Raw-evidence increment `ef15e6e648935044edbb4b09874119bc6c823fc7`, message
+`fix(phase-08): validate raw Native evidence before signing and attesting`, pushed
+to PRIVATE origin/main; four CI jobs PASS:
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34442633781.
+The tested source passed the real deposit and 17 security checks.
+Recovery-script construction, BIP342 sighashes, mixed witness attachment and
+unsigned offline preparation now pass local validation; commit/private push/
+exact-SHA CI are pending for this increment. Eight new unit tests and six actual
+Native-node CSV recovery checks pass. Full rerun: 152 Node tests + two vectors
+on Windows and WSL; 58 Solana Rust + 26 Native Rust tests, fmt/clippy and two SBF
+builds in WSL; automatic deposit + 17 security checks pass, reserve/supply each
+100000000 atomic. An initial CLI null-result parsing failure was corrected using
+the bounded JSON-RPC UTXO adapter and a fresh complete run passed. The known
+unmaintained bincode warning remains reported; all five Rust audits and npm audit
+find zero vulnerabilities. Declared dependency licenses pass. Current source and
+143 existing commits scan clean; staged/outgoing scans must precede publication.
+Provenance: 160 -> 164 files, four original code/test additions, none deleted/moved.
+No normal-flow recovery, FROST script-path sweep, race/reorg or PSBT integration
+is claimed yet. Continue Phase 08; do not advance Phase 09.
+
 Latest verified Phase 08 increment `33b622638617258660019302b6db8d8868e7093f`,
 `fix(phase-08): bind attestations to configured native domain`, pushed to PRIVATE
 origin/main; four CI jobs PASS:
 https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34440113182.
 It executed the real deposit and six security checks.
 
-Current raw-evidence increment: required bounded Rust raw-header/Merkle validation
+Completed raw-evidence increment: required bounded Rust raw-header/Merkle validation
 before each FROST participant and attester authorization, independently recomputed
 Native transaction/sighash policy, finalized sweep/UTXO checks, digest-bound claims,
 bounded RPC streams, and negative tests. Latest full local validation: 144 Node
@@ -14,11 +34,11 @@ tests + two vectors on Windows and WSL; 58 Solana Rust + 26 Native Rust tests in
 WSL; two SBF builds, real automatic deposit and 17 real security checks PASS.
 Current source and 142 existing commits passed secret scanning; 160 provenance
 entries cover the new tree. Dependencies unchanged; audits retain the reported
-unmaintained bincode warning. Its commit/push/exact-SHA CI are pending in this
-snapshot. No production data or identities were provisioned or published.
+unmaintained bincode warning. Its commit/push/exact-SHA CI are recorded above.
+No production data or identities were provisioned or published.
 
-Next: verify this increment's CI, then resolve temporary user-recovery scripts,
-recovery races, remaining account/source checks and real failure/restart tests.
+Next: publish and verify the recovery-script increment, integrate the recoverable
+deposit/sweep path, then add races, account/source and real failure/restart tests.
 Same-process local signer objects are not deployed isolated services; shared
 validating-node UTXO observations are not independent cryptographic UTXO proofs.
 Phase 08 remains incomplete; Phase 09 is NOT_STARTED; Mainnet is DISABLED.

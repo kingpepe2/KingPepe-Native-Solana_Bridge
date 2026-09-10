@@ -15,11 +15,14 @@
   },
   "evidenceScope": "Current local integration increment; its CI result must be checked at the exact source SHA. Earlier per-component CI booleans were historical, not proof of this tree.",
   "previousVerifiedSource": {
-    "sha": "33b622638617258660019302b6db8d8868e7093f",
-    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34440113182",
+    "sha": "ef15e6e648935044edbb4b09874119bc6c823fc7",
+    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34442633781",
     "status": "PASS"
   },
   "sourceState": {
+    "recoveryScriptIncrement": "LOCAL_UNIT_AND_REAL_NODE_TESTS_PASS_AWAITING_EXACT_SHA_CI",
+    "recoverableDepositIntegration": "NOT_INTEGRATED_IN_NORMAL_FLOW",
+    "recoveryPsbtWalletIntegration": "NOT_IMPLEMENTED",
     "provenance": "FILE_BY_FILE_REVIEWED",
     "repositoryPrivacy": "VERIFIED_PRIVATE",
     "canonicalMessages": "IMPLEMENTED_AND_TESTED_LOCALLY",
@@ -43,13 +46,13 @@
   },
   "localValidation": {
     "windows": {
-      "nodeTestsPass": 144,
+      "nodeTestsPass": 152,
       "protocolVectorsPass": 2,
       "nativeSbf": "NOT_RUN_NOT_SUPPORTED",
       "serviceAclProtectedStorage": "NOT_RUN"
     },
     "wsl": {
-      "nodeTestsPass": 144,
+      "nodeTestsPass": 152,
       "protocolVectorsPass": 2,
       "solanaRustTestsPass": 58,
       "nativeRustTestsPass": 26,
@@ -60,6 +63,8 @@
       "rawNativeSecurityChecksPass": 10,
       "signerAttesterRawEvidenceCoverageChecksPass": 1,
       "combinedRealSecurityChecksPass": 17,
+      "nativeCsvRecoveryChecksPass": 6,
+      "nativeCsvRecoveryChecksFail": 0,
       "rawInputHeaders": 33,
       "rawReserveHeaders": 39,
       "duplicateBacking": "NEW_NONCE_VALID_ATTESTATIONS_PREFLIGHT_REJECTED_SUPPLY_UNCHANGED",
@@ -89,7 +94,7 @@
     "externalReview": "NOT_RUN"
   },
   "phase08Remaining": [
-    "Review actual temporary-deposit recovery script and sweep/recovery race coverage",
+    "Integrate tested recovery script into the automatic deposit flow, verify real FROST BIP342 sweep acceptance, and test sweep/recovery races and reorgs",
     "Configure production Native evidence sources; current raw-header/Merkle integration is REGTEST-only with explicit local-node UTXO trust",
     "Review remaining account and source-validation dependencies",
     "Exercise real-daemon failure/restart/reorg/replay cases beyond model tests"

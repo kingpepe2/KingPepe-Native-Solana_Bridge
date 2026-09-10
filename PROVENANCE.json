@@ -30,6 +30,16 @@
     "cleanup": "Removed unused RPC-object-only deposit fingerprint helper after repository-wide usage review; retained independently implemented Rust and JavaScript transaction parsers.",
     "terminologyReview": "New and changed original implementation contains no KingPepe project-role use of the prohibited terminology; protocol and third-party terms remain unchanged."
   },
+  "phase08RecoveryScriptReview": {
+    "filesBefore": 160,
+    "filesAfter": 164,
+    "filesDeleted": 0,
+    "filesMoved": 0,
+    "newFiles": ["native/node/native-tapscript.mjs", "native/recovery/taproot-deposit.mjs", "native/node/tests/native-tapscript.test.mjs", "solana/tests/local-native-recovery.mjs"],
+    "sourceImports": "Original bounded implementation against BIP341/BIP342/BIP112 standard facts and the pinned Native interpreter; no upstream implementation copied. Existing third-party vector and dependency notices retained.",
+    "dependencyChanges": "None; uses the existing pinned curve dependency and Node standard library.",
+    "terminologyReview": "No new project-role terminology requiring replacement; existing Solana protocol and third-party terms preserved."
+  },
   "provenancePolicy": {
     "originalCodeLicense": "Proprietary (Copyright (c) 2026 KingPepe Team)",
     "provenanceClassifications": [
@@ -42,6 +52,26 @@
     ]
   },
   "trackedFiles": [
+    {
+      "path": "native/node/native-tapscript.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original bounded public Taproot tree/control-block implementation against BIP341 standard facts using the pinned curve dependency; no upstream implementation copied. Public NUMS point is not an operational wallet identity."
+    },
+    {
+      "path": "native/recovery/taproot-deposit.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original REGTEST deposit-intent encoding, two-branch CSV recovery script policy and unsigned offline transaction preparation; no secret generation or broadcast."
+    },
+    {
+      "path": "native/node/tests/native-tapscript.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original construction/encoding/sighash tests with public generator-point fixtures and explicit invalid witness bytes; not operational keys or successful node-spend claims."
+    },
+    {
+      "path": "solana/tests/local-native-recovery.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Real isolated Native regtest CSV script tests. Simulated user secret exists only in ephemeral process memory and is cleared; never returned, persisted, passed in command arguments or logged."
+    },
     {
       "path": "native/proof/src/evidence.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",

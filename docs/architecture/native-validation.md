@@ -60,9 +60,11 @@ validation, independent fork-choice proof or UTXO proof. Canonical-chain selecti
 and unspent state retain `CONFIGURED_LOCAL_VALIDATING_NODE_RPC_OBSERVATION`
 trust. A/B use the same host and Native node, not physically independent sources.
 The CLI is REGTEST-only and bounded to short local chains; production evidence
-sources and resource policy remain unconfigured. The local temporary P2TR
-deposit still has no implemented user CSV recovery path. Recovery races,
-production storage/fencing and complete failure testing remain Phase 08 gaps.
+sources and resource policy remain unconfigured. A separate REGTEST user CSV
+script now passes actual node tests, but the normal deposit flow still uses its
+non-recoverable test intent. See [recovery construction and scope](../../native/recovery/README.md).
+Full deposit/sweep integration, recovery races, production storage/fencing and
+complete failure testing remain Phase 08 gaps.
 
 ## Phase 06 primitives
 

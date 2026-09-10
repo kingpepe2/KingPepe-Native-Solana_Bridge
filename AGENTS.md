@@ -26,10 +26,14 @@
 ## Current phase and evidence
 
 PHASE 08: real local Native-to-Solana happy-path integration is now exercised.
-Domain-binding commit 33b622638617258660019302b6db8d8868e7093f was pushed to
-PRIVATE origin/main and passed all four jobs, including six real security checks:
-https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34440113182
-The current raw Native evidence integration needs its own exact-SHA CI.
+Raw-evidence commit ef15e6e648935044edbb4b09874119bc6c823fc7 was pushed to
+PRIVATE origin/main and passed all four jobs, including 17 real security checks:
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34442633781
+The current recovery-script increment is locally tested, awaiting its own
+commit/push/exact-SHA CI. It adds bounded two-leaf construction, BIP342 sighashes,
+witness attachment and unsigned offline preparation. Six real-node recovery
+checks pass, as do all 17 existing security checks and the automatic deposit.
+The normal deposit flow still uses its existing non-recoverable local test intent.
 
 A pinned Native REGTEST node accepted real FROST A+B Taproot sweep signatures;
 the Agave local validator verified two Ed25519 attestations, created a receipt,
@@ -84,7 +88,9 @@ Safe checks:
   only with the pinned isolated REGTEST/local-validator tools and an external,
   fresh KINGPEPE_LOCAL_E2E_ROOT. Generated SBF keypairs also stay external.
 - node solana/tests/local-deposit-security.mjs uses the same isolated tools/root
-  and runs the real deposit plus 17 raw Native/local-validator security checks.
+  and runs the real deposit plus 17 raw Native/local-validator security checks
+  and six real Native CSV recovery checks. Full recovery/sweep integration and
+  PSBT wallet integration are not yet implemented.
 - CI runs cargo-audit against all five lockfiles without ignored advisories.
   bincode 1.3.3 has a retained, reported unmaintained warning, not a clean bill
   of health or production approval.

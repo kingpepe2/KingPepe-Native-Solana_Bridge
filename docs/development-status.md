@@ -2,11 +2,43 @@
 
 ## Current Phase 08 integration evidence (2026-09-10)
 
+Latest verified source: `ef15e6e648935044edbb4b09874119bc6c823fc7`, message
+`fix(phase-08): validate raw Native evidence before signing and attesting`, pushed
+to PRIVATE origin/main. All four [CI jobs passed](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34442633781),
+including the real deposit and all 17 Native/Solana security checks.
+Current recovery-script increment is LOCALLY_TESTED, awaiting its own commit,
+private push and exact-SHA CI. Eight new construction/encoding/sighash/unsigned
+preparation tests pass. A fresh isolated REGTEST + local-validator run passed
+the automatic deposit, all 17 existing security checks, and six real CSV recovery
+checks: immature and one-block-early rejection, wrong sighash amount rejection,
+CSV-disable bypass rejection, mature recovery and replay rejection. Reserve and
+SPL supply both equal 100000000 atomic units. The recovery checks use separate
+test funds and a simulated user key, not FROST for the user-recovery branch.
+
+Windows and WSL each pass 152 Node tests plus two vectors; WSL passes 58 Solana
+Rust and 26 Native Rust tests, fmt and clippy. Both SBF programs build. No final
+suite failures or skips. An initial real-node attempt failed while parsing the
+CLI's empty output for a null UTXO result; the bounded JSON-RPC adapter now checks
+the explicit unspent=false observation, and the complete fresh rerun passes.
+The earlier unit offset assertion was also corrected and fully rerun. No failing
+gate was weakened. npm audit and all five Rust audits find zero vulnerabilities;
+the reported unmaintained bincode warning remains. Declared license checks pass.
+The source and all 143 existing commits scan without secrets. Staged and outgoing
+scans remain mandatory before publication. Provenance covers 164 files, up from
+160: four original code/test files, no deletions, moves or new dependencies.
+
+This does not integrate recoverable deposits into the normal bridge flow, verify
+the FROST BIP342 sweep branch, provide PSBT wallet integration, or prove sweep/
+recovery races and reorganizations. Those remain Phase 08 work. Earlier CI is
+not evidence for this newer tree. See [recovery scope](../native/recovery/README.md).
+
+The following raw-evidence and earlier increment counts are historical.
+
 Domain-binding commit `33b622638617258660019302b6db8d8868e7093f`, message
 `fix(phase-08): bind attestations to configured native domain`, pushed to PRIVATE
 origin/main; all four [CI jobs passed](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34440113182),
-including six real-validator security checks. This is the latest verified SHA;
-the current raw-evidence increment below awaits its own commit/push/exact-SHA CI.
+including six real-validator security checks. The subsequent raw-evidence
+increment and exact-SHA CI are recorded above.
 
 Current increment: the REGTEST deposit harness invokes a bounded locked Rust
 executable to check raw genesis-to-tip headers, PoW/difficulty/chainwork, header
@@ -63,7 +95,7 @@ Previous source `cb7b44544f8c3935ddc8065eee5d67ee220afee2`, message
 `fix(phase-08): isolate pinned SBF builds and validate real native sweep`,
 was pushed to PRIVATE origin/main and passed all four
 [CI jobs](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34432312954).
-The newer raw-evidence increment above awaits its own commit/push/CI in this snapshot.
+The newer raw-evidence increment and its exact-SHA CI are recorded above.
 CI emits the tested GITHUB_SHA; no self-referential commit SHA is embedded.
 
 - Bounded same-signature setup/receipt/claim finality waiting is implemented.
@@ -119,18 +151,18 @@ CI emits the tested GITHUB_SHA; no self-referential commit SHA is embedded.
 - Stale AGENTS/readiness summaries were consolidated; historical evidence below
   is not proof of this newer source.
 
-Measured tests: 144 Node tests + two vectors on Windows and WSL; 58 Solana Rust
-tests + 26 Native proof/supporting-crate tests in WSL. Formatting/clippy passed.
-Zero failures/skips in these measured suites; two SBF builds and real deposit
-E2E plus 17 real Native/local-validator security checks passed. Native Windows SBF,
+Measured current tests: 152 Node tests + two vectors on Windows and WSL; 58 Solana
+Rust tests + 26 Native proof/supporting-crate tests in WSL. Formatting/clippy pass.
+Zero failures/skips in these final measured suites; two SBF builds and real deposit
+E2E plus 17 security checks and six Native recovery checks pass. Native Windows SBF,
 Windows service ACL/protected storage, full
 failure matrix, withdrawal E2E, Devnet and fresh-clone reproducibility: NOT_RUN.
 
-Phase 08 is still incomplete. Next: exact-SHA CI, then temporary-deposit
-recovery/race coverage, remaining account/source validation, production Native
-evidence sources and real-daemon failure/replay/restart tests. The local deposit uses an
-isolated FROST-controlled P2TR test intent; this run does not prove user CSV
-recovery. File-journal tests do not prove production fsync, authenticated
+Phase 08 is still incomplete. Next: publish/verify this increment, then integrate
+the tested recovery script into normal deposits and verify the FROST script-path
+sweep; add race, reorg and remaining source/failure/restart tests. The normal local
+deposit still uses the isolated non-recoverable FROST P2TR intent. File-journal
+tests do not prove production fsync, authenticated
 storage, fencing or rollback guarantees. Production observers remain BLOCKED.
 Phase 09 has not started; productionReady=false; Mainnet activation DISABLED.
 

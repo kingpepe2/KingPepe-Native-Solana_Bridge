@@ -28,9 +28,20 @@
     "phase06Use": "KingPepe Native genesis, decimals, PoW, difficulty, chainwork, activation, address, transaction, and header format facts",
     "phase08Use": "KingPepe REGTEST 8-decimal atomic units, coinbase maturity 20, Taproot activation, Bech32 HRP rkpepe, median-time-past 11 and two-hour future-header bound for isolated FROST deposits and raw header/Merkle verification",
     "phase08HeaderTimeSources": ["src/chain.h: MAX_FUTURE_BLOCK_TIME and GetMedianTimePast", "src/validation.cpp: ContextualCheckBlockHeader"],
+    "phase08RecoverySources": ["src/kernel/chainparams.cpp: REGTEST CSVHeight=1 and Taproot ALWAYS_ACTIVE", "src/script/interpreter.cpp: CHECKSEQUENCEVERIFY", "src/bitcoin-cli.cpp: ParseResult suppresses null output"],
     "status": "reference-facts-only-no-git-history-import"
   },
   "standardsReferences": [
+    {
+      "project": "BIP-342",
+      "url": "https://github.com/bitcoin/bips/blob/master/bip-0342.mediawiki",
+      "use": "Reference-only tapscript default sighash extension: leaf hash, key version and no-code-separator position. No upstream implementation copied."
+    },
+    {
+      "project": "BIP-112",
+      "url": "https://github.com/bitcoin/bips/blob/master/bip-0112.mediawiki",
+      "use": "Reference-only CSV script semantics, checked against pinned Native interpreter and regtest activation rules; not Bitcoin activation parameters."
+    },
     {
       "project": "BIP-173",
       "url": "https://github.com/bitcoin/bips/blob/master/bip-0173.mediawiki",
@@ -44,7 +55,7 @@
     {
       "project": "BIP-341",
       "url": "https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki",
-      "use": "Reference-only Taproot P2TR scriptPubKey shape, key-path SIGHASH_DEFAULT message construction, tagged TapSighash hashing, key-path witness shape, and selected public wallet vector verification."
+      "use": "Reference-only Taproot P2TR outputs, TapLeaf/TapBranch/control blocks and public NUMS construction, SIGHASH_DEFAULT hashing, witness encoding, and selected public wallet vector verification."
     }
   ],
   "comparison": {

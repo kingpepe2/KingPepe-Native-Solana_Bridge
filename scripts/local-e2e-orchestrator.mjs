@@ -30,6 +30,7 @@ export const ALLOWED_REGTEST_CLI_COMMANDS = Object.freeze(
     "gettxout",
     "sendtoaddress",
     "sendrawtransaction",
+    "testmempoolaccept",
     "stop",
   ]),
 );
