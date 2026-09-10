@@ -512,6 +512,7 @@ dependencies = [
  "solana-instructions-sysvar",
  "solana-program",
  "solana-system-interface",
+ "spl-token-interface",
  "thiserror 1.0.69",
 ]
 

@@ -143,7 +143,7 @@ test("localnet setup plan initializes mint, recipient token account, transceiver
       ["splInitializeMint2", 6, [1]],
       ["systemCreateRecipientTokenAccount", 7, [0, 2]],
       ["splInitializeRecipientTokenAccount3", 6, [2, 1]],
-      ["transceiverInitialize", 8, [4, 0, 7]],
+      ["transceiverInitialize", 8, [4, 1, 0, 7]],
       ["bridgeInitialize", 9, [3, 1, 6, 0, 7]],
     ],
   );
