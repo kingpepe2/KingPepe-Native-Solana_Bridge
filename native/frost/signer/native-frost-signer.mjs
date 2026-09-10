@@ -3,8 +3,6 @@ import { performance } from "node:perf_hooks";
 import { schnorr_FROST } from "@noble/curves/secp256k1.js";
 import {
   REQUIRED_FROST_SIGNERS,
-  REQUIRED_FROST_THRESHOLD,
-  assertHashHex,
   assertNativeSigningApproved,
   assertNativeSigningPolicy,
   assertNativeFrostRuntimePolicy,
@@ -14,12 +12,18 @@ import {
   nativeSigningIntentDigest,
   sha256Canonical,
   validateNativeSigningIntent,
+  dataRecord,
 } from "../policy/native-signing-policy.mjs";
 import { validateNativeFrostSigningRequest } from "../policy/signing-request.mjs";
+import { createTwoPartyDkgRequest, nativeFrostKeyContext, sameNativeFrostKeyDeployment,
+  validateNativeFrostDkgRequest } from "../policy/dkg-request.mjs";
 
 function secureFrostRandomBytes(length = 32) {
   return Uint8Array.from(randomBytes(length));
 }
+
+// Matches the bounded plain-record parser. Retention is never auto-pruned.
+const MAX_DKG_EPOCHS = 40;
 
 export class NativeFrostSigner {
   #policy;
@@ -27,13 +31,19 @@ export class NativeFrostSigner {
   #available = true;
   #nativeEvidenceValidator;
   #validatedNativeIntents = new Map();
+  #keyContext;
+  #dkgRequest;
 
   constructor(options) {
+    options = dataRecord(options, "FrostSignerOptions");
     if (!REQUIRED_FROST_SIGNERS.includes(options.signerId)) throw new Error("unsupported KingPepe FROST signer ID");
     if (!Number.isSafeInteger(options.index) || options.index < 0 || options.index > 1) throw new Error("invalid FROST signer index");
-    this.signerId = options.signerId;
-    this.index = options.index;
+    if (REQUIRED_FROST_SIGNERS[options.index] !== options.signerId) throw new Error("FrostSignerRoleIndexMismatch");
+    Object.defineProperties(this, { signerId: { value: options.signerId, enumerable: true },
+      index: { value: options.index, enumerable: true } });
     this.#policy = assertNativeFrostRuntimePolicy(options.policy);
+    this.#keyContext = nativeFrostKeyContext(this.#policy);
+    this.#dkgRequest = createTwoPartyDkgRequest({ epoch: this.#keyContext.keyEpoch, context: this.#keyContext });
     this.#stateStore = options.stateStore;
     if (options.nativeEvidenceValidator !== undefined && typeof options.nativeEvidenceValidator !== "function") {
       throw new Error("FROST native evidence validator must be a function");
@@ -41,6 +51,11 @@ export class NativeFrostSigner {
     this.#nativeEvidenceValidator = options.nativeEvidenceValidator;
     const state = this.#stateStore.load();
     if (state.signerId !== this.signerId) throw new Error("FROST signer state identity mismatch");
+    this.#validateStateDeployment(state);
+  }
+
+  dkgContext() {
+    return this.#keyContext;
   }
 
   frostIdentifier() {
@@ -71,13 +86,15 @@ export class NativeFrostSigner {
 
   dkgRound1(request) {
     this.#requireAvailable();
-    validateDkgRequest(request, this.signerId, this.index);
+    request = validateNativeFrostDkgRequest(request, this.#keyContext);
     const state = this.#stateStore.load();
+    this.#validateDkgState(state, request);
     const existing = state.dkg[request.sessionId];
     if (existing !== undefined) {
       assertSameCanonical(existing.request, request, "DKG round1 request changed");
       return { signerId: this.signerId, round1: existing.localRound1 };
     }
+    if (Object.keys(state.dkg).length >= MAX_DKG_EPOCHS) throw new Error("FrostDkgStateCapacity");
 
     const generated = schnorr_FROST.DKG.round1(
       this.frostIdentifier(),
@@ -97,8 +114,9 @@ export class NativeFrostSigner {
 
   dkgRound2(request, round1Messages) {
     this.#requireAvailable();
-    validateDkgRequest(request, this.signerId, this.index);
+    request = validateNativeFrostDkgRequest(request, this.#keyContext);
     const state = this.#stateStore.load();
+    this.#validateDkgState(state, request);
     const session = requireDkgSession(state, request);
     const accepted = validateRound1Set(request, round1Messages);
     if (session.acceptedRound1 !== undefined) {
@@ -126,8 +144,9 @@ export class NativeFrostSigner {
 
   dkgFinalize(request, round1Messages, incomingRound2) {
     this.#requireAvailable();
-    validateDkgRequest(request, this.signerId, this.index);
+    request = validateNativeFrostDkgRequest(request, this.#keyContext);
     const state = this.#stateStore.load();
+    this.#validateDkgState(state, request);
     const session = requireDkgSession(state, request);
     if (session.finalKey !== undefined) return this.#completion(request, session.finalKey);
     const accepted = validateRound1Set(request, round1Messages);
@@ -289,10 +308,48 @@ export class NativeFrostSigner {
   }
 
   #activeKey(state, epoch) {
+    this.#validateStateDeployment(state);
     if (state.activeEpoch !== epoch) throw new Error("FROST signer has no active key for epoch");
-    const session = Object.values(state.dkg).find((entry) => entry.request.epoch === epoch && entry.finalKey !== undefined);
+    if (epoch !== this.#keyContext.keyEpoch) throw new Error("FrostActiveKeyEpochMismatch");
+    const session = state.dkg[this.#dkgRequest.sessionId];
     if (session?.finalKey === undefined) throw new Error("FROST signer active share is unavailable");
+    validateNativeFrostDkgRequest(session.request, this.#keyContext);
     return deserializeKey(session.finalKey);
+  }
+
+  #validateDkgState(state, request) {
+    this.#validateStateDeployment(state);
+    if (state.activeEpoch !== undefined && request.epoch < state.activeEpoch) throw new Error("FrostDkgEpochRollback");
+  }
+
+  #validateStateDeployment(state) {
+    // Structural context checks only, not authentication or rollback detection.
+    // Existing incompatible state is rejected without reset, migration or keys.
+    try {
+      if (state.signerId !== this.signerId) throw new Error("RoleMismatch");
+      if (state.activeEpoch !== undefined && (!Number.isInteger(state.activeEpoch) || state.activeEpoch < 1 ||
+          state.activeEpoch > 0xffff_ffff)) throw new Error("EpochMismatch");
+      const sessions = dataRecord(state.dkg, "FrostStateDkg");
+      const epochs = new Set();
+      for (const [id, session] of Object.entries(sessions)) {
+        const entry = dataRecord(session, "FrostStateDkgSession");
+        const request = dataRecord(entry.request, "FrostStateDkgRequest");
+        const stored = validateNativeFrostDkgRequest(request, request.context);
+        if (stored.sessionId !== id || !sameNativeFrostKeyDeployment(stored.context, this.#keyContext) || epochs.has(stored.epoch)) {
+          throw new Error("ContextMismatch");
+        }
+        if (entry.localRound1 !== undefined && dataRecord(entry.localRound1, "FrostStateRound1").identifier !== this.frostIdentifier()) {
+          throw new Error("RoleMismatch");
+        }
+        if (entry.finalKey !== undefined) {
+          const key = dataRecord(entry.finalKey, "FrostStateKey");
+          if (dataRecord(key.secret, "FrostStateKeyShare").identifier !== this.frostIdentifier()) throw new Error("RoleMismatch");
+        }
+        epochs.add(stored.epoch);
+      }
+    } catch {
+      throw new Error("FrostStateDeploymentMismatch");
+    }
   }
 
   #completion(request, storedKey) {
@@ -315,25 +372,6 @@ export class NativeFrostSigner {
   #requireAvailable() {
     if (!this.#available) throw new Error(`${this.signerId} is unavailable`);
   }
-}
-
-function validateDkgRequest(request, signerId, index) {
-  if (request.protocol !== "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_DKG/V1") throw new Error("wrong FROST DKG protocol");
-  if (!Number.isSafeInteger(request.epoch) || request.epoch < 1) throw new Error("invalid FROST DKG epoch");
-  assertHashHex(request.sessionId, "FROST DKG session ID");
-  assertHashHex(request.participantSetHash, "FROST participant set hash");
-  if (request.threshold !== REQUIRED_FROST_THRESHOLD) throw new Error("FROST threshold must be exactly 2");
-  if (!Array.isArray(request.participants) || request.participants.length !== REQUIRED_FROST_SIGNERS.length) {
-    throw new Error("FROST DKG requires exactly A+B");
-  }
-  const sorted = [...request.participants].sort((left, right) => left.index - right.index);
-  for (let i = 0; i < sorted.length; i += 1) {
-    if (sorted[i].signerId !== REQUIRED_FROST_SIGNERS[i] || sorted[i].index !== i) {
-      throw new Error("FROST DKG participant set must be exactly A+B");
-    }
-  }
-  const own = request.participants.find((participant) => participant.signerId === signerId);
-  if (own?.index !== index) throw new Error("signer is not enrolled in this FROST DKG request");
 }
 
 function requireDkgSession(state, request) {

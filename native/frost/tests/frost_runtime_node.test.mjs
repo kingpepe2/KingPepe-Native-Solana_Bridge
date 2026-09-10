@@ -15,6 +15,7 @@ import {
   createNativeSigningPolicy,
   createLocalNativeDkgPolicy,
   createNativeFrostSigningRequest,
+  createTwoPartyDkgRequest,
   evaluateNativeSigningPolicy,
   nativeSigningIntentDigest,
   runTwoPartyDkg,
@@ -23,6 +24,7 @@ import {
   validateNativeFrostSigningRequest,
 } from "../index.mjs";
 import { REGTEST_GENESIS } from "../../node/native-raw-evidence.mjs";
+import { validateNativeFrostDkgRequest } from "../policy/dkg-request.mjs";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
 
@@ -114,6 +116,279 @@ function makePolicy(auth, overrides = {}) {
     ...overrides,
   });
 }
+
+function dkgContextFixture(overrides = {}) {
+  return { protocol: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_KEY_CONTEXT/V2", environment: "localnet",
+    nativeNetwork: "regtest", nativeGenesisHash: REGTEST_GENESIS,
+    solanaDeployment: h("solana-local-deployment"), bridgeProgramId: h("bridge-program-id"),
+    transceiverProgramId: h("transceiver-program-id"), mint: h("kpepe-mint"), keyEpoch: 1, ...overrides };
+}
+
+test("DKG session identity changes with the deployment and Mint context", () => {
+  const first = createTwoPartyDkgRequest({ epoch: 1, context: dkgContextFixture() });
+  for (const field of ["solanaDeployment", "bridgeProgramId", "transceiverProgramId", "mint"]) {
+    const other = createTwoPartyDkgRequest({ epoch: 1, context: dkgContextFixture({ [field]: h(`other-${field}`) }) });
+    assert.notEqual(other.sessionId, first.sessionId, field);
+  }
+});
+
+test("DKG request participants and their role indexes are immutable", () => {
+  const context = dkgContextFixture();
+  const request = createTwoPartyDkgRequest({ epoch: 1, context });
+  assert.equal(Object.isFrozen(request.participants), true);
+  assert.equal(Object.isFrozen(request.participants[0]), true);
+  assert.equal(Object.isFrozen(request.context), true);
+  context.mint = h("changed-after-build");
+  assert.equal(request.context.mint, h("kpepe-mint"));
+  assert.throws(() => { request.context.mint = context.mint; }, TypeError);
+});
+
+test("DKG V2 session hashes match the explicit public metadata transcript", () => {
+  const context = dkgContextFixture();
+  const participants = [{ signerId: REQUIRED_FROST_SIGNERS[0], index: 0 },
+    { signerId: REQUIRED_FROST_SIGNERS[1], index: 1 }];
+  const contextDigest = sha256Canonical(context);
+  const participantSetHash = sha256Canonical({ protocol: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_PARTICIPANT_SET/V2",
+    participants, threshold: 2 });
+  const sessionId = sha256Canonical({ protocol: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_DKG_SESSION/V2",
+    epoch: 1, contextDigest, participantSetHash, threshold: 2 });
+  const expected = { protocol: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_DKG/V2", epoch: 1, context,
+    contextDigest, sessionId, participantSetHash, threshold: 2, participants };
+  assert.deepEqual(createTwoPartyDkgRequest({ epoch: 1, context }), expected);
+  assert.deepEqual(validateNativeFrostDkgRequest(expected, context), expected);
+});
+
+test("DKG rejects unknown fields, incompatible local context and ambiguous epochs", () => {
+  const context = dkgContextFixture();
+  for (const options of [{ epoch: 1 }, { epoch: 1, context, extra: true },
+    { epoch: 1, context: { ...context, extra: true } }, { epoch: 2, context }]) {
+    assert.throws(() => createTwoPartyDkgRequest(options), /FrostDkg/u);
+  }
+  for (const overrides of [{ protocol: "legacy" }, { environment: "mainnet" }, { nativeNetwork: "mainnet" },
+    { nativeGenesisHash: h("wrong-genesis") }]) {
+    assert.throws(() => createTwoPartyDkgRequest({ epoch: 1, context: { ...context, ...overrides } }), /FrostDkgLocalContext/u);
+  }
+  for (const epoch of [undefined, null, "1", 0, -1, 1.5, 0x1_0000_0000]) {
+    assert.throws(() => createTwoPartyDkgRequest({ epoch, context: { ...context, keyEpoch: epoch } }), /FrostDkgEpoch/u);
+  }
+  const last = createTwoPartyDkgRequest({ epoch: 0xffff_ffff, context: { ...context, keyEpoch: 0xffff_ffff } });
+  assert.equal(last.epoch, 0xffff_ffff);
+  assert.notEqual(last.sessionId, createTwoPartyDkgRequest({ epoch: 1, context }).sessionId);
+});
+
+for (const [field, alter] of [
+  ["protocol", (r) => { r.protocol = "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_DKG/V1"; }],
+  ["epoch", (r) => { r.epoch = 2; }],
+  ["contextDigest", (r) => { r.contextDigest = h("substituted-context"); }],
+  ["sessionId", (r) => { r.sessionId = h("substituted-session"); }],
+  ["participantSetHash", (r) => { r.participantSetHash = h("substituted-roles"); }],
+  ["threshold", (r) => { r.threshold = 1; }],
+  ["participants", (r) => { r.participants.reverse(); }],
+]) {
+  test(`all DKG rounds reject altered ${field} before loading or saving state`, () => {
+    let loads = 0;
+    let saves = 0;
+    const signer = new NativeFrostSigner({ signerId: REQUIRED_FROST_SIGNERS[0], index: 0, policy: makePolicy(baseAuthorization()),
+      stateStore: { load() { loads += 1; return { signerId: REQUIRED_FROST_SIGNERS[0], dkg: {} }; }, save() { saves += 1; } } });
+    const request = structuredClone(createTwoPartyDkgRequest({ epoch: 1, context: dkgContextFixture() }));
+    alter(request);
+    for (const round of ["dkgRound1", "dkgRound2", "dkgFinalize"]) assert.throws(() => signer[round](request), /FrostDkg/u);
+    assert.equal(loads, 1);
+    assert.equal(saves, 0);
+  });
+}
+
+test("each DKG round rejects a correctly hashed request for a different deployment", () => {
+  let loads = 0;
+  const signer = new NativeFrostSigner({ signerId: REQUIRED_FROST_SIGNERS[0], index: 0, policy: makePolicy(baseAuthorization()),
+    stateStore: { load() { loads += 1; return { signerId: REQUIRED_FROST_SIGNERS[0], dkg: {} }; } } });
+  for (const field of ["solanaDeployment", "bridgeProgramId", "transceiverProgramId", "mint"]) {
+    const request = createTwoPartyDkgRequest({ epoch: 1, context: dkgContextFixture({ [field]: h(`foreign-${field}`) }) });
+    for (const round of ["dkgRound1", "dkgRound2", "dkgFinalize"]) assert.throws(() => signer[round](request), /FrostDkgContextMismatch/u);
+  }
+  assert.equal(loads, 1);
+});
+
+test("DKG participants require a complete, distinct, ordered and dense A+B set", () => {
+  const request = createTwoPartyDkgRequest({ epoch: 1, context: dkgContextFixture() });
+  for (const participants of [[request.participants[0]], [request.participants[1]],
+    [request.participants[0], request.participants[0]], Array(2),
+    [...request.participants, request.participants[0]],
+    [{ ...request.participants[0], index: 1 }, request.participants[1]],
+    [{ ...request.participants[0], extra: true }, request.participants[1]]]) {
+    assert.throws(() => validateNativeFrostDkgRequest({ ...request, participants }, request.context), /FrostDkgParticipant/u);
+  }
+});
+
+test("DKG metadata snapshots reject accessors, proxies and custom iterators without executing them", () => {
+  let calls = 0;
+  const request = createTwoPartyDkgRequest({ epoch: 1, context: dkgContextFixture() });
+  const getter = { get() { calls += 1; return request.context; } };
+  const options = { epoch: 1 };
+  Object.defineProperty(options, "context", getter);
+  assert.throws(() => createTwoPartyDkgRequest(options), /PlainDataRequired/u);
+  const packet = { ...request };
+  Object.defineProperty(packet, "context", getter);
+  assert.throws(() => validateNativeFrostDkgRequest(packet, request.context), /PlainDataRequired/u);
+  const context = { ...request.context };
+  Object.defineProperty(context, "mint", getter);
+  assert.throws(() => createTwoPartyDkgRequest({ epoch: 1, context }), /PlainDataRequired/u);
+  const participants = [...request.participants];
+  participants[Symbol.iterator] = () => { calls += 1; throw new Error("must not execute"); };
+  assert.throws(() => validateNativeFrostDkgRequest({ ...request, participants }, request.context), /PlainArrayRequired/u);
+  const proxy = new Proxy(request, { get() { calls += 1; } });
+  assert.throws(() => validateNativeFrostDkgRequest(proxy, request.context), /PlainDataRequired/u);
+  assert.equal(calls, 0);
+});
+
+test("DKG coordinator rejects options substitution before contacting participants", () => {
+  let calls = 0;
+  const signers = REQUIRED_FROST_SIGNERS.map((signerId) => ({ signerId,
+    dkgContext() { calls += 1; return dkgContextFixture(); }, dkgRound1() { throw new Error("must not execute"); } }));
+  for (const options of [{ epoch: 1, context: dkgContextFixture() }, { epoch: 1, extra: true }, {}]) {
+    assert.throws(() => runTwoPartyDkg(signers, options), /FrostDkgCoordinatorOptions/u);
+  }
+  const options = {};
+  Object.defineProperty(options, "epoch", { get() { calls += 1; return 1; } });
+  assert.throws(() => runTwoPartyDkg(signers, options), /PlainDataRequired/u);
+  assert.equal(calls, 0);
+});
+
+test("DKG coordinator rejects different A and B contexts before any DKG round", () => {
+  let loads = 0;
+  let saves = 0;
+  const signers = REQUIRED_FROST_SIGNERS.map((signerId, index) => new NativeFrostSigner({ signerId, index,
+    policy: makePolicy(baseAuthorization(), index === 1 ? { mint: h("different-mint") } : {}),
+    stateStore: { load() { loads += 1; return { signerId, dkg: {} }; }, save() { saves += 1; } } }));
+  assert.throws(() => runTwoPartyDkg(signers, { epoch: 1 }), /FrostDkgParticipantContextMismatch/u);
+  assert.equal(loads, 2);
+  assert.equal(saves, 0);
+});
+
+test("signer rejects a role/index mismatch before reading state", () => {
+  let loads = 0;
+  assert.throws(() => new NativeFrostSigner({ signerId: REQUIRED_FROST_SIGNERS[0], index: 1,
+    policy: makePolicy(baseAuthorization()), stateStore: { load() { loads += 1; } } }), /FrostSignerRoleIndexMismatch/u);
+  assert.equal(loads, 0);
+});
+
+test("signer options cannot change their role through an accessor", () => {
+  let calls = 0;
+  const options = { index: 0, policy: makePolicy(baseAuthorization()) };
+  Object.defineProperty(options, "signerId", { get() { calls += 1; return REQUIRED_FROST_SIGNERS[0]; } });
+  assert.throws(() => new NativeFrostSigner(options), /PlainDataRequired/u);
+  assert.equal(calls, 0);
+});
+
+test("DKG retention capacity fails before generating or persisting another epoch", () => {
+  const dkg = {};
+  for (let epoch = 1; epoch <= 40; epoch += 1) {
+    const request = createTwoPartyDkgRequest({ epoch, context: dkgContextFixture({ keyEpoch: epoch }) });
+    dkg[request.sessionId] = { request };
+  }
+  let saves = 0;
+  const signer = new NativeFrostSigner({ signerId: REQUIRED_FROST_SIGNERS[0], index: 0,
+    policy: makePolicy(baseAuthorization(), { keyEpoch: 41 }),
+    stateStore: { load() { return { signerId: REQUIRED_FROST_SIGNERS[0], dkg }; }, save() { saves += 1; } } });
+  const request = createTwoPartyDkgRequest({ epoch: 41, context: dkgContextFixture({ keyEpoch: 41 }) });
+  assert.throws(() => signer.dkgRound1(request), /FrostDkgStateCapacity/u);
+  assert.equal(saves, 0);
+  assert.equal(Object.keys(dkg).length, 40);
+});
+
+test("DKG state substitutions are rejected without replacing existing test material", () => {
+  const runtime = createRuntime();
+  try {
+    const store = new FileBackedFrostStateStore({ signerId: REQUIRED_FROST_SIGNERS[0],
+      root: path.join(runtime.root, "frost-a"), repoRoot: REPO_ROOT });
+    const original = store.load();
+    const id = runtime.epoch.request.sessionId;
+    const mutations = [
+      (s) => { s.dkg[id].request.context.mint = h("other-mint"); },
+      (s) => { s.dkg[h("wrong-map-key")] = s.dkg[id]; delete s.dkg[id]; },
+      (s) => { s.dkg[h("duplicate-map-key")] = structuredClone(s.dkg[id]); },
+      (s) => { s.dkg[id].request.protocol = "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_DKG/V1"; delete s.dkg[id].request.context; },
+      (s) => { s.dkg[id].finalKey.secret.identifier = runtime.signerB.frostIdentifier(); },
+    ];
+    const request = frostRequestFor(intentFromAuthorization(runtime.auth));
+    for (const alter of mutations) {
+      const changed = structuredClone(original);
+      alter(changed);
+      store.save(changed);
+      const before = readFileSync(path.join(store.root, "frost-signer-state.json"));
+      assert.throws(() => runtime.signerA.signingCommitment(request), /FrostStateDeployment/u);
+      assert.throws(() => new NativeFrostSigner({ signerId: REQUIRED_FROST_SIGNERS[0], index: 0,
+        policy: runtime.policy, stateStore: store }), /FrostStateDeployment/u);
+      assert.equal(before.equals(readFileSync(path.join(store.root, "frost-signer-state.json"))), true);
+    }
+  } finally { runtime.cleanup(); }
+});
+
+test("new local key epoch selects its exact DKG session while retaining the earlier epoch", () => {
+  const runtime = createRuntime();
+  try {
+    const policy = makePolicy(runtime.auth, { keyEpoch: 2 });
+    const signers = REQUIRED_FROST_SIGNERS.map((signerId, index) => new NativeFrostSigner({ signerId, index, policy,
+      stateStore: new FileBackedFrostStateStore({ signerId, root: path.join(runtime.root, index === 0 ? "frost-a" : "frost-b"), repoRoot: REPO_ROOT }) }));
+    const epoch = runTwoPartyDkg(signers, { epoch: 2 });
+    assert.notEqual(epoch.request.sessionId, runtime.epoch.request.sessionId);
+    const coordinator = new NativeFrostCoordinator({ signers, publicPackage: epoch.publicPackage,
+      aggregateTweakedXOnlyPublicKey: epoch.aggregateTweakedXOnlyPublicKey });
+    const result = coordinator.signAutomatically(intentFromAuthorization(runtime.auth, { keyEpoch: 2 }));
+    assert.equal(result.state, "SIGNED");
+    assert.equal(schnorr.verify(Buffer.from(result.signatureHex, "hex"), Buffer.from(result.messageHex, "hex"),
+      Buffer.from(epoch.aggregateTweakedXOnlyPublicKey, "hex")), true);
+    assert.throws(() => runtime.signerA.signingCommitment(frostRequestFor(intentFromAuthorization(runtime.auth))), /no active key/u);
+    const saved = JSON.parse(readFileSync(path.join(runtime.root, "frost-a", "frost-signer-state.json"), "utf8"));
+    assert.equal(Object.keys(saved.dkg).length, 2);
+    assert.equal(saved.activeEpoch, 2);
+  } finally { runtime.cleanup(); }
+});
+
+test("an earlier unfinished DKG cannot replace a later active key epoch", () => {
+  const runtime = createRuntime();
+  try {
+    const stores = REQUIRED_FROST_SIGNERS.map((signerId, index) => new FileBackedFrostStateStore({ signerId,
+      root: path.join(runtime.root, index === 0 ? "frost-a" : "frost-b"), repoRoot: REPO_ROOT }));
+    const participants = (keyEpoch) => REQUIRED_FROST_SIGNERS.map((signerId, index) => new NativeFrostSigner({ signerId, index,
+      policy: makePolicy(runtime.auth, { keyEpoch }), stateStore: stores[index] }));
+    const old = participants(2);
+    const request = createTwoPartyDkgRequest({ epoch: 2, context: dkgContextFixture({ keyEpoch: 2 }) });
+    const round1 = old.map((signer) => signer.dkgRound1(request));
+    const round2 = old.map((signer) => signer.dkgRound2(request, round1));
+    runTwoPartyDkg(participants(3), { epoch: 3 });
+    for (let i = 0; i < old.length; i += 1) {
+      const file = path.join(stores[i].root, "frost-signer-state.json");
+      const before = readFileSync(file);
+      assert.throws(() => old[i].dkgFinalize(request, round1,
+        [{ senderId: old[1 - i].signerId, round2: round2[1 - i][old[i].signerId] }]), /FrostDkgEpochRollback/u);
+      assert.throws(() => old[i].dkgRound1(request), /FrostDkgEpochRollback/u);
+      assert.throws(() => old[i].dkgRound2(request, round1), /FrostDkgEpochRollback/u);
+      assert.equal(before.equals(readFileSync(file)), true);
+      assert.equal(stores[i].load().activeEpoch, 3);
+    }
+  } finally { runtime.cleanup(); }
+});
+
+test("signer role and identifier index cannot change after initialization", () => {
+  const runtime = createRuntime();
+  try {
+    assert.throws(() => { runtime.signerA.signerId = REQUIRED_FROST_SIGNERS[1]; }, TypeError);
+    assert.throws(() => { runtime.signerB.index = 0; }, TypeError);
+  } finally { runtime.cleanup(); }
+});
+
+test("reopening a signer under another deployment cannot reuse its existing key epoch", () => {
+  const runtime = createRuntime();
+  try {
+    for (const field of ["solanaDeployment", "bridgeProgramId", "transceiverProgramId", "mint"]) {
+      assert.throws(() => new NativeFrostSigner({ signerId: REQUIRED_FROST_SIGNERS[0], index: 0,
+        policy: makePolicy(runtime.auth, { [field]: h(`different-${field}`) }),
+        stateStore: new FileBackedFrostStateStore({ signerId: REQUIRED_FROST_SIGNERS[0],
+          root: path.join(runtime.root, "frost-a"), repoRoot: REPO_ROOT }) }), /FrostStateDeployment/u);
+    }
+  } finally { runtime.cleanup(); }
+});
 
 test("Native signing policy cannot enable Mainnet through matching configuration", () => {
   assert.throws(() => makePolicy(baseAuthorization(), { nativeNetwork: "mainnet" }), /RegtestOnly/u);
@@ -496,7 +771,8 @@ test("B without A cannot cause a threshold downgrade", () => {
 
 test("explicit local DKG capability cannot sign, even after successful A+B setup", () => {
   const policy = createLocalNativeDkgPolicy({ environment: "localnet", nativeNetwork: "regtest",
-    nativeGenesisHash: REGTEST_GENESIS, solanaDeployment: h("solana-local-deployment"), keyEpoch: 1 });
+    nativeGenesisHash: REGTEST_GENESIS, solanaDeployment: h("solana-local-deployment"), keyEpoch: 1,
+    bridgeProgramId: h("bridge-program-id"), transceiverProgramId: h("transceiver-program-id"), mint: h("kpepe-mint") });
   const runtime = createRuntime({}, policy);
   try {
     const intent = intentFromAuthorization(runtime.auth);
@@ -512,7 +788,8 @@ test("explicit local DKG capability cannot sign, even after successful A+B setup
 
 test("local DKG capability applies the same environment and activation guards", () => {
   const options = { environment: "localnet", nativeNetwork: "regtest", nativeGenesisHash: REGTEST_GENESIS,
-    solanaDeployment: h("solana-local-deployment"), keyEpoch: 1 };
+    solanaDeployment: h("solana-local-deployment"), keyEpoch: 1,
+    bridgeProgramId: h("bridge-program-id"), transceiverProgramId: h("transceiver-program-id"), mint: h("kpepe-mint") };
   for (const overrides of [{ environment: "mainnet" }, { nativeNetwork: "mainnet" },
     { nativeGenesisHash: h("another-network") }, { productionSigningAuthorized: true }]) {
     assert.throws(() => createLocalNativeDkgPolicy({ ...options, ...overrides }), /LocalnetOnly|RegtestOnly|RegtestGenesis|ActivationDisabled/u);
@@ -614,7 +891,7 @@ test("request and policy rejection happen before any signing-state load", () => 
   let loads = 0;
   const auth = baseAuthorization();
   const signer = new NativeFrostSigner({ signerId: REQUIRED_FROST_SIGNERS[0], index: 0, policy: makePolicy(auth),
-    stateStore: { load() { loads += 1; return { signerId: REQUIRED_FROST_SIGNERS[0] }; } } });
+    stateStore: { load() { loads += 1; return { signerId: REQUIRED_FROST_SIGNERS[0], dkg: {} }; } } });
   assert.equal(loads, 1);
   const badBinding = { ...frostRequestFor(intentFromAuthorization(auth)), requestId: h("wrong-request") };
   const badPolicy = frostRequestFor(intentFromAuthorization(auth, { amountAtomic: "1" }));

@@ -28,8 +28,8 @@ These controls protect cooperative API use, not arbitrary hostile code with
 process/host access. Policy enrollment is not proof of chain truth; each signing
 participant still needs its independent configured raw-evidence checks. The
 current in-memory policy is reconstructed from validated evidence, not restored
-from caller JSON. DKG deployment/active-key binding, full authorization-intent
-enrollment and coordinator failure cleanup need further hardening.
+from caller JSON. Full authorization-intent enrollment, authenticated inner DKG
+transcripts/transport and coordinator failure cleanup need further hardening.
 Signer-state authentication, service access and
 rollback assurance remain incomplete. No production signing is authorized and
 none of these deficiencies requires a second physical host.
@@ -54,6 +54,38 @@ assurance. The pinned library's own mathematical commitment check is preserved.
 Application-specific participant input checks are discussed in
 [RFC 9591 section 7.7](https://www.rfc-editor.org/rfc/rfc9591.html#section-7.7);
 that reference does not audit this bridge or specify its project DKG protocol.
+
+## DKG deployment boundary
+
+The original V2 DKG context contains its protocol, localnet environment, REGTEST
+network/genesis, Solana deployment, Manager/Transceiver IDs, Mint and key epoch.
+Hashes are normalized 32-byte lowercase hex; the epoch is a positive u32. Its
+canonical project-metadata digest and the exact ordered A/0, B/1 participant-set
+digest bind the DKG session. This is application metadata, not a change to the
+pinned primitive, its proof of knowledge or the Native signing message.
+
+All request fields are mandatory and unknown fields are rejected. The request,
+context and participant records are detached frozen snapshots. Both participants
+recompute the binding before any DKG state load, and the coordinator compares
+their configured contexts before starting rounds. Signer roles/indexes cannot be
+changed after construction. Saved context, session-map key and public/final-key
+participant identifiers are checked before reuse; the active key must be in the
+exact session for the configured deployment and epoch. Old compatible epochs can
+be retained but cannot be selected as the current epoch. Delayed DKG completion
+cannot replace a later active epoch: all three rounds reject a request older than
+the stored active epoch before writing. This comparison is not rollback proof if
+the complete state is restored to an earlier snapshot. Forty retained DKG
+records is a local resource ceiling, not a production rotation policy; capacity
+failure occurs before creating a new record and never prunes existing material.
+
+Legacy V1 and incompatible state are rejected without automatic migration,
+replacement keys or deletion. Fresh isolated local tests use V2; missing or
+incompatible production material must never trigger setup. This increment is
+not stored-state authentication, confidential/authenticated DKG peer transport,
+full inner-transcript retry binding, production key ceremony or rollback/clone
+detection. Rewriting all stored metadata with its anchor can defeat structural
+checks. Complete DKG finalization retry and uncertain nonce/session recovery remain
+open; no assertion of service crash safety follows from metadata validation.
 
 ## Phase 04 implementation
 

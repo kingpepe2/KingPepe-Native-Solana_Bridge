@@ -114,6 +114,9 @@ export function createLocalNativeDkgPolicy(options) {
   options = dataRecord(options, "DKG policy");
   const policy = Object.freeze({ ...localPolicyContext(options), purpose: "LOCAL_DKG_ONLY",
     solanaDeployment: assertHashHex(options.solanaDeployment, "DKG policy Solana deployment"),
+    bridgeProgramId: assertHashHex(options.bridgeProgramId, "DKG policy bridge program"),
+    transceiverProgramId: assertHashHex(options.transceiverProgramId, "DKG policy transceiver program"),
+    mint: assertHashHex(options.mint, "DKG policy mint"),
     keyEpoch: checkedSafeEpoch(options.keyEpoch, "DKG policy key epoch") });
   localDkgPolicies.add(policy);
   return policy;

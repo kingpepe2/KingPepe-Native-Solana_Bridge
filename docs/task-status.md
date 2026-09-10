@@ -1,6 +1,36 @@
 # KingPepe Native - Solana Bridge Task Status
 
-## Current Phase 08 signing-request binding (2026-09-10)
+## Current Phase 08 DKG deployment and active-key binding (2026-09-10)
+
+Implemented locally: immutable V2 DKG context/session metadata, exact deployment
+and active-key selection, immutable participant roles, all-round request checks
+before state access, incompatible-state rejection without migration/replacement,
+bounded retained epochs and older-DKG finalization rejection after a newer epoch
+activates. Native signature algorithm and exact A+B unchanged. Initial regressions:
+54 PASS / 4 FAIL, expanded 73 PASS / 2 FAIL, then 77 PASS / 1 FAIL for the delayed
+epoch downgrade. Final focused: 78 PASS (24 new). Windows/WSL each 395 Node tests
++ two vectors PASS; WSL 93 Rust tests, fmt/clippy/audits PASS. An intermediate
+fresh real E2E passed 55 checks; the final fresh rerun and both SBF builds also
+PASS all 55 checks. Reserve/supply each 100000000 atomic, pending credits zero,
+no per-transfer team approval. This is not a withdrawal E2E result. Current source
+and all 155 commits scan clean; 179-file provenance, nine JSON parses and private
+path/IP checks PASS. Staged/outgoing scans, private push and exact-SHA CI pending.
+
+Provenance 178 -> 179 files, one original module, no file deletions/moves,
+dependency/license changes or production actions. Phase 08 INCOMPLETE;
+Phase 09 NOT_STARTED; Mainnet DISABLED. These are structural/context guards, not
+authenticated storage/transport or nonce rollback guarantees. Next: finish the
+increment's gates, then full intent enrollment and nonce/state/restart hardening.
+See [detailed evidence](development-status.md#current-phase-08-dkg-deployment-and-active-key-binding-2026-09-10).
+
+## Previous Phase 08 signing-request binding (verified source)
+
+Source `39c5fdc9c12affe037232c87d4da5421f9046ada`, message
+`fix(phase-08): bind FROST requests before signer state access`, privately pushed;
+[all four exact-SHA CI jobs PASS](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34478411388).
+Exact-SHA CI confirms the real deposit and all 55 checks. Current/staged/outgoing
+source and all 155 commits scanned clean; zero artifacts. The following 371-test
+evidence belongs to that SHA.
 
 Implemented locally: shared immutable V1 request/session metadata validation in
 coordinator and both signer paths, before signing-state/key access. Actual Native
@@ -13,11 +43,11 @@ Fresh real deposit, both SBF builds and all 55 checks PASS; reserve/supply each
 Provenance 177 -> 178 files: one original request module, no deletions/moves,
 dependency/license/toolchain changes or production actions. Current source and
 all 154 existing commits scan clean; exact provenance, nine JSON parses and
-private-path/IP checks PASS. Staged/outgoing scans, private push and exact-SHA
-CI pending. Phase 08 INCOMPLETE;
+private-path/IP checks PASS. Staged/outgoing/all-155-commit scans, private push
+and exact-SHA CI passed as recorded above. Phase 08 INCOMPLETE;
 Phase 09 NOT_STARTED; Mainnet DISABLED. Next: DKG deployment/active-key binding,
 full intent enrollment, signer-state authentication/fencing and failure/restart.
-See [current detailed evidence](development-status.md#current-phase-08-signing-request-binding-2026-09-10).
+See [detailed evidence](development-status.md#previous-phase-08-signing-request-binding-verified-source).
 
 ## Previous Phase 08 signer-policy isolation (verified source)
 

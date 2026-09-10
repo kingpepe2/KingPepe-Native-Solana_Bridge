@@ -1,8 +1,71 @@
 # KingPepe Native - Solana Bridge Development Status
 
-## Current Phase 08 signing-request binding (2026-09-10)
+## Current Phase 08 DKG deployment and active-key binding (2026-09-10)
 
-UNPUBLISHED / LOCALLY_TESTED, including a fresh real-chain run. A shared original
+UNPUBLISHED / LOCALLY_TESTED, including the final fresh real-chain rerun.
+Original V2 DKG metadata binds the explicit
+local environment, verified Native REGTEST genesis, Solana deployment, Manager,
+Transceiver, Mint and positive-u32 key epoch. Both participants validate the exact
+request/session/participant hashes before DKG state access. The coordinator
+compares independently configured contexts and rejects option substitution.
+Signer role/index is immutable and saved public/key identifiers must match it.
+Active-key lookup uses the exact context-derived session, not the first matching
+epoch. A delayed unfinished older DKG cannot replace a later active epoch.
+Compatible older epochs remain retained. A 40-epoch local resource ceiling
+fails before generating/persisting another record; it never prunes old material.
+
+Existing legacy V1, mismatched deployment or malformed state fails closed without
+automatic migration, key replacement or data deletion. Tests use fresh disposable
+material outside source. These checks bind metadata and cooperating APIs only:
+they do not authenticate stored bytes or peer DKG payloads, prove nonce freshness,
+provide confidential/authenticated IPC or prevent a privileged host compromise.
+The pinned FROST primitive, actual Native sighash and exact A+B threshold are
+unchanged. No production ceremony, signing, services or funds were used.
+
+Four initial focused failures reproduced the missing deployment and mutation
+boundaries (54 PASS / 4 FAIL). Expanded tests then found two more gaps (73 PASS /
+2 FAIL): silently ignored coordinator options and a substituted saved participant
+identifier. Both were corrected. An intermediate full run passed 394 Node tests
+per platform, 93 Rust tests and a fresh real deposit with all 55 checks. Final
+review then reproduced delayed old-DKG finalization replacing a newer active
+epoch (77 PASS / 1 FAIL; the focused finalization-only probe also failed). The
+guard rejects older epochs before any DKG round writes; this compares current
+stored state, not an independent monotonic anchor or rollback proof.
+
+Final focused suite: 78 PASS (24 new), zero failures/skips. Full Windows/WSL each:
+395 Node tests and two vectors PASS. WSL: 64 Solana + 29 Native Rust tests,
+fmt/clippy, five lockfile audits and declared-license metadata PASS. npm zero
+vulnerabilities; bincode 1.3.3 unmaintained warning remains reported. Native
+Windows Cargo/combined-license and service ACL/protected-storage tests remain
+NOT_RUN locally. The final fresh REGTEST/local-validator deposit and both SBF
+builds PASS: real A+B Native-accepted signatures, separate Ed25519 attestations,
+actual SPL mint and all 55 checks (22 security, seven CSV, four wallet PSBT, ten
+pre-mint races, seven claim-worker and five accounting). Canonical reserve and
+observed supply each 100000000 atomic; pending credits zero. No per-transfer
+team approval. Withdrawal E2E and full multi-service restart remain NOT_RUN.
+Private publication is pending.
+Current source and all 155 existing commits scanned clean; exact 179-file
+provenance, nine JSON parses and private-path/IP checks PASS. Staged/outgoing
+scans and exact-SHA CI remain pending.
+
+Provenance 178 -> 179: one original DKG metadata module, superseded inline DKG
+request validation/construction and unused imports removed. No source files
+deleted/moved, dependencies/toolchains/licenses changed or third-party/legacy
+implementation imported. Phase 08 INCOMPLETE; Phase 09 NOT_STARTED; Mainnet
+DISABLED. Next: complete this increment's gates, then full intent enrollment,
+nonce/state authentication/fencing and failure/restart/reconciliation dependencies.
+See [FROST boundaries](security/software-frost.md#dkg-deployment-boundary).
+
+## Previous Phase 08 signing-request binding (verified source)
+
+Source `39c5fdc9c12affe037232c87d4da5421f9046ada`, message
+`fix(phase-08): bind FROST requests before signer state access`, privately pushed;
+[all four exact-SHA CI jobs PASS](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34478411388).
+CI confirms the real deposit and all 55 checks. Current/staged/outgoing source and
+all 155 commits scanned clean; zero workflow artifacts were uploaded. The
+371-test evidence below belongs to that SHA, not newer source.
+
+LOCALLY_AND_CI_TESTED, including a fresh real-chain run. A shared original
 V1 request builder/validator binds envelope request ID and epoch to the immutable
 intent, requires a positive u32 attempt and exact A+B order, and recomputes the
 session ID. Unknown/missing fields, malformed metadata, accessors and custom
@@ -35,7 +98,8 @@ races, seven claim-worker and five accounting. Reserve/supply each 100000000
 atomic, pending credits zero. This is not a withdrawal or full-service restart
 E2E result. Current source and all 154 existing commits scan clean. Exact
 178-file provenance, nine JSON parses and private-path/IP checks PASS.
-Staged/outgoing scans, private publication and exact-SHA CI are pending.
+Staged/outgoing/all-155-commit scans, private publication and exact-SHA CI passed
+as recorded above.
 
 Provenance 177 -> 178 files: one original request module, no deleted/moved files
 or imported third-party/legacy source. No dependency/toolchain/license changes

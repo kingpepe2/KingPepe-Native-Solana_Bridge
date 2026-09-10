@@ -1950,7 +1950,8 @@ async function prepareLocalReserveSweepFeeFundingInputs({
 export async function createLocalFrostTaprootCustodyContext({ plan, flowConfig }) {
   const config = requireObject(flowConfig, "flowConfig");
   const dkgPolicy = createLocalNativeDkgPolicy({ environment: "localnet", nativeNetwork: config.nativeChainName,
-    nativeGenesisHash: REGTEST_GENESIS, solanaDeployment: config.solanaDeploymentHex, keyEpoch: config.keyEpoch });
+    nativeGenesisHash: REGTEST_GENESIS, solanaDeployment: config.solanaDeploymentHex, keyEpoch: config.keyEpoch,
+    bridgeProgramId: config.bridgeProgramIdHex, transceiverProgramId: config.transceiverProgramIdHex, mint: config.mintHex });
   const repoRoot = path.resolve(plan.repoRoot);
   const frostRoot = validateStateRoot({
     stateRoot: path.join(config.stateRoot, "ephemeral-frost-custody"),

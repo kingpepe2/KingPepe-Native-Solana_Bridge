@@ -25,10 +25,10 @@
 ## Current phase
 
 PHASE 08 INCOMPLETE. Phase 09 NOT_STARTED.
-Last verified source: c7bf77b18df30e5565d38d5011eb10a909dd8448, private push and
+Last verified source: 39c5fdc9c12affe037232c87d4da5421f9046ada, private push and
 all four exact-SHA CI jobs PASS:
-https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34475711434
-Its current/staged/outgoing source and all 154 commits scanned clean; zero
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34478411388
+Its current/staged/outgoing source and all 155 commits scanned clean; zero
 workflow artifacts were uploaded. That evidence does not certify newer source.
 
 Absorbing-stop source 2bdff8f1687085d63de8c628ae12a4f2efed163e was pushed
@@ -52,13 +52,26 @@ fresh E2E failed there. The harness now uses the explicit DKG-only capability;
 the guard was not bypassed. See development-status for subsequent real-chain,
 scan and publication evidence. These are API boundaries, not a hostile-code sandbox.
 
-Current unpublished request increment: a shared immutable V1 request builder and
+The verified request increment: a shared immutable V1 request builder and
 validator bind request ID, epoch, attempt, intent/message digest and exact A+B
 ordering to the recomputed session before any signing-state/key access. The actual
 Native sighash/ciphersuite is unchanged. Initial focused tests: 40 PASS / 6 FAIL;
 final focused: 54 PASS. Windows/WSL: 371 Node tests (14 new) and two vectors PASS;
-WSL 93 Rust tests and audits PASS. Fresh real E2E/publication results are tracked
-in development-status. DKG deployment binding and signer state remain incomplete.
+WSL 93 Rust tests and audits PASS. Both SBF builds, the fresh real deposit and all
+55 integration checks PASS locally and in exact-SHA CI.
+
+Current unpublished DKG increment: V2 request/context metadata binds localnet,
+verified Native REGTEST genesis, Solana deployment, both programs, Mint and key
+epoch. Both participants validate before DKG state access; active-key lookup uses
+the exact context-derived session. Role/index is immutable. Incompatible or
+legacy V1 state is rejected without migration, replacement keys or deleting data.
+This is structural/API binding, not authenticated DKG transport, signer-state
+authentication or rollback proof. A delayed older DKG cannot replace a later
+active epoch. Focused 78 tests PASS (24 new); Windows/WSL each pass 395 Node tests,
+two vectors, and WSL 93 Rust tests/audits. Real-chain validation and publication
+are recorded in development-status. Do not reuse old test roots
+to bypass the new context check. The local 40-epoch retention ceiling fails
+before adding another epoch; it never deletes retained records automatically.
 Node 24.21.0 / npm 11.19.0 / bundled SQLite 3.53.4 are required. The SQLite
 API remains release-candidate stability 1.2, not production approval.
 See docs/development-status.md for current measured tests and publication state.
@@ -84,8 +97,9 @@ global hard stops, post-mint deep-reorg response and external review remain open
 Read-only review reproduced matching Mainnet policy approval and exposed Map
 mutation on the preceding source. Current regression-tested changes close these
 configuration/API paths. The current request changes close envelope/intent ID
-and session mismatches. DKG deployment/active-key binding, complete authorization
-intent enrollment and coordinator failure cleanup still need hardening. The pinned
+and session mismatches. The current DKG changes bind deployment metadata and
+active-key selection, but authenticated inner DKG transcripts/transport, complete
+authorization-intent enrollment and coordinator failure cleanup remain open. The pinned
 upstream FROST code is explicitly unaudited; never claim broader library audit
 coverage applies to it. The approved same-host topology is not the cause of
 these blockers. See docs/security/software-frost.md.

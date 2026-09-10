@@ -5,44 +5,24 @@ import {
   assertHashHex,
   bytesToHex,
   canonicalJson,
+  dataRecord,
   hexToBytes,
-  sha256Canonical,
   validateNativeSigningIntent,
 } from "../policy/native-signing-policy.mjs";
 import { createNativeFrostSigningRequest } from "../policy/signing-request.mjs";
+import { createTwoPartyDkgRequest, normalizeNativeFrostKeyContext } from "../policy/dkg-request.mjs";
 import { deserializeFrostPublic } from "../signer/native-frost-signer.mjs";
 
-export function createTwoPartyDkgRequest(options) {
-  const participants = [
-    { signerId: REQUIRED_FROST_SIGNERS[0], index: 0 },
-    { signerId: REQUIRED_FROST_SIGNERS[1], index: 1 },
-  ];
-  const participantSetHash = sha256Canonical({
-    protocol: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_PARTICIPANT_SET/V1",
-    participants,
-    threshold: REQUIRED_FROST_THRESHOLD,
-  });
-  const epoch = options.epoch;
-  if (!Number.isSafeInteger(epoch) || epoch < 1) throw new Error("invalid DKG epoch");
-  return Object.freeze({
-    protocol: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_DKG/V1",
-    epoch,
-    sessionId: sha256Canonical({
-      protocol: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_DKG_SESSION/V1",
-      epoch,
-      participantSetHash,
-      threshold: REQUIRED_FROST_THRESHOLD,
-    }),
-    participantSetHash,
-    threshold: REQUIRED_FROST_THRESHOLD,
-    participants,
-  });
-}
+export { createTwoPartyDkgRequest } from "../policy/dkg-request.mjs";
 
 export function runTwoPartyDkg(signers, options) {
+  options = dataRecord(options, "FrostDkgCoordinatorOptions");
+  if (Object.keys(options).length !== 1 || !Object.hasOwn(options, "epoch")) throw new Error("FrostDkgCoordinatorOptionsFields");
   if (signers.length !== REQUIRED_FROST_SIGNERS.length) throw new Error("FROST DKG requires A+B signers");
   const byId = signerMap(signers);
-  const request = createTwoPartyDkgRequest(options);
+  const contexts = REQUIRED_FROST_SIGNERS.map((id) => normalizeNativeFrostKeyContext(byId.get(id).dkgContext()));
+  if (canonicalJson(contexts[0]) !== canonicalJson(contexts[1])) throw new Error("FrostDkgParticipantContextMismatch");
+  const request = createTwoPartyDkgRequest({ epoch: options.epoch, context: contexts[0] });
   const round1 = request.participants.map((participant) => byId.get(participant.signerId).dkgRound1(request));
   const round2BySender = new Map(
     request.participants.map((participant) => [participant.signerId, byId.get(participant.signerId).dkgRound2(request, round1)]),

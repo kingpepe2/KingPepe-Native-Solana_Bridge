@@ -3,6 +3,17 @@
   "generatedAt": "2026-09-10T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
   "purpose": "file-by-file provenance classification for local tracked content",
+  "phase08DkgBindingReview": {
+    "filesBefore": 178,
+    "filesAfter": 179,
+    "newFiles": ["native/frost/policy/dkg-request.mjs"],
+    "filesDeleted": 0,
+    "filesMoved": 0,
+    "changes": "Original immutable V2 DKG deployment/context/session metadata; exact active-key and role selection; coordinator option and all-round request checks; bounded retained epochs and delayed older-epoch finalization rejection; 24 original regressions. Superseded inline request handling and unused imports removed.",
+    "sourceImports": "None; uses existing original policy helpers, verified REGTEST identity and pinned library API. No third-party cryptographic implementation or vectors copied or modified.",
+    "dependencyChanges": "None; pinned dependencies, lockfiles, toolchains and required third-party notices preserved.",
+    "scope": "Structural/API binding only, not authenticated DKG transport, protected signer state, nonce rollback or production key ceremony. Incompatible state rejected without migration, replacement or deletion. No operational data published."
+  },
   "phase08SigningRequestReview": {
     "filesBefore": 177,
     "filesAfter": 178,
@@ -177,6 +188,11 @@
     ]
   },
   "trackedFiles": [
+    {
+      "path": "native/frost/policy/dkg-request.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original V2 project DKG context/request metadata validation. No upstream primitive or vectors copied; Native ciphersuite unchanged."
+    },
     {
       "path": "native/frost/policy/signing-request.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
