@@ -41,11 +41,11 @@ pub const LOCALNET_PROGRAM_ID_BASE58: &str = "AkqLGFTy43D9cLjHRTQGpRGb2uWA8nuVyG
 pub const PROGRAM_ABI_STATUS: &str = "ECONOMIC_ABI_ENABLED";
 pub const TRANSCEIVER_INSTRUCTION_INITIALIZE: u8 = 1;
 pub const TRANSCEIVER_INSTRUCTION_VERIFY_MESSAGE_FROM_ED25519: u8 = 2;
-pub const TRANSCEIVER_CONFIG_INSTRUCTION_LENGTH: usize = 197;
+pub const TRANSCEIVER_CONFIG_INSTRUCTION_LENGTH: usize = 237;
 pub const TRANSCEIVER_CONFIG_PDA_SEED_PREFIX: &[u8] = b"kingpepe-transceiver-config";
 pub const TRANSCEIVER_RECEIPT_PDA_SEED_PREFIX: &[u8] = b"kingpepe-transceiver-receipt";
 pub const TRANSCEIVER_ACCOUNT_VERSION: u8 = 1;
-pub const TRANSCEIVER_CONFIG_ACCOUNT_MAGIC: [u8; 8] = *b"KPTCFG01";
+pub const TRANSCEIVER_CONFIG_ACCOUNT_MAGIC: [u8; 8] = *b"KPTCFG02";
 pub const TRANSCEIVER_RECEIPT_ACCOUNT_MAGIC: [u8; 8] = *b"KPTRCPT1";
 pub const TRANSCEIVER_CONFIG_ACCOUNT_LENGTH: usize = 8 + 1 + TRANSCEIVER_CONFIG_INSTRUCTION_LENGTH;
 pub const VERIFIED_RECEIPT_ACCOUNT_LENGTH: usize = 240;
@@ -77,7 +77,7 @@ pub fn process_instruction_accounts(
 ) -> Result<(), EntrypointError> {
     match decode_transceiver_instruction(instruction_data)? {
         TransceiverInstruction::Initialize(config) => {
-            process_initialize_accounts(program_id, accounts, config)
+            process_initialize_accounts(program_id, accounts, *config)
         }
         TransceiverInstruction::VerifyMessageFromEd25519 {
             message,
@@ -106,9 +106,9 @@ pub fn decode_transceiver_instruction(
                     found: instruction_data.len(),
                 });
             }
-            Ok(TransceiverInstruction::Initialize(
+            Ok(TransceiverInstruction::Initialize(Box::new(
                 decode_transceiver_config(&instruction_data[1..])?,
-            ))
+            )))
         }
         TRANSCEIVER_INSTRUCTION_VERIFY_MESSAGE_FROM_ED25519 => {
             let expected = 1 + MESSAGE_LENGTH + 4;
@@ -139,7 +139,7 @@ pub fn decode_transceiver_instruction(
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TransceiverInstruction {
-    Initialize(TransceiverConfig),
+    Initialize(Box<TransceiverConfig>),
     VerifyMessageFromEd25519 {
         message: Box<CanonicalBridgeMessage>,
         ed25519_instruction_indexes: [u16; 2],
@@ -178,6 +178,9 @@ pub struct TransceiverConfig {
     pub manager_program_id: PubkeyBytes,
     pub mint: PubkeyBytes,
     pub solana_deployment: Hash32,
+    pub protocol_id: u32,
+    pub native_network: u32,
+    pub native_genesis: Hash32,
     pub authorized_attesters: [PubkeyBytes; 2],
     pub active: bool,
     pub key_epoch: u32,
@@ -189,6 +192,9 @@ impl TransceiverConfig {
             || self.manager_program_id == [0u8; 32]
             || self.mint == [0u8; 32]
             || self.solana_deployment == [0u8; 32]
+            || self.native_genesis == [0u8; 32]
+            || self.protocol_id == 0
+            || self.native_network == 0
         {
             return Err(TransceiverError::InvalidConfig);
         }
@@ -285,6 +291,9 @@ impl TransceiverProgram {
             || message.deployment.manager_program_id != self.config.manager_program_id
             || message.deployment.mint != self.config.mint
             || message.deployment.solana_deployment != self.config.solana_deployment
+            || message.deployment.protocol_id != self.config.protocol_id
+            || message.deployment.native_network != self.config.native_network
+            || message.deployment.native_genesis != self.config.native_genesis
             || message.key_epoch != self.config.key_epoch
         {
             return Err(TransceiverError::DomainMismatch);
@@ -795,6 +804,9 @@ fn encode_transceiver_config(config: &TransceiverConfig, out: &mut Vec<u8>) {
     out.extend(config.manager_program_id);
     out.extend(config.mint);
     out.extend(config.solana_deployment);
+    out.extend(config.protocol_id.to_le_bytes());
+    out.extend(config.native_network.to_le_bytes());
+    out.extend(config.native_genesis);
     out.extend(config.authorized_attesters[0]);
     out.extend(config.authorized_attesters[1]);
     out.push(config.active as u8);
@@ -840,6 +852,9 @@ fn decode_transceiver_config(data: &[u8]) -> Result<TransceiverConfig, Entrypoin
     let manager_program_id = cursor.read_array::<32>()?;
     let mint = cursor.read_array::<32>()?;
     let solana_deployment = cursor.read_array::<32>()?;
+    let protocol_id = cursor.read_u32_le()?;
+    let native_network = cursor.read_u32_le()?;
+    let native_genesis = cursor.read_array::<32>()?;
     let first_attester = cursor.read_array::<32>()?;
     let second_attester = cursor.read_array::<32>()?;
     let active = cursor.read_bool()?;
@@ -850,6 +865,9 @@ fn decode_transceiver_config(data: &[u8]) -> Result<TransceiverConfig, Entrypoin
         manager_program_id,
         mint,
         solana_deployment,
+        protocol_id,
+        native_network,
+        native_genesis,
         authorized_attesters: [first_attester, second_attester],
         active,
         key_epoch,
@@ -1309,6 +1327,9 @@ mod tests {
             manager_program_id: h(2),
             mint: h(3),
             solana_deployment: h(4),
+            protocol_id: 1,
+            native_network: 2,
+            native_genesis: h(7),
             authorized_attesters: [h(5), h(6)],
             active: true,
             key_epoch: 9,
@@ -1504,7 +1525,7 @@ mod tests {
     #[test]
     fn transceiver_instruction_abi_round_trips_and_rejects_duplicate_indexes() {
         let config = config();
-        let initialize = TransceiverInstruction::Initialize(config.clone());
+        let initialize = TransceiverInstruction::Initialize(Box::new(config.clone()));
         let initialize_bytes = initialize.encode().unwrap();
         assert_eq!(
             initialize_bytes.len(),
@@ -1614,7 +1635,7 @@ mod tests {
             false,
             true,
         );
-        let initialize = TransceiverInstruction::Initialize(config.clone())
+        let initialize = TransceiverInstruction::Initialize(Box::new(config.clone()))
             .encode()
             .unwrap();
         let mut mint_data = vec![0; spl_token_interface::state::Mint::LEN];
@@ -1962,6 +1983,28 @@ mod tests {
             ),
             Err(TransceiverError::DuplicateAttester)
         );
+    }
+
+    #[test]
+    fn transceiver_rejects_native_domain_substitution_even_with_both_attesters() {
+        let config = config();
+        let original = message(&config);
+        for field in 0..3 {
+            let mut msg = original.clone();
+            match field {
+                0 => msg.deployment.protocol_id += 1,
+                1 => msg.deployment.native_network += 1,
+                _ => msg.deployment.native_genesis = h(99),
+            }
+            msg.operation_id = msg.derive_operation_id().unwrap();
+            let digest = msg.message_digest().unwrap();
+            let mut program = TransceiverProgram::initialize(config.clone()).unwrap();
+            assert_eq!(
+                program.verify_message(&msg, &observations(&config, digest)),
+                Err(TransceiverError::DomainMismatch)
+            );
+            assert_eq!(program.verified_messages(), 0);
+        }
     }
 
     #[test]

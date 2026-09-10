@@ -31,8 +31,8 @@ export const MINT_ACCOUNT_LENGTH = 82;
 export const SPL_TOKEN_ACCOUNT_LENGTH = 165;
 
 const LOCALNET = "localnet";
-const BRIDGE_CONFIG_INSTRUCTION_LENGTH = 256;
-const TRANSCEIVER_CONFIG_INSTRUCTION_LENGTH = 197;
+const BRIDGE_CONFIG_INSTRUCTION_LENGTH = 207;
+const TRANSCEIVER_CONFIG_INSTRUCTION_LENGTH = 237;
 const BRIDGE_STATE_PDA_SEED_PREFIX = "kingpepe-bridge-state";
 const MINT_AUTHORITY_PDA_SEED_PREFIX = "kingpepe-mint-authority";
 const TRANSCEIVER_CONFIG_PDA_SEED_PREFIX = "kingpepe-transceiver-config";
@@ -40,7 +40,6 @@ const UINT_DECIMAL = /^(0|[1-9][0-9]*)$/u;
 const MAX_U32 = 0xffff_ffffn;
 const MAX_U64 = 0xffff_ffff_ffff_ffffn;
 const MAX_U8 = 0xffn;
-const ZERO_32 = new Uint8Array(32);
 
 export function buildLocalnetSolanaSetupTransactionPlan(config) {
   const normalized = normalizeSetupConfig(config);
@@ -114,6 +113,9 @@ export function buildLocalnetSolanaSetupTransactionPlan(config) {
       8,
       [4, 1, 0, 7],
       encodeTransceiverInitialize({
+        protocolId: normalized.protocolId,
+        nativeNetwork: normalized.nativeNetwork,
+        nativeGenesis: normalized.nativeGenesis,
         transceiverProgram: normalized.transceiverProgram,
         managerProgram: normalized.managerProgram,
         mint: normalized.mint,
@@ -136,7 +138,6 @@ export function buildLocalnetSolanaSetupTransactionPlan(config) {
         mintAuthority,
         decimals: normalized.decimals,
         nativeDecimals: normalized.nativeDecimals,
-        initialSupply: normalized.initialSupply,
         policyEpoch: normalized.policyEpoch,
         keyEpoch: normalized.keyEpoch,
         depositsPaused: normalized.depositsPaused,
@@ -214,6 +215,9 @@ export async function prepareSignedLocalnetSolanaSetupTransaction(config) {
     ],
   ];
   const messageBytes = Buffer.from(plan.messageBase64, "base64");
+  if (1 + signers.length * 64 + messageBytes.length > 1232) {
+    throw new Error("LocalnetSolanaSetupTransactionPacketLimitExceeded");
+  }
   const signatures = [];
 
   for (const [role, expectedBase58, signer] of signers) {
@@ -290,6 +294,12 @@ function normalizeSetupConfig(config) {
   const feePayer = normalizePubkeyPair(value, "feePayerBase58", "feePayerHex");
   const recentBlockhash = normalizePubkeyPair(value, "recentBlockhashBase58", "recentBlockhashHex");
   const solanaDeployment = normalizeHash(value.solanaDeploymentHex, "solanaDeploymentHex");
+  const nativeGenesis = normalizeHash(value.nativeGenesisHex, "nativeGenesisHex");
+  const protocolId = checkedU32(value.protocolId, "protocolId");
+  const nativeNetwork = checkedU32(value.nativeNetwork, "nativeNetwork");
+  if (protocolId === 0 || nativeNetwork === 0 || isZeroBytes(nativeGenesis.bytes)) {
+    throw new Error("LocalnetSolanaSetupNativeDomainRequired");
+  }
   const attesters = normalizeAttesters(value.attesterPublicKeysHex);
   const decimals = checkedU8(value.decimals, "decimals");
   const nativeDecimals = checkedU8(value.nativeDecimals, "nativeDecimals");
@@ -351,6 +361,9 @@ function normalizeSetupConfig(config) {
     recentBlockhash,
     solanaDeployment,
     attesters,
+    protocolId,
+    nativeNetwork,
+    nativeGenesis,
     decimals,
     nativeDecimals,
     initialSupply,
@@ -410,6 +423,9 @@ function encodeInitializeAccount3({ tokenAccountOwner }) {
 }
 
 function encodeTransceiverInitialize({
+  protocolId,
+  nativeNetwork,
+  nativeGenesis,
   transceiverProgram,
   managerProgram,
   mint,
@@ -424,6 +440,9 @@ function encodeTransceiverInitialize({
     managerProgram.bytes,
     mint.bytes,
     solanaDeployment.bytes,
+    u32Le(protocolId),
+    u32Le(nativeNetwork),
+    nativeGenesis.bytes,
     attesters[0].bytes,
     attesters[1].bytes,
     Uint8Array.of(active ? 1 : 0),
@@ -444,7 +463,6 @@ function encodeBridgeInitialize({
   mintAuthority,
   decimals,
   nativeDecimals,
-  initialSupply,
   policyEpoch,
   keyEpoch,
   depositsPaused,
@@ -460,9 +478,9 @@ function encodeBridgeInitialize({
     mint.bytes,
     tokenProgram.bytes,
     mintAuthority.bytes,
-    Uint8Array.of(decimals, nativeDecimals, 0),
-    ZERO_32,
-    u128Le(initialSupply),
+    // None freeze authority and zero premine are implicit in this compact
+    // initialization ABI, not caller-selectable omitted authorizations.
+    Uint8Array.of(decimals, nativeDecimals),
     u32Le(policyEpoch),
     u32Le(keyEpoch),
     Uint8Array.of(
@@ -689,19 +707,6 @@ function u64Le(value) {
   }
   const out = Buffer.alloc(8);
   out.writeBigUInt64LE(bigint, 0);
-  return out;
-}
-
-function u128Le(value) {
-  let bigint = decimalToBigInt(value, "u128");
-  const out = Buffer.alloc(16);
-  for (let index = 0; index < 16; index += 1) {
-    out[index] = Number(bigint & 0xffn);
-    bigint >>= 8n;
-  }
-  if (bigint !== 0n) {
-    throw new Error("u128:Overflow");
-  }
   return out;
 }
 

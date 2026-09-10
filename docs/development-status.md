@@ -2,6 +2,12 @@
 
 ## Current Phase 08 integration evidence (2026-09-10)
 
+Security commit `95d00b19026dd56320cc012f580802bff6300fc0`, message
+`fix(phase-08): authorize mint enrollment and prevent backing replay`, pushed to
+PRIVATE origin/main; all four [CI jobs passed](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34439119240).
+CI measured the real deposit plus three retry/replay/supply checks. Its exact-SHA
+evidence does not certify the newer domain-binding change described below.
+
 Integration source `bfc704c561fcf47e9625c7aff6c8bb72b1997ba7` was pushed to the
 private repository. [CI run 34437324660](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34437324660)
 failed in the SBF job: running host Cargo metadata from the repository root
@@ -44,6 +50,14 @@ CI emits the tested GITHUB_SHA; no self-referential commit SHA is embedded.
   claimed finalized failed transaction. A test-harness account-wrapper mismatch
   initially failed the final supply check; the corrected full run passed all
   three checks. These are not the complete failure/reorg/restart matrix.
+- The current Transceiver configuration additionally binds protocol ID, Native
+  network code and genesis. Three more real-validator checks reject separately
+  substituted domains signed by both disposable attesters and verify no receipt
+  was created. The full six-check run passed with unchanged supply.
+- Compact bridge initialization makes zero premine and None freeze authority
+  implicit, mandatory values. Old initialization serialization is rejected;
+  persisted bridge state layout is unchanged. Transceiver config uses KPTCFG02
+  and rejects old unbound config. Setup signing enforces the 1232-byte packet cap.
 - The observer checks account program ownership, PDA, freshness, Mint layout,
   exact supply, decimals, PDA mint authority and no freeze authority. It reports
   RPC_OBSERVATION, not independent chain validation.
@@ -65,15 +79,15 @@ CI emits the tested GITHUB_SHA; no self-referential commit SHA is embedded.
 - Stale AGENTS/readiness summaries were consolidated; historical evidence below
   is not proof of this newer source.
 
-Measured tests: 133 Node tests + two vectors on Windows and WSL; 56 Solana Rust
+Measured tests: 134 Node tests + two vectors on Windows and WSL; 58 Solana Rust
 tests + 22 Native supporting-crate tests in WSL. Formatting/clippy passed.
 Zero failures/skips in these measured suites; two SBF builds and real deposit
-E2E plus three real-validator security checks passed. Native Windows SBF,
+E2E plus six real-validator security checks passed. Native Windows SBF,
 Windows service ACL/protected storage, full
 failure matrix, withdrawal E2E, Devnet and fresh-clone reproducibility: NOT_RUN.
 
 Phase 08 is still incomplete. Next: exact-SHA CI, then temporary-deposit
-recovery/race coverage, on-chain Native network/genesis binding, complete Native evidence
+recovery/race coverage, remaining account/source validation, complete Native evidence
 wiring and real-daemon failure/replay/restart tests. The local deposit uses an
 isolated FROST-controlled P2TR test intent; this run does not prove user CSV
 recovery. File-journal tests do not prove production fsync, authenticated

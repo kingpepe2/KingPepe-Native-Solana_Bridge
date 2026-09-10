@@ -42,7 +42,10 @@ pub const PROGRAM_ABI_STATUS: &str = "ECONOMIC_ABI_ENABLED";
 pub const BRIDGE_INSTRUCTION_INITIALIZE: u8 = 1;
 pub const BRIDGE_INSTRUCTION_ACCEPT_DEPOSIT_CLAIM: u8 = 2;
 pub const BRIDGE_INSTRUCTION_RECORD_WITHDRAWAL_REQUEST: u8 = 3;
-pub const BRIDGE_CONFIG_INSTRUCTION_LENGTH: usize = 256;
+// Initialization omits the mandatory None freeze authority and zero premine.
+// Persisted state keeps its existing full, validated configuration layout.
+pub const BRIDGE_CONFIG_INSTRUCTION_LENGTH: usize = 207;
+pub const BRIDGE_CONFIG_STATE_LENGTH: usize = 256;
 pub const BURN_CHECKED_INSTRUCTION_LENGTH: usize = 105;
 pub const BRIDGE_STATE_PDA_SEED_PREFIX: &[u8] = b"kingpepe-bridge-state";
 pub const DEPOSIT_CLAIM_PDA_SEED_PREFIX: &[u8] = b"kingpepe-deposit-claim";
@@ -54,8 +57,7 @@ pub const BRIDGE_ACCOUNT_VERSION: u8 = 1;
 pub const BRIDGE_STATE_ACCOUNT_MAGIC: [u8; 8] = *b"KPBSTAT1";
 pub const DEPOSIT_CLAIM_ACCOUNT_MAGIC: [u8; 8] = *b"KPBCLM01";
 pub const WITHDRAWAL_RECORD_ACCOUNT_MAGIC: [u8; 8] = *b"KPBWDR01";
-pub const BRIDGE_STATE_ACCOUNT_LENGTH: usize =
-    8 + 1 + 1 + BRIDGE_CONFIG_INSTRUCTION_LENGTH + 16 + 16;
+pub const BRIDGE_STATE_ACCOUNT_LENGTH: usize = 8 + 1 + 1 + BRIDGE_CONFIG_STATE_LENGTH + 16 + 16;
 pub const DEPOSIT_CLAIM_ACCOUNT_LENGTH: usize = 8 + 1 + 32 + 32 + 8 + 2 + MAX_DESTINATION_LENGTH;
 pub const WITHDRAWAL_RECORD_ACCOUNT_LENGTH: usize =
     8 + 1 + 32 + 32 + 32 + 8 + 8 + 2 + MAX_DESTINATION_LENGTH + 32;
@@ -105,9 +107,12 @@ pub fn decode_bridge_instruction(
                     found: instruction_data.len(),
                 });
             }
-            Ok(BridgeInstruction::Initialize(decode_bridge_config(
-                &instruction_data[1..],
-            )?))
+            let compact = &instruction_data[1..];
+            let mut full = Vec::with_capacity(BRIDGE_CONFIG_STATE_LENGTH);
+            full.extend_from_slice(&compact[..195]);
+            full.extend_from_slice(&[0; 49]); // None + zero pubkey padding + u128 zero.
+            full.extend_from_slice(&compact[195..]);
+            Ok(BridgeInstruction::Initialize(decode_bridge_config(&full)?))
         }
         BRIDGE_INSTRUCTION_ACCEPT_DEPOSIT_CLAIM => {
             let expected = 1 + bridge_messages::MESSAGE_LENGTH;
@@ -157,8 +162,16 @@ impl BridgeInstruction {
         let mut out = Vec::new();
         match self {
             BridgeInstruction::Initialize(config) => {
+                if config.mint_binding.freeze_authority.is_some()
+                    || config.mint_binding.initial_supply != 0
+                {
+                    return Err(EntrypointError::InvalidInstructionEncoding);
+                }
                 out.push(BRIDGE_INSTRUCTION_INITIALIZE);
-                encode_bridge_config(config, &mut out);
+                let mut full = Vec::with_capacity(BRIDGE_CONFIG_STATE_LENGTH);
+                encode_bridge_config(config, &mut full);
+                out.extend_from_slice(&full[..195]);
+                out.extend_from_slice(&full[244..]);
             }
             BridgeInstruction::AcceptDepositClaim(message) => {
                 out.push(BRIDGE_INSTRUCTION_ACCEPT_DEPOSIT_CLAIM);
@@ -1538,7 +1551,7 @@ pub fn decode_bridge_state_account(data: &[u8]) -> Result<BridgeStateAccount, Ac
         return Err(AccountCodecError::UnsupportedVersion);
     }
     let state = program_state_from_u8(cursor.read_u8()?)?;
-    let config_bytes = cursor.read_array::<BRIDGE_CONFIG_INSTRUCTION_LENGTH>()?;
+    let config_bytes = cursor.read_array::<BRIDGE_CONFIG_STATE_LENGTH>()?;
     let config =
         decode_bridge_config(&config_bytes).map_err(|_| AccountCodecError::InvalidEncoding)?;
     let minted_supply = cursor.read_u128_le()?;
@@ -2066,6 +2079,9 @@ mod tests {
             mint: config.mint_binding.mint,
             solana_deployment: config.solana_deployment,
             authorized_attesters: [h(21), h(22)],
+            protocol_id: 1,
+            native_network: 2,
+            native_genesis: h(8),
             active: true,
             key_epoch: config.key_epoch,
         })
@@ -2174,6 +2190,29 @@ mod tests {
             process_instruction_boundary(&[255]),
             Err(EntrypointError::UnsupportedInstructionTag(255))
         );
+    }
+
+    #[test]
+    fn compact_initialization_rejects_premine_freeze_and_old_serialization() {
+        let config = base_config();
+        for frozen in [false, true] {
+            let mut invalid = config.clone();
+            if frozen {
+                invalid.mint_binding.freeze_authority = Some(h(99));
+            } else {
+                invalid.mint_binding.initial_supply = 1;
+            }
+            assert_eq!(
+                BridgeInstruction::Initialize(invalid).encode(),
+                Err(EntrypointError::InvalidInstructionEncoding)
+            );
+        }
+        let mut legacy = vec![BRIDGE_INSTRUCTION_INITIALIZE];
+        encode_bridge_config(&config, &mut legacy);
+        assert!(matches!(
+            decode_bridge_instruction(&legacy),
+            Err(EntrypointError::InvalidInstructionLength { .. })
+        ));
     }
 
     #[test]

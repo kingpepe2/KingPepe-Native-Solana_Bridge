@@ -14,6 +14,11 @@
     "terminologyReview": "Case-insensitive project-role terminology reviewed. Solana account ownership terms are SOLANA_PROTOCOL_TERM; tar --no-same-owner is THIRD_PARTY_TERM. No project governance role uses that terminology.",
     "sourceImports": "No upstream source implementation or legacy files imported in this increment. Existing BIP-341 public vector material retains DERIVED_FROM_THIRD_PARTY classification and BSD-3-Clause attribution/terms."
   },
+  "phase08DomainReview": {
+    "newFiles": 0,
+    "dependencyChanges": "None",
+    "changes": "Original protocol/Native-domain configuration validation, compact mandatory-zero initialization encoding, matching local setup wiring and real-validator adversarial checks. No upstream source copied."
+  },
   "provenancePolicy": {
     "originalCodeLicense": "Proprietary (Copyright (c) 2026 KingPepe Team)",
     "provenanceClassifications": [

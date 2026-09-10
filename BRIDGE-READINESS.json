@@ -15,8 +15,8 @@
   },
   "evidenceScope": "Current local integration increment; its CI result must be checked at the exact source SHA. Earlier per-component CI booleans were historical, not proof of this tree.",
   "previousVerifiedSource": {
-    "sha": "507c94f39b1f91630baf22824ca4094e3f99d5b6",
-    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34437591936",
+    "sha": "95d00b19026dd56320cc012f580802bff6300fc0",
+    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34439119240",
     "status": "PASS"
   },
   "sourceState": {
@@ -33,6 +33,7 @@
     "receiptAndClaim": "TWO_TRANSACTIONS_CANONICAL_SHARED_MESSAGE",
     "initialEnrollment": "EXACT_MINT_SIGNATURE_REQUIRED_NOT_AN_ALTERNATE_MINTER",
     "backingReplayProtection": "PERMANENT_OUTPOINT_PDA_REAL_LOCAL_VALIDATOR_REJECTION_TESTED",
+    "transceiverNativeDomain": "PROTOCOL_NETWORK_GENESIS_BOUND_DUAL_SIGNED_SUBSTITUTIONS_REJECTED_LOCAL_VALIDATOR",
     "legacyOversizedBundle": "REMOVED_NOT_A_VALID_LOCAL_VALIDATOR_TRANSACTION",
     "durability": "IMPLEMENTED_BUT_INCOMPLETE",
     "sdkCliApp": "INCOMPLETE",
@@ -40,19 +41,19 @@
   },
   "localValidation": {
     "windows": {
-      "nodeTestsPass": 133,
+      "nodeTestsPass": 134,
       "protocolVectorsPass": 2,
       "nativeSbf": "NOT_RUN_NOT_SUPPORTED",
       "serviceAclProtectedStorage": "NOT_RUN"
     },
     "wsl": {
-      "nodeTestsPass": 133,
+      "nodeTestsPass": 134,
       "protocolVectorsPass": 2,
-      "solanaRustTestsPass": 56,
+      "solanaRustTestsPass": 58,
       "nativeRustTestsPass": 22,
       "sbfProgramsBuilt": 2,
       "nativeToSolana": "PASS_SINGLE_FRESH_OPERATION_REAL_DAEMONS",
-      "localValidatorSecurityChecksPass": 3,
+      "localValidatorSecurityChecksPass": 6,
       "localValidatorSecurityChecksFail": 0,
       "duplicateBacking": "NEW_NONCE_VALID_ATTESTATIONS_PREFLIGHT_REJECTED_SUPPLY_UNCHANGED",
       "canonicalReserveAtomic": "100000000",
@@ -83,7 +84,7 @@
   "phase08Remaining": [
     "Review actual temporary-deposit recovery script and sweep/recovery race coverage",
     "Wire complete Native evidence validation into the daemon-backed path and independent attester checks",
-    "Bind Native network/genesis in on-chain configuration and review remaining account/security dependencies",
+    "Review remaining account and source-validation dependencies",
     "Exercise real-daemon failure/restart/reorg/replay cases beyond model tests"
   ],
   "readinessGates": {

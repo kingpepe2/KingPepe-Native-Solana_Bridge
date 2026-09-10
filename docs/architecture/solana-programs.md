@@ -4,15 +4,40 @@
 
 Both direct Rust programs compile to SBF and execute the real local deposit
 path. The historical Phase 05 model description below is not a complete
-on-chain security certification. Initialization authorization needs further
-review before Phase 08 security completion.
+on-chain security certification. Initial enrollment requires the exact Mint
+identity to sign both Manager and Transceiver setup; the fee payer alone cannot
+take over that Mint's configuration. SPL mint authority stays exclusively a PDA.
 
 The transceiver requires the actual current instruction from the real
 Instructions sysvar. Two preceding Ed25519 instructions use strict self-indexed
 signature/key fields and cross-reference the same canonical bytes in that
 transceiver instruction. Wrong indexes, offsets, current program, bytes or
 attester identities fail. Receipt creation and later claim/mint are separate
-packet-sized transactions; a persistent claim PDA prevents replay.
+packet-sized transactions. Persistent claim and Native-outpoint backing PDAs
+prevent new nonce/evidence/epoch envelopes from reusing consumed backing.
+The backing marker has no close instruction. Receipt/mint does not require the
+Mint identity's enrollment signature or per-transfer KingPepe Team approval.
+
+The Transceiver binds protocol ID (u32 LE), Native network code (u32 LE), and
+Native genesis (32 bytes) in addition to its previous deployment identities.
+Initialize data is tag 1 plus 237 config bytes: Transceiver, Manager, Mint,
+Solana deployment (32 bytes each); protocol ID; Native network; Native genesis;
+two attesters (32 bytes each); active (u8 boolean); key epoch (u32 LE).
+The config account uses KPTCFG02, version 1 and these config bytes (246 bytes).
+Old unbound config is rejected. These are project protocol network codes,
+not Wormhole chain registrations.
+
+Bridge initialize data is tag 1 plus a compact 207-byte config: environment
+(u8); Manager, Transceiver, Solana deployment, Mint, Token Program, mint-authority
+PDA (32 bytes each); decimals and Native decimals (u8 each); policy/key epochs
+(u32 LE each); deposit-pause, withdrawal-pause, hard-stop and Mainnet-activation
+(u8 boolean each). None freeze authority and zero initial supply are mandatory
+implicit values; encoders reject requests for other values. The previous
+257-byte initialization instruction is rejected, not accepted as an alternative.
+Persisted bridge state keeps its previous 256-byte full config representation;
+claim/withdrawal/receipt encodings and canonical economic messages are unchanged.
+The setup transaction includes all enrollment signatures and is bounded to
+1232 bytes before any signer is invoked.
 
 Actual bridge deposit/withdrawal paths enforce local activation, pause/hard-stop
 and environment gates. Deposits enforce Clock validity and exact recipient

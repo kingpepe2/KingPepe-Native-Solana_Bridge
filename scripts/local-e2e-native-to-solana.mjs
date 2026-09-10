@@ -2026,7 +2026,7 @@ export function validateLocalSolanaSetupContext(context, flowConfig) {
   return normalized;
 }
 
-export async function submitLocalnetSolanaSetup({ plan, flowConfig, localSolanaSetupContext, rpcClient }) {
+export async function submitLocalnetSolanaSetup({ plan, flowConfig, localSolanaSetupContext, nativeSource, rpcClient }) {
   const config = requireObject(flowConfig, "flowConfig");
   const setupContext = validateLocalSolanaSetupContext(localSolanaSetupContext, config);
   const submitter = new LocalnetSolanaSetupSubmitter({
@@ -2034,6 +2034,9 @@ export async function submitLocalnetSolanaSetup({ plan, flowConfig, localSolanaS
       environment: "localnet",
       cluster: "localnet",
       solanaDeploymentHex: config.solanaDeploymentHex,
+      protocolId: config.protocolId,
+      nativeNetwork: config.nativeNetwork,
+      nativeGenesisHex: normalizeHash32(nativeSource?.nativeGenesisHash, "nativeGenesisHash"),
       managerProgramIdHex: config.bridgeProgramIdHex,
       transceiverProgramIdHex: config.transceiverProgramIdHex,
       decimals: config.nativeDecimals,
