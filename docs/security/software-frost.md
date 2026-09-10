@@ -52,8 +52,8 @@ digests are unchanged. A digest match states equality with local policy input;
 it does not prove Native/Solana chain truth or replace each participant's evidence
 validator. A different B policy cannot be overridden by A or the coordinator.
 If A already reserved a nonce before B rejects, the synchronous coordinator now
-requests bound cleanup from both participants. Uncertain restart recovery remains
-separate work. No production permission,
+requests bound cleanup from both participants. V2 uncertain-session recovery is
+described below; complete service restart remains separate work. No production permission,
 protected-state or rollback guarantee follows from this enrollment boundary.
 
 ## Coordinated abort boundary
@@ -68,8 +68,8 @@ tombstone. Counters require canonical u64 decimal strings; numeric JSON values
 are rejected even with recomputed metadata. Missing or contradictory records
 are rejected without repair.
 No active private-key deserialization or new policy approval is needed to destroy
-an existing reservation. RESERVED becomes ABORTED/CONSUMED and its stored nonce
-is removed before acknowledgment; SIGNED shares are preserved. Repeated abort
+an existing reservation. RESERVED becomes ABORTED/CONSUMED and its volatile nonce
+is discarded before acknowledgment; SIGNED shares are preserved. Repeated abort
 is idempotent. Stored share material cannot be hidden by an ABORTED label.
 
 The eight-field local receipt binds protocol, role, request, epoch, session,
@@ -83,9 +83,9 @@ reset or 1-of-2 fallback. Completed shares are not removed to manufacture a retr
 
 This is cooperating synchronous-runtime handling, not durable global fencing,
 automatic process recovery, full rollback/clone detection or protected storage.
-Logical JSON nonce removal is not forensic erasure. RESERVED secret nonces still
-persist in external local test state; automatic destruction of uncertain sessions
-on restart remains open. Disk-full/response-loss tests inject failures around
+V1 JSON nonce removal was not forensic erasure. V2 no longer serializes these
+secret nonce bytes and handles uncertain reservations as described below.
+Disk-full/response-loss tests inject failures around
 real external file writes, not physical power failures or a filled production
 volume. No production signing or services are authorized by these tests.
 
@@ -106,12 +106,48 @@ and JSON parse errors omit underlying paths/content. Existing checkout, link and
 file-type checks still apply. Thirteen added regressions include two real setup
 processes, loss of an enrolled file and preserving the original signing session.
 
-No V1 data is migrated or deleted. Reserved secret nonces still persist, so this
-does NOT complete uncertain nonce restart recovery. Rechecks around rename are
+No V1 data is migrated or deleted. Exclusive creation alone does NOT establish
+uncertain nonce restart recovery; V2 adds the handling below. Rechecks around rename are
 not atomic compare-and-swap or protection from a hostile filesystem race; failed
 updates may retain external temporary state. No authenticated monotonic anchor,
 protected share storage, power-loss proof or ongoing signer exclusivity is
 claimed. These remain separate work and prevent production readiness.
+
+## V2 volatile nonce and restart boundary
+
+Signing nonce bytes are never serialized in V2 state. A private Map retains the
+generated Uint8Arrays only for the active signer instance, bound to the persisted
+public commitment. The complete validated V1 request is stored with the public
+reservation. Save must succeed before exposing its commitment; an uncertain save
+discards the nonce. Before signing, the Map entry is removed, the consumed marker
+is persisted, and only then is the primitive invoked. A finally block clears the
+nonce even if the consumed-marker write or primitive fails. Completed share
+publication rechecks the saved session/tombstone; exact retries return the same
+share without new nonce generation. Temporary decoded key/share byte buffers are
+also cleared after use. This does not erase all JavaScript/OS memory copies.
+
+A valid abort discards the volatile nonce even if its subsequent state read fails.
+close() discards all nonce capabilities and permanently disables that instance.
+On reopen, every saved session and tombstone is validated before any recovery
+write: full request/session/deployment/key binding, exact metadata fields,
+canonical counters, unique reservation/counter identities and state consistency.
+Uncertain RESERVED entries are persisted as ABORTED/CONSUMED with the explicit
+RECOVERY_UNCERTAIN_NONCE outcome before the constructor returns. Missing or
+contradictory stored metadata or failed persistence stops reopening. Completed
+shares remain intact. This is not independent verification of chain evidence.
+V1 state is rejected without migration, replacement keys or deletion. The local
+4096-session ceiling fails before adding another session and never prunes markers.
+
+Sixteen new regressions include actual child-process SIGKILL after reservation,
+reopen, before/after-persistence errors, exact completed aggregate reconstruction,
+closed-instance refusal, malformed-state rejection and restoration of an earlier
+public reservation snapshot. Test children receive no keys/nonces through IPC or
+output. A restored public snapshot cannot recreate the destroyed nonce bytes.
+This does not prove detection of every rollback, cloned memory image, privileged
+host access, OS swap/dump or power failure. Long-term DKG shares remain in private
+external JSON, and this adapter still lacks authenticated/protected share storage
+and a retained signer lease. Global economic stops, fencing and multi-service
+recovery remain separate requirements. Mainnet and production signing stay disabled.
 
 ## Signing-request boundary
 
@@ -163,8 +199,8 @@ incompatible production material must never trigger setup. This increment is
 not stored-state authentication, confidential/authenticated DKG peer transport,
 full inner-transcript retry binding, production key ceremony or rollback/clone
 detection. Rewriting all stored metadata with its anchor can defeat structural
-checks. Complete DKG finalization retry and uncertain nonce/session recovery remain
-open; no assertion of service crash safety follows from metadata validation.
+checks. Complete DKG finalization retry and service recovery remain open;
+the V2 nonce handling above does not establish full service crash safety.
 
 ## Phase 04 implementation
 

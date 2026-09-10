@@ -18,6 +18,7 @@ import {
 import { createNativeFrostAbortReceipt, validateNativeFrostSigningRequest } from "../policy/signing-request.mjs";
 import { createTwoPartyDkgRequest, nativeFrostKeyContext, sameNativeFrostKeyDeployment,
   validateNativeFrostDkgRequest } from "../policy/dkg-request.mjs";
+import { assertFrostStateEnvelope } from "../state/file-state-store.mjs";
 
 function secureFrostRandomBytes(length = 32) {
   return Uint8Array.from(randomBytes(length));
@@ -25,6 +26,7 @@ function secureFrostRandomBytes(length = 32) {
 
 // Matches the bounded plain-record parser. Retention is never auto-pruned.
 const MAX_DKG_EPOCHS = 40;
+const MAX_SIGNING_SESSIONS = 4096; // Local resource ceiling; records are never pruned automatically.
 
 export class NativeFrostSigner {
   #policy;
@@ -34,6 +36,8 @@ export class NativeFrostSigner {
   #validatedNativeIntents = new Map();
   #keyContext;
   #dkgRequest;
+  #nonces = new Map();
+  #closed = false;
 
   constructor(options) {
     options = dataRecord(options, "FrostSignerOptions");
@@ -53,6 +57,7 @@ export class NativeFrostSigner {
     const state = this.#stateStore.load();
     if (state.signerId !== this.signerId) throw new Error("FROST signer state identity mismatch");
     this.#validateStateDeployment(state);
+    this.#recoverUncertainNonces(state);
   }
 
   dkgContext() {
@@ -68,7 +73,13 @@ export class NativeFrostSigner {
   }
 
   isAvailable() {
-    return this.#available;
+    return this.#available && !this.#closed;
+  }
+
+  close() {
+    this.#closed = true;
+    for (const id of this.#nonces.keys()) this.#discardNonce(id);
+    this.#validatedNativeIntents.clear();
   }
 
   async verifyNativeEvidence(intent) {
@@ -179,110 +190,106 @@ export class NativeFrostSigner {
     this.#requireAvailable();
     request = validateNativeFrostSigningRequest(request);
     const { state, key } = this.#authorizeRequestWithKey(request);
-    const existing = state.signing[request.sessionId];
-    if (existing !== undefined) {
-      assertSameSigningRequest(existing, request);
-      if (existing.state === "ABORTED") throw new Error("FROST nonce was already burned");
-      if (existing.commitment === undefined) throw new Error("FROST signing session is missing its public commitment");
-      return commitmentEnvelope(this.signerId, request, existing.commitment);
-    }
-
-    const counter = nextCounter(state.nonceReservationCounter);
-    const generated = schnorr_FROST.commit(key.secret, secureFrostRandomBytes);
-    let nonce;
     try {
-      nonce = serializeNonce(generated, this.signerId, counter, request);
-    } finally {
-      generated.nonces.hiding.fill(0);
-      generated.nonces.binding.fill(0);
-    }
-    state.nonceReservationCounter = counter;
-    state.signing[request.sessionId] = {
-      requestId: request.requestId,
-      epoch: request.epoch,
-      intentDigest: request.intentDigest,
-      messageHex: request.messageHex,
-      participantIds: [...request.participantIds],
-      nonceReservationId: nonce.commitment.nonceReservationId,
-      reservationCounter: counter,
-      state: "RESERVED",
-      commitment: nonce.commitment,
-      nonce,
-    };
-    state.nonceTombstones[nonce.commitment.nonceReservationId] = {
-      nonceReservationId: nonce.commitment.nonceReservationId,
-      reservationCounter: counter,
-      requestId: request.requestId,
-      epoch: request.epoch,
-      sessionId: request.sessionId,
-      intentDigest: request.intentDigest,
-      messageHex: request.messageHex,
-      participantIds: [...request.participantIds],
-      commitmentSha256: sha256Canonical(nonce.commitment),
-      state: "RESERVED",
-    };
-    this.#stateStore.save(state);
-    return commitmentEnvelope(this.signerId, request, nonce.commitment);
+      const existing = state.signing[request.sessionId];
+      if (existing !== undefined) {
+        assertSameSigningRequest(existing, request);
+        validateNonceSessionState(state, existing, request, this.signerId, this.frostIdentifier());
+        if (existing.state === "ABORTED") { this.#discardNonce(request.sessionId); throw new Error("FROST nonce was already burned"); }
+        if (existing.state === "RESERVED") this.#reservedNonce(request.sessionId, existing);
+        return commitmentEnvelope(this.signerId, request, existing.commitment);
+      }
+      if (this.#nonces.has(request.sessionId)) {
+        this.#discardNonce(request.sessionId);
+        throw new Error("FrostNonceStateChanged");
+      }
+      if (Object.keys(state.signing).length >= MAX_SIGNING_SESSIONS) throw new Error("FrostSigningStateCapacity");
+      const counter = nextCounter(state.nonceReservationCounter);
+      const generated = schnorr_FROST.commit(key.secret, secureFrostRandomBytes);
+      let retained = false;
+      try {
+        const commitment = serializePublicNonceCommitment(generated.commitments, this.signerId, counter, request);
+        state.nonceReservationCounter = counter;
+        state.signing[request.sessionId] = {
+          request: structuredClone(request),
+          requestId: request.requestId, epoch: request.epoch, intentDigest: request.intentDigest,
+          messageHex: request.messageHex, participantIds: [...request.participantIds],
+          nonceReservationId: commitment.nonceReservationId, reservationCounter: counter,
+          state: "RESERVED", commitment,
+        };
+        state.nonceTombstones[commitment.nonceReservationId] = {
+          nonceReservationId: commitment.nonceReservationId, reservationCounter: counter,
+          requestId: request.requestId, epoch: request.epoch, sessionId: request.sessionId,
+          intentDigest: request.intentDigest, messageHex: request.messageHex,
+          participantIds: [...request.participantIds], commitmentSha256: sha256Canonical(commitment), state: "RESERVED",
+        };
+        // Only public reservation metadata reaches the store. Secret nonce bytes
+        // stay in this instance and are discarded if persistence is uncertain.
+        this.#stateStore.save(state);
+        const envelope = commitmentEnvelope(this.signerId, request, commitment);
+        this.#nonces.set(request.sessionId, { nonces: generated.nonces, commitmentHash: sha256Canonical(commitment) });
+        retained = true;
+        return envelope;
+      } finally { if (!retained) zeroNonce(generated.nonces); }
+    } finally { key.secret.signingShare.fill(0); }
   }
 
   signatureShare(request, commitments) {
     this.#requireAvailable();
     request = validateNativeFrostSigningRequest(request);
     const { state, key } = this.#authorizeRequestWithKey(request);
-    const session = state.signing[request.sessionId];
-    if (session === undefined) throw new Error("signer has no reserved FROST nonce for session");
-    assertSameSigningRequest(session, request);
-
-    const commitmentPayloads = validateCommitmentSet(request, commitments);
-    const commitmentSetHash = sha256Canonical(commitmentPayloads);
-    if (session.state === "SIGNED") {
-      if (session.commitmentSetHash !== commitmentSetHash || session.shareHex === undefined) {
-        throw new Error("signed FROST session transcript changed");
-      }
-      return shareEnvelope(this.signerId, request, key.secret.identifier, session.shareHex, commitmentSetHash);
-    }
-    if (session.state !== "RESERVED" || session.nonce === undefined) throw new Error("FROST nonce is not available");
-
-    const tombstone = state.nonceTombstones[session.nonceReservationId];
-    if (tombstone?.state !== "RESERVED") throw new Error("FROST nonce tombstone is not reserved");
-
-    const nonce = deserializeNonce(session.nonce);
-    session.state = "ABORTED";
-    delete session.nonce;
-    tombstone.state = "CONSUMED";
-    tombstone.outcome = "SHARE_COMPUTATION_STARTED";
-    tombstone.commitmentSetHash = commitmentSetHash;
-    this.#stateStore.save(state);
-
-    let share;
     try {
-      share = schnorr_FROST.signShare(
-        key.secret,
-        key.public,
-        nonce.nonces,
-        commitmentPayloads.map(deserializeCommitment),
-        hexToBytes(request.messageHex, "FROST signing message"),
-      );
-    } finally {
-      nonce.nonces.hiding.fill(0);
-      nonce.nonces.binding.fill(0);
-    }
+      const session = state.signing[request.sessionId];
+      if (session === undefined) throw new Error("signer has no reserved FROST nonce for session");
+      assertSameSigningRequest(session, request);
+      const tombstone = validateNonceSessionState(state, session, request, this.signerId, this.frostIdentifier());
 
-    const freshState = this.#stateStore.load();
-    const freshSession = freshState.signing[request.sessionId];
-    const freshTombstone = freshState.nonceTombstones[session.nonceReservationId];
-    freshSession.state = "SIGNED";
-    freshSession.commitmentSetHash = commitmentSetHash;
-    freshSession.shareHex = bytesToHex(share);
-    freshTombstone.outcome = "SHARE_PERSISTED";
-    freshTombstone.shareSha256 = sha256Canonical({ shareHex: freshSession.shareHex });
-    this.#stateStore.save(freshState);
-    return shareEnvelope(this.signerId, request, key.secret.identifier, freshSession.shareHex, commitmentSetHash);
+      const commitmentPayloads = validateCommitmentSet(request, commitments);
+      const commitmentSetHash = sha256Canonical(commitmentPayloads);
+      if (session.state === "SIGNED") {
+        if (session.commitmentSetHash !== commitmentSetHash || session.shareHex === undefined) {
+          throw new Error("signed FROST session transcript changed");
+        }
+        return shareEnvelope(this.signerId, request, key.secret.identifier, session.shareHex, commitmentSetHash);
+      }
+      if (session.state !== "RESERVED") { this.#discardNonce(request.sessionId); throw new Error("FROST nonce is not available"); }
+      const nonce = this.#reservedNonce(request.sessionId, session);
+      // Remove before either persistent consumption or cryptographic computation.
+      // Even a failed pre-sign write cannot make these bytes available again.
+      this.#nonces.delete(request.sessionId);
+      try {
+        session.state = "ABORTED";
+        tombstone.state = "CONSUMED";
+        tombstone.outcome = "SHARE_COMPUTATION_STARTED";
+        tombstone.commitmentSetHash = commitmentSetHash;
+        this.#stateStore.save(state);
+
+        const share = schnorr_FROST.signShare(key.secret, key.public, nonce,
+          commitmentPayloads.map(deserializeCommitment), hexToBytes(request.messageHex, "FROST signing message"));
+        try {
+          const freshState = this.#stateStore.load();
+          this.#validateStateDeployment(freshState);
+          const freshSession = freshState.signing[request.sessionId];
+          const freshTombstone = freshState.nonceTombstones[session.nonceReservationId];
+          if (canonicalJson(freshSession) !== canonicalJson(session) || canonicalJson(freshTombstone) !== canonicalJson(tombstone)) {
+            throw new Error("FrostNonceStateChanged");
+          }
+          freshSession.state = "SIGNED";
+          freshSession.commitmentSetHash = commitmentSetHash;
+          freshSession.shareHex = bytesToHex(share);
+          freshTombstone.outcome = "SHARE_PERSISTED";
+          freshTombstone.shareSha256 = sha256Canonical({ shareHex: freshSession.shareHex });
+          this.#stateStore.save(freshState);
+          return shareEnvelope(this.signerId, request, key.secret.identifier, freshSession.shareHex, commitmentSetHash);
+        } finally { share.fill(0); }
+      } finally { zeroNonce(nonce); }
+    } finally { key.secret.signingShare.fill(0); }
   }
 
   abortSigningSession(request) {
     this.#requireAvailable();
     request = validateNativeFrostSigningRequest(request);
+    this.#discardNonce(request.sessionId);
     const state = this.#stateStore.load();
     this.#validateStateDeployment(state);
     const session = state.signing[request.sessionId];
@@ -291,9 +298,10 @@ export class NativeFrostSigner {
     // Cancellation never enrolls/authorizes an operation or deserializes a key.
     // In particular, a later policy rejection must not prevent nonce destruction.
     assertSameSigningRequest(session, request);
-    const tombstone = validateAbortSessionState(state, session, request, this.signerId, this.frostIdentifier());
+    let tombstone;
+    try { tombstone = validateNonceSessionState(state, session, request, this.signerId, this.frostIdentifier()); }
+    catch { throw new Error("FrostAbortStateInvalid"); }
     if (session.state === "SIGNED" || session.state === "ABORTED") return receipt(session.state);
-    delete session.nonce;
     session.state = "ABORTED";
     tombstone.state = "CONSUMED";
     tombstone.outcome = "ABORTED";
@@ -305,14 +313,13 @@ export class NativeFrostSigner {
     assertNativeSigningPolicy(this.#policy);
     assertNativeSigningApproved(this.#policy, request.intent);
     const state = this.#stateStore.load();
-    const key = this.#activeKey(state, request.epoch);
     if (this.#nativeEvidenceValidator !== undefined) {
       const checkedAt = this.#validatedNativeIntents.get(request.intentDigest);
       if (checkedAt === undefined || performance.now() - checkedAt > 30_000) {
         throw new Error("FROST fresh independent Native evidence required");
       }
     }
-    return { state, key };
+    return { state, key: this.#activeKey(state, request.epoch) };
   }
 
   #activeKey(state, epoch) {
@@ -331,6 +338,7 @@ export class NativeFrostSigner {
   }
 
   #validateStateDeployment(state) {
+    assertFrostStateEnvelope(state, this.signerId);
     // Structural context checks only, not authentication or rollback detection.
     // Existing incompatible state is rejected without reset, migration or keys.
     try {
@@ -378,7 +386,58 @@ export class NativeFrostSigner {
   }
 
   #requireAvailable() {
+    if (this.#closed) throw new Error("FrostSignerClosed");
     if (!this.#available) throw new Error(`${this.signerId} is unavailable`);
+  }
+
+  #reservedNonce(sessionId, session) {
+    const value = this.#nonces.get(sessionId);
+    if (value === undefined || value.commitmentHash !== sha256Canonical(session.commitment)) {
+      this.#discardNonce(sessionId);
+      throw new Error("FROST nonce is not available");
+    }
+    return value.nonces;
+  }
+
+  #discardNonce(sessionId) {
+    const value = this.#nonces.get(sessionId);
+    this.#nonces.delete(sessionId);
+    if (value !== undefined) zeroNonce(value.nonces);
+  }
+
+  #recoverUncertainNonces(state) {
+    const pending = [];
+    try {
+      const sessions = Object.entries(state.signing);
+      if (sessions.length > MAX_SIGNING_SESSIONS || Object.keys(state.nonceTombstones).length !== sessions.length) throw new Error();
+      const ids = new Set();
+      const counters = new Set();
+      for (const [sessionId, raw] of sessions) {
+        const session = dataRecord(raw, "FrostNonceSession");
+        const request = validateNativeFrostSigningRequest(session.request);
+        if (request.sessionId !== sessionId) throw new Error();
+        for (const field of ["nativeNetwork", "nativeGenesisHash", "solanaDeployment", "bridgeProgramId", "transceiverProgramId", "mint"]) {
+          if (request.intent[field] !== this.#keyContext[field]) throw new Error();
+        }
+        const dkg = createTwoPartyDkgRequest({ epoch: request.epoch, context: { ...this.#keyContext, keyEpoch: request.epoch } });
+        if (state.dkg[dkg.sessionId]?.finalKey === undefined || state.activeEpoch === undefined || state.activeEpoch < request.epoch) throw new Error();
+        const tombstone = validateNonceSessionState(state, session, request, this.signerId, this.frostIdentifier());
+        if (ids.has(session.nonceReservationId) || counters.has(session.reservationCounter)) throw new Error();
+        ids.add(session.nonceReservationId);
+        counters.add(session.reservationCounter);
+        if (session.state === "RESERVED") pending.push({ sessionId, session, tombstone });
+      }
+    } catch { throw new Error("FrostNonceRecoveryStateInvalid"); }
+    // Validate the entire snapshot first. Never partially repair contradictory
+    // state, and never deserialize or generate a secret nonce during recovery.
+    if (pending.length === 0) return;
+    for (const { sessionId, session, tombstone } of pending) {
+      state.signing[sessionId] = { ...session, state: "ABORTED" };
+      tombstone.state = "CONSUMED";
+      tombstone.outcome = "RECOVERY_UNCERTAIN_NONCE";
+    }
+    try { this.#stateStore.save(state); }
+    catch { throw new Error("FrostNonceRecoveryPersistenceFailed"); }
   }
 }
 
@@ -524,34 +583,25 @@ function deserializeKey(value) {
   };
 }
 
-function serializeNonce(value, signerId, reservationCounter, request) {
+function serializePublicNonceCommitment(value, signerId, reservationCounter, request) {
   const commitment = {
-    identifier: value.commitments.identifier,
-    hidingHex: bytesToHex(value.commitments.hiding),
-    bindingHex: bytesToHex(value.commitments.binding),
+    identifier: value.identifier,
+    hidingHex: bytesToHex(value.hiding),
+    bindingHex: bytesToHex(value.binding),
     intentDigest: request.intentDigest,
     messageHex: request.messageHex,
     participantIds: [...request.participantIds],
   };
   return {
-    hidingHex: bytesToHex(value.nonces.hiding),
-    bindingHex: bytesToHex(value.nonces.binding),
-    commitment: {
-      ...commitment,
-      nonceReservationId: computeNonceReservationId(signerId, reservationCounter, request, commitment),
-      reservationCounter,
-    },
+    ...commitment,
+    nonceReservationId: computeNonceReservationId(signerId, reservationCounter, request, commitment),
+    reservationCounter,
   };
 }
 
-function deserializeNonce(value) {
-  return {
-    nonces: {
-      hiding: hexToBytes(value.hidingHex, "FROST hiding nonce"),
-      binding: hexToBytes(value.bindingHex, "FROST binding nonce"),
-    },
-    commitments: deserializeCommitment(value.commitment),
-  };
+function zeroNonce(value) {
+  value.hiding.fill(0);
+  value.binding.fill(0);
 }
 
 function deserializeCommitment(value) {
@@ -611,11 +661,19 @@ function nextCounter(value) {
   return (current + 1n).toString();
 }
 
-function validateAbortSessionState(state, session, request, signerId, identifier) {
+function validateNonceSessionState(state, session, request, signerId, identifier) {
   // These are consistency checks against the currently loaded local state, not
   // an authenticated monotonic anchor or proof against whole-state rollback.
   try {
+    session = dataRecord(session, "FrostNonceSession");
+    const fields = ["request", "requestId", "epoch", "intentDigest", "messageHex", "participantIds", "nonceReservationId",
+      "reservationCounter", "state", "commitment", "commitmentSetHash", "shareHex"];
+    if (Object.keys(session).some(field => !fields.includes(field))) throw new Error();
+    assertSameSigningRequest(session, request);
+    assertSameCanonical(validateNativeFrostSigningRequest(session.request), request, "FrostStoredRequestMismatch");
     const commitment = dataRecord(session.commitment, "FrostAbortCommitment");
+    if (Object.keys(commitment).length !== 8 || !/^(02|03)[0-9a-f]{64}$/u.test(commitment.hidingHex) ||
+        !/^(02|03)[0-9a-f]{64}$/u.test(commitment.bindingHex)) throw new Error();
     const { nonceReservationId, reservationCounter, ...unsigned } = commitment;
     canonicalUintDecimal(reservationCounter, "FROST reservation counter");
     canonicalUintDecimal(state.nonceReservationCounter, "FROST nonce high-water mark");
@@ -625,26 +683,37 @@ function validateAbortSessionState(state, session, request, signerId, identifier
         unsigned.identifier !== identifier || unsigned.intentDigest !== request.intentDigest ||
         unsigned.messageHex !== request.messageHex || canonicalJson(unsigned.participantIds) !== canonicalJson(request.participantIds) ||
         computeNonceReservationId(signerId, reservationCounter, request, unsigned) !== nonceReservationId) throw new Error();
-    const tombstone = state.nonceTombstones[nonceReservationId];
-    if (tombstone === undefined || tombstone.nonceReservationId !== nonceReservationId ||
+    const storedTombstone = state.nonceTombstones[nonceReservationId];
+    const tombstone = dataRecord(storedTombstone, "FrostNonceTombstone");
+    const tombstoneFields = ["nonceReservationId", "reservationCounter", "requestId", "epoch", "sessionId",
+      "intentDigest", "messageHex", "participantIds", "commitmentSha256", "state", "outcome", "commitmentSetHash", "shareSha256"];
+    if (Object.keys(tombstone).some(field => !tombstoneFields.includes(field)) || tombstone.nonceReservationId !== nonceReservationId ||
         tombstone.reservationCounter !== reservationCounter || tombstone.sessionId !== request.sessionId ||
         tombstone.requestId !== request.requestId || tombstone.epoch !== request.epoch ||
         tombstone.intentDigest !== request.intentDigest || tombstone.messageHex !== request.messageHex ||
         canonicalJson(tombstone.participantIds) !== canonicalJson(request.participantIds) ||
         tombstone.commitmentSha256 !== sha256Canonical(commitment)) throw new Error();
     if (session.state === "RESERVED") {
-      if (tombstone.state !== "RESERVED" || session.nonce === undefined || session.shareHex !== undefined ||
-          tombstone.outcome !== undefined || tombstone.shareSha256 !== undefined) throw new Error();
+      if (tombstone.state !== "RESERVED" || session.shareHex !== undefined || session.commitmentSetHash !== undefined ||
+          tombstone.outcome !== undefined || tombstone.shareSha256 !== undefined || tombstone.commitmentSetHash !== undefined) throw new Error();
     } else {
       if (!["SIGNED", "ABORTED"].includes(session.state) || tombstone.state !== "CONSUMED" || session.nonce !== undefined) throw new Error();
       if (session.state === "SIGNED" && (typeof session.shareHex !== "string" || !/^[0-9a-f]{64}$/u.test(session.shareHex) ||
+          typeof session.commitmentSetHash !== "string" || !/^[0-9a-f]{64}$/u.test(session.commitmentSetHash) ||
+          session.commitmentSetHash !== tombstone.commitmentSetHash ||
           tombstone.outcome !== "SHARE_PERSISTED" ||
           tombstone.shareSha256 !== sha256Canonical({ shareHex: session.shareHex }))) throw new Error();
       if (session.state === "ABORTED" && (session.shareHex !== undefined || tombstone.shareSha256 !== undefined ||
-          !["ABORTED", "SHARE_COMPUTATION_STARTED"].includes(tombstone.outcome))) throw new Error();
+          session.commitmentSetHash !== undefined ||
+          !["ABORTED", "SHARE_COMPUTATION_STARTED", "RECOVERY_UNCERTAIN_NONCE"].includes(tombstone.outcome))) throw new Error();
+      if (session.state === "ABORTED" && (tombstone.outcome === "SHARE_COMPUTATION_STARTED" ?
+        typeof tombstone.commitmentSetHash !== "string" || !/^[0-9a-f]{64}$/u.test(tombstone.commitmentSetHash) :
+        tombstone.commitmentSetHash !== undefined)) throw new Error();
     }
-    return tombstone;
-  } catch { throw new Error("FrostAbortStateInvalid"); }
+    // dataRecord validates a detached snapshot. Callers mutate the corresponding
+    // stored record only after every consistency check succeeds.
+    return storedTombstone;
+  } catch { throw new Error("FrostNonceStateInvalid"); }
 }
 
 function assertSameSigningRequest(session, request) {

@@ -1,6 +1,6 @@
 # FROST state
 
-`file-state-store.mjs` provides the localnet JSON signer-state adapter. It rejects
+`file-state-store.mjs` provides the V2 localnet JSON signer-state adapter. It rejects
 source-tree roots, linked paths and nonregular files. The constructor may prepare
 an empty external directory, but does not create state or generate a key.
 
@@ -17,6 +17,12 @@ This is not atomic concurrent-update fencing, an ongoing signer lease, directory
 power-loss durability or authenticated rollback detection. A failed update may
 leave a temporary file in the private external root; it is never published or
 automatically adopted as current state. No automatic migration/repair is provided.
-V1 state still contains private shares and RESERVED secret nonces; uncertain
-nonce restart handling, protected storage and service isolation remain incomplete.
-The limitation is the current adapter, not the approved single-host topology.
+V1 state is rejected without migration or deletion. V2 contains the full validated
+request, public nonce commitment and persistent tombstone, never the signing
+nonce bytes. Those live only in the signer instance and are discarded on abort,
+close, failure or consumption. Reopening a signer validates all retained sessions
+before burning uncertain RESERVED entries. Completed shares remain idempotent.
+This does not protect against process-memory snapshots or privileged clones.
+Long-term DKG private shares still use external JSON; protected storage,
+authentication, service isolation and full rollback assurance remain incomplete.
+The limitations concern this adapter, not the approved single-host topology.

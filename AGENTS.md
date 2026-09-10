@@ -25,10 +25,10 @@
 ## Current phase
 
 PHASE 08 INCOMPLETE. Phase 09 NOT_STARTED.
-Last verified source: ab79614f3a39fc495a8e4a9deda9754289d60a75, private push and
+Last verified source: cdd95747db9e45b5a31a440f380cc1dcc2f13623, private push and
 all four exact-SHA CI jobs PASS:
-https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34491098042
-Its current/staged/outgoing source and all 158 commits scanned clean; zero
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34494000161
+Its current/staged/outgoing source and all 159 commits scanned clean; zero
 workflow artifacts were uploaded. That evidence does not certify newer source.
 
 Absorbing-stop source 2bdff8f1687085d63de8c628ae12a4f2efed163e was pushed
@@ -96,11 +96,11 @@ hide a persisted share. A second isolated failure exposed numeric nonce-counter
 coercion; the existing exact u64-string validator now rejects it. Windows/WSL
 each 429 Node tests (23 new), two vectors;
 WSL 93 Rust tests/audits, both SBF builds and 55 fresh real-chain checks PASS.
-Scans/publication are recorded in development-status. Reserved nonces still
-persist in local JSON; restart destruction, authenticated/fenced state, protected
-storage and authenticated IPC remain required work.
+Scans/publication are recorded in development-status. That source still persisted
+reserved nonces; the current V2 change below removes this behavior. Authenticated/
+fenced state, protected storage and authenticated IPC remain required work.
 
-Current unpublished state-lifecycle increment: only explicit createLocal with a
+The verified state-lifecycle increment: only explicit createLocal with a
 genuine local policy creates an empty signer envelope, using exclusive creation.
 Ordinary load/save cannot initialize missing state or overwrite incompatible or
 corrupt state. I/O and JSON parse errors exclude private paths/content. Actual
@@ -109,9 +109,29 @@ Initial focused 111 PASS / 11 FAIL; then 214 focused PASS. Windows/WSL each
 442 Node tests (13 new) and two vectors PASS; WSL 93 Rust tests/audits PASS.
 Real-chain validation and publication are recorded in development-status.
 Exclusive creation is not an ongoing signer lease, state authentication, atomic
-concurrent-update fencing or nonce restart safety. Existing V1 state is not
-migrated; reserved secret nonces still persist in local JSON. No production
-configuration, keys or services were created. Next: volatile nonce/restart safety.
+concurrent-update fencing or nonce restart safety. That V1 source still persisted
+reserved nonces. No production configuration, keys or services were created.
+
+Current unpublished volatile nonce/restart increment: V2 stores full validated
+requests and public nonce commitments/tombstones only; secret nonce Uint8Arrays
+stay in the signer-private Map. Persist-before-exposure, remove-before-consumption
+and computation, and finally-buffer clearing apply on failures as well as success.
+Abort discards the volatile nonce even if a subsequent state read fails. close()
+discards nonce capabilities and cannot be reversed by the test availability flag.
+Reopen validates the full snapshot, then burns every uncertain RESERVED session
+before readiness. Completed shares retain exact idempotency. V1 state is rejected
+without migration, keys or deletion. Initial 125 PASS / 8 FAIL, then 129 PASS /
+4 FAIL exposed a detached-copy recovery update; fixed to explicitly replace the
+stored session. Then 133 PASS; expanded 138 PASS / 1 FAIL exposed extra tombstone
+metadata; strict fields/state residue checks fixed it. A late isolated regression
+(0 PASS / 1 FAIL) exposed accepting a reservation with no active epoch; the
+explicit missing-epoch check now rejects it. Windows/WSL each 458 Node tests
+(16 new), two vectors, WSL 93 Rust/audits PASS. A real SIGKILL child crash is
+tested; no key/nonce bytes are sent in test IPC or output. Fresh real-chain and
+publication evidence are tracked in development-status. Long-term DKG shares
+still persist in external JSON. This does not prove full snapshot/clone rollback,
+power-loss durability, protected storage, service leases or global restart safety.
+Next: those state/service/security dependencies before Phase 09.
 Node 24.21.0 / npm 11.19.0 / bundled SQLite 3.53.4 are required. The SQLite
 API remains release-candidate stability 1.2, not production approval.
 See docs/development-status.md for current measured tests and publication state.
@@ -140,8 +160,9 @@ configuration/API paths. The current request changes close envelope/intent ID
 and session mismatches. The current DKG changes bind deployment metadata and
 active-key selection. Current complete-intent enrollment closes purpose, evidence
 digest and unsigned-transaction identity substitution. Synchronous coordinator
-cleanup is now implemented locally; durable restart and authenticated inner DKG
-transcripts/transport remain open. The pinned
+cleanup and isolated V2 nonce restart handling are implemented locally; complete
+durable service restart and authenticated inner DKG transcripts/transport remain
+open. The pinned
 upstream FROST code is explicitly unaudited; never claim broader library audit
 coverage applies to it. The approved same-host topology is not the cause of
 these blockers. See docs/security/software-frost.md.
