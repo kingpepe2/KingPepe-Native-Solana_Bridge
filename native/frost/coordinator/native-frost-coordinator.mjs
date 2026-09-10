@@ -23,16 +23,22 @@ export function runTwoPartyDkg(signers, options) {
   const contexts = REQUIRED_FROST_SIGNERS.map((id) => normalizeNativeFrostKeyContext(byId.get(id).dkgContext()));
   if (canonicalJson(contexts[0]) !== canonicalJson(contexts[1])) throw new Error("FrostDkgParticipantContextMismatch");
   const request = createTwoPartyDkgRequest({ epoch: options.epoch, context: contexts[0] });
-  const round1 = request.participants.map((participant) => byId.get(participant.signerId).dkgRound1(request));
-  const round2BySender = new Map(
-    request.participants.map((participant) => [participant.signerId, byId.get(participant.signerId).dkgRound2(request, round1)]),
-  );
-  const completions = request.participants.map((participant) => {
-    const incoming = request.participants
-      .filter((peer) => peer.signerId !== participant.signerId)
-      .map((peer) => ({ senderId: peer.signerId, round2: round2BySender.get(peer.signerId)[participant.signerId] }));
-    return byId.get(participant.signerId).dkgFinalize(request, round1, incoming);
-  });
+  const phases = request.participants.map(p => byId.get(p.signerId).dkgPhase(request));
+  if (phases.some(phase => !["NOT_STARTED", "ROUND1", "ROUND2", "STAGED", "FINALIZED"].includes(phase))) throw new Error("FrostDkgPhaseInvalid");
+  const ready = phases.every(phase => ["STAGED", "FINALIZED"].includes(phase));
+  if (phases.includes("FINALIZED") && !ready) throw new Error("FrostDkgIncompleteHandoffRecovery");
+  if (!ready) {
+    const round1 = request.participants.map(p => byId.get(p.signerId).dkgRound1(request));
+    const round2BySender = new Map(request.participants.map(p => [p.signerId, byId.get(p.signerId).dkgRound2(request, round1)]));
+    // Persist the verified incoming contribution at BOTH recipients before
+    // finalization destroys either participant's previous DKG material.
+    for (const participant of request.participants) {
+      const incoming = request.participants.filter(peer => peer.signerId !== participant.signerId)
+        .map(peer => ({ senderId: peer.signerId, round2: round2BySender.get(peer.signerId)[participant.signerId] }));
+      byId.get(participant.signerId).dkgStageRound2(request, round1, incoming);
+    }
+  }
+  const completions = request.participants.map(p => byId.get(p.signerId).dkgCompleteStaged(request));
   const [first, second] = completions;
   if (canonicalJson(first.publicPackage) !== canonicalJson(second.publicPackage)) throw new Error("FROST public packages disagree");
   if (first.aggregateTweakedXOnlyPublicKey !== second.aggregateTweakedXOnlyPublicKey) throw new Error("FROST aggregate keys disagree");

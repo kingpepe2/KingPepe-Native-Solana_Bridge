@@ -25,10 +25,10 @@
 ## Current phase
 
 PHASE 08 INCOMPLETE. Phase 09 NOT_STARTED.
-Last verified source: cdd95747db9e45b5a31a440f380cc1dcc2f13623, private push and
+Last verified source: 86ecdd921cdee867fbc882bfe8bc5c5e90e6a37c, private push and
 all four exact-SHA CI jobs PASS:
-https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34494000161
-Its current/staged/outgoing source and all 159 commits scanned clean; zero
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34499581191
+Its current/staged/outgoing source and all 160 commits scanned clean; zero
 workflow artifacts were uploaded. That evidence does not certify newer source.
 
 Absorbing-stop source 2bdff8f1687085d63de8c628ae12a4f2efed163e was pushed
@@ -112,7 +112,7 @@ Exclusive creation is not an ongoing signer lease, state authentication, atomic
 concurrent-update fencing or nonce restart safety. That V1 source still persisted
 reserved nonces. No production configuration, keys or services were created.
 
-Current unpublished volatile nonce/restart increment: V2 stores full validated
+The verified volatile nonce/restart increment: V2 stores full validated
 requests and public nonce commitments/tombstones only; secret nonce Uint8Arrays
 stay in the signer-private Map. Persist-before-exposure, remove-before-consumption
 and computation, and finally-buffer clearing apply on failures as well as success.
@@ -131,6 +131,19 @@ tested; no key/nonce bytes are sent in test IPC or output. Fresh real-chain and
 publication evidence are tracked in development-status. Long-term DKG shares
 still persist in external JSON. This does not prove full snapshot/clone rollback,
 power-loss durability, protected storage, service leases or global restart safety.
+Current unpublished DKG handoff increment: strict bounded immutable round-one/
+round-two snapshots and announced/private polynomial binding; both recipients
+persist cryptographically verified incoming handoff before finalization removes
+old DKG material. Exact digest-bound retries and saved-setup resume never create
+replacement keys. Malformed supplied payloads are checked even after completion.
+Initial 140 PASS / 8 FAIL, then 148 PASS; expanded focused 230 PASS. A later
+isolated test exposed private polynomial substitution; fixed, then 231 focused
+PASS. Full Windows/WSL each 476 Node tests (18 new) and two vectors PASS; WSL
+93 Rust tests/audits PASS. Fresh real-chain and publication evidence are tracked
+in development-status. Older completed setup missing the new digest cannot
+resume setup without reviewed handling; no automatic migration or deletion.
+The JSON handoff is private external test state, not confidential authenticated
+service IPC, protected storage, a signer lease or full rollback assurance.
 Next: those state/service/security dependencies before Phase 09.
 Node 24.21.0 / npm 11.19.0 / bundled SQLite 3.53.4 are required. The SQLite
 API remains release-candidate stability 1.2, not production approval.
@@ -161,8 +174,8 @@ and session mismatches. The current DKG changes bind deployment metadata and
 active-key selection. Current complete-intent enrollment closes purpose, evidence
 digest and unsigned-transaction identity substitution. Synchronous coordinator
 cleanup and isolated V2 nonce restart handling are implemented locally; complete
-durable service restart and authenticated inner DKG transcripts/transport remain
-open. The pinned
+durable service restart and authenticated DKG transport remain open. Current
+local inner-message/handoff checks do not authenticate peers or stored bytes. The pinned
 upstream FROST code is explicitly unaudited; never claim broader library audit
 coverage applies to it. The approved same-host topology is not the cause of
 these blockers. See docs/security/software-frost.md.

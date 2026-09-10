@@ -199,8 +199,48 @@ incompatible production material must never trigger setup. This increment is
 not stored-state authentication, confidential/authenticated DKG peer transport,
 full inner-transcript retry binding, production key ceremony or rollback/clone
 detection. Rewriting all stored metadata with its anchor can defeat structural
-checks. Complete DKG finalization retry and service recovery remain open;
-the V2 nonce handling above does not establish full service crash safety.
+checks. Local DKG handoff/retry handling is described below; complete service
+recovery remains open. These checks do not establish full service crash safety.
+
+## Local DKG transcript and durable handoff
+
+The original message adapter uses exact A+B role identifiers, two compressed
+33-byte commitments and a 64-byte proof in round one, and one peer's 32-byte
+contribution in round two. These are the pinned Taproot-compatible primitive's
+encodings, not another FROST ciphersuite. Plain bounded snapshots reject getters,
+proxies, sparse/extended arrays, extra fields and noncanonical hex before state
+reads. The participant's own round-one message must equal its saved announcement;
+the private polynomial's identifier, threshold, step and public commitments must
+also agree. The unchanged pinned primitive checks the peer proof and contribution.
+
+Both participants persist their verified incoming contribution and a digest of
+the full deployment request and exact round-one/round-two transcript before the
+coordinator asks either to finalize. A temporary candidate used for contribution
+verification is discarded, not activated. Finalization rechecks saved state,
+derives the same key, persists it and removes old DKG and handoff secret material.
+The request-bound digest remains. Completed requests still validate supplied
+retry payloads; a separate request-only resume API validates its saved phase and
+handoff. Full setup can reopen after one participant finalized without rebuilding
+either key. A finalized peer plus missing handoff at the other participant stops.
+Old completed V2 setup without this digest is rejected for setup resume, unchanged.
+There is no automatic migration, deletion or replacement-key generation.
+
+Eighteen new regressions use real ephemeral DKG and external files, including
+before/after-save failures, exact reopen, absent/changed handoff, malformed input,
+caller mutation and private/public polynomial substitution. Final local Windows/
+WSL tests pass. Failures are injected; this is not physical power-loss testing.
+Owned decoded byte buffers are cleared, but JavaScript/OS forensic erasure is not
+proven. Runtime contributions, final shares and retry records are never published.
+
+This is cooperating local API/storage handling, not authenticated confidential
+DKG transport, a protected state adapter, an ongoing signer lease, rollback-proof
+ceremony or independent cryptographic audit. The coordinator currently routes
+private DKG contributions in-process; it has no final private signing share, but
+service transport isolation is still required. Successful local setup does not
+authorize production provisioning or activation. Key generation is outside
+[RFC 9591's scope](https://www.rfc-editor.org/rfc/rfc9591.html); the pinned
+[Noble FROST component](https://github.com/paulmillr/noble-curves/blob/2.3.0/README.md#frost-threshold-signatures)
+explicitly lacks an external audit. No upstream implementation or vectors copied.
 
 ## Phase 04 implementation
 

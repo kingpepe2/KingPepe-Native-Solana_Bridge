@@ -476,7 +476,9 @@ for (const [field, alter] of [
       stateStore: { load() { loads += 1; return initialSignerState(REQUIRED_FROST_SIGNERS[0]); }, save() { saves += 1; } } });
     const request = structuredClone(createTwoPartyDkgRequest({ epoch: 1, context: dkgContextFixture() }));
     alter(request);
-    for (const round of ["dkgRound1", "dkgRound2", "dkgFinalize"]) assert.throws(() => signer[round](request), /FrostDkg/u);
+    for (const round of ["dkgRound1", "dkgRound2", "dkgFinalize", "dkgStageRound2", "dkgPhase", "dkgCompleteStaged"]) {
+      assert.throws(() => signer[round](request), /FrostDkg/u);
+    }
     assert.equal(loads, 1);
     assert.equal(saves, 0);
   });
@@ -488,7 +490,9 @@ test("each DKG round rejects a correctly hashed request for a different deployme
     stateStore: { load() { loads += 1; return initialSignerState(REQUIRED_FROST_SIGNERS[0]); } } });
   for (const field of ["solanaDeployment", "bridgeProgramId", "transceiverProgramId", "mint"]) {
     const request = createTwoPartyDkgRequest({ epoch: 1, context: dkgContextFixture({ [field]: h(`foreign-${field}`) }) });
-    for (const round of ["dkgRound1", "dkgRound2", "dkgFinalize"]) assert.throws(() => signer[round](request), /FrostDkgContextMismatch/u);
+    for (const round of ["dkgRound1", "dkgRound2", "dkgFinalize", "dkgStageRound2", "dkgPhase", "dkgCompleteStaged"]) {
+      assert.throws(() => signer[round](request), /FrostDkgContextMismatch/u);
+    }
   }
   assert.equal(loads, 1);
 });
@@ -869,7 +873,7 @@ test("frozen normalized intent stays detached from later array changes", () => {
   assert.throws(() => normalized.inputOutpoints.push(outpoint("more")), TypeError);
 });
 
-function createRuntime(evidenceValidators = {}, policyOverride) {
+function createRuntime(evidenceValidators = {}, policyOverride, initializeDkg = true) {
   const root = withTempRoot();
   const auth = baseAuthorization();
   const policy = policyOverride ?? makePolicy(auth);
@@ -889,8 +893,8 @@ function createRuntime(evidenceValidators = {}, policyOverride) {
     nativeEvidenceValidator: evidenceValidators.A });
   const signerB = new NativeFrostSigner({ signerId: REQUIRED_FROST_SIGNERS[1], index: 1, policy, stateStore: storeB,
     nativeEvidenceValidator: evidenceValidators.B });
-  const epoch = runTwoPartyDkg([signerA, signerB], { epoch: 1 });
-  const coordinator = new NativeFrostCoordinator({
+  const epoch = initializeDkg ? runTwoPartyDkg([signerA, signerB], { epoch: 1 }) : undefined;
+  const coordinator = epoch === undefined ? undefined : new NativeFrostCoordinator({
     signers: [signerA, signerB],
     publicPackage: epoch.publicPackage,
     aggregateTweakedXOnlyPublicKey: epoch.aggregateTweakedXOnlyPublicKey,
@@ -898,6 +902,301 @@ function createRuntime(evidenceValidators = {}, policyOverride) {
   const cleanup = () => rmSync(root, { recursive: true, force: true });
   return { root, auth, policy, signerA, signerB, epoch, coordinator, cleanup };
 }
+
+function dkgFixture(t) {
+  const runtime = createRuntime({}, undefined, false);
+  t.after(runtime.cleanup);
+  const signers = [runtime.signerA, runtime.signerB];
+  const stores = REQUIRED_FROST_SIGNERS.map((signerId, index) => new FileBackedFrostStateStore({ signerId,
+    root: path.join(runtime.root, index === 0 ? "frost-a" : "frost-b"), repoRoot: REPO_ROOT }));
+  const request = createTwoPartyDkgRequest({ epoch: 1, context: signers[0].dkgContext() });
+  const round1 = signers.map(signer => signer.dkgRound1(request));
+  const round2 = () => {
+    const sent = signers.map(signer => signer.dkgRound2(request, round1));
+    return signers.map((signer, index) => [{ senderId: signers[1 - index].signerId, round2: sent[1 - index][signer.signerId] }]);
+  };
+  return { ...runtime, signers, stores, request, round1, round2 };
+}
+
+test("DKG rejects substituted self-generated round-one material before accepting a transcript", t => {
+  const f = dkgFixture(t);
+  const changed = structuredClone(f.round1);
+  changed[0].round1.proofOfKnowledgeHex = "00".repeat(64);
+  const before = readFileSync(path.join(f.stores[0].root, "frost-signer-state.json"));
+  assert.throws(() => f.signers[0].dkgRound2(f.request, changed), /FrostDkgOwnRound1Mismatch/u);
+  assert.equal(before.equals(readFileSync(path.join(f.stores[0].root, "frost-signer-state.json"))), true);
+});
+
+test("completed DKG cannot accept missing or changed retry payloads", () => {
+  const runtime = createRuntime();
+  try {
+    assert.throws(() => runtime.signerA.dkgFinalize(runtime.epoch.request, [], []), /FrostDkg/u);
+    const round1 = [runtime.signerA, runtime.signerB].map(s => s.dkgRound1(runtime.epoch.request));
+    round1[0].round1.extra = true;
+    assert.throws(() => runtime.signerA.dkgFinalize(runtime.epoch.request, round1, []), /FrostDkg/u);
+  } finally { runtime.cleanup(); }
+});
+
+test("complete DKG setup can reopen and repeat without changing either key or state", () => {
+  const runtime = createRuntime();
+  try {
+    const files = ["frost-a", "frost-b"].map(role => path.join(runtime.root, role, "frost-signer-state.json"));
+    const before = files.map(file => readFileSync(file));
+    const next = runTwoPartyDkg([reopenSigner(runtime, 0), reopenSigner(runtime, 1)], { epoch: 1 });
+    assert.equal(next.aggregateTweakedXOnlyPublicKey === runtime.epoch.aggregateTweakedXOnlyPublicKey, true);
+    for (const [index, file] of files.entries()) assert.equal(before[index].equals(readFileSync(file)), true);
+  } finally { runtime.cleanup(); }
+});
+
+test("malformed DKG inner payloads are rejected before signer-state reads or getters", t => {
+  const f = dkgFixture(t);
+  let loads = 0;
+  let getters = 0;
+  const signer = reopenSigner(f, 0, { load() { loads += 1; return f.stores[0].load(); }, save: s => f.stores[0].save(s) });
+  loads = 0;
+  const accessor = structuredClone(f.round1);
+  Object.defineProperty(accessor[0].round1, "proofOfKnowledgeHex", { get() { getters += 1; return "00".repeat(64); }, enumerable: true });
+  const oversized = structuredClone(f.round1);
+  oversized[1].round1.commitmentsHex.push(oversized[1].round1.commitmentsHex[0]);
+  for (const raw of [[], accessor, oversized]) {
+    assert.throws(() => signer.dkgRound2(f.request, raw), /FrostDkg/u);
+    assert.throws(() => signer.dkgFinalize(f.request, raw, []), /FrostDkg/u);
+  }
+  assert.equal(loads, 0);
+  assert.equal(getters, 0);
+});
+
+test("DKG stages both incoming packages before finalization and retains exact retry binding", t => {
+  const f = dkgFixture(t);
+  const incoming = f.round2();
+  for (let i = 0; i < 2; i += 1) {
+    f.signers[i].dkgStageRound2(f.request, f.round1, incoming[i]);
+    assert.equal(f.signers[i].dkgPhase(f.request), "STAGED");
+    assert.equal(f.stores[i].load().activeEpoch, undefined);
+  }
+  const first = f.signers[0].dkgFinalize(f.request, f.round1, incoming[0]);
+  const repeated = f.signers[0].dkgFinalize(f.request, f.round1, incoming[0]);
+  assert.equal(first.publicPackageHash === repeated.publicPackageHash, true);
+  const changed = structuredClone(incoming[0]);
+  changed[0].round2.signingShareHex = "00".repeat(32);
+  assert.throws(() => f.signers[0].dkgFinalize(f.request, f.round1, changed), /FrostDkgTranscriptMismatch/u);
+  assert.throws(() => f.signers[0].dkgRound2(f.request, f.round1), /FrostDkgAlreadyFinalized/u);
+  const resumed = runTwoPartyDkg([reopenSigner(f, 0), reopenSigner(f, 1)], { epoch: 1 });
+  assert.equal(first.aggregateTweakedXOnlyPublicKey === resumed.aggregateTweakedXOnlyPublicKey, true);
+  for (const store of f.stores) {
+    const session = store.load().dkg[f.request.sessionId];
+    assert.equal(session.secret, undefined);
+    assert.equal(session.stagedRound2, undefined);
+    assert.equal(typeof session.finalizationDigest, "string");
+  }
+});
+
+for (const persisted of [false, true]) {
+  test(`DKG resumes after finalization storage failure ${persisted ? "after" : "before"} persistence`, t => {
+    const f = dkgFixture(t);
+    let fail = true;
+    const signerB = reopenSigner(f, 1, { load: () => f.stores[1].load(), save(state) {
+      if (fail && state.dkg[f.request.sessionId]?.finalKey !== undefined) {
+        if (persisted) f.stores[1].save(state);
+        throw new Error("TEST_DKG_FINAL_SAVE_FAILURE");
+      }
+      f.stores[1].save(state);
+    } });
+    assert.throws(() => runTwoPartyDkg([f.signers[0], signerB], { epoch: 1 }), /TEST_DKG_FINAL_SAVE_FAILURE/u);
+    const first = f.stores[0].load().dkg[f.request.sessionId].finalKey;
+    fail = false;
+    const resumed = runTwoPartyDkg([reopenSigner(f, 0), reopenSigner(f, 1)], { epoch: 1 });
+    assert.equal(resumed.publicPackageHash === sha256Canonical(first.public), true);
+  });
+}
+
+test("DKG rejects changed saved handoff data without creating a replacement key", t => {
+  const f = dkgFixture(t);
+  const incoming = f.round2();
+  for (let i = 0; i < 2; i += 1) f.signers[i].dkgStageRound2(f.request, f.round1, incoming[i]);
+  const state = f.stores[1].load();
+  state.dkg[f.request.sessionId].stagedRound2[0].round2.signingShareHex = "00".repeat(32);
+  f.stores[1].save(state);
+  const file = path.join(f.stores[1].root, "frost-signer-state.json");
+  const before = readFileSync(file);
+  assert.throws(() => runTwoPartyDkg(f.signers, { epoch: 1 }), /FrostDkg/u);
+  assert.equal(before.equals(readFileSync(file)), true);
+  assert.equal(f.stores[1].load().dkg[f.request.sessionId].finalKey, undefined);
+});
+
+for (const persisted of [false, true]) {
+  test(`neither DKG participant finalizes if the second handoff fails ${persisted ? "after" : "before"} persistence`, t => {
+    const f = dkgFixture(t);
+    let fail = true;
+    const signerB = reopenSigner(f, 1, { load: () => f.stores[1].load(), save(state) {
+      if (fail && state.dkg[f.request.sessionId]?.stagedRound2 !== undefined) {
+        if (persisted) f.stores[1].save(state);
+        throw new Error("TEST_DKG_HANDOFF_SAVE_FAILURE");
+      }
+      f.stores[1].save(state);
+    } });
+    assert.throws(() => runTwoPartyDkg([f.signers[0], signerB], { epoch: 1 }), /TEST_DKG_HANDOFF_SAVE_FAILURE/u);
+    for (const store of f.stores) {
+      assert.equal(store.load().dkg[f.request.sessionId].finalKey, undefined);
+      assert.equal(store.load().activeEpoch, undefined);
+    }
+    fail = false;
+    const signers = [reopenSigner(f, 0), reopenSigner(f, 1)];
+    const epoch = runTwoPartyDkg(signers, { epoch: 1 });
+    const coordinator = new NativeFrostCoordinator({ signers, publicPackage: epoch.publicPackage,
+      aggregateTweakedXOnlyPublicKey: epoch.aggregateTweakedXOnlyPublicKey });
+    assert.equal(coordinator.signAutomatically(f.auth).state, "SIGNED");
+  });
+}
+
+test("a finalized DKG participant cannot trigger replacement setup for a peer missing its handoff", t => {
+  const f = dkgFixture(t);
+  const incoming = f.round2();
+  for (let i = 0; i < 2; i += 1) f.signers[i].dkgStageRound2(f.request, f.round1, incoming[i]);
+  f.signers[0].dkgCompleteStaged(f.request);
+  const state = f.stores[1].load();
+  delete state.dkg[f.request.sessionId].stagedRound2;
+  delete state.dkg[f.request.sessionId].stagedDigest;
+  f.stores[1].save(state);
+  const file = path.join(f.stores[1].root, "frost-signer-state.json");
+  const before = readFileSync(file);
+  assert.throws(() => runTwoPartyDkg(f.signers, { epoch: 1 }), /FrostDkgIncompleteHandoffRecovery/u);
+  assert.equal(before.equals(readFileSync(file)), true);
+});
+
+test("DKG round-one parser rejects noncanonical shapes and encodings before state access", t => {
+  const f = dkgFixture(t);
+  let loads = 0;
+  const signer = reopenSigner(f, 0, { load() { loads += 1; return f.stores[0].load(); }, save: s => f.stores[0].save(s) });
+  loads = 0;
+  for (const change of [
+    r => { r[1] = structuredClone(r[0]); },
+    r => { r[1].signerId = "UNENROLLED"; },
+    r => { r[1].round1.identifier = r[0].round1.identifier; },
+    r => { r[1].round1.commitmentsHex[0] = r[1].round1.commitmentsHex[0].toUpperCase(); },
+    r => { r[1].round1.proofOfKnowledgeHex += "00"; },
+    r => { r[1].round1.proofOfKnowledgeHex = "00"; },
+    r => { r[1].extra = true; },
+    r => { r[1].round1.extra = true; },
+    r => { delete r[1]; },
+    r => { r.extra = true; },
+  ]) {
+    const raw = structuredClone(f.round1); change(raw);
+    assert.throws(() => signer.dkgRound2(f.request, raw), /FrostDkg/u);
+  }
+  assert.equal(loads, 0);
+});
+
+test("DKG round-two parser rejects wrong sender, ambiguous scalars and accessors before state access", t => {
+  const f = dkgFixture(t);
+  const incoming = f.round2();
+  let loads = 0;
+  let getters = 0;
+  const signer = reopenSigner(f, 0, { load() { loads += 1; return f.stores[0].load(); }, save: s => f.stores[0].save(s) });
+  loads = 0;
+  for (const change of [
+    r => { r.length = 0; },
+    r => { r.push(structuredClone(r[0])); },
+    r => { r[0].senderId = f.signers[0].signerId; },
+    r => { r[0].round2.identifier = f.signers[0].frostIdentifier(); },
+    r => { r[0].round2.signingShareHex += "00"; },
+    r => { r[0].round2.signingShareHex = "AA".repeat(32); },
+    r => { r[0].round2.extra = true; },
+    r => { r[0].extra = true; },
+    r => { Object.defineProperty(r[0].round2, "signingShareHex", { enumerable: true, get() { getters += 1; return "00".repeat(32); } }); },
+  ]) {
+    const raw = structuredClone(incoming[0]); change(raw);
+    for (const method of ["dkgStageRound2", "dkgFinalize"]) assert.throws(() => signer[method](f.request, f.round1, raw), /FrostDkg/u);
+  }
+  assert.equal(loads, 0);
+  assert.equal(getters, 0);
+});
+
+test("DKG rejects invalid peer proof and private contribution without persisting acceptance", t => {
+  const f = dkgFixture(t);
+  const file = path.join(f.stores[0].root, "frost-signer-state.json");
+  let before = readFileSync(file);
+  const invalid = structuredClone(f.round1);
+  invalid[1].round1.proofOfKnowledgeHex = "00".repeat(64);
+  assert.throws(() => f.signers[0].dkgRound2(f.request, invalid), /^Error: FrostDkgRound2ValidationFailed$/u);
+  assert.equal(before.equals(readFileSync(file)), true);
+  const incoming = f.round2();
+  before = readFileSync(file);
+  incoming[0][0].round2.signingShareHex = "00".repeat(32);
+  assert.throws(() => f.signers[0].dkgStageRound2(f.request, f.round1, incoming[0]), /^Error: FrostDkgContributionValidationFailed$/u);
+  assert.equal(before.equals(readFileSync(file)), true);
+  assert.equal(f.signers[0].dkgPhase(f.request), "ROUND2");
+});
+
+test("DKG handoff snapshots stay unchanged when caller objects mutate during state reads", t => {
+  const f = dkgFixture(t);
+  const incoming = f.round2();
+  const callerRound1 = structuredClone(f.round1);
+  const callerRound2 = structuredClone(incoming[0]);
+  let mutate = false;
+  const signer = reopenSigner(f, 0, { load() {
+    if (mutate) {
+      callerRound1[0].round1.proofOfKnowledgeHex = "00".repeat(64);
+      callerRound2[0].round2.signingShareHex = "00".repeat(32);
+    }
+    return f.stores[0].load();
+  }, save: s => f.stores[0].save(s) });
+  mutate = true;
+  signer.dkgStageRound2(f.request, callerRound1, callerRound2);
+  const saved = f.stores[0].load().dkg[f.request.sessionId];
+  assert.equal(sha256Canonical(saved.stagedRound2) === sha256Canonical(incoming[0]), true);
+  const complete = signer.dkgFinalize(f.request, f.round1, incoming[0]);
+  assert.equal(complete.secretShareStoredLocally, true);
+});
+
+test("DKG detects a handoff state change before publishing its final key", t => {
+  const f = dkgFixture(t);
+  const incoming = f.round2();
+  f.signers[0].dkgStageRound2(f.request, f.round1, incoming[0]);
+  let reads = 0;
+  let armed = false;
+  const signer = reopenSigner(f, 0, { load() {
+    if (armed && ++reads === 2) {
+      const state = f.stores[0].load();
+      state.dkg[f.request.sessionId].stagedDigest = h("changed-after-derivation");
+      f.stores[0].save(state);
+    }
+    return f.stores[0].load();
+  }, save: s => f.stores[0].save(s) });
+  armed = true;
+  assert.throws(() => signer.dkgCompleteStaged(f.request), /FrostDkgStateChanged/u);
+  assert.equal(f.stores[0].load().dkg[f.request.sessionId].finalKey, undefined);
+  assert.equal(f.stores[0].load().activeEpoch, undefined);
+});
+
+test("old completed DKG without a finalization transcript is rejected for setup resume without migration", () => {
+  const runtime = createRuntime();
+  try {
+    const store = new FileBackedFrostStateStore({ signerId: REQUIRED_FROST_SIGNERS[0], root: path.join(runtime.root, "frost-a"), repoRoot: REPO_ROOT });
+    const state = store.load();
+    delete state.dkg[runtime.epoch.request.sessionId].finalizationDigest;
+    store.save(state);
+    const file = path.join(store.root, "frost-signer-state.json");
+    const before = readFileSync(file);
+    assert.throws(() => runTwoPartyDkg([runtime.signerA, runtime.signerB], { epoch: 1 }), /FrostDkgFinalizedStateInvalid/u);
+    assert.equal(before.equals(readFileSync(file)), true);
+  } finally { runtime.cleanup(); }
+});
+
+test("DKG cannot finalize private polynomial state that differs from its announced local commitment", t => {
+  const f = dkgFixture(t);
+  const incoming = f.round2();
+  const other = dkgFixture(t);
+  other.round2();
+  const state = f.stores[0].load();
+  state.dkg[f.request.sessionId].secret = other.stores[0].load().dkg[other.request.sessionId].secret;
+  f.stores[0].save(state);
+  const file = path.join(f.stores[0].root, "frost-signer-state.json");
+  const before = readFileSync(file);
+  assert.throws(() => f.signers[0].dkgStageRound2(f.request, f.round1, incoming[0]), /FrostDkgContributionValidationFailed/u);
+  assert.equal(before.equals(readFileSync(file)), true);
+  assert.equal(f.stores[0].load().dkg[f.request.sessionId].finalKey, undefined);
+});
 
 function frostRequestFor(intent, attempt = 1) {
   const intentDigest = nativeSigningIntentDigest(intent);

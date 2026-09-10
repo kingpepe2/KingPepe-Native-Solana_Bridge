@@ -14,11 +14,14 @@ import {
   sha256Canonical,
   validateNativeSigningIntent,
   dataRecord,
+  dataArray,
 } from "../policy/native-signing-policy.mjs";
 import { createNativeFrostAbortReceipt, validateNativeFrostSigningRequest } from "../policy/signing-request.mjs";
 import { createTwoPartyDkgRequest, nativeFrostKeyContext, sameNativeFrostKeyDeployment,
   validateNativeFrostDkgRequest } from "../policy/dkg-request.mjs";
 import { assertFrostStateEnvelope } from "../state/file-state-store.mjs";
+import { dkgFinalizationDigest, normalizeDkgRound1, validateDkgRound1Set,
+  validateDkgRound2Set } from "../policy/dkg-messages.mjs";
 
 function secureFrostRandomBytes(length = 32) {
   return Uint8Array.from(randomBytes(length));
@@ -114,76 +117,101 @@ export class NativeFrostSigner {
       undefined,
       secureFrostRandomBytes,
     );
-    const localRound1 = serializeRound1(generated.public);
-    state.dkg[request.sessionId] = {
-      request: structuredClone(request),
-      secret: serializeDkgSecret(generated.secret),
-      localRound1,
-    };
-    this.#stateStore.save(state);
-    return { signerId: this.signerId, round1: localRound1 };
+    try {
+      const localRound1 = serializeRound1(generated.public);
+      state.dkg[request.sessionId] = { request: structuredClone(request),
+        secret: serializeDkgSecret(generated.secret), localRound1 };
+      this.#stateStore.save(state);
+      return { signerId: this.signerId, round1: localRound1 };
+    } finally { cleanDkgSecret(generated.secret); }
   }
 
   dkgRound2(request, round1Messages) {
     this.#requireAvailable();
     request = validateNativeFrostDkgRequest(request, this.#keyContext);
+    const accepted = validateDkgRound1Set(request, round1Messages);
     const state = this.#stateStore.load();
     this.#validateDkgState(state, request);
     const session = requireDkgSession(state, request);
-    const accepted = validateRound1Set(request, round1Messages);
+    this.#checkOwnRound1(session, accepted);
     if (session.acceptedRound1 !== undefined) {
       assertSameCanonical(session.acceptedRound1, accepted, "DKG round1 transcript changed after acceptance");
     }
-    const secret = deserializeDkgSecret(session.secret);
-    const ownIdentifier = this.frostIdentifier();
-    const remote = accepted.filter((entry) => entry.identifier !== ownIdentifier).map(deserializeRound1);
-    const outgoing = schnorr_FROST.DKG.round2(secret, remote);
-    session.secret = serializeDkgSecret(secret);
-    session.acceptedRound1 = accepted;
-    this.#stateStore.save(state);
+    if (session.finalKey !== undefined) throw new Error("FrostDkgAlreadyFinalized");
+    const secret = this.#checkedDkgSecret(session, session.acceptedRound1 === undefined ? 1 : 2);
+    try {
+      const remote = accepted.filter(entry => entry.identifier !== this.frostIdentifier()).map(deserializeRound1);
+      let outgoing;
+      try { outgoing = schnorr_FROST.DKG.round2(secret, remote); }
+      catch { throw new Error("FrostDkgRound2ValidationFailed"); }
+      const result = Object.fromEntries(request.participants.filter(p => p.signerId !== this.signerId).map(p => {
+        const value = outgoing[schnorr_FROST.Identifier.fromNumber(p.index + 1)];
+        if (value === undefined) throw new Error("FrostDkgReceiverMissing");
+        return [p.signerId, serializeRound2(value)];
+      }));
+      session.secret = serializeDkgSecret(secret);
+      session.acceptedRound1 = accepted;
+      this.#stateStore.save(state);
+      return result;
+    } finally { cleanDkgSecret(secret); }
+  }
 
-    return Object.fromEntries(
-      request.participants
-        .filter((participant) => participant.signerId !== this.signerId)
-        .map((participant) => {
-          const receiverIdentifier = schnorr_FROST.Identifier.fromNumber(participant.index + 1);
-          const value = outgoing[receiverIdentifier];
-          if (value === undefined) throw new Error("FROST DKG omitted an enrolled receiver");
-          return [participant.signerId, serializeRound2(value)];
-        }),
-    );
+  dkgStageRound2(request, round1Messages, incomingRound2) {
+    this.#requireAvailable();
+    request = validateNativeFrostDkgRequest(request, this.#keyContext);
+    const accepted = validateDkgRound1Set(request, round1Messages);
+    const incoming = validateDkgRound2Set(request, this.signerId, incomingRound2);
+    const state = this.#stateStore.load();
+    this.#validateDkgState(state, request);
+    const session = requireDkgSession(state, request);
+    this.#checkOwnRound1(session, accepted);
+    assertSameCanonical(session.acceptedRound1, accepted, "DKG finalization requires the accepted round1 transcript");
+    const digest = dkgFinalizationDigest(request, this.signerId, accepted, incoming);
+    const phase = this.#dkgPhase(state, request);
+    if (phase === "FINALIZED" || phase === "STAGED") {
+      if (digest !== (session.finalizationDigest ?? session.stagedDigest)) throw new Error("FrostDkgTranscriptMismatch");
+      return phase;
+    }
+    // Verify the exact contribution with the unchanged primitive before saving
+    // the handoff. This temporary candidate is not activated or retained.
+    const candidate = this.#deriveDkgKey(session, accepted, incoming);
+    candidate.secret.signingShare.fill(0);
+    const fresh = this.#unchangedDkgState(request, session);
+    fresh.dkg[request.sessionId].stagedRound2 = structuredClone(incoming);
+    fresh.dkg[request.sessionId].stagedDigest = digest;
+    this.#stateStore.save(fresh);
+    return "STAGED";
+  }
+
+  dkgPhase(request) {
+    this.#requireAvailable();
+    request = validateNativeFrostDkgRequest(request, this.#keyContext);
+    const state = this.#stateStore.load();
+    this.#validateDkgState(state, request);
+    return this.#dkgPhase(state, request);
   }
 
   dkgFinalize(request, round1Messages, incomingRound2) {
     this.#requireAvailable();
     request = validateNativeFrostDkgRequest(request, this.#keyContext);
+    const accepted = validateDkgRound1Set(request, round1Messages);
+    const incoming = validateDkgRound2Set(request, this.signerId, incomingRound2);
     const state = this.#stateStore.load();
     this.#validateDkgState(state, request);
     const session = requireDkgSession(state, request);
-    if (session.finalKey !== undefined) return this.#completion(request, session.finalKey);
-    const accepted = validateRound1Set(request, round1Messages);
-    assertSameCanonical(session.acceptedRound1, accepted, "DKG finalization requires the accepted round1 transcript");
+    this.#checkOwnRound1(session, accepted);
+    assertSameCanonical(session.acceptedRound1, accepted, "FrostDkgTranscriptMismatch");
+    const digest = dkgFinalizationDigest(request, this.signerId, accepted, incoming);
+    if (digest !== (session.finalizationDigest ?? session.stagedDigest)) throw new Error("FrostDkgTranscriptMismatch");
+    return this.#completeStagedDkg(state, request);
+  }
 
-    const ownIdentifier = this.frostIdentifier();
-    const remoteRound1 = accepted.filter((entry) => entry.identifier !== ownIdentifier).map(deserializeRound1);
-    const packages = incomingRound2.map(({ senderId, round2 }) => {
-      const sender = request.participants.find((participant) => participant.signerId === senderId);
-      if (sender === undefined || sender.signerId === this.signerId) throw new Error("invalid DKG round2 sender");
-      const expectedIdentifier = schnorr_FROST.Identifier.fromNumber(sender.index + 1);
-      if (round2.identifier !== expectedIdentifier) throw new Error("DKG round2 sender identifier mismatch");
-      return deserializeRound2(round2);
-    });
-    if (packages.length !== request.participants.length - 1) throw new Error("missing FROST DKG round2 package");
-
-    const secret = deserializeDkgSecret(session.secret);
-    const key = schnorr_FROST.DKG.round3(secret, remoteRound1, packages);
-    schnorr_FROST.validateSecret(key.secret, key.public);
-    schnorr_FROST.DKG.clean(secret);
-    session.finalKey = serializeKey(key);
-    delete session.secret;
-    state.activeEpoch = request.epoch;
-    this.#stateStore.save(state);
-    return this.#completion(request, session.finalKey);
+  dkgCompleteStaged(request) {
+    this.#requireAvailable();
+    request = validateNativeFrostDkgRequest(request, this.#keyContext);
+    const state = this.#stateStore.load();
+    this.#validateDkgState(state, request);
+    return this.#completeStagedDkg(state, request);
   }
 
   signingCommitment(request) {
@@ -368,7 +396,126 @@ export class NativeFrostSigner {
     }
   }
 
+  #checkOwnRound1(session, accepted) {
+    const local = normalizeDkgRound1(session.localRound1, this.frostIdentifier());
+    assertSameCanonical(local, accepted[this.index], "FrostDkgOwnRound1Mismatch");
+  }
+
+  #storedRound1(session, request) {
+    const raw = dataArray(session.acceptedRound1, 2, "FrostDkgStoredRound1");
+    if (raw.length !== 2) throw new Error("FrostDkgStoredRound1Count");
+    const accepted = validateDkgRound1Set(request, request.participants.map((p, index) => ({ signerId: p.signerId, round1: raw[index] })));
+    this.#checkOwnRound1(session, accepted);
+    return accepted;
+  }
+
+  #dkgPhase(state, request) {
+    const raw = state.dkg[request.sessionId];
+    if (raw === undefined) return "NOT_STARTED";
+    const session = dataRecord(requireDkgSession(state, request), "FrostDkgSession");
+    const allowed = ["request", "secret", "localRound1", "acceptedRound1", "stagedRound2", "stagedDigest", "finalKey", "finalizationDigest"];
+    if (Object.keys(session).some(key => !allowed.includes(key))) throw new Error("FrostDkgSessionFields");
+    normalizeDkgRound1(session.localRound1, this.frostIdentifier());
+    if (session.finalKey !== undefined) {
+      if (session.secret !== undefined || session.stagedRound2 !== undefined || session.stagedDigest !== undefined ||
+          typeof session.finalizationDigest !== "string" || !/^[0-9a-f]{64}$/u.test(session.finalizationDigest) ||
+          state.activeEpoch !== request.epoch) throw new Error("FrostDkgFinalizedStateInvalid");
+      this.#storedRound1(session, request);
+      return "FINALIZED";
+    }
+    if (session.finalizationDigest !== undefined) throw new Error("FrostDkgFinalizedStateInvalid");
+    if (session.acceptedRound1 === undefined) {
+      if (session.stagedRound2 !== undefined || session.stagedDigest !== undefined) throw new Error("FrostDkgHandoffStateInvalid");
+      return "ROUND1";
+    }
+    const accepted = this.#storedRound1(session, request);
+    if (session.stagedRound2 === undefined) {
+      if (session.stagedDigest !== undefined) throw new Error("FrostDkgHandoffStateInvalid");
+      return "ROUND2";
+    }
+    const incoming = validateDkgRound2Set(request, this.signerId, session.stagedRound2);
+    if (session.stagedDigest !== dkgFinalizationDigest(request, this.signerId, accepted, incoming)) throw new Error("FrostDkgHandoffStateInvalid");
+    return "STAGED";
+  }
+
+  #deriveDkgKey(session, accepted, incoming) {
+    let secret;
+    let cache;
+    let key;
+    const packages = [];
+    try {
+      secret = this.#checkedDkgSecret(session, 2);
+      cache = secret.round2Cache;
+      const remote = accepted.filter(entry => entry.identifier !== this.frostIdentifier()).map(deserializeRound1);
+      for (const entry of incoming) packages.push(deserializeRound2(entry.round2));
+      key = schnorr_FROST.DKG.round3(secret, remote, packages);
+      if (key.secret.identifier !== this.frostIdentifier() || key.public.signers.min !== 2 || key.public.signers.max !== 2) {
+        throw new Error();
+      }
+      schnorr_FROST.validateSecret(key.secret, key.public);
+      return key;
+    } catch {
+      key?.secret?.signingShare.fill(0);
+      throw new Error("FrostDkgContributionValidationFailed");
+    } finally {
+      for (const entry of packages) entry.signingShare.fill(0);
+      cleanDkgSecret(secret, cache);
+    }
+  }
+
+  #checkedDkgSecret(session, step) {
+    let secret;
+    try {
+      secret = deserializeDkgSecret(session.secret);
+      if (secret.identifier !== BigInt(this.index + 1) || secret.signers.min !== 2 || secret.signers.max !== 2 || secret.step !== step) {
+        throw new Error();
+      }
+      const local = normalizeDkgRound1(session.localRound1, this.frostIdentifier());
+      assertSameCanonical(secret.commitment.map(bytesToHex), local.commitmentsHex, "FrostDkgLocalPolynomialMismatch");
+      return secret;
+    } catch {
+      cleanDkgSecret(secret);
+      throw new Error("FrostDkgPrivateStateInvalid");
+    }
+  }
+
+  #unchangedDkgState(request, session) {
+    const state = this.#stateStore.load();
+    this.#validateDkgState(state, request);
+    assertSameCanonical(state.dkg[request.sessionId], session, "FrostDkgStateChanged");
+    return state;
+  }
+
+  #completeStagedDkg(state, request) {
+    const phase = this.#dkgPhase(state, request);
+    const session = requireDkgSession(state, request);
+    if (phase === "FINALIZED") return this.#completion(request, session.finalKey);
+    if (phase !== "STAGED") throw new Error("FrostDkgHandoffRequired");
+    const accepted = this.#storedRound1(session, request);
+    const incoming = validateDkgRound2Set(request, this.signerId, session.stagedRound2);
+    const key = this.#deriveDkgKey(session, accepted, incoming);
+    try {
+      const fresh = this.#unchangedDkgState(request, session);
+      const stored = fresh.dkg[request.sessionId];
+      stored.finalKey = serializeKey(key);
+      stored.finalizationDigest = stored.stagedDigest;
+      delete stored.secret;
+      delete stored.stagedRound2;
+      delete stored.stagedDigest;
+      fresh.activeEpoch = request.epoch;
+      this.#stateStore.save(fresh);
+      return this.#completion(request, stored.finalKey);
+    } finally { key.secret.signingShare.fill(0); }
+  }
+
   #completion(request, storedKey) {
+    let key;
+    try {
+      key = deserializeKey(storedKey);
+      if (key.secret.identifier !== this.frostIdentifier() || key.public.signers.min !== 2 || key.public.signers.max !== 2) throw new Error();
+      schnorr_FROST.validateSecret(key.secret, key.public);
+    } catch { throw new Error("FrostDkgStoredKeyInvalid"); }
+    finally { key?.secret?.signingShare.fill(0); }
     const publicPackageHash = sha256Canonical(storedKey.public);
     const group = storedKey.public.commitmentsHex[0];
     if (group === undefined || group.length !== 66) throw new Error("invalid FROST group commitment");
@@ -449,24 +596,6 @@ function requireDkgSession(state, request) {
   return session;
 }
 
-function validateRound1Set(request, round1Messages) {
-  if (!Array.isArray(round1Messages) || round1Messages.length !== request.participants.length) {
-    throw new Error("FROST DKG round1 set must contain A+B");
-  }
-  const bySigner = new Map();
-  for (const message of round1Messages) {
-    if (bySigner.has(message.signerId)) throw new Error("duplicate FROST DKG round1 sender");
-    const participant = request.participants.find((entry) => entry.signerId === message.signerId);
-    if (participant === undefined) throw new Error("unknown FROST DKG round1 sender");
-    const expectedIdentifier = schnorr_FROST.Identifier.fromNumber(participant.index + 1);
-    if (message.round1.identifier !== expectedIdentifier) throw new Error("FROST DKG round1 identifier mismatch");
-    bySigner.set(message.signerId, message.round1);
-  }
-  return request.participants
-    .map((participant) => bySigner.get(participant.signerId))
-    .map((round1) => structuredClone(round1));
-}
-
 function validateCommitmentSet(request, commitments) {
   if (!Array.isArray(commitments) || commitments.length !== REQUIRED_FROST_SIGNERS.length) {
     throw new Error("FROST commitment set must include A+B");
@@ -545,6 +674,14 @@ function deserializeDkgSecret(value) {
       : { round2Cache: Object.fromEntries(Object.entries(value.round2Cache).map(([id, entry]) => [id, deserializeRound2(entry)])) }),
     ...(value.step === undefined ? {} : { step: value.step }),
   };
+}
+
+function cleanDkgSecret(secret, retainedCache) {
+  if (secret === undefined) return;
+  for (const entry of Object.values(retainedCache ?? secret.round2Cache ?? {})) entry.signingShare.fill(0);
+  // The pinned API clears its local scalar references. JavaScript/OS copies are
+  // outside this guarantee; this is not a claim of forensic memory erasure.
+  schnorr_FROST.DKG.clean(secret);
 }
 
 function serializeFrostPublic(value) {

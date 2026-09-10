@@ -26,3 +26,11 @@ This does not protect against process-memory snapshots or privileged clones.
 Long-term DKG private shares still use external JSON; protected storage,
 authentication, service isolation and full rollback assurance remain incomplete.
 The limitations concern this adapter, not the approved single-host topology.
+
+DKG setup temporarily retains each verified incoming contribution and its
+request/transcript-bound digest outside Git. The coordinator stages both before
+either finalizes. Finalization removes the staged contribution and previous DKG
+secret, retaining the final private share and retry digest. Resume never creates
+replacement keys. Completed older setup without this digest cannot resume setup
+automatically; no migration or deletion is performed. This is not protected or
+authenticated storage, and does not prove a rollback-resistant key ceremony.

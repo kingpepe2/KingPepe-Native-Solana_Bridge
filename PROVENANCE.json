@@ -3,6 +3,17 @@
   "generatedAt": "2026-09-10T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
   "purpose": "file-by-file provenance classification for local tracked content",
+  "phase08DkgHandoffReview": {
+    "filesBefore": 179,
+    "filesAfter": 180,
+    "newFiles": ["native/frost/policy/dkg-messages.mjs"],
+    "filesDeleted": 0,
+    "filesMoved": 0,
+    "changes": "Original strict DKG inner-message snapshots, announced/private polynomial binding, cryptographically verified durable incoming handoff at both participants before finalization, digest-bound retries and saved-setup resume. Eighteen new regressions. Removed superseded permissive inline round-one parsing.",
+    "sourceImports": "None; original policy helpers and pinned Noble DKG APIs used unchanged. No cryptographic algorithm, pseudocode or vectors copied.",
+    "dependencyChanges": "None; dependencies, lockfiles, toolchains and required licenses/notices preserved.",
+    "scope": "Local process/file setup recovery, not authenticated confidential IPC, protected storage, ongoing signer leases, full rollback or power-loss proof. No production keys or services created and no legacy material changed."
+  },
   "phase08VolatileNonceReview": {
     "filesBefore": 179,
     "filesAfter": 179,
@@ -232,6 +243,11 @@
     ]
   },
   "trackedFiles": [
+    {
+      "path": "native/frost/policy/dkg-messages.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original bounded canonical DKG input snapshots and project handoff digest binding around unchanged pinned primitive APIs; no upstream source copied. Not authenticated transport."
+    },
     {
       "path": "native/frost/policy/dkg-request.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
@@ -570,7 +586,7 @@
     {
       "path": "native/frost/coordinator/native-frost-coordinator.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 04 two-party FROST DKG and signing coordinator without a private share."
+      "notes": "Original exact A+B coordination, both-recipient durable DKG handoff before finalization, explicit saved-setup resume and synchronous signing abort. No coordinator private signing share; confidential peer transport remains incomplete."
     },
     {
       "path": "native/frost/index.mjs",
@@ -600,7 +616,7 @@
     {
       "path": "native/frost/signer/native-frost-signer.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original FROST participant integration with context-bound DKG/policy, private volatile nonce buffers, public V2 reservations/tombstones, failure disposal and validated uncertain-session reopen. Uses the pinned primitive unchanged; not protected storage or full rollback assurance."
+      "notes": "Original FROST participant integration with context/inner-message/polynomial-bound DKG, verified durable handoff and digest-bound setup resume, volatile nonce buffers and validated uncertain-session reopen. Uses the pinned primitive unchanged; not protected storage or full rollback assurance."
     },
     {
       "path": "native/frost/src/coordinator.rs",
@@ -645,7 +661,7 @@
     {
       "path": "native/frost/tests/frost_runtime_node.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original real A+B FROST, policy/request/DKG/abort, state lifecycle and V2 volatile-nonce tests, including competing setup processes and an actual SIGKILL after reservation. Keys remain temporary outside source and never printed. Not full service restart/rollback proof."
+      "notes": "Original real A+B FROST, DKG transcript/handoff/failure/resume and policy/request/abort/volatile-nonce tests; competing setup processes and an actual SIGKILL after reservation. Keys remain temporary outside source and never printed. Not full service restart/rollback proof."
     },
     {
       "path": "native/frost/tests/signing_runtime_tests.rs",

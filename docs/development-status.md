@@ -1,8 +1,66 @@
 # KingPepe Native - Solana Bridge Development Status
 
-## Current Phase 08 volatile nonce and signer restart (2026-09-10)
+## Current Phase 08 DKG transcript and durable handoff (2026-09-10)
 
-UNPUBLISHED / LOCALLY_TESTED. V2 state persists the full validated V1 signing
+UNPUBLISHED / LOCALLY_TESTED. Original bounded inner-message snapshots
+reject accessors, malformed sets, unknown fields, noncanonical encodings and
+wrong roles before state reads. Each participant checks its announced round-one
+material and private polynomial commitment. The pinned DKG primitive verifies
+the peer proof and incoming contribution; the algorithm is unchanged.
+
+The coordinator persists a verified incoming handoff at both recipients before
+either finalizes and removes old DKG material. Reopen resumes these exact saved
+inputs. Completed retries retain a digest binding the full deployment request,
+accepted round-one messages and incoming contribution. Full supplied payloads
+are checked even for completed requests. The separate saved-resume API takes
+only a validated request, verifies local phase/state and never generates keys.
+Final state removes staged private contributions and previous DKG secrets.
+Conflicting or incomplete handoff stops without repair or replacement keys.
+
+Initial tests: 140 PASS / 8 FAIL; first implementation 148 PASS. Expanded focused
+suites: 230 PASS. A later isolated regression failed (0 PASS / 1 FAIL): another
+valid private polynomial could differ from the participant's announced public
+commitment. Role, threshold, step and private/public commitment checks now reject
+that contradiction. Final focused suites: 231 PASS, including 18 new regressions.
+Windows/WSL each pass 476 Node tests and two vectors. WSL passes 64 Solana plus
+29 Native Rust tests, fmt/clippy, all five lockfile audits and declared-license
+metadata checks. npm reports zero vulnerabilities; the bincode 1.3.3 unmaintained
+warning remains reported without suppression. No final executed failures/skips.
+Native Windows Cargo/combined-license and service ACL/protected-secret integration
+are NOT_RUN locally. Windows CI results must be checked separately.
+
+Both SBF builds and the fresh Native REGTEST/Solana-local-validator deposit PASS:
+real Native-accepted A+B signature, separate Ed25519 attestations, actual receipt/
+mint and exact reconciliation. All 55 checks PASS: 22 security, seven CSV, four
+wallet PSBT, ten pre-mint races, seven claim-worker and five accounting checks.
+Reserve/supply each 100000000 atomic, pending credits zero; no per-transfer team
+approval. Withdrawal E2E and full multi-service restart remain NOT_RUN.
+Current tree and all 160 existing history commits scan clean; exact 180-file
+provenance, nine JSON parses and private-path/IP checks PASS. No added project-role
+naming exceptions. Private origin and zero remote divergence verified. Staged/
+outgoing scans, publication and exact-SHA CI pending. Phase 08 INCOMPLETE;
+Phase 09 NOT_STARTED.
+
+Provenance: 179 to 180 files, one original DKG message module; no deletions/moves,
+dependency/license changes or upstream/legacy code copied. Actual state and test
+material remain outside Git. This does not authenticate stored state or peer IPC,
+prove a retained signer lease, power-loss durability or full rollback detection.
+Older completed V2 setup without the new transcript digest is rejected for setup
+resume unchanged; no automatic migration, replacement or deletion is performed.
+Protected storage, service isolation/fencing, global recovery and external review
+remain open. Mainnet DISABLED; no production configuration, keys or services touched.
+
+## Previous Phase 08 volatile nonce and signer restart (verified source)
+
+Source `86ecdd921cdee867fbc882bfe8bc5c5e90e6a37c`, message
+`fix(phase-08): keep FROST nonces volatile across restarts`, privately pushed;
+[all four exact-SHA CI jobs PASS](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34499581191).
+CI confirms 458 Node tests, 93 Rust tests and two vectors per platform, both SBF
+builds, the real deposit and all 55 checks. Current/staged/outgoing source and
+all 160 history commits scan clean; zero uploaded artifacts. That evidence belongs
+to this SHA, not newer source.
+
+LOCALLY_AND_CI_TESTED. V2 state persists the full validated V1 signing
 request, public commitment and nonce tombstones, not secret nonce bytes. Those
 remain in a signer-private Map. Reservation must persist before commitment
 exposure. Nonces are removed from the Map before the consumed marker and share
@@ -50,7 +108,8 @@ serialization/deserialization was removed. No upstream/legacy source copied.
 Current-tree and all 159 existing-history commits scanned clean; all nine JSON
 files parse, exact 179-file provenance coverage and private-path/IP checks PASS.
 No added project-role naming exceptions. Private origin and zero remote
-divergence verified. Staged/outgoing scans, publication and exact-SHA CI pending.
+divergence verified. Staged/outgoing/all-160-commit scans, publication and exact-SHA
+CI passed as recorded above.
 Phase 08 INCOMPLETE; Phase 09
 NOT_STARTED; Mainnet DISABLED; no production actions.
 
@@ -59,8 +118,8 @@ storage, an ongoing signer lease, complete economic-state rollback detection or
 protection against privileged memory snapshots/cloned processes. Buffer clearing
 does not prove forensic erasure of runtime or operating-system copies. Full
 service restart/global stop/fencing, protected shares, inner DKG transport and
-external security review remain open. Next: publish after remaining gates, then
-address those security dependencies before Phase 09.
+external security review remain open. Next: DKG transcript/handoff recovery and
+remaining security dependencies before Phase 09.
 
 ## Previous Phase 08 explicit signer-state lifecycle (verified source)
 

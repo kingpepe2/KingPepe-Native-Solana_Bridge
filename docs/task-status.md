@@ -1,6 +1,36 @@
 # KingPepe Native - Solana Bridge Task Status
 
-## Current Phase 08 volatile nonce and signer restart (2026-09-10)
+## Current Phase 08 DKG transcript and durable handoff (2026-09-10)
+
+Implemented locally: bounded immutable inner-message validation, own announced/
+private polynomial binding, cryptographically verified handoff at both recipients
+before finalization, exact transcript retries and saved-setup resume without
+replacement keys. Initial 140 PASS / 8 FAIL; first fix 148 PASS; expanded focused
+230 PASS. A late private/public polynomial substitution test failed and was fixed;
+final focused 231 PASS, including 18 new regressions. Windows/WSL each 476 Node
+tests and two vectors PASS; WSL 93 Rust tests, fmt/clippy/audits PASS. Both SBF
+builds and all 55 fresh real-chain checks PASS; reserve/supply each 100000000
+atomic, pending credits zero, no per-transfer team approval. Native Windows
+Cargo/service ACL tests, withdrawal E2E and full multi-service restart remain
+NOT_RUN locally. Current tree and all 160 existing commits scan clean; exact
+180-file provenance, nine JSON parses and private-path/IP checks PASS. Private
+origin verified. Staged/outgoing scans, publication and exact-SHA CI pending.
+
+Provenance 179 to 180 files; one original message module, no source imports,
+deletions/moves or dependency/license changes. No production actions. Phase 08
+INCOMPLETE; Phase 09 NOT_STARTED; Mainnet DISABLED. Protected/authenticated storage,
+confidential authenticated IPC, signer leases, global fencing/recovery and external
+review remain open. Next: complete this increment's gates, then those dependencies.
+See [detailed evidence](development-status.md#current-phase-08-dkg-transcript-and-durable-handoff-2026-09-10).
+
+## Previous Phase 08 volatile nonce and signer restart (verified source)
+
+Source `86ecdd921cdee867fbc882bfe8bc5c5e90e6a37c`, message
+`fix(phase-08): keep FROST nonces volatile across restarts`, privately pushed;
+[all four exact-SHA CI jobs PASS](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34499581191).
+CI confirms 458 Node tests, 93 Rust tests and two vectors per platform, both SBF
+builds, the real deposit and 55 checks. Current/staged/outgoing source and all
+160 history commits scan clean; zero uploaded artifacts. Exact-SHA evidence only.
 
 Implemented locally: V2 full-request/public-reservation state with secret nonce
 bytes only in a private Map; persist-before-exposure, remove-before-consumption,
@@ -20,13 +50,14 @@ per-transfer team approval. Withdrawal E2E/full multi-service restart NOT_RUN.
 
 Current tree and all 159 existing commits scan clean; provenance, nine JSON
 parsers and private-path/IP checks PASS. Private origin verified. Staged/outgoing
-scans, private push and exact-SHA CI pending. Provenance remains 179 files; no new,
+scans, all-160-commit scan, private push and exact-SHA CI PASS as recorded above.
+Provenance remains 179 files; no new,
 deleted/moved files, dependency/license changes or production actions. Phase 08
 INCOMPLETE; Phase 09 NOT_STARTED; Mainnet DISABLED. Remaining: protected/authenticated
 share storage, ongoing signer leases, full rollback/global fencing/service
-recovery, inner DKG transport and external review. Next: finish publication gates,
-then those security dependencies before Phase 09.
-See [detailed evidence](development-status.md#current-phase-08-volatile-nonce-and-signer-restart-2026-09-10).
+recovery, inner DKG transport and external review. Next: DKG handoff and those
+security dependencies before Phase 09.
+See [detailed evidence](development-status.md#previous-phase-08-volatile-nonce-and-signer-restart-verified-source).
 
 ## Previous Phase 08 explicit signer-state lifecycle (verified source)
 
