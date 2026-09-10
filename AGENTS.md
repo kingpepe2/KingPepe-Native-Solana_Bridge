@@ -31,6 +31,19 @@ https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34499581
 Its current/staged/outgoing source and all 160 commits scanned clean; zero
 workflow artifacts were uploaded. That evidence does not certify newer source.
 
+CURRENT BLOCKER: GITHUB_ACTIONS_ACCOUNT_EXECUTION_BLOCKED.
+Published DKG source 0133a6cc7f22bf880249a72a62502aa4bf3a638b has NOT_RUN CI tests:
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34503594802
+All four jobs failed before any step started; account-level annotations require
+KingPepe Team action. Workflow remains active; zero artifacts, no test logs.
+Do not change billing/account settings, repository privacy or security gates to
+bypass this. No next dependent implementation until exact-SHA CI can run and pass.
+The clean published SHA was rerun locally: Windows/WSL each 476 Node tests, two
+vectors; WSL 93 Rust tests/audits; both SBF builds and 55 fresh real-chain checks
+PASS. Local success is not GitHub CI success. Resume by restoring Actions through
+KingPepe Team, rerunning this source and verifying the latest continuity-only
+commit's CI, then continuing Phase 08 state/service/security dependencies.
+
 Absorbing-stop source 2bdff8f1687085d63de8c628ae12a4f2efed163e was pushed
 privately. CI 34470295877 completed the real deposit and all 55 checks but failed
 because the workflow still required five rather than seven claim-worker checks.
@@ -131,7 +144,7 @@ tested; no key/nonce bytes are sent in test IPC or output. Fresh real-chain and
 publication evidence are tracked in development-status. Long-term DKG shares
 still persist in external JSON. This does not prove full snapshot/clone rollback,
 power-loss durability, protected storage, service leases or global restart safety.
-Current unpublished DKG handoff increment: strict bounded immutable round-one/
+Published, locally tested, CI-BLOCKED DKG handoff increment: strict bounded immutable round-one/
 round-two snapshots and announced/private polynomial binding; both recipients
 persist cryptographically verified incoming handoff before finalization removes
 old DKG material. Exact digest-bound retries and saved-setup resume never create
