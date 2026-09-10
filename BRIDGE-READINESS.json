@@ -18,11 +18,11 @@
     "sourceSha": "2bdff8f1687085d63de8c628ae12a4f2efed163e",
     "url": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34470295877",
     "reason": "Real deposit and 55 checks passed; workflow still required five instead of seven claim-worker checks. Other three jobs passed.",
-    "correction": "Unpublished workflow now requires seven plus both named stopped-worker checks; six executable CI-gate regressions pass. Exact corrective SHA CI pending."
+    "correction": "ee011923da423475c4ccae3c9685d8a1ce257f23 requires seven plus both named stopped-worker checks; CI 34472369148 all four jobs PASS and zero artifacts."
   },
   "previousVerifiedSource": {
-    "sha": "2de96942d7da69466a6130cb55804916171e4976",
-    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34466302475",
+    "sha": "ee011923da423475c4ccae3c9685d8a1ce257f23",
+    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34472369148",
     "status": "PASS"
   },
   "sourceState": {
@@ -51,7 +51,9 @@
     "depositJournalRuntime": "NODE_24_21_0_SQLITE_3_53_4_RELEASE_CANDIDATE_API_NOT_PRODUCTION_APPROVAL",
     "frost": "REAL_NODE_ACCEPTED_2_OF_2_BIP340_LOCALNET",
     "frostUpstreamReview": "NOBLE_CURVES_2_3_0_FROST_EXPLICITLY_UNAUDITED_UPSTREAM",
-    "frostPolicyReview": "OPEN_MATCHING_MAINNET_POLICY_APPROVAL_AND_EXPOSED_AUTHORIZATION_MAP_MUTATION_REPRODUCED_NO_KEYS_OR_SIGNING",
+    "frostPolicyReview": "LOCALNET_REGTEST_PIN_PRIVATE_IMMUTABLE_LOOKUP_AND_BOUNDED_DATA_33_NEW_REGRESSIONS_PASS_CURRENT_CI_PENDING",
+    "frostDkgPolicy": "EXPLICIT_LOCAL_DKG_ONLY_CAPABILITY_CANNOT_AUTHORIZE_TRANSACTION_SIGNING",
+    "frostTranscriptReview": "REQUEST_INTENT_IDENTITIES_AND_DKG_DEPLOYMENT_BINDING_REQUIRE_HARDENING",
     "frostRustCrate": "SUPPORTING_POLICY_STATE_MODEL_ONLY",
     "solanaPrograms": "SBF_AND_DEPOSIT_HAPPY_PATH_TESTED_LOCALNET_ONLY",
     "attestations": "PROJECT_ATTESTED_2_OF_2_ED25519",
@@ -70,7 +72,8 @@
   },
   "localValidation": {
     "windows": {
-      "nodeTestsPass": 324,
+      "nodeTestsPass": 357,
+      "frostPolicyRegressionsIncluded": 33,
       "ciGateRegressionsIncluded": 6,
       "absorbingStopRegressionsIncluded": 45,
       "runtimePathTestsIncluded": 40,
@@ -82,7 +85,8 @@
       "serviceAclProtectedStorage": "NOT_RUN"
     },
     "wsl": {
-      "nodeTestsPass": 324,
+      "nodeTestsPass": 357,
+      "frostPolicyRegressionsIncluded": 33,
       "ciGateRegressionsIncluded": 6,
       "absorbingStopRegressionsIncluded": 45,
       "runtimePathTestsIncluded": 40,
@@ -140,7 +144,7 @@
     "externalReview": "NOT_RUN"
   },
   "phase08Remaining": [
-    "Close local signer-policy Mainnet/configuration-mutation boundaries and review the explicitly unaudited upstream FROST component; read-only policy diagnostics used no keys or signing",
+    "Harden signer request-envelope/intent identity and DKG deployment transcript binding; review the explicitly unaudited upstream FROST component. Current local-only immutable policy does not supply state authentication or a hostile-code sandbox",
     "Implement and test post-mint deep-reorg hard stops; ten pre-mint race/fork checks pass but are not compensation or production finality assurance",
     "Configure production Native evidence sources; current raw-header/Merkle integration is REGTEST-only with explicit local-node UTXO trust",
     "Review remaining account and source-validation dependencies",

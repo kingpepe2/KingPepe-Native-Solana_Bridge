@@ -3,6 +3,18 @@
   "generatedAt": "2026-09-10T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
   "purpose": "file-by-file provenance classification for local tracked content",
+  "phase08SignerPolicyReview": {
+    "filesBefore": 177,
+    "filesAfter": 177,
+    "filesDeleted": 0,
+    "filesMoved": 0,
+    "newFiles": [],
+    "changes": "Original local-only FROST policy guard, private immutable authorization snapshot, bounded data validation, explicit local DKG-only capability, matching harness integration and 33 regression tests. Existing REGTEST identity reused from the reviewed Native evidence source.",
+    "sourceImports": "None. Existing Node standard library APIs used; no third-party or legacy implementation copied. Per-file classifications and required third-party notices unchanged.",
+    "dependencyChanges": "None; all dependency, toolchain, lockfile and license pins unchanged.",
+    "terminologyReview": "No new prohibited KingPepe project-role terms; official protocol and third-party terms preserved.",
+    "scope": "Local API configuration and mutation boundary, not independent evidence by itself, production activation, a hostile-code sandbox or authenticated signer state. No operational data moved, deleted or published."
+  },
   "phase08StopCiCorrectionReview": {
     "filesBefore": 176,
     "filesAfter": 177,

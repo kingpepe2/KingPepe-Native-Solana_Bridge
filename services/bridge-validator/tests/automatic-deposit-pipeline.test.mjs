@@ -74,7 +74,7 @@ function baseConfig(overrides = {}) {
     deployment: {
       protocolId: 1,
       nativeNetwork: 8_000_111,
-      nativeGenesis: h("kingpepe-regtest-genesis"),
+      nativeGenesis: REGTEST_GENESIS,
       solanaDeployment: h("solana-local-deployment"),
       managerProgramId: h("bridge-program-id"),
       transceiverProgramId: h("transceiver-program-id"),
@@ -196,6 +196,7 @@ function createFrostRuntime(config, operation) {
     reserveCommitment: operation.reserveSweep.signingIntent.reserveCommitment,
   };
   const policy = createNativeSigningPolicy({
+    environment: "localnet",
     nativeNetwork: "regtest",
     nativeGenesisHash: config.deployment.nativeGenesis,
     solanaDeployment: config.deployment.solanaDeployment,

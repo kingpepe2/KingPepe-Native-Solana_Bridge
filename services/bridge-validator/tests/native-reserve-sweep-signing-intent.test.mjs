@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { test } from "node:test";
+import { REGTEST_GENESIS } from "../../../native/node/native-raw-evidence.mjs";
 import {
   FROST_SIGNING_INTENT_PROTOCOL,
   FROST_SIGNING_MODE,
@@ -29,7 +30,7 @@ function baseInput(overrides = {}) {
     config: {
       environment: "localnet",
       nativeNetworkName: "regtest",
-      nativeGenesisHash: h("kingpepe-regtest-genesis"),
+      nativeGenesisHash: REGTEST_GENESIS,
       solanaDeployment: h("solana-local-deployment"),
       bridgeProgramId: h("bridge-program-id"),
       transceiverProgramId: h("transceiver-program-id"),

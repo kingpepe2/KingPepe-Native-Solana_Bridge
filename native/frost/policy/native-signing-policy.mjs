@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { types } from "node:util";
+import { REGTEST_GENESIS } from "../../node/native-raw-evidence.mjs";
 
 export const FROST_SIGNING_INTENT_PROTOCOL = "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_SIGNING_INTENT/V1";
 export const FROST_SIGNING_MODE = "SINGLE_HOST_PROJECT_CONTROLLED_FROST";
@@ -8,6 +10,14 @@ export const REQUIRED_FROST_THRESHOLD = 2;
 const HASH_HEX = /^[0-9a-f]{64}$/u;
 const HEX = /^(?:[0-9a-f]{2})*$/u;
 const UINT_DECIMAL = /^(0|[1-9][0-9]*)$/u;
+const U64_MAX = 0xffff_ffff_ffff_ffffn;
+// Local parser/resource ceilings, not approved production economic limits.
+const MAX_POLICY_OPERATIONS = 256;
+const MAX_INTENT_INPUTS = 256;
+const MAX_INTENT_OUTPUTS = 256;
+const MAX_SCRIPT_BYTES = 10_000;
+const authorizationSnapshots = new WeakMap();
+const localDkgPolicies = new WeakSet();
 
 export function bytesToHex(value) {
   return Buffer.from(value).toString("hex");
@@ -36,8 +46,8 @@ export function assertHex(value, bytes, label) {
 }
 
 export function canonicalUintDecimal(value, label) {
-  if (typeof value !== "string" || !UINT_DECIMAL.test(value)) {
-    throw new Error(`${label} must be a canonical unsigned decimal string`);
+  if (typeof value !== "string" || value.length > 20 || !UINT_DECIMAL.test(value) || BigInt(value) > U64_MAX) {
+    throw new Error(`${label} must be a canonical u64 decimal string`);
   }
   return value;
 }
@@ -73,13 +83,16 @@ function canonicalize(value) {
 }
 
 export function createNativeSigningPolicy(options) {
+  options = dataRecord(options, "policy");
+  const context = localPolicyContext(options);
   const authorizedOperations = new Map();
-  for (const operation of options.authorizedOperations ?? []) {
-    authorizedOperations.set(assertHashHex(operation.signingRequestId, "authorized signing request ID"), normalizeAuthorization(operation));
+  for (const operation of dataArray(options.authorizedOperations, MAX_POLICY_OPERATIONS, "authorized operations")) {
+    const normalized = normalizeAuthorization(operation);
+    if (authorizedOperations.has(normalized.signingRequestId)) throw new Error("NativeSigningPolicyDuplicateRequest");
+    authorizedOperations.set(normalized.signingRequestId, normalized);
   }
-  return Object.freeze({
-    nativeNetwork: options.nativeNetwork,
-    nativeGenesisHash: assertHashHex(options.nativeGenesisHash, "policy Native genesis hash"),
+  const policy = Object.freeze({
+    ...context,
     solanaDeployment: assertHashHex(options.solanaDeployment, "policy Solana deployment"),
     bridgeProgramId: assertHashHex(options.bridgeProgramId, "policy bridge program ID"),
     transceiverProgramId: assertHashHex(options.transceiverProgramId, "policy transceiver program ID"),
@@ -87,36 +100,85 @@ export function createNativeSigningPolicy(options) {
     keyEpoch: checkedSafeEpoch(options.keyEpoch, "policy key epoch"),
     maxAmountAtomic: BigInt(canonicalUintDecimal(options.maxAmountAtomic, "policy max amount")),
     maxFeeAtomic: BigInt(canonicalUintDecimal(options.maxFeeAtomic, "policy max fee")),
-    reserveScriptPubKeyHex: assertHex(options.reserveScriptPubKeyHex, undefined, "policy reserve scriptPubKey"),
-    authorizedOperations,
+    reserveScriptPubKeyHex: checkedScript(options.reserveScriptPubKeyHex, "policy reserve scriptPubKey"),
+    // Read-only inspection, never a writable enrollment interface.
+    authorizedOperations: Object.freeze([...authorizedOperations.values()]),
+  });
+  authorizationSnapshots.set(policy, authorizedOperations);
+  return policy;
+}
+
+// Explicit ephemeral local setup capability; it has no transaction authorization
+// and cannot be upgraded in place into a signing policy after DKG.
+export function createLocalNativeDkgPolicy(options) {
+  options = dataRecord(options, "DKG policy");
+  const policy = Object.freeze({ ...localPolicyContext(options), purpose: "LOCAL_DKG_ONLY",
+    solanaDeployment: assertHashHex(options.solanaDeployment, "DKG policy Solana deployment"),
+    keyEpoch: checkedSafeEpoch(options.keyEpoch, "DKG policy key epoch") });
+  localDkgPolicies.add(policy);
+  return policy;
+}
+
+function localPolicyContext(options) {
+  if (options.environment !== "localnet") throw new Error("NativeSigningPolicyLocalnetOnly");
+  if (options.nativeNetwork !== "regtest") throw new Error("NativeSigningPolicyRegtestOnly");
+  if (options.nativeGenesisHash !== REGTEST_GENESIS) throw new Error("NativeSigningPolicyRegtestGenesisRequired");
+  for (const flag of ["productionReady", "productionSigningAuthorized", "productionBroadcastAuthorized"]) {
+    if (options[flag] !== undefined && options[flag] !== false) throw new Error("NativeSigningPolicyActivationDisabled");
+  }
+  if (options.mainnetActivation !== undefined && options.mainnetActivation !== "DISABLED") {
+    throw new Error("NativeSigningPolicyActivationDisabled");
+  }
+  return Object.freeze({
+    environment: "localnet",
+    productionReady: false,
+    productionSigningAuthorized: false,
+    productionBroadcastAuthorized: false,
+    mainnetActivation: "DISABLED",
+    nativeNetwork: "regtest",
+    nativeGenesisHash: REGTEST_GENESIS,
   });
 }
 
+export function assertNativeSigningPolicy(policy) {
+  if (!authorizationSnapshots.has(policy)) throw new Error("NativeSigningPolicySnapshotRequired");
+  return policy;
+}
+
+export function assertNativeFrostRuntimePolicy(policy) {
+  if (!localDkgPolicies.has(policy)) assertNativeSigningPolicy(policy);
+  return policy;
+}
+
 function normalizeAuthorization(value) {
-  return Object.freeze({
+  value = dataRecord(value, "authorization");
+  const normalized = {
     signingRequestId: assertHashHex(value.signingRequestId, "authorized signing request ID"),
     operationId: assertHashHex(value.operationId, "authorized operation ID"),
     withdrawalId: assertHashHex(value.withdrawalId, "authorized withdrawal ID"),
     taprootSighashHex: assertHashHex(value.taprootSighashHex, "authorized Taproot sighash"),
     transactionCommitment: assertHashHex(value.transactionCommitment, "authorized transaction commitment"),
     signingInputIndex: checkedNonNegativeIndex(value.signingInputIndex, "authorized signing input index"),
-    recipientScriptPubKeyHex: assertHex(value.recipientScriptPubKeyHex, undefined, "authorized recipient scriptPubKey"),
+    recipientScriptPubKeyHex: checkedScript(value.recipientScriptPubKeyHex, "authorized recipient scriptPubKey"),
     amountAtomic: canonicalUintDecimal(value.amountAtomic, "authorized amount"),
     feeAtomic: canonicalUintDecimal(value.feeAtomic, "authorized fee"),
-    changeScriptPubKeyHex: assertHex(value.changeScriptPubKeyHex, undefined, "authorized change scriptPubKey"),
+    changeScriptPubKeyHex: checkedScript(value.changeScriptPubKeyHex, "authorized change scriptPubKey"),
     changeAtomic: canonicalUintDecimal(value.changeAtomic, "authorized change"),
-    inputOutpoints: Object.freeze([...value.inputOutpoints]),
-    outputCommitments: Object.freeze([...value.outputCommitments]),
+    inputOutpoints: normalizeOutpoints(value.inputOutpoints),
+    outputCommitments: normalizeHashList(value.outputCommitments, "authorized output commitment"),
     reserveCommitment: assertHashHex(value.reserveCommitment, "authorized reserve commitment"),
-  });
+  };
+  validateEconomicShape(normalized);
+  return Object.freeze(normalized);
 }
 
 function checkedSafeEpoch(value, label) {
-  if (!Number.isSafeInteger(value) || value < 1) throw new Error(`${label} must be a positive safe integer`);
+  if (!Number.isInteger(value) || value < 1 || value > 0xffff_ffff) throw new Error(`${label} must be a positive u32`);
   return value;
 }
 
 export function validateNativeSigningIntent(intent) {
+  intent = dataRecord(intent, "intent");
   if (intent?.protocol !== FROST_SIGNING_INTENT_PROTOCOL) throw new Error("wrong Native FROST signing protocol");
   if (intent.mode !== FROST_SIGNING_MODE) throw new Error("wrong Native FROST signing mode");
   if (!["WITHDRAWAL", "RESERVE_SWEEP", "RESERVE_MIGRATION"].includes(intent.purpose)) {
@@ -144,35 +206,41 @@ export function validateNativeSigningIntent(intent) {
     transactionCommitment: assertHashHex(intent.transactionCommitment, "transaction commitment"),
     signingInputIndex: checkedNonNegativeIndex(intent.signingInputIndex, "signing input index"),
     taprootSighashHex: assertHashHex(intent.taprootSighashHex, "Taproot sighash"),
-    recipientScriptPubKeyHex: assertHex(intent.recipientScriptPubKeyHex, undefined, "recipient scriptPubKey"),
+    recipientScriptPubKeyHex: checkedScript(intent.recipientScriptPubKeyHex, "recipient scriptPubKey"),
     amountAtomic: canonicalUintDecimal(intent.amountAtomic, "amount"),
     feeAtomic: canonicalUintDecimal(intent.feeAtomic, "fee"),
-    changeScriptPubKeyHex: assertHex(intent.changeScriptPubKeyHex, undefined, "change scriptPubKey"),
+    changeScriptPubKeyHex: checkedScript(intent.changeScriptPubKeyHex, "change scriptPubKey"),
     changeAtomic: canonicalUintDecimal(intent.changeAtomic, "change"),
     inputOutpoints: normalizeOutpoints(intent.inputOutpoints),
     outputCommitments: normalizeHashList(intent.outputCommitments, "output commitment"),
     reserveCommitment: assertHashHex(intent.reserveCommitment, "reserve commitment"),
-    pauseWithdrawals: intent.pauseWithdrawals === true,
-    hardStop: intent.hardStop === true,
+    pauseWithdrawals: checkedBoolean(intent.pauseWithdrawals, "pauseWithdrawals"),
+    hardStop: checkedBoolean(intent.hardStop, "hardStop"),
   };
+  validateEconomicShape(normalized);
+  return Object.freeze(normalized);
+}
+
+function validateEconomicShape(normalized) {
   if (BigInt(normalized.amountAtomic) <= 0n) throw new Error("amount must be greater than zero");
   if (normalized.signingInputIndex >= normalized.inputOutpoints.length) {
     throw new Error("signing input index is outside the committed inputs");
   }
   if (normalized.outputCommitments.length === 0) throw new Error("output commitments are required");
-  return Object.freeze(normalized);
 }
 
 function checkedNonNegativeIndex(value, label) {
-  if (!Number.isSafeInteger(value) || value < 0) throw new Error(`${label} must be a non-negative safe integer`);
+  if (!Number.isInteger(value) || value < 0 || value > 0xffff_ffff) throw new Error(`${label} must be a u32`);
   return value;
 }
 
 function normalizeOutpoints(value) {
-  if (!Array.isArray(value) || value.length === 0) throw new Error("input outpoints are required");
+  value = dataArray(value, MAX_INTENT_INPUTS, "input outpoints");
+  if (value.length === 0) throw new Error("input outpoints are required");
   const normalized = value.map((entry) => {
-    if (typeof entry !== "string" || !/^[0-9a-f]{64}:[0-9]+$/u.test(entry.toLowerCase())) {
-      throw new Error("input outpoint must be txid:vout");
+    if (typeof entry !== "string" || entry.length > 75 || !/^[0-9a-f]{64}:(0|[1-9][0-9]*)$/u.test(entry.toLowerCase()) ||
+        BigInt(entry.slice(65)) > 0xffff_ffffn) {
+      throw new Error("input outpoint must be txid:canonical-u32-vout");
     }
     return entry.toLowerCase();
   });
@@ -181,8 +249,51 @@ function normalizeOutpoints(value) {
 }
 
 function normalizeHashList(value, label) {
-  if (!Array.isArray(value)) throw new Error(`${label} list is required`);
+  value = dataArray(value, MAX_INTENT_OUTPUTS, label);
   return Object.freeze(value.map((entry, index) => assertHashHex(entry, `${label} ${index}`)));
+}
+
+function checkedScript(value, label) {
+  if (typeof value !== "string" || value.length === 0 || value.length > MAX_SCRIPT_BYTES * 2) {
+    throw new Error(`${label} must be a bounded nonempty script`);
+  }
+  return assertHex(value, undefined, label);
+}
+
+function checkedBoolean(value, label) {
+  if (typeof value !== "boolean") throw new Error(`${label} must be a boolean`);
+  return value;
+}
+
+// Capture ordinary data once. Reject accessors, proxies, sparse arrays and
+// custom prototypes before invoking any caller-supplied getter or iterator.
+// This is an API integrity boundary, not a sandbox for hostile in-process code.
+function dataRecord(value, label) {
+  if (value === null || typeof value !== "object" || types.isProxy(value) || Array.isArray(value) ||
+      ![Object.prototype, null].includes(Object.getPrototypeOf(value))) throw new Error(`${label}:PlainDataRequired`);
+  const keys = Reflect.ownKeys(value);
+  if (keys.length > 40) throw new Error(`${label}:TooManyFields`);
+  const snapshot = Object.create(null);
+  for (const key of keys) {
+    const field = Object.getOwnPropertyDescriptor(value, key);
+    if (typeof key !== "string" || !Object.hasOwn(field, "value")) throw new Error(`${label}:PlainDataRequired`);
+    snapshot[key] = field.value;
+  }
+  return snapshot;
+}
+
+function dataArray(value, limit, label) {
+  if (!Array.isArray(value) || types.isProxy(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > limit) {
+    throw new Error(`${label}:BoundedArrayRequired`);
+  }
+  if (Reflect.ownKeys(value).length !== value.length + 1) throw new Error(`${label}:PlainArrayRequired`);
+  const snapshot = [];
+  for (let i = 0; i < value.length; i += 1) {
+    const entry = Object.getOwnPropertyDescriptor(value, String(i));
+    if (entry === undefined || !Object.hasOwn(entry, "value")) throw new Error(`${label}:PlainArrayRequired`);
+    snapshot.push(entry.value);
+  }
+  return snapshot;
 }
 
 export function nativeSigningIntentDigest(intent) {
@@ -190,10 +301,11 @@ export function nativeSigningIntentDigest(intent) {
 }
 
 export function evaluateNativeSigningPolicy(policy, intent) {
+  assertNativeSigningPolicy(policy);
   const normalized = validateNativeSigningIntent(intent);
   const amount = BigInt(normalized.amountAtomic);
   const fee = BigInt(normalized.feeAtomic);
-  const authorization = policy.authorizedOperations.get(normalized.signingRequestId);
+  const authorization = authorizationSnapshots.get(policy).get(normalized.signingRequestId);
   const checks = {
     noHardStop: !normalized.hardStop,
     withdrawalsOpen: !normalized.pauseWithdrawals,

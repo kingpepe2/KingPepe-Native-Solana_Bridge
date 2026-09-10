@@ -1,15 +1,73 @@
 # KingPepe Native - Solana Bridge Development Status
 
-## Current Phase 08 absorbing-stop correction (2026-09-10)
+## Current Phase 08 signer-policy isolation (2026-09-10)
 
-UNPUBLISHED / LOCALLY_TESTED, including a fresh real-chain run.
+UNPUBLISHED / LOCALLY_TESTED, including a fresh real-chain rerun.
+The original local signing policy now requires explicit localnet plus the pinned
+REGTEST genesis, keeps authorization lookup module-private, and exposes only
+frozen detached inspection records. Caller-built/cloned policies, duplicate
+request IDs and enabled production flags are rejected. Epochs/outpoint indexes
+are bounded u32; monetary values are canonical exact u64; input/output/script
+sizes are bounded. Accessors, proxies, sparse arrays and malformed stop/pause
+flags cannot change policy while validation reads it. Both participants reject
+wrong Native domains before reserving a nonce. No weaker threshold or
+per-transfer team approval was introduced.
+
+Local setup has an explicit DKG-only capability. It generates disposable A+B
+material outside source but cannot authorize a commitment or signature share,
+even after successful DKG. Signing uses a separate immutable evidence-derived
+policy. This is not a production key ceremony or a process-security sandbox.
+See [software FROST boundaries](security/software-frost.md).
+
+Four targeted tests first reproduced the old policy defects (7 PASS / 4 FAIL).
+After the guard, the initial full Windows/WSL runs had 353 PASS / 2 FAIL because
+two local DKG setup call sites supplied undefined policy. The first fresh E2E
+also failed there before a deposit; it is not passing evidence. The explicit
+DKG-only capability corrects those call sites without relaxing the signing
+guard. Final Windows/WSL: 357 Node tests (33 new) plus two vectors each PASS,
+zero failures/skips. WSL: 64 Solana + 29 Native Rust tests, fmt/clippy and all
+five Rust lockfile audits PASS. npm reports zero vulnerabilities; declared
+dependency-license metadata passes. The bincode 1.3.3 unmaintained warning
+remains reported. Native Windows Cargo/combined-license audit, service ACLs
+and protected-storage integration remain NOT_RUN locally.
+
+The corrected fresh REGTEST/local-validator run and both SBF builds PASS:
+automatic Native deposit, real A+B Native-accepted signatures, separate A+B
+Ed25519 attestations, actual Solana mint and all 55 checks (22 security, seven
+CSV, four wallet PSBT, ten pre-mint races, seven claim-worker, five accounting).
+Canonical reserve and observed SPL supply are each 100000000 atomic; pending
+credit is zero. No per-transfer team approval. No withdrawal E2E or complete
+service restart claim follows from this single fresh deposit.
+
+No source files added/deleted/moved: provenance remains exactly 177 files.
+No dependency, toolchain or third-party license change, no upstream/legacy
+source imported, and no production data or services touched. Current source and
+all 153 existing commits scan clean; nine JSON files parse, exact provenance
+coverage passes and private-path/IP findings are zero. Staged/outgoing scans,
+private publication and exact-SHA CI are pending.
+Phase 08 INCOMPLETE; Phase 09 NOT_STARTED; Mainnet DISABLED. Next dependencies:
+request-envelope/intent identity and DKG deployment transcript binding, then
+authenticated/fenced signer state, full restart, broadcast-to-credit persistence,
+and bridge-wide reconciliation/hard stops. Upstream FROST remains explicitly
+unaudited; local signature compatibility is not external review.
+
+## Previous Phase 08 absorbing-stop correction (verified source)
+
+Source `ee011923da423475c4ccae3c9685d8a1ce257f23`, message
+`fix(ci): require expanded phase-08 claim-worker evidence`, privately pushed;
+[all four exact-SHA CI jobs PASS](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34472369148).
+CI confirms the real automatic deposit and all 55 checks. Current/staged/outgoing
+source and all 153 commits scanned clean; zero workflow artifacts were uploaded.
+The following 324-test evidence belongs to that SHA, not newer source.
+
+LOCALLY_AND_CI_TESTED, including a fresh real-chain run.
 The absorbing-stop implementation was published as
 `2bdff8f1687085d63de8c628ae12a4f2efed163e`, message
 `fix(phase-08): preserve integrity stops across retries and late responses`.
 [CI failed](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34470295877):
 the real flow completed and all 55 checks passed, but the workflow still required
 the previous count of five claim-worker checks instead of seven. Its other three
-jobs passed. The current corrective increment requires seven and both named stop
+jobs passed. The verified corrective increment requires seven and both named stop
 checks. Six tests execute the actual workflow validation code to verify acceptance
 and rejection; they are CI-contract tests, not additional blockchain evidence.
 No bridge economic code or security requirement was weakened by this correction.
@@ -48,9 +106,8 @@ a claim of a complete global stop or cancellation of an earlier network send.
 Final reserve and SPL supply are each 100000000 atomic, pending credit zero;
 no per-transfer team approval. A second fresh run after the CI-contract correction
 also passes both SBF builds and all 55 checks with the same final totals.
-All existing 152 commits and current source
-scan clean. Staged/outgoing scans, private publication and exact-SHA CI are
-pending. No dependency, toolchain or license change; no source/operational files
+Staged/outgoing/all-153-commit scans, private publication and exact-SHA CI passed
+as recorded above. No dependency, toolchain or license change; no source/operational files
 deleted or moved. Provenance: 175 -> 176 files for the shared stop guard, then
 176 -> 177 for the corrective CI-gate regression test file.
 Mainnet DISABLED; Phase 08 INCOMPLETE; Phase 09 NOT_STARTED. Next dependencies
@@ -58,8 +115,8 @@ include authenticated/fenced signer state, full service restart, the
 broadcast-to-credit persistence gap and bridge-wide reconciliation/hard stops.
 Separate read-only policy diagnostics reproduced approval of matching Mainnet
 configuration and mutation of the exposed authorization Map. No keys, signing
-or network were involved. Those signer-policy defects remain open for the next
-increment; upstream FROST audit coverage also remains unresolved, as disclosed
+or network were involved. Those signer-policy defects were open at that SHA;
+the current increment addresses them. Upstream FROST review remains unresolved, as disclosed
 in [software FROST](security/software-frost.md).
 See [local boundary and limitations](security/local-deposit-accounting.md).
 

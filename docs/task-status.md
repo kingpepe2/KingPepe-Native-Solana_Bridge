@@ -1,6 +1,36 @@
 # KingPepe Native - Solana Bridge Task Status
 
-## Current Phase 08 absorbing-stop correction (2026-09-10)
+## Current Phase 08 signer-policy isolation (2026-09-10)
+
+Implemented locally: localnet/REGTEST-only immutable policy capability, private
+authorization lookup, bounded data and explicit local DKG-only setup that cannot
+authorize signing. Windows/WSL each 357 Node tests + two vectors PASS; WSL 93 Rust
+tests, fmt/clippy and audits PASS. Thirty-three new regressions, no failures/skips
+in final suites. Initial tests reproduced the four policy defects and later two
+DKG integration failures; the first fresh E2E failed at those undefined-policy
+setup calls. They now use explicit DKG-only capabilities, with signing still
+disabled there. The subsequent fresh real deposit, both SBF builds and all 55
+integration checks PASS; reserve/supply each 100000000 atomic, pending credit
+zero, no per-transfer team approval. Current source and all 153 existing commits
+scan clean; nine JSON files and exact provenance/private-data checks pass.
+Staged/outgoing scans, commit/private push and exact-SHA CI are pending.
+No dependency/license changes, file additions/deletions/moves or
+production actions. Provenance remains 177 files.
+
+Phase 08 INCOMPLETE; Phase 09 NOT_STARTED; Mainnet DISABLED. Next: validate/publish
+this increment, then harden request-envelope/intent identities and DKG deployment
+transcripts, authenticated/fenced signer state and full restart/reconciliation.
+Local policy and signature tests are not external FROST audit or host isolation.
+See [full current evidence](development-status.md#current-phase-08-signer-policy-isolation-2026-09-10).
+
+## Previous Phase 08 absorbing-stop correction (verified source)
+
+Source `ee011923da423475c4ccae3c9685d8a1ce257f23`, message
+`fix(ci): require expanded phase-08 claim-worker evidence`, privately pushed;
+[all four exact-SHA CI jobs PASS](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34472369148).
+Exact-SHA CI completes the real deposit and all 55 checks. Current/staged/outgoing
+source and all 153 commits scanned clean; zero workflow artifacts were uploaded.
+The following 324-test evidence belongs to that SHA.
 
 Implemented locally: absorbing operation/ledger stops, late-response guards and
 pre-authorization status checks. Windows/WSL each 324 Node tests + two vectors
@@ -10,15 +40,15 @@ and 55 integration/security checks PASS; reserve and supply each 100000000 atomi
 pending credit zero. Current source and all 152 existing commits scan clean.
 Source 2bdff8f1687085d63de8c628ae12a4f2efed163e was pushed privately;
 [CI failed on an obsolete five-check requirement](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34470295877)
-despite the real flow and all seven claim-worker checks passing. The unpublished
+despite the real flow and all seven claim-worker checks passing. The verified
 correction requires seven and both named stop tests; six executable gate tests
 pass. A second fresh real-chain run also passes all 55 checks. Corrective
-staged/outgoing scans, private push and exact-SHA CI are pending.
+staged/outgoing scans, private push and exact-SHA CI passed as recorded above.
 No production actions. For the full
 test scope, corrected failures and limitations see
-[development status](development-status.md#current-phase-08-absorbing-stop-correction-2026-09-10).
-Phase 08 INCOMPLETE; Phase 09 NOT_STARTED. Next: validate/publish this correction,
-then close the reproduced local signer-policy Mainnet/configuration-mutation gaps
+[development status](development-status.md#previous-phase-08-absorbing-stop-correction-verified-source).
+Phase 08 INCOMPLETE; Phase 09 NOT_STARTED. The next work at that SHA was to close
+the reproduced local signer-policy Mainnet/configuration-mutation gaps
 and continue Phase 08 recovery/fencing/reconciliation. No keys/signing/network
 were involved in the policy diagnostics; the upstream FROST component is unaudited.
 

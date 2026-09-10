@@ -36,6 +36,7 @@ import {
   NativeFrostSigner,
   REQUIRED_FROST_SIGNERS,
   createNativeSigningPolicy,
+  createLocalNativeDkgPolicy,
   runTwoPartyDkg,
 } from "../native/frost/index.mjs";
 import {
@@ -1569,6 +1570,7 @@ export async function signLocalReserveSweepWithFrost({
   );
   const authorizedOperations = prepared.map((entry) => entry.authorizedOperation);
   const signerPolicy = createNativeSigningPolicy({
+    environment: "localnet",
     nativeNetwork: localSigningConfig.nativeNetworkName,
     nativeGenesisHash: localSigningConfig.nativeGenesisHash,
     solanaDeployment: localSigningConfig.solanaDeployment,
@@ -1947,6 +1949,8 @@ async function prepareLocalReserveSweepFeeFundingInputs({
 
 export async function createLocalFrostTaprootCustodyContext({ plan, flowConfig }) {
   const config = requireObject(flowConfig, "flowConfig");
+  const dkgPolicy = createLocalNativeDkgPolicy({ environment: "localnet", nativeNetwork: config.nativeChainName,
+    nativeGenesisHash: REGTEST_GENESIS, solanaDeployment: config.solanaDeploymentHex, keyEpoch: config.keyEpoch });
   const repoRoot = path.resolve(plan.repoRoot);
   const frostRoot = validateStateRoot({
     stateRoot: path.join(config.stateRoot, "ephemeral-frost-custody"),
@@ -1956,7 +1960,7 @@ export async function createLocalFrostTaprootCustodyContext({ plan, flowConfig }
   const signerA = new NativeFrostSigner({
     signerId: REQUIRED_FROST_SIGNERS[0],
     index: 0,
-    policy: undefined,
+    policy: dkgPolicy,
     stateStore: new FileBackedFrostStateStore({
       signerId: REQUIRED_FROST_SIGNERS[0],
       root: path.join(frostRoot, "frost-a"),
@@ -1966,14 +1970,14 @@ export async function createLocalFrostTaprootCustodyContext({ plan, flowConfig }
   const signerB = new NativeFrostSigner({
     signerId: REQUIRED_FROST_SIGNERS[1],
     index: 1,
-    policy: undefined,
+    policy: dkgPolicy,
     stateStore: new FileBackedFrostStateStore({
       signerId: REQUIRED_FROST_SIGNERS[1],
       root: path.join(frostRoot, "frost-b"),
       repoRoot,
     }),
   });
-  const keyEpoch = 1;
+  const keyEpoch = dkgPolicy.keyEpoch;
   const epoch = runTwoPartyDkg([signerA, signerB], { epoch: keyEpoch });
   const xOnly = normalizeHash32(epoch.aggregateTweakedXOnlyPublicKey, "aggregateTweakedXOnlyPublicKey");
   return Object.freeze({

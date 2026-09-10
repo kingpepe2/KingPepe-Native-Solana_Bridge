@@ -8,12 +8,30 @@ are compatibility evidence, not a security audit of FROST, DKG or this bridge.
 Do not transfer audit claims from other portions of the library to this component.
 See the [upstream FROST warning](https://github.com/paulmillr/noble-curves/blob/2.3.0/README.md#frost-threshold-signatures).
 
-A read-only policy diagnostic also reproduced matching Mainnet-policy approval
-and mutation of the exposed authorized-operation Map. No keys, signing or network
-were used. These local runtime boundaries need correction before the Phase 08
-work can be considered complete. No production signing is authorized. Signer
-state authentication, exclusive service access and rollback assurance also
-remain incomplete. None of these deficiencies requires a second physical host.
+A read-only diagnostic reproduced matching Mainnet-policy approval and mutation
+of the exposed authorized-operation Map on the preceding source. No keys,
+signing or network were used. The current original policy implementation rejects
+both paths: creation requires localnet and the pinned REGTEST genesis, the lookup
+is module-private, and all exposed authorization records/arrays are frozen copies.
+Clones, proxies and caller-built lookups are not recognized policy capabilities.
+Explicit attempts to enable production flags fail closed. A separate local
+DKG-only capability permits disposable setup but never transaction signing.
+
+Policy data uses exact u64 amounts, positive u32 epochs and canonical u32
+outpoints. Accessors, proxies, sparse arrays, duplicate request IDs, malformed
+pause/stop flags and out-of-range input indexes are rejected. Resource ceilings
+are 256 operations, 256 inputs, 256 output commitments, 40 record fields and
+10000 bytes per nonempty script. These are local API ceilings, not approved
+production transfer limits or assertions of Native consensus maxima.
+
+These controls protect cooperative API use, not arbitrary hostile code with
+process/host access. Policy enrollment is not proof of chain truth; each signing
+participant still needs its independent configured raw-evidence checks. The
+current in-memory policy is reconstructed from validated evidence, not restored
+from caller JSON. Request-envelope/intent identity and DKG deployment transcript
+binding need further hardening. Signer-state authentication, service access and
+rollback assurance remain incomplete. No production signing is authorized and
+none of these deficiencies requires a second physical host.
 
 ## Phase 04 implementation
 
@@ -40,7 +58,11 @@ Legacy read-only recovery material identifies the Native signing path as Bitcoin
 - 8 decimal atomic Native units.
 - Taproot active for KingPepe mainnet and regtest configurations.
 
-Phase 04 validates the FROST signature against the committed 32-byte Taproot sighash. Full Native transaction construction and node acceptance are later Native proof and local end-to-end phases.
+Phase 04 originally validated the committed 32-byte Taproot sighash. Phase 08
+now constructs real test transactions and obtains independent REGTEST node
+acceptance, including recovery-script sweeps. Exact-SHA evidence is in
+[development status](../development-status.md); this does not establish
+production signing, full restart/rollback safety or an external security audit.
 
 ## Same-host risk statement
 

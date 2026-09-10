@@ -13,10 +13,14 @@ import {
   NativeFrostSigner,
   REQUIRED_FROST_SIGNERS,
   createNativeSigningPolicy,
+  createLocalNativeDkgPolicy,
+  evaluateNativeSigningPolicy,
   nativeSigningIntentDigest,
   runTwoPartyDkg,
   sha256Canonical,
+  validateNativeSigningIntent,
 } from "../index.mjs";
+import { REGTEST_GENESIS } from "../../node/native-raw-evidence.mjs";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
 
@@ -63,7 +67,7 @@ function intentFromAuthorization(auth, overrides = {}) {
     mode: FROST_SIGNING_MODE,
     purpose: "WITHDRAWAL",
     nativeNetwork: "regtest",
-    nativeGenesisHash: h("kingpepe-regtest-genesis"),
+    nativeGenesisHash: REGTEST_GENESIS,
     solanaDeployment: h("solana-local-deployment"),
     bridgeProgramId: h("bridge-program-id"),
     transceiverProgramId: h("transceiver-program-id"),
@@ -91,10 +95,11 @@ function intentFromAuthorization(auth, overrides = {}) {
   };
 }
 
-function makePolicy(auth) {
+function makePolicy(auth, overrides = {}) {
   return createNativeSigningPolicy({
+    environment: "localnet",
     nativeNetwork: "regtest",
-    nativeGenesisHash: h("kingpepe-regtest-genesis"),
+    nativeGenesisHash: REGTEST_GENESIS,
     solanaDeployment: h("solana-local-deployment"),
     bridgeProgramId: h("bridge-program-id"),
     transceiverProgramId: h("transceiver-program-id"),
@@ -104,13 +109,209 @@ function makePolicy(auth) {
     maxFeeAtomic: "100000",
     reserveScriptPubKeyHex: p2tr("reserve"),
     authorizedOperations: [auth],
+    ...overrides,
   });
 }
 
-function createRuntime(evidenceValidators = {}) {
-  const root = withTempRoot();
+test("Native signing policy cannot enable Mainnet through matching configuration", () => {
+  assert.throws(() => makePolicy(baseAuthorization(), { nativeNetwork: "mainnet" }), /RegtestOnly/u);
+});
+
+test("Native signing policy pins the verified REGTEST genesis", () => {
+  assert.throws(() => makePolicy(baseAuthorization(), { nativeGenesisHash: h("different-genesis") }), /RegtestGenesis/u);
+});
+
+test("Native signing policy rejects an unbranded caller-built authorization Map", () => {
   const auth = baseAuthorization();
   const policy = makePolicy(auth);
+  const forged = { ...policy, authorizedOperations: new Map([[auth.signingRequestId, auth]]) };
+  assert.throws(() => evaluateNativeSigningPolicy(forged, intentFromAuthorization(auth)), /PolicySnapshotRequired/u);
+});
+
+test("Native signing authorization collection cannot enroll an operation after creation", () => {
+  const auth = baseAuthorization();
+  const policy = makePolicy(auth, { authorizedOperations: [] });
+  assert.equal(evaluateNativeSigningPolicy(policy, intentFromAuthorization(auth)).result, "REJECTED");
+  assert.throws(() => policy.authorizedOperations.set(auth.signingRequestId, auth), TypeError);
+  assert.equal(evaluateNativeSigningPolicy(policy, intentFromAuthorization(auth)).result, "REJECTED");
+});
+
+for (const environment of [undefined, "devnet", "mainnet"]) {
+  test(`Native signing policy rejects environment ${String(environment)}`, () => {
+    assert.throws(() => makePolicy(baseAuthorization(), { environment }), /LocalnetOnly/u);
+  });
+}
+
+for (const [flag, value] of [
+  ["productionReady", true], ["productionSigningAuthorized", true],
+  ["productionBroadcastAuthorized", true], ["mainnetActivation", "ENABLED"],
+]) {
+  test(`Native signing policy cannot enable ${flag}`, () => {
+    assert.throws(() => makePolicy(baseAuthorization(), { [flag]: value }), /ActivationDisabled/u);
+  });
+}
+
+test("Native signing policy is a frozen, detached authorization snapshot", () => {
+  const auth = baseAuthorization();
+  const original = intentFromAuthorization(structuredClone(auth));
+  const operations = [auth];
+  const overrides = { authorizedOperations: operations };
+  const policy = makePolicy(auth, overrides);
+  auth.amountAtomic = "1";
+  auth.inputOutpoints[0] = outpoint("substituted-input");
+  auth.outputCommitments[0] = h("substituted-output");
+  operations.push(baseAuthorization({ signingRequestId: h("extra-request") }));
+  overrides.maxFeeAtomic = "0";
+  assert.equal(evaluateNativeSigningPolicy(policy, original).result, "APPROVED");
+  assert.equal(evaluateNativeSigningPolicy(policy, intentFromAuthorization(auth)).result, "REJECTED");
+  assert.throws(() => { policy.nativeNetwork = "mainnet"; }, TypeError);
+  assert.throws(() => { policy.productionSigningAuthorized = true; }, TypeError);
+  assert.throws(() => policy.authorizedOperations.push(auth), TypeError);
+  assert.throws(() => { policy.authorizedOperations[0].amountAtomic = "1"; }, TypeError);
+  assert.throws(() => { policy.authorizedOperations[0].inputOutpoints[0] = outpoint("other"); }, TypeError);
+  assert.throws(() => { policy.authorizedOperations[0].outputCommitments[0] = h("other"); }, TypeError);
+  assert.equal(evaluateNativeSigningPolicy(policy, original).result, "APPROVED");
+});
+
+test("cloning or inheriting a valid policy does not manufacture a signing capability", () => {
+  const auth = baseAuthorization();
+  const policy = makePolicy(auth);
+  for (const forged of [structuredClone(policy), Object.create(policy), new Proxy(policy, {})]) {
+    assert.throws(() => evaluateNativeSigningPolicy(forged, intentFromAuthorization(auth)), /PolicySnapshotRequired/u);
+  }
+});
+
+test("signer rejects forged policy before opening any state", () => {
+  let loaded = false;
+  const policy = makePolicy(baseAuthorization());
+  assert.throws(() => new NativeFrostSigner({ signerId: REQUIRED_FROST_SIGNERS[0], index: 0,
+    policy: { ...policy }, stateStore: { load() { loaded = true; throw new Error("UnexpectedStateRead"); } } }),
+  /PolicySnapshotRequired/u);
+  assert.equal(loaded, false);
+});
+
+test("policy rejects duplicate request identifiers instead of replacing authorization", () => {
+  const auth = baseAuthorization();
+  assert.throws(() => makePolicy(auth, { authorizedOperations: [auth, { ...auth, amountAtomic: "1" }] }), /DuplicateRequest/u);
+});
+
+for (const field of ["amountAtomic", "feeAtomic", "changeAtomic"]) {
+  test(`policy and intent reject oversized or ambiguous ${field}`, () => {
+    for (const value of ["18446744073709551616", "9".repeat(100_000), "01", "1e2", "-1", 1]) {
+      const auth = baseAuthorization({ [field]: value });
+      assert.throws(() => makePolicy(auth), /canonical u64/u);
+      assert.throws(() => validateNativeSigningIntent(intentFromAuthorization(auth)), /canonical u64/u);
+    }
+  });
+}
+
+test("policy caps reject u64 overflow and preserve exact boundary values", () => {
+  for (const field of ["maxAmountAtomic", "maxFeeAtomic"]) {
+    assert.throws(() => makePolicy(baseAuthorization(), { [field]: "18446744073709551616" }), /canonical u64/u);
+  }
+  const auth = baseAuthorization({ amountAtomic: "18446744073709551615", feeAtomic: "0", changeAtomic: "0" });
+  const policy = makePolicy(auth, { maxAmountAtomic: auth.amountAtomic });
+  assert.equal(evaluateNativeSigningPolicy(policy, intentFromAuthorization(auth)).result, "APPROVED");
+});
+
+test("policy and intent epochs are bounded to positive u32", () => {
+  for (const keyEpoch of [0, -1, 1.5, 0x1_0000_0000, Number.MAX_SAFE_INTEGER]) {
+    assert.throws(() => makePolicy(baseAuthorization(), { keyEpoch }), /positive u32/u);
+    assert.throws(() => validateNativeSigningIntent(intentFromAuthorization(baseAuthorization(), { keyEpoch })), /positive u32/u);
+  }
+  const auth = baseAuthorization();
+  assert.equal(evaluateNativeSigningPolicy(makePolicy(auth, { keyEpoch: 0xffff_ffff }),
+    intentFromAuthorization(auth, { keyEpoch: 0xffff_ffff })).result, "APPROVED");
+});
+
+test("policy and intent reject noncanonical, overflowing and duplicate outpoints", () => {
+  for (const inputOutpoints of [[`${h("input")}:00`], [`${h("input")}:4294967296`],
+    [`${h("input")}:${"9".repeat(100_000)}`], [outpoint("input"), outpoint("input")]]) {
+    const auth = baseAuthorization({ inputOutpoints });
+    assert.throws(() => makePolicy(auth), /outpoint/u);
+    assert.throws(() => validateNativeSigningIntent(intentFromAuthorization(auth)), /outpoint/u);
+  }
+  const auth = baseAuthorization({ inputOutpoints: [outpoint("input", 0xffff_ffff)] });
+  assert.equal(evaluateNativeSigningPolicy(makePolicy(auth), intentFromAuthorization(auth)).result, "APPROVED");
+});
+
+for (const field of ["recipientScriptPubKeyHex", "changeScriptPubKeyHex"]) {
+  test(`policy and intent require bounded nonempty ${field}`, () => {
+    for (const value of ["", "51".repeat(10_001)]) {
+      const auth = baseAuthorization({ [field]: value });
+      assert.throws(() => makePolicy(auth), /bounded nonempty/u);
+      assert.throws(() => validateNativeSigningIntent(intentFromAuthorization(auth)), /bounded nonempty/u);
+    }
+  });
+}
+
+test("policy and intent enforce bounded dense operation, input and output arrays", () => {
+  const auth = baseAuthorization();
+  assert.throws(() => makePolicy(auth, { authorizedOperations: Array(257).fill(auth) }), /BoundedArray/u);
+  for (const field of ["inputOutpoints", "outputCommitments"]) {
+    for (const value of [Array(257).fill(auth[field][0]), Array(1), new Proxy(auth[field], {})]) {
+      const altered = { ...auth, [field]: value };
+      assert.throws(() => makePolicy(altered), /ArrayRequired/u);
+      assert.throws(() => validateNativeSigningIntent(intentFromAuthorization(altered)), /ArrayRequired/u);
+    }
+  }
+});
+
+test("authorization validation rejects impossible indexes, empty outputs and zero amount", () => {
+  for (const overrides of [{ signingInputIndex: 2 }, { signingInputIndex: -1 }, { outputCommitments: [] }, { amountAtomic: "0" }]) {
+    assert.throws(() => makePolicy(baseAuthorization(overrides)), /input|outputs|output commitments|amount/u);
+  }
+});
+
+test("intent stop and pause flags cannot turn missing or malformed evidence into false", () => {
+  for (const flag of ["hardStop", "pauseWithdrawals"]) {
+    for (const value of [undefined, null, 0, "false", "true"]) {
+      assert.throws(() => validateNativeSigningIntent(intentFromAuthorization(baseAuthorization(), { [flag]: value })), /boolean/u);
+    }
+    const auth = baseAuthorization();
+    assert.equal(evaluateNativeSigningPolicy(makePolicy(auth), intentFromAuthorization(auth, { [flag]: true })).result, "REJECTED");
+  }
+});
+
+test("policy and intent reject accessors without running caller code", () => {
+  let reads = 0;
+  const auth = baseAuthorization();
+  Object.defineProperty(auth, "amountAtomic", { get() { reads += 1; return "1"; } });
+  assert.throws(() => makePolicy(auth), /PlainDataRequired/u);
+  const intent = intentFromAuthorization(baseAuthorization());
+  Object.defineProperty(intent, "hardStop", { get() { reads += 1; return false; } });
+  assert.throws(() => validateNativeSigningIntent(intent), /PlainDataRequired/u);
+  const options = {};
+  Object.defineProperty(options, "environment", { get() { reads += 1; return "localnet"; } });
+  assert.throws(() => createNativeSigningPolicy(options), /PlainDataRequired/u);
+  const outpoints = [outpoint("input")];
+  Object.defineProperty(outpoints, "0", { get() { reads += 1; return outpoint("other"); } });
+  assert.throws(() => makePolicy(baseAuthorization({ inputOutpoints: outpoints })), /PlainArrayRequired/u);
+  assert.equal(reads, 0);
+});
+
+test("policy rejects proxies and custom prototypes before reading policy values", () => {
+  let reads = 0;
+  const proxy = new Proxy({}, { get() { reads += 1; return "localnet"; } });
+  assert.throws(() => createNativeSigningPolicy(proxy), /PlainDataRequired/u);
+  assert.throws(() => makePolicy(Object.create(baseAuthorization())), /PlainDataRequired/u);
+  assert.equal(reads, 0);
+});
+
+test("frozen normalized intent stays detached from later array changes", () => {
+  const raw = intentFromAuthorization(baseAuthorization());
+  const normalized = validateNativeSigningIntent(raw);
+  const digest = nativeSigningIntentDigest(normalized);
+  raw.inputOutpoints[0] = outpoint("other");
+  raw.outputCommitments[0] = h("other");
+  assert.equal(nativeSigningIntentDigest(normalized), digest);
+  assert.throws(() => normalized.inputOutpoints.push(outpoint("more")), TypeError);
+});
+
+function createRuntime(evidenceValidators = {}, policyOverride) {
+  const root = withTempRoot();
+  const auth = baseAuthorization();
+  const policy = policyOverride ?? makePolicy(auth);
   const storeA = new FileBackedFrostStateStore({
     signerId: REQUIRED_FROST_SIGNERS[0],
     root: path.join(root, "frost-a"),
@@ -258,6 +459,61 @@ test("each signer rejects altered transaction policy fields before producing a s
     } finally {
       runtime.cleanup();
     }
+  }
+});
+
+test("A and B each reject a nonlocal Native domain before reserving any nonce", () => {
+  const runtime = createRuntime();
+  try {
+    for (const altered of [{ nativeNetwork: "mainnet" }, { nativeGenesisHash: h("different-genesis") }]) {
+      const request = frostRequestFor(intentFromAuthorization(runtime.auth, altered));
+      for (const signer of [runtime.signerA, runtime.signerB]) {
+        assert.throws(() => signer.signingCommitment(request), /nativeDomain/u);
+      }
+    }
+    for (const role of ["frost-a", "frost-b"]) {
+      const state = JSON.parse(readFileSync(path.join(runtime.root, role, "frost-signer-state.json"), "utf8"));
+      assert.equal(state.nonceReservationCounter, "0");
+      assert.equal(Object.keys(state.signing).length, 0);
+      assert.equal(Object.keys(state.nonceTombstones).length, 0);
+    }
+  } finally { runtime.cleanup(); }
+});
+
+test("B without A cannot cause a threshold downgrade", () => {
+  const runtime = createRuntime();
+  try {
+    runtime.signerA.setAvailableForTestOnly(false);
+    const result = runtime.coordinator.signAutomatically(intentFromAuthorization(runtime.auth));
+    assert.equal(result.state, "WAITING_FOR_QUORUM");
+    assert.equal(result.available, 1);
+    assert.equal(result.required, 2);
+    assert.equal(result.signatureHex, undefined);
+  } finally { runtime.cleanup(); }
+});
+
+test("explicit local DKG capability cannot sign, even after successful A+B setup", () => {
+  const policy = createLocalNativeDkgPolicy({ environment: "localnet", nativeNetwork: "regtest",
+    nativeGenesisHash: REGTEST_GENESIS, solanaDeployment: h("solana-local-deployment"), keyEpoch: 1 });
+  const runtime = createRuntime({}, policy);
+  try {
+    const intent = intentFromAuthorization(runtime.auth);
+    assert.throws(() => runtime.coordinator.signAutomatically(intent), /PolicySnapshotRequired/u);
+    for (const signer of [runtime.signerA, runtime.signerB]) {
+      assert.throws(() => signer.signingCommitment(frostRequestFor(intent)), /PolicySnapshotRequired/u);
+      assert.throws(() => signer.signatureShare(frostRequestFor(intent), []), /PolicySnapshotRequired/u);
+    }
+    assert.throws(() => { policy.authorizedOperations = [runtime.auth]; }, TypeError);
+    assert.throws(() => evaluateNativeSigningPolicy(policy, intent), /PolicySnapshotRequired/u);
+  } finally { runtime.cleanup(); }
+});
+
+test("local DKG capability applies the same environment and activation guards", () => {
+  const options = { environment: "localnet", nativeNetwork: "regtest", nativeGenesisHash: REGTEST_GENESIS,
+    solanaDeployment: h("solana-local-deployment"), keyEpoch: 1 };
+  for (const overrides of [{ environment: "mainnet" }, { nativeNetwork: "mainnet" },
+    { nativeGenesisHash: h("another-network") }, { productionSigningAuthorized: true }]) {
+    assert.throws(() => createLocalNativeDkgPolicy({ ...options, ...overrides }), /LocalnetOnly|RegtestOnly|RegtestGenesis|ActivationDisabled/u);
   }
 });
 

@@ -119,6 +119,7 @@ export function prepareLocalNativeReserveSweepSigningIntent(input) {
     reserveCommitment: signingIntent.reserveCommitment,
   });
   const signerPolicy = createNativeSigningPolicy({
+    environment: "localnet",
     nativeNetwork: config.nativeNetworkName,
     nativeGenesisHash: config.nativeGenesisHash,
     solanaDeployment: config.solanaDeployment,
