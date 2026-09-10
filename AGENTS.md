@@ -29,6 +29,10 @@ but not a Native withdrawal payout or the full Phase 09 E2E.
 
 Audit baseline: 9ea5e198b57f48086a0c7861123a6d79d14e8560.
 Prior implementation: 0133a6cc7f22bf880249a72a62502aa4bf3a638b.
+Published audit fixes: 845f2b22c87a94f79a3b499209260247a5d01acf; separate-clone
+Windows/WSL Node, Rust, SBF and real-chain reruns passed for that SHA. Its exact
+Actions run 34519943346 was rejected before steps. Follow-up changes need new
+SHA-bound validation; the remaining security findings still prevent Phase 09.
 Current evidence and outstanding findings: docs/phase-08-5-audit.md,
 docs/development-status.md, docs/task-status.md and BRIDGE-READINESS.json.
 Historical passing runs do not certify a later SHA.

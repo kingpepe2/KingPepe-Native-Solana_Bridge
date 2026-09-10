@@ -3,6 +3,12 @@
 This procedure is for disposable KingPepe REGTEST and Solana local-validator
 testing. Mainnet activation and production signing remain disabled.
 
+The repository's .gitattributes specifies LF for text on Windows and Linux/WSL.
+An older Windows clone without that policy can show CRLF-only changes in WSL
+Git despite identical normalized source. Verify the diff and preserve work; do
+not reset a checkout to resolve line endings. New clones use the committed LF
+policy. This changes no global Git defaults or binary files.
+
 The exact development tool versions and fetched archive checksums are in
 `scripts/local-e2e-toolchain.json`. The native source commit and tree were
 confirmed against the source repository, independently of the recovery notes.

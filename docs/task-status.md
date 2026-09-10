@@ -2,22 +2,33 @@
 
 ## Current Phase 08.5 audit (2026-09-10)
 
-Audit baseline 9ea5e198b57f48086a0c7861123a6d79d14e8560; PRIVATE repository.
-Fresh withdrawal-PDA creation/atomic burn+record and audit boundary fixes are
-implemented. Windows/WSL each 501 Node tests plus two vectors, WSL 97 Rust tests,
-quality gates, two SBF programs, 55 real deposit checks and 26 finalized record
-checks PASS. Native deposit reaches COMPLETED; no Native withdrawal payout or
-Phase 09 implementation. Provenance/guardrails/declared licenses and dependency
-audits pass; bincode warning retained. Scans/publication/fresh-clone SHA evidence
-will be recorded after execution, not inferred from the worktree.
+Audit fixes published PRIVATE at 845f2b22c87a94f79a3b499209260247a5d01acf:
+`fix(phase-08.5): initialize withdrawal records and harden audit boundaries`.
+Fresh clone of that exact SHA passed Windows/WSL 501 Node tests and two vectors
+each, 97 Rust tests/quality gates from a new host target, both SBF builds from a
+new SBF target, 55 real deposit checks and 26 finalized withdrawal-record checks.
+Both program hashes reproduce. Native deposit COMPLETED; Phase 09 NOT_STARTED.
+No Native withdrawal payout, production data or legacy mutation.
 
-Actions remains account-blocked before all four jobs start on baseline run
-34509774457 attempt 2. The latest audit authorization permits local fixes and
-private pushes during this block, not Phase 09 or weakened gates. Full audit
-verdict remains BLOCKED by state/isolation/global-stop/upgrade-source/deep-reorg
-findings; see [audit report](phase-08-5-audit.md). Finish publication/fresh-clone
-checks, report, then STOP for Team instruction. productionReady=false;
-mainnetActivation=DISABLED. Historical entries below are not current certification.
+Exact-source CI run 34519943346 rejected all four jobs before steps due to
+GITHUB_ACTIONS_ACCOUNT_EXECUTION_BLOCKED: tests NOT_RUN, artifacts zero.
+Provenance, guardrails, declared licenses, npm audit and five Cargo audits passed;
+bincode unmaintained warning retained. Current/staged/outgoing scans passed, as
+did all 164 published commits in Gitleaks. Four earlier historical URL candidates
+were reviewed inert negative-test inputs, not concealed findings.
+
+Follow-up: LF checkout policy resolves cross-platform false dirty status without
+global Git changes, and finalized failure tests additionally assert rent refund
+apart from the charged transaction fee. Record the follow-up's actual validation
+after execution; a commit cannot record its own final SHA. See
+[development evidence](development-status.md) and [audit report](phase-08-5-audit.md).
+
+Full audit verdict remains BLOCKED by A85-08 through A85-11: protected storage/
+isolation, durable global-stop/service recovery, deployed source/upgrade watcher
+and post-mint deep-reorg/rollback assurance. Complete follow-up publication and
+affected exact-SHA validation, report, then STOP for Team instruction.
+productionReady=false; mainnetActivation=DISABLED.
+Historical entries below are not current certification.
 
 ## Historical Phase 08 recovery validation (2026-09-10)
 

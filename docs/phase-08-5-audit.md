@@ -6,8 +6,9 @@ productionReady=false; mainnetActivation=DISABLED.
 
 Baseline: `9ea5e198b57f48086a0c7861123a6d79d14e8560`.
 Earlier implementation: `0133a6cc7f22bf880249a72a62502aa4bf3a638b`.
-The fixes below were tested in the reviewed worktree on that baseline.
-Publication/fresh-clone SHA evidence is recorded in development-status; a commit
+The fixes were published at `845f2b22c87a94f79a3b499209260247a5d01acf` and
+rerun from a separate clean clone of that SHA. Follow-up checkout/rent-test
+changes require their own validation. Exact evidence is in development-status; a commit
 cannot contain its own final SHA. Do not attribute historical CI to newer source.
 
 ## Verdict
@@ -19,7 +20,7 @@ single-deposit flow is not full multi-service recovery or production observation
 | Phase | Audit result | Scope / reason |
 | --- | --- | --- |
 | 01 foundation/legal/guardrails | PASS locally | PRIVATE repository, proprietary original source, complete classifications, retained third-party terms; scans are detection tools, not proof of absence |
-| 02 workspace/toolchain | PASS locally; fresh clone pending | Exact engines/locks, direct SBF path, no Anchor CLI dependency or copied legacy runtime; current clone builds |
+| 02 workspace/toolchain | PASS at published 845f2b2 | Exact engines/locks, direct SBF path, separate clean clone/new project builds; LF follow-up fixes cross-platform status noise |
 | 03 messages/accounting | PASS for implemented primitives | Canonical vectors, replay and checked arithmetic; fixed early miner-fee surplus; future operation-bound payout journal not implemented |
 | 04 FROST | FAIL full audit gate | Real Native-compatible signing passes; protected shares, leases, authenticated state/IPC and full rollback/global restart safety remain incomplete |
 | 05 Solana programs | PASS exercised local boundary | Fresh-PDA defect fixed and 26 finalized regressions; SBF/deposit checks pass; not exhaustive account fuzzing or an external audit |
@@ -70,7 +71,7 @@ AUDIT_PASS_LOCALLY_CI_ACCOUNT_BLOCKED. That label is not earned.
    gates. Stale IDL, production-key loading, observer and CI-pause claims were
    corrected. Current NTT main/tree/releases were compared, with no code import.
 
-## Measured local validation before publication
+## Measured local validation and published-source fresh clone
 
 | Check | PASS | FAIL | SKIP | Qualification |
 | --- | ---: | ---: | ---: | --- |
@@ -81,6 +82,10 @@ AUDIT_PASS_LOCALLY_CI_ACCOUNT_BLOCKED. That label is not earned.
 | SBF programs | 2 | 0 | 0 | Direct Linux/WSL SBF builds; generated keypairs external |
 | Existing local flow checks | 55 | 0 | 0 | 22 security, 7 CSV, 4 PSBT, 10 pre-mint races, 7 claim retries, 5 accounting |
 | New withdrawal record checks | 26 | 0 | 0 | Finalized validator execution, not mocked/preflight-only failures |
+
+These counts were repeated in the separate 845f2b2 clone, not copied from the
+baseline report. Compiled project targets started empty; verified pinned compiler
+and dependency downloads were reused. Windows and WSL locked npm installs ran.
 
 Node groups: 159 FROST, 35 Native, 8 attester, 28 observer, 174 pipeline/ledger,
 97 scripts/guards/CI contracts. Vectors are separate, not two extra Node tests.
@@ -154,7 +159,8 @@ that actually ran, not to the missing cases.
   verified deployed identities and one-time Team activation authorization.
   No Devnet/Mainnet deployment or production key/service actions were performed.
 - **A85-14 / EXTERNAL_BLOCKER:** GitHub Actions account execution. All four jobs
-  rejected before steps on baseline run 34509774457 attempt 2. Tests NOT_RUN.
+  rejected before steps on audit-source run 34519943346 attempt 1, SHA 845f2b2;
+  zero artifacts, tests NOT_RUN. Baseline run 34509774457 attempt 2 was also blocked.
   Exact annotation: "The job was not started because recent account payments
   have failed or your spending limit needs to be increased. Please check the
   'Billing & plans' section in your settings". No account/gate changes authorized.
@@ -192,6 +198,26 @@ no detected keypair/wallet/state filenames, are not staged or publication artifa
 and are not used as clean-clone evidence. Their presence is not a source build
 or runtime-secret guarantee; this audit does not delete another session's cache.
 
-Fresh-clone execution and final tree/history/publication scans will be bound to
-the published audit source in development-status. Until recorded, they are
-NOT_RUN for that SHA. No current local result certifies CI or production.
+## Published-source reproducibility and scan evidence
+
+The separate 845f2b2 clone reproduced both programs with new project targets:
+
+- kingpepe_bridge.so: `88e2f8413eafbcb800fb8c8e8db2df20e4aa8188304922bf59bd80e2e0eb004c`
+- kingpepe_transceiver.so: `58bacbe7119e8793ae93dc0e025ed2ebc96c9a1407b16fdcbbdab2ec4d706eb0`
+
+Those hashes match the primary reviewed builds. This is measured same-toolchain
+reproducibility across two source locations, not a universal or independent audit.
+Keys and build/runtime outputs stayed external and were not uploaded. Current,
+staged and every outgoing snapshot passed publication review; full 164-commit
+Gitleaks scan passed. The supplementary historical boundary scan's four
+URL-userinfo candidates were reviewed inert negative-test fixtures; no real
+credential was identified and no blanket exception was added.
+
+The Windows clone had no normalized content diff, but WSL Git could report
+CRLF-only modifications. The follow-up .gitattributes enforces LF without changing
+global configuration or rewriting history. A stronger failure assertion also
+checks transaction-fee-only loss by the payer, so record rent must roll back.
+All 26 tightened finalized cases passed in a new isolated worktree run before
+the follow-up commit, with no partial Mint/token/state/record/rent changes.
+Post-publication evidence for that follow-up must be reported against its own SHA,
+not inherited from 845f2b2. No local result certifies CI or production.

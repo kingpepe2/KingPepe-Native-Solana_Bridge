@@ -16,14 +16,15 @@
     "externalReview": "NOT_RUN",
     "phaseResults": {
       "phase01": "PASS_LOCAL_SOURCE_SCOPE",
-      "phase02": "PASS_LOCAL_WORKSPACE_FRESH_CLONE_PENDING",
+      "phase02": "PASS_LOCKED_FRESH_CLONE_845F2B2",
       "phase03": "PASS_IMPLEMENTED_PRIMITIVES",
       "phase04": "FAIL_SECURITY_DEPENDENCIES",
       "phase05": "PASS_EXERCISED_LOCAL_PROGRAM_BOUNDARY",
       "phase06": "PASS_REGTEST_SCOPE",
       "phase07": "FAIL_SOURCE_AND_UPGRADE_WATCHER_INCOMPLETE",
       "phase08": "FAIL_FULL_SERVICE_RECOVERY_REORG_GATES"
-    }
+    },
+    "validatedSourceSha": "845f2b22c87a94f79a3b499209260247a5d01acf"
   },
   "localValidation": {
     "environment": "WINDOWS_PORTABLE_NODE_AND_UBUNTU_24_04_WSL2",
@@ -62,7 +63,18 @@
     "mintedSupplyAtomic": "100000000",
     "authorizedUnmintedCreditsAtomic": "0",
     "noPerTransferTeamApproval": true,
-    "freshClone": "NOT_RUN_FOR_PENDING_PUBLICATION",
+    "freshClone": {
+      "status": "PASS_FOR_SPECIFIED_SOURCE",
+      "sourceSha": "845f2b22c87a94f79a3b499209260247a5d01acf",
+      "newHostAndSbfProjectTargets": true,
+      "windowsNodePass": 501,
+      "wslNodePass": 501,
+      "rustPass": 97,
+      "depositChecksPass": 55,
+      "withdrawalRecordChecksPass": 26,
+      "sbfPrograms": 2,
+      "followUpCheckoutAndRentAssertion": "REVALIDATION_REQUIRED_FOR_FOLLOW_UP_SHA"
+    },
     "windowsRustServicesAcl": "NOT_RUN"
   },
   "sourceState": {
@@ -85,11 +97,12 @@
   },
   "publicationBlocker": {
     "code": "GITHUB_ACTIONS_ACCOUNT_EXECUTION_BLOCKED",
-    "sourceSha": "9ea5e198b57f48086a0c7861123a6d79d14e8560",
-    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34509774457",
-    "runAttempt": 2,
+    "sourceSha": "845f2b22c87a94f79a3b499209260247a5d01acf",
+    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34519943346",
+    "runAttempt": 1,
     "ciTests": "NOT_RUN_ALL_FOUR_JOBS_REJECTED_BEFORE_STEPS",
-    "requiredAction": "KingPepe Team restores Actions execution. Audit fixes/private pushes are authorized; no gate/account/protection bypass."
+    "requiredAction": "KingPepe Team restores Actions execution. Audit fixes/private pushes are authorized; no gate/account/protection bypass.",
+    "artifacts": 0
   },
   "dependencyAudit": {
     "npmVulnerabilities": 0,
@@ -125,7 +138,7 @@
     "SECRET_SCAN_PASS": "REQUIRED_EACH_PUBLICATION",
     "DEPENDENCY_AUDIT_PASS": "NO_VULNERABILITIES_ONE_REPORTED_WARNING",
     "LICENSE_PROVENANCE_PASS": "LOCAL_SOURCE_METADATA",
-    "REPRODUCIBLE_BUILD_PASS": "FRESH_CLONE_PENDING",
+    "REPRODUCIBLE_BUILD_PASS": "SBF_HASH_MATCH_845F2B2_TWO_FRESH_PROJECT_BUILDS_NOT_UNIVERSAL_REPRODUCIBILITY",
     "PRODUCTION_CONFIGURATION_VALIDATED": "NOT_CONFIGURED",
     "PROGRAM_IDENTITIES_VERIFIED": "LOCAL_ONLY",
     "MINT_AUTHORITY_VERIFIED": "LOCAL_BRIDGE_PDA_ONLY",

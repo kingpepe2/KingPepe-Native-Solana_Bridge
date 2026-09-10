@@ -2,40 +2,64 @@
 
 ## Current Phase 08.5 retrospective audit (2026-09-10)
 
-Baseline HEAD/origin/main: 9ea5e198b57f48086a0c7861123a6d79d14e8560, clean at
-takeover, PRIVATE. Reviewed source fixes are described in
-[the audit report](phase-08-5-audit.md). Phase 09 remains NOT_STARTED.
-The Team explicitly authorized this audit/fix/private-publication workflow while
-Actions is account-blocked, superseding earlier blanket pauses on local fixes.
+Published audit implementation: `845f2b22c87a94f79a3b499209260247a5d01acf`,
+`fix(phase-08.5): initialize withdrawal records and harden audit boundaries`.
+Normal push to PRIVATE origin/main succeeded. Baseline was
+`9ea5e198b57f48086a0c7861123a6d79d14e8560`; no history rewrite or legacy import.
+See [the audit report](phase-08-5-audit.md). Phase 09 remains NOT_STARTED.
 
-Current worktree validation: Windows/WSL each 501 Node tests and two vectors PASS;
-WSL 97 Rust tests (66 Solana, 31 Native), all five check/fmt/all-features Clippy
-gates, both SBF builds, 55 fresh deposit/recovery/retry checks and 26 finalized
-fresh withdrawal-record regressions PASS. Deposit reaches COMPLETED with reserve
-and supply 100000000 atomic, pending credit zero and no per-transfer Team approval.
-The withdrawal probe does not construct a Native payout. Earlier IllegalOwner is
-fixed; failed rollback probes leave no partial burn/record. No pins/dependencies
-changed and no base tools or production services were installed.
+That exact published SHA was cloned into a separate new checkout. Locked npm
+installation and tests passed on Windows and WSL: 501 Node tests plus two vectors
+per platform. New, previously absent host/SBF project build directories produced
+97 Rust tests (66 Solana, 31 Native), all five check/fmt/all-features Clippy gates,
+and both SBF programs. No copied project build artifacts were used as evidence.
 
-Source/provenance guardrails and declared dependency-license checks PASS; npm audit
-zero vulnerabilities; five Rust lock audits have no vulnerability and retain the
-bincode unmaintained warning. Gitleaks current/staged scans and all 163 existing
-commits found no leaks. The additional publication-boundary scan reviewed 1168
-historical blobs: four URL-userinfo candidates were inert negative-test inputs,
-not service credentials; no broad scanner exception or history rewrite was added.
-Current exact provenance covers 185 files (99 original code, 57 original docs,
-one derived public-vector file, eight generated files, 20 build/config metadata).
-Outgoing-commit scanning and a clean-clone rerun remain required after commit.
-Do not infer exact-SHA CI from these worktree results.
+A fresh REGTEST/local-validator deposit reached COMPLETED, with 55 existing
+deposit/recovery/retry/accounting checks passing. A separate fresh validator run
+passed 26 finalized withdrawal-record checks after its own completed deposit.
+Reserve and supply were 100000000 atomic, pending credit zero, project fee zero
+and no per-transfer Team approval. Withdrawal tests do not construct Native payouts.
+The IllegalOwner defect is fixed. Both freshly built program hashes match the
+reviewed primary builds; the audit report records the binary hashes and limits.
 
-Baseline [CI 34509774457 attempt 2](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34509774457)
-again rejected all four jobs before steps: GITHUB_ACTIONS_ACCOUNT_EXECUTION_BLOCKED,
-tests NOT_RUN. No billing/privacy/protection/gate changes. Fresh clone remains
-pending publication at this entry. Full audit gate FAILS Phases 04, 07 and 08 for
-the open state/isolation/global-stop/upgrade-observation/reorg findings in the
-report; successful local tests do not close those gaps. SAFE_TO_BEGIN_PHASE_09=false.
-Next: finish scans/private publication and exact-SHA fresh clone, report, then wait
-for explicit KingPepe Team direction. Mainnet remains DISABLED, productionReady=false.
+Windows/WSL npm audits reported zero vulnerabilities. Source guardrails, exact
+provenance and declared dependency-license checks passed. All five Cargo lockfiles
+reported no vulnerabilities; bincode RUSTSEC-2025-0141 remains visible as an
+unmaintained warning. All 164 published commits passed Gitleaks. Outgoing source
+snapshots and current/staged content passed publication scans before the push.
+An additional earlier scan reviewed 1168 historical blobs: four URL-userinfo
+candidates were inert negative-test inputs, not service credentials. No broad
+exception or history rewrite was added; scanner passes are not proof of absence.
+
+The 845f2b2 checkout contains 185 files (99 original code, 57 original docs, one
+derived public-vector file, eight generated files, 20 build/config metadata).
+Its blocker inventory hashes matched all 49 listed files. The follow-up adds one
+classified build-metadata file, .gitattributes, for 186 files; it enforces LF across
+Windows/WSL. The first fresh clone had no semantic changes, but WSL Git's different
+CRLF handling could report false modifications. Normalized diff was empty.
+No global Git settings or other-session working files were changed.
+
+The follow-up also strengthens every finalized withdrawal failure assertion:
+besides unchanged Mint/token/bridge/record state, the fee payer must lose only the
+transaction fee, not record rent. This tightening and checkout-policy change need
+their own post-publication validation; 845f2b2 results are not relabeled as that
+future SHA. No runtime pins/dependencies or base tools were changed or installed.
+The tightened worktree regression passed all 26 finalized cases before this
+follow-up commit, including fee-only payer loss on each rejected transaction.
+
+[Exact-source CI 34519943346](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34519943346)
+for 845f2b2 rejected all four jobs before any step; zero artifacts, tests NOT_RUN.
+GITHUB_ACTIONS_ACCOUNT_EXECUTION_BLOCKED remains external. Exact annotation:
+"The job was not started because recent account payments have failed or your
+spending limit needs to be increased. Please check the 'Billing & plans' section
+in your settings". No account/privacy/protection/security-gate changes.
+
+Full audit gate FAILS Phases 04, 07 and 08 for the unresolved protected-storage,
+service isolation/global-stop/recovery, actual upgrade/source observation and
+post-mint reorg findings. SAFE_TO_BEGIN_PHASE_09=false regardless of local counts.
+Next: validate the follow-up, scan and publish PRIVATE, check its exact-SHA CI and
+clean-clone scope, deliver the audit report, then STOP for explicit Team direction.
+productionReady=false; mainnetActivation=DISABLED.
 
 ## Historical Phase 08 recovery validation (2026-09-10)
 

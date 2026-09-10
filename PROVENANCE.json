@@ -6,7 +6,7 @@
   "phase085AuditReview": {
     "baseline": "9ea5e198b57f48086a0c7861123a6d79d14e8560",
     "filesBefore": 180,
-    "filesAfter": 185,
+    "filesAfter": 186,
     "filesDeleted": 0,
     "filesMoved": 0,
     "scope": "Phases 01-08 audit fixes only; Phase 09 NOT_STARTED. Original PDA lifecycle/Native domain and script checks, independent real validator tests, exact fee-liability correction, attester policy boundary and source audit checks. No upstream source code imported.",
@@ -270,6 +270,7 @@
     ]
   },
   "trackedFiles": [
+    { "path": ".gitattributes", "classification": "BUILD_OR_CONFIGURATION_METADATA", "notes": "Original text-only LF checkout policy for reproducible Windows/WSL source inspection; binary files are not normalized." },
     { "path": "docs/phase-08-5-audit.md", "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION", "notes": "Original retrospective audit, measured local coverage and explicit unresolved security dependencies; not external certification or private deployment data." },
     { "path": "docs/phase-08-5-blocker-inventory.json", "classification": "GENERATED_FILE", "notes": "Generated source-keyword location inventory with reviewed classifications; no runtime state, live identities or secret content." },
     { "path": "solana/tests/local-withdrawal-record.mjs", "classification": "ORIGINAL_KINGPEPE_CODE", "notes": "Original isolated real-validator audit regression for atomic burn/withdrawal record lifecycle only; no Phase 09 payout implementation or imported code." },

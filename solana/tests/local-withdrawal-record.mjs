@@ -133,8 +133,13 @@ export async function testWithdrawalRecord(context, user, onCheck = () => {}) {
   async function rejection(label, req, additional = [], failedIndex = 0, extraSigners) {
     onCheck(label);
     const before = await economicSnapshot(req.record);
-    await send([req.instruction, ...additional], { failedIndex, extraSigners });
+    const payerBefore = (await account(payer.publicKeyBase58)).lamports;
+    const failed = await send([req.instruction, ...additional], { failedIndex, extraSigners });
     assert.deepEqual(await economicSnapshot(req.record), before, "FAILED_TRANSACTION_CHANGED_ECONOMIC_STATE");
+    const payerAfter = (await account(payer.publicKeyBase58)).lamports;
+    assert.ok([payerBefore, payerAfter, failed.meta.fee].every(Number.isSafeInteger), "LOCAL_RENT_BALANCE_PRECISION_REQUIRED");
+    // Transaction fees are charged even on failure; record rent must roll back.
+    assert.equal(BigInt(payerAfter), BigInt(payerBefore) - BigInt(failed.meta.fee), "FAILED_TRANSACTION_RETAINED_RECORD_RENT");
     passed.push(label);
   }
 
