@@ -473,7 +473,7 @@ for (const [field, alter] of [
     let loads = 0;
     let saves = 0;
     const signer = new NativeFrostSigner({ signerId: REQUIRED_FROST_SIGNERS[0], index: 0, policy: makePolicy(baseAuthorization()),
-      stateStore: { load() { loads += 1; return { signerId: REQUIRED_FROST_SIGNERS[0], dkg: {} }; }, save() { saves += 1; } } });
+      stateStore: { load() { loads += 1; return initialSignerState(REQUIRED_FROST_SIGNERS[0]); }, save() { saves += 1; } } });
     const request = structuredClone(createTwoPartyDkgRequest({ epoch: 1, context: dkgContextFixture() }));
     alter(request);
     for (const round of ["dkgRound1", "dkgRound2", "dkgFinalize"]) assert.throws(() => signer[round](request), /FrostDkg/u);
@@ -485,7 +485,7 @@ for (const [field, alter] of [
 test("each DKG round rejects a correctly hashed request for a different deployment", () => {
   let loads = 0;
   const signer = new NativeFrostSigner({ signerId: REQUIRED_FROST_SIGNERS[0], index: 0, policy: makePolicy(baseAuthorization()),
-    stateStore: { load() { loads += 1; return { signerId: REQUIRED_FROST_SIGNERS[0], dkg: {} }; } } });
+    stateStore: { load() { loads += 1; return initialSignerState(REQUIRED_FROST_SIGNERS[0]); } } });
   for (const field of ["solanaDeployment", "bridgeProgramId", "transceiverProgramId", "mint"]) {
     const request = createTwoPartyDkgRequest({ epoch: 1, context: dkgContextFixture({ [field]: h(`foreign-${field}`) }) });
     for (const round of ["dkgRound1", "dkgRound2", "dkgFinalize"]) assert.throws(() => signer[round](request), /FrostDkgContextMismatch/u);
@@ -543,7 +543,7 @@ test("DKG coordinator rejects different A and B contexts before any DKG round", 
   let saves = 0;
   const signers = REQUIRED_FROST_SIGNERS.map((signerId, index) => new NativeFrostSigner({ signerId, index,
     policy: makePolicy(baseAuthorization(), index === 1 ? { mint: h("different-mint") } : {}),
-    stateStore: { load() { loads += 1; return { signerId, dkg: {} }; }, save() { saves += 1; } } }));
+    stateStore: { load() { loads += 1; return initialSignerState(signerId); }, save() { saves += 1; } } }));
   assert.throws(() => runTwoPartyDkg(signers, { epoch: 1 }), /FrostDkgParticipantContextMismatch/u);
   assert.equal(loads, 2);
   assert.equal(saves, 0);
@@ -573,7 +573,7 @@ test("DKG retention capacity fails before generating or persisting another epoch
   let saves = 0;
   const signer = new NativeFrostSigner({ signerId: REQUIRED_FROST_SIGNERS[0], index: 0,
     policy: makePolicy(baseAuthorization(), { keyEpoch: 41 }),
-    stateStore: { load() { return { signerId: REQUIRED_FROST_SIGNERS[0], dkg }; }, save() { saves += 1; } } });
+    stateStore: { load() { return { ...initialSignerState(REQUIRED_FROST_SIGNERS[0]), dkg }; }, save() { saves += 1; } } });
   const request = createTwoPartyDkgRequest({ epoch: 41, context: dkgContextFixture({ keyEpoch: 41 }) });
   assert.throws(() => signer.dkgRound1(request), /FrostDkgStateCapacity/u);
   assert.equal(saves, 0);
@@ -924,6 +924,311 @@ function frostRequestFor(intent, attempt = 1) {
   };
 }
 
+function reopenSigner(runtime, index, stateStore) {
+  const signerId = REQUIRED_FROST_SIGNERS[index];
+  return new NativeFrostSigner({ signerId, index, policy: runtime.policy,
+    stateStore: stateStore ?? new FileBackedFrostStateStore({ signerId,
+      root: path.join(runtime.root, index === 0 ? "frost-a" : "frost-b"), repoRoot: REPO_ROOT }) });
+}
+
+test("reserved signing state persists the full request but no secret nonce bytes", () => {
+  const runtime = createRuntime();
+  try {
+    const request = frostRequestFor(runtime.auth);
+    const publicA = runtime.signerA.signingCommitment(request);
+    const state = JSON.parse(readFileSync(path.join(runtime.root, "frost-a", "frost-signer-state.json"), "utf8"));
+    assert.equal(state.format, "kingpepe-native-solana-frost-state/v2");
+    const session = state.signing[request.sessionId];
+    assert.equal(session.state, "RESERVED");
+    assert.equal(Object.hasOwn(session, "nonce"), false, "Private nonce data must not be serialized");
+    assert.deepEqual(session.request, createNativeFrostSigningRequest(runtime.auth));
+    assert.deepEqual(session.commitment, publicA.commitment);
+    assert.deepEqual(runtime.signerA.signingCommitment(request), publicA);
+    assert.equal(runtime.coordinator.signAutomatically(request.intent).state, "SIGNED");
+  } finally { runtime.cleanup(); }
+});
+
+test("signer reopen burns uncertain reservations before becoming available", () => {
+  const runtime = createRuntime();
+  try {
+    const request = frostRequestFor(runtime.auth);
+    const commitments = [runtime.signerA.signingCommitment(request), runtime.signerB.signingCommitment(request)];
+    const freshA = reopenSigner(runtime, 0);
+    assertSessionOutcome(runtime, "A", request, "ABORTED");
+    assert.throws(() => freshA.signingCommitment(request), /already burned/u);
+    assert.throws(() => freshA.signatureShare(request, commitments), /nonce is not available/u);
+    assert.throws(() => runtime.signerA.signatureShare(request, commitments), /nonce is not available/u);
+    const again = reopenSigner(runtime, 0);
+    assert.throws(() => again.signingCommitment(request), /already burned/u);
+    assert.equal(runtime.signerB.abortSigningSession(request).state, "ABORTED");
+    const coordinator = new NativeFrostCoordinator({ signers: [freshA, runtime.signerB],
+      publicPackage: runtime.epoch.publicPackage, aggregateTweakedXOnlyPublicKey: runtime.epoch.aggregateTweakedXOnlyPublicKey });
+    assert.equal(coordinator.signAutomatically(request.intent, { attempt: 2 }).state, "SIGNED");
+  } finally { runtime.cleanup(); }
+});
+
+test("reopened completed signers reproduce the exact saved aggregate without new nonces", () => {
+  const runtime = createRuntime();
+  try {
+    const first = runtime.coordinator.signAutomatically(runtime.auth);
+    const before = ["frost-a", "frost-b"].map(role => readFileSync(path.join(runtime.root, role, "frost-signer-state.json")));
+    const coordinator = new NativeFrostCoordinator({ signers: [reopenSigner(runtime, 0), reopenSigner(runtime, 1)],
+      publicPackage: runtime.epoch.publicPackage, aggregateTweakedXOnlyPublicKey: runtime.epoch.aggregateTweakedXOnlyPublicKey });
+    assert.equal(coordinator.signAutomatically(runtime.auth).signatureHex, first.signatureHex);
+    for (const [index, role] of ["frost-a", "frost-b"].entries()) {
+      assert.equal(before[index].equals(readFileSync(path.join(runtime.root, role, "frost-signer-state.json"))), true);
+    }
+  } finally { runtime.cleanup(); }
+});
+
+test("V1 signer state is rejected without migration or removal of test recovery material", () => {
+  const runtime = createRuntime();
+  try {
+    const file = path.join(runtime.root, "frost-a", "frost-signer-state.json");
+    const state = JSON.parse(readFileSync(file, "utf8"));
+    state.format = "kingpepe-native-solana-frost-state/v1";
+    writeFileSync(file, JSON.stringify(state));
+    const before = readFileSync(file);
+    assert.throws(() => reopenSigner(runtime, 0), /unsupported FROST signer state format/u);
+    assert.equal(before.equals(readFileSync(file)), true);
+  } finally { runtime.cleanup(); }
+});
+
+test("restoring a public reservation snapshot cannot recover a consumed volatile nonce", () => {
+  const runtime = createRuntime();
+  try {
+    const request = frostRequestFor(runtime.auth);
+    const commitments = [runtime.signerA.signingCommitment(request), runtime.signerB.signingCommitment(request)];
+    const store = new FileBackedFrostStateStore({ signerId: REQUIRED_FROST_SIGNERS[0],
+      root: path.join(runtime.root, "frost-a"), repoRoot: REPO_ROOT });
+    const reservation = store.load();
+    runtime.signerA.signatureShare(request, commitments);
+    store.save(reservation); // Only the isolated test's earlier public reservation state.
+    assert.throws(() => runtime.signerA.signatureShare(request, commitments), /nonce is not available/u);
+    const fresh = reopenSigner(runtime, 0);
+    assertSessionOutcome(runtime, "A", request, "ABORTED");
+    assert.throws(() => fresh.signatureShare(request, commitments), /nonce is not available/u);
+  } finally { runtime.cleanup(); }
+});
+
+for (const persisted of [false, true]) {
+  test(`restart fails closed when uncertain reservation cleanup fails ${persisted ? "after" : "before"} persistence`, () => {
+    const runtime = createRuntime();
+    try {
+      const request = frostRequestFor(runtime.auth);
+      runtime.signerA.signingCommitment(request);
+      const store = new FileBackedFrostStateStore({ signerId: REQUIRED_FROST_SIGNERS[0],
+        root: path.join(runtime.root, "frost-a"), repoRoot: REPO_ROOT });
+      let writes = 0;
+      assert.throws(() => reopenSigner(runtime, 0, { load: () => store.load(), save(state) {
+        writes += 1;
+        if (persisted) store.save(state);
+        throw new Error("TEST_RECOVERY_WRITE_FAILURE");
+      } }), /FrostNonceRecoveryPersistenceFailed/u);
+      assert.equal(writes, 1);
+      assert.equal(store.load().signing[request.sessionId].state, persisted ? "ABORTED" : "RESERVED");
+      const fresh = reopenSigner(runtime, 0);
+      assert.throws(() => fresh.signingCommitment(request), /already burned/u);
+    } finally { runtime.cleanup(); }
+  });
+}
+
+test("signer restart validates all pending sessions before writing any recovery transition", () => {
+  const runtime = createRuntime();
+  try {
+    const first = frostRequestFor(runtime.auth);
+    const second = frostRequestFor(runtime.auth, 2);
+    runtime.signerA.signingCommitment(first);
+    runtime.signerA.signingCommitment(second);
+    const store = new FileBackedFrostStateStore({ signerId: REQUIRED_FROST_SIGNERS[0],
+      root: path.join(runtime.root, "frost-a"), repoRoot: REPO_ROOT });
+    const state = store.load();
+    state.nonceTombstones[state.signing[second.sessionId].nonceReservationId].sessionId = h("corrupt-session");
+    store.save(state);
+    const file = path.join(store.root, "frost-signer-state.json");
+    const before = readFileSync(file);
+    assert.throws(() => reopenSigner(runtime, 0), /FrostNonceRecoveryStateInvalid/u);
+    assert.equal(before.equals(readFileSync(file)), true);
+    assert.equal(store.load().signing[first.sessionId].state, "RESERVED");
+  } finally { runtime.cleanup(); }
+});
+
+test("failed consumed-marker persistence makes the volatile nonce unavailable in that signer", () => {
+  const runtime = createRuntime();
+  try {
+    const request = frostRequestFor(runtime.auth);
+    const store = new FileBackedFrostStateStore({ signerId: REQUIRED_FROST_SIGNERS[0],
+      root: path.join(runtime.root, "frost-a"), repoRoot: REPO_ROOT });
+    let fail = true;
+    const signerA = reopenSigner(runtime, 0, { load: () => store.load(), save(state) {
+      if (fail && state.signing[request.sessionId]?.state === "ABORTED") throw new Error("TEST_CONSUME_WRITE_FAILURE");
+      store.save(state);
+    } });
+    const commitments = [signerA.signingCommitment(request), runtime.signerB.signingCommitment(request)];
+    assert.throws(() => signerA.signatureShare(request, commitments), /TEST_CONSUME_WRITE_FAILURE/u);
+    fail = false;
+    assert.throws(() => signerA.signatureShare(request, commitments), /nonce is not available/u);
+    assert.equal(signerA.abortSigningSession(request).state, "ABORTED");
+  } finally { runtime.cleanup(); }
+});
+
+test("a killed signer process cannot resume its old reserved nonce after reopening", async () => {
+  const runtime = createRuntime();
+  try {
+    const module = pathToFileURL(path.join(REPO_ROOT, "native/frost/index.mjs")).href;
+    const code = `import { FileBackedFrostStateStore, NativeFrostSigner, createNativeSigningPolicy,
+      createNativeFrostSigningRequest } from ${JSON.stringify(module)};
+      let raw = ''; for await (const chunk of process.stdin) raw += chunk;
+      try { const input = JSON.parse(raw);
+        const signer = new NativeFrostSigner({ ...input.options, policy: createNativeSigningPolicy(input.policy),
+          stateStore: new FileBackedFrostStateStore(input.store) });
+        signer.signingCommitment(createNativeFrostSigningRequest(input.intent));
+        setInterval(() => {}, 1000);
+        process.stdout.write('RESERVED');
+      } catch { process.exitCode = 1; }`;
+    const policy = { ...runtime.policy, maxAmountAtomic: runtime.policy.maxAmountAtomic.toString(),
+      maxFeeAtomic: runtime.policy.maxFeeAtomic.toString() };
+    await new Promise((resolve, reject) => {
+      const child = spawn(process.execPath, ["--input-type=module", "-e", code], { windowsHide: true,
+        stdio: ["pipe", "pipe", "pipe"], timeout: 20_000 });
+      let output = "";
+      let diagnostics = 0;
+      let killed = false;
+      child.stdout.on("data", chunk => {
+        output += chunk;
+        if (output === "RESERVED" && !killed) killed = child.kill("SIGKILL");
+      });
+      child.stderr.on("data", chunk => { diagnostics += chunk.length; });
+      child.on("error", () => reject(new Error("NonceCrashChildStartFailed")));
+      child.stdin.on("error", () => reject(new Error("NonceCrashChildInputFailed")));
+      child.on("close", (code, signal) => {
+        if (!killed || output !== "RESERVED" || diagnostics !== 0 || signal !== "SIGKILL") {
+          reject(new Error("NonceCrashChildNotConfirmed"));
+        } else resolve();
+      });
+      // No keys/nonces in IPC or output. The child reads only its isolated A file.
+      child.stdin.end(JSON.stringify({ policy, intent: runtime.auth,
+        options: { signerId: REQUIRED_FROST_SIGNERS[0], index: 0 },
+        store: { signerId: REQUIRED_FROST_SIGNERS[0], root: path.join(runtime.root, "frost-a"), repoRoot: REPO_ROOT } }));
+    });
+    const request = frostRequestFor(runtime.auth);
+    const fresh = reopenSigner(runtime, 0);
+    assertSessionOutcome(runtime, "A", request, "ABORTED");
+    assert.throws(() => fresh.signingCommitment(request), /already burned/u);
+    const coordinator = new NativeFrostCoordinator({ signers: [fresh, runtime.signerB], publicPackage: runtime.epoch.publicPackage,
+      aggregateTweakedXOnlyPublicKey: runtime.epoch.aggregateTweakedXOnlyPublicKey });
+    assert.equal(coordinator.signAutomatically(request.intent, { attempt: 2 }).state, "SIGNED");
+  } finally { runtime.cleanup(); }
+});
+
+for (const persisted of [false, true]) {
+  test(`reservation persistence failure ${persisted ? "after" : "before"} saving never retains a usable secret nonce`, () => {
+    const runtime = createRuntime();
+    try {
+      const request = frostRequestFor(runtime.auth);
+      const store = new FileBackedFrostStateStore({ signerId: REQUIRED_FROST_SIGNERS[0],
+        root: path.join(runtime.root, "frost-a"), repoRoot: REPO_ROOT });
+      let fail = true;
+      const signerA = reopenSigner(runtime, 0, { load: () => store.load(), save(state) {
+        if (fail && state.signing[request.sessionId]?.state === "RESERVED") {
+          if (persisted) store.save(state);
+          throw new Error("TEST_RESERVATION_PERSISTENCE_FAILURE");
+        }
+        store.save(state);
+      } });
+      assert.throws(() => signerA.signingCommitment(request), /TEST_RESERVATION_PERSISTENCE_FAILURE/u);
+      fail = false;
+      if (persisted) assert.throws(() => signerA.signingCommitment(request), /nonce is not available/u);
+      else assert.equal(store.load().signing[request.sessionId], undefined);
+      assert.equal(signerA.abortSigningSession(request).state, persisted ? "ABORTED" : "NOT_RESERVED");
+      const coordinator = new NativeFrostCoordinator({ signers: [signerA, runtime.signerB], publicPackage: runtime.epoch.publicPackage,
+        aggregateTweakedXOnlyPublicKey: runtime.epoch.aggregateTweakedXOnlyPublicKey });
+      assert.equal(coordinator.signAutomatically(request.intent, { attempt: 2 }).state, "SIGNED");
+    } finally { runtime.cleanup(); }
+  });
+}
+
+test("closing a signer discards its nonce capability and cannot be undone by availability toggles", () => {
+  const runtime = createRuntime();
+  try {
+    const request = frostRequestFor(runtime.auth);
+    runtime.signerA.signingCommitment(request);
+    runtime.signerA.close();
+    runtime.signerA.close();
+    runtime.signerA.setAvailableForTestOnly(true);
+    assert.equal(runtime.signerA.isAvailable(), false);
+    assert.throws(() => runtime.signerA.signingCommitment(request), /FrostSignerClosed/u);
+    const fresh = reopenSigner(runtime, 0);
+    assertSessionOutcome(runtime, "A", request, "ABORTED");
+    assert.throws(() => fresh.signingCommitment(request), /already burned/u);
+  } finally { runtime.cleanup(); }
+});
+
+test("a valid abort discards its volatile nonce even if reading state fails", () => {
+  const runtime = createRuntime();
+  try {
+    const request = frostRequestFor(runtime.auth);
+    const store = new FileBackedFrostStateStore({ signerId: REQUIRED_FROST_SIGNERS[0],
+      root: path.join(runtime.root, "frost-a"), repoRoot: REPO_ROOT });
+    let fail = false;
+    const signerA = reopenSigner(runtime, 0, { load() {
+      if (fail) throw new Error("TEST_ABORT_READ_FAILURE");
+      return store.load();
+    }, save: state => store.save(state) });
+    const commitments = [signerA.signingCommitment(request), runtime.signerB.signingCommitment(request)];
+    fail = true;
+    assert.throws(() => signerA.abortSigningSession(request), /TEST_ABORT_READ_FAILURE/u);
+    fail = false;
+    assert.throws(() => signerA.signatureShare(request, commitments), /nonce is not available/u);
+    assert.equal(signerA.abortSigningSession(request).state, "ABORTED");
+  } finally { runtime.cleanup(); }
+});
+
+test("restart rejects missing, substituted or extra nonce metadata without repairing it", () => {
+  const runtime = createRuntime();
+  try {
+    const request = frostRequestFor(runtime.auth);
+    runtime.signerA.signingCommitment(request);
+    const store = new FileBackedFrostStateStore({ signerId: REQUIRED_FROST_SIGNERS[0],
+      root: path.join(runtime.root, "frost-a"), repoRoot: REPO_ROOT });
+    const original = store.load();
+    for (const alter of [
+      (session) => { delete session.request; },
+      (session) => { session.request.intent.proofFingerprint = h("replaced-proof"); },
+      (session) => { session.nonce = { testMarker: "not-a-real-secret" }; },
+      (session, tombstone) => { tombstone.extra = "unexpected"; },
+      (session, tombstone) => { tombstone.commitmentSetHash = h("unexpected-transcript"); },
+      (session) => { session.commitment.hidingHex = "00"; },
+    ]) {
+      const changed = structuredClone(original);
+      const session = changed.signing[request.sessionId];
+      alter(session, changed.nonceTombstones[session.nonceReservationId]);
+      store.save(changed);
+      const file = path.join(store.root, "frost-signer-state.json");
+      const before = readFileSync(file);
+      assert.throws(() => reopenSigner(runtime, 0), /FrostNonceRecoveryStateInvalid/u);
+      assert.equal(before.equals(readFileSync(file)), true);
+    }
+  } finally { runtime.cleanup(); }
+});
+
+test("a reservation without its active epoch is contradictory state, not recoverable setup", () => {
+  const runtime = createRuntime();
+  try {
+    const request = frostRequestFor(runtime.auth);
+    runtime.signerA.signingCommitment(request);
+    const store = new FileBackedFrostStateStore({ signerId: REQUIRED_FROST_SIGNERS[0],
+      root: path.join(runtime.root, "frost-a"), repoRoot: REPO_ROOT });
+    const state = store.load();
+    delete state.activeEpoch;
+    store.save(state);
+    const file = path.join(store.root, "frost-signer-state.json");
+    const before = readFileSync(file);
+    assert.throws(() => reopenSigner(runtime, 0), /FrostNonceRecoveryStateInvalid/u);
+    assert.equal(before.equals(readFileSync(file)), true);
+  } finally { runtime.cleanup(); }
+});
+
 function coordinatorWithFaults(runtime, faults = {}) {
   const signers = [runtime.signerA, runtime.signerB].map((signer, index) => {
     const fault = faults[index === 0 ? "A" : "B"] ?? {};
@@ -1088,7 +1393,7 @@ test("malformed abort requests fail before any state read or accessor execution"
   let getters = 0;
   const signer = new NativeFrostSigner({ signerId: REQUIRED_FROST_SIGNERS[0], index: 0,
     policy: makePolicy(baseAuthorization()), stateStore: { load() {
-      loads += 1; return { signerId: REQUIRED_FROST_SIGNERS[0], dkg: {} };
+      loads += 1; return initialSignerState(REQUIRED_FROST_SIGNERS[0]);
     } } });
   const request = frostRequestFor(baseAuthorization());
   for (const change of [{ requestId: h("different") }, { epoch: 2 }, { sessionId: h("different") },
@@ -1541,7 +1846,7 @@ test("request and policy rejection happen before any signing-state load", () => 
   let loads = 0;
   const auth = baseAuthorization();
   const signer = new NativeFrostSigner({ signerId: REQUIRED_FROST_SIGNERS[0], index: 0, policy: makePolicy(auth),
-    stateStore: { load() { loads += 1; return { signerId: REQUIRED_FROST_SIGNERS[0], dkg: {} }; } } });
+    stateStore: { load() { loads += 1; return initialSignerState(REQUIRED_FROST_SIGNERS[0]); } } });
   assert.equal(loads, 1);
   const badBinding = { ...frostRequestFor(intentFromAuthorization(auth)), requestId: h("wrong-request") };
   const badPolicy = frostRequestFor(intentFromAuthorization(auth, { amountAtomic: "1" }));

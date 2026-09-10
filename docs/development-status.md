@@ -1,8 +1,77 @@
 # KingPepe Native - Solana Bridge Development Status
 
-## Current Phase 08 explicit signer-state lifecycle (2026-09-10)
+## Current Phase 08 volatile nonce and signer restart (2026-09-10)
 
-UNPUBLISHED / LOCALLY_TESTED. Fresh isolated state creation now
+UNPUBLISHED / LOCALLY_TESTED. V2 state persists the full validated V1 signing
+request, public commitment and nonce tombstones, not secret nonce bytes. Those
+remain in a signer-private Map. Reservation must persist before commitment
+exposure. Nonces are removed from the Map before the consumed marker and share
+computation; buffers are cleared even if that initial write fails. A valid abort
+discards the nonce before reading state, and close permanently disables that
+instance. Completed shares preserve exact transcript-bound retry semantics.
+
+Reopening validates every retained session and tombstone, role/deployment/key
+context, counters, exact metadata fields and state consistency before any recovery
+write. All uncertain RESERVED sessions become ABORTED/CONSUMED before readiness.
+Recovery never deserializes or regenerates a nonce; V1 is rejected without
+migration, replacement keys or deleting recovery material. Local retention is
+bounded to 4096 signing sessions, with no automatic pruning. This is a resource
+ceiling, not an approved production transfer limit.
+
+Initial regressions: 125 PASS / 8 FAIL. First implementation: 129 PASS / 4 FAIL;
+a detached validated copy was updated while the original session was persisted.
+Explicit replacement of the saved session fixed the bug; then 133 PASS. Expanded
+tests: 138 PASS / 1 FAIL exposed accepted extra tombstone metadata. Exact fields
+and state-dependent commitment-set residue checks now reject it. Intermediate
+full runs passed 457 Node tests per platform, 93 Rust tests and 55 real checks.
+Final review added an isolated failing test (0 PASS / 1 FAIL) for a reservation
+with a missing active epoch; an explicit check now rejects that contradiction.
+The final Windows/WSL reruns each pass 458 Node tests (16 new) and two vectors.
+A real child process is
+killed after reservation persistence; reopening burns its session and an explicit
+fresh attempt succeeds. Test IPC/output contains no keys or nonce bytes.
+Failure injection uses actual external files; this is not a power-loss test.
+
+WSL 64 Solana + 29 Native Rust tests, fmt/clippy, five lockfile audits and declared
+dependency-license metadata PASS. npm zero vulnerabilities; bincode 1.3.3
+unmaintained warning remains reported. No final executed failures/skips. Native
+Windows Cargo/combined-license and service ACL/protected-secret tests remain
+NOT_RUN locally. The final fresh rerun after the active-epoch fix passes both SBF
+builds and the REGTEST/local-validator deposit:
+Native-node-accepted real A+B sweep, separate Ed25519 attestations, actual SPL
+mint and reconciliation. All 55 checks PASS (22 security, seven CSV, four wallet
+PSBT, ten pre-mint races, seven claim-worker and five accounting). Reserve and
+supply each 100000000 atomic; pending credits zero; no per-transfer team approval.
+Withdrawal E2E and full multi-service restart remain NOT_RUN.
+
+Provenance remains 179 files, no additions/deletions/moves or dependency/license
+changes. Original session checks and pinned APIs were reused; private nonce
+serialization/deserialization was removed. No upstream/legacy source copied.
+Current-tree and all 159 existing-history commits scanned clean; all nine JSON
+files parse, exact 179-file provenance coverage and private-path/IP checks PASS.
+No added project-role naming exceptions. Private origin and zero remote
+divergence verified. Staged/outgoing scans, publication and exact-SHA CI pending.
+Phase 08 INCOMPLETE; Phase 09
+NOT_STARTED; Mainnet DISABLED; no production actions.
+
+Long-term DKG shares still use external JSON. This is not authenticated/protected
+storage, an ongoing signer lease, complete economic-state rollback detection or
+protection against privileged memory snapshots/cloned processes. Buffer clearing
+does not prove forensic erasure of runtime or operating-system copies. Full
+service restart/global stop/fencing, protected shares, inner DKG transport and
+external security review remain open. Next: publish after remaining gates, then
+address those security dependencies before Phase 09.
+
+## Previous Phase 08 explicit signer-state lifecycle (verified source)
+
+Source `cdd95747db9e45b5a31a440f380cc1dcc2f13623`, message
+`fix(phase-08): require explicit local signer state creation`, privately pushed;
+[all four exact-SHA CI jobs PASS](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34494000161).
+CI confirms 442 Node tests, 93 Rust tests and two vectors per platform, both SBF
+builds, the real deposit and all 55 checks. Current/staged/outgoing/all-159-history
+commit secret scans PASS; zero artifacts. This evidence belongs to that SHA.
+
+LOCALLY_AND_CI_TESTED. Fresh isolated state creation now
 requires an explicit genuine localnet/REGTEST policy and exact A/B role. It creates
 only an empty envelope with exclusive file creation; competing setup processes
 cannot overwrite it. The constructor can prepare an empty external directory but
@@ -31,14 +100,15 @@ changes. No legacy/upstream implementation imported. Existing original policy
 and path guards and Node APIs are reused. All runtime material remains external.
 Current-source and all-158-history-commit secret scans PASS; exact 179-file
 provenance, nine JSON parses, private-path/IP and added terminology checks PASS.
-Staged/outgoing scans, private publication and exact-SHA CI are pending. Phase 08 INCOMPLETE;
+Staged/outgoing/all-159-commit scans, private publication and exact-SHA CI passed
+as recorded above. Phase 08 INCOMPLETE;
 Phase 09 NOT_STARTED; Mainnet DISABLED; no production actions.
 
 This is local lifecycle protection, not ongoing signer exclusivity, authenticated
 state, atomic concurrent-update fencing, power-loss proof or nonce restart safety.
-V1 RESERVED secret nonces still persist. Rechecks do not close hostile filesystem
-races; failed updates may leave temporary files outside source. Next: validate
-and publish this increment, then volatile nonce/uncertain-session restart safety
+That V1 source still persisted RESERVED secret nonces. Rechecks do not close
+hostile filesystem races; failed updates may leave temporary files outside
+source. Next: volatile nonce/uncertain-session restart safety
 and remaining durable service/reconciliation dependencies.
 
 ## Previous Phase 08 coordinated nonce abort (verified source)

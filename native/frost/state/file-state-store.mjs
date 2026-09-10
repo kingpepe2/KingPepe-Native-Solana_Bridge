@@ -5,7 +5,7 @@ import { validateRuntimeFile, validateRuntimeStateRoot } from "../../../shared/r
 import { REQUIRED_FROST_SIGNERS, assertNativeFrostRuntimePolicy, canonicalUintDecimal,
   dataRecord } from "../policy/native-signing-policy.mjs";
 
-export const FROST_STATE_FORMAT = "kingpepe-native-solana-frost-state/v1";
+export const FROST_STATE_FORMAT = "kingpepe-native-solana-frost-state/v2";
 
 export class FileBackedFrostStateStore {
   #root;
@@ -58,12 +58,12 @@ export class FileBackedFrostStateStore {
     // JSON parser errors can contain source excerpts. Never forward them.
     try { parsed = JSON.parse(raw); }
     catch { throw new Error("FrostStateInvalidJson"); }
-    validateStateEnvelope(parsed, this.#signerId);
+    assertFrostStateEnvelope(parsed, this.#signerId);
     return parsed;
   }
 
   save(state) {
-    validateStateEnvelope(state, this.#signerId);
+    assertFrostStateEnvelope(state, this.#signerId);
     // Save updates an existing compatible envelope; it is never initialization
     // or an automatic repair of missing/corrupt/foreign state.
     this.load();
@@ -89,7 +89,8 @@ export function initialSignerState(signerId) {
   };
 }
 
-function validateStateEnvelope(value, signerId) {
+export function assertFrostStateEnvelope(value, signerId) {
+  value = dataRecord(value, "FrostStateEnvelope");
   if (value?.format !== FROST_STATE_FORMAT) throw new Error("unsupported FROST signer state format");
   if (value.signerId !== signerId) throw new Error("FROST signer state role mismatch");
   if (!isRecord(value.dkg)) throw new Error("invalid FROST DKG state");

@@ -3,6 +3,17 @@
   "generatedAt": "2026-09-10T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
   "purpose": "file-by-file provenance classification for local tracked content",
+  "phase08VolatileNonceReview": {
+    "filesBefore": 179,
+    "filesAfter": 179,
+    "newFiles": [],
+    "filesDeleted": 0,
+    "filesMoved": 0,
+    "changes": "Original V2 public-reservation/full-request state, signer-private volatile nonce buffers, failure-safe disposal, validated uncertain-session recovery, exact completed-share retry, closed-instance guard and 16 new regressions including actual SIGKILL and missing active epoch. Removed private nonce serialization/deserialization and reused the original session/tombstone consistency checks.",
+    "sourceImports": "None; existing original policy/state helpers and pinned Node/noble APIs reused without copying upstream implementation, pseudocode or vectors.",
+    "dependencyChanges": "None; lockfiles, toolchains, licenses and third-party notices unchanged.",
+    "scope": "Local process/file-snapshot nonce safety only; not full memory snapshot/clone rollback, protected share storage, ongoing signer exclusivity or economic-journal fencing. No production material created, migrated, moved or deleted."
+  },
   "phase08StateLifecycleReview": {
     "filesBefore": 179,
     "filesAfter": 179,
@@ -589,7 +600,7 @@
     {
       "path": "native/frost/signer/native-frost-signer.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 04 FROST participant implementation with DKG, policy checks, nonce reservation, and tombstones."
+      "notes": "Original FROST participant integration with context-bound DKG/policy, private volatile nonce buffers, public V2 reservations/tombstones, failure disposal and validated uncertain-session reopen. Uses the pinned primitive unchanged; not protected storage or full rollback assurance."
     },
     {
       "path": "native/frost/src/coordinator.rs",
@@ -629,12 +640,12 @@
     {
       "path": "native/frost/state/file-state-store.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original external signer-state boundary with explicit local-policy-gated exclusive creation, existing-state-only load/save, redacted errors and exact envelope checks; not protected storage or nonce rollback assurance."
+      "notes": "Original external V2 signer-state boundary with explicit local-policy-gated exclusive creation, existing-state-only load/save, redacted errors and shared envelope checks. V1 rejected without migration/deletion; not protected storage or complete rollback assurance."
     },
     {
       "path": "native/frost/tests/frost_runtime_node.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original real A+B FROST, policy/request/DKG/abort and local state lifecycle tests including competing setup processes; generated keys remain temporary outside source and are never printed. Full nonce restart/rollback assurance remains unproven."
+      "notes": "Original real A+B FROST, policy/request/DKG/abort, state lifecycle and V2 volatile-nonce tests, including competing setup processes and an actual SIGKILL after reservation. Keys remain temporary outside source and never printed. Not full service restart/rollback proof."
     },
     {
       "path": "native/frost/tests/signing_runtime_tests.rs",

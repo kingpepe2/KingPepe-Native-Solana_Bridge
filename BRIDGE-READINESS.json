@@ -21,8 +21,8 @@
     "correction": "ee011923da423475c4ccae3c9685d8a1ce257f23 requires seven plus both named stopped-worker checks; CI 34472369148 all four jobs PASS and zero artifacts."
   },
   "previousVerifiedSource": {
-    "sha": "ab79614f3a39fc495a8e4a9deda9754289d60a75",
-    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34491098042",
+    "sha": "cdd95747db9e45b5a31a440f380cc1dcc2f13623",
+    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34494000161",
     "status": "PASS"
   },
   "sourceState": {
@@ -59,10 +59,12 @@
     "frostDkgEpoch": "DELAYED_OLDER_FINALIZATION_REJECTED_AGAINST_CURRENT_ACTIVE_EPOCH_NOT_INDEPENDENT_ROLLBACK_PROOF",
     "frostIntentEnrollment": "COMPLETE_IMMUTABLE_28_FIELD_INTENT_DIGEST_BINDING_STRICT_FIELDS_11_REGRESSIONS_PREVIOUS_EXACT_SHA_CI_PASS",
     "frostNonceAbort": "BOUND_SYNCHRONOUS_BOTH_PEER_CLEANUP_SIGNED_SHARE_PRESERVATION_23_NEW_REGRESSIONS_PREVIOUS_EXACT_SHA_CI_PASS",
-    "frostStateLifecycle": "EXPLICIT_LOCAL_CAPABILITY_GATED_EXCLUSIVE_CREATION_REOPEN_SAVE_REJECT_MISSING_CORRUPT_FOREIGN_STATE_13_NEW_REGRESSIONS_CURRENT_CI_PENDING",
-    "frostStateLifecycleLimitations": "V1_NONCES_STILL_PERSIST_NOT_ONGOING_SIGNER_EXCLUSIVITY_AUTHENTICATION_CONCURRENT_UPDATE_FENCING_OR_RESTART_PROOF",
-    "frostAbortLimitations": "INSTANCE_REFUSAL_NOT_DURABLE_GLOBAL_STOP_OR_RESERVED_NONCE_RESTART_PROTECTION",
-    "frostTranscriptReview": "AUTHENTICATED_INNER_DKG_TRANSPORT_UNCERTAIN_NONCE_RESTART_AND_DURABLE_FENCING_REQUIRE_HARDENING",
+    "frostStateLifecycle": "EXPLICIT_LOCAL_CAPABILITY_GATED_EXCLUSIVE_CREATION_REOPEN_SAVE_REJECT_MISSING_CORRUPT_FOREIGN_STATE_13_REGRESSIONS_PREVIOUS_EXACT_SHA_CI_PASS",
+    "frostStateLifecycleLimitations": "NOT_ONGOING_SIGNER_EXCLUSIVITY_AUTHENTICATION_CONCURRENT_UPDATE_FENCING_OR_COMPLETE_RESTART_PROOF",
+    "frostNonceRestart": "V2_VOLATILE_NONCES_VALIDATED_PUBLIC_RESERVATIONS_REOPEN_BURNS_UNCERTAIN_SESSIONS_EXACT_COMPLETED_SHARE_RETRY_16_NEW_REGRESSIONS_LOCAL_PASS_CURRENT_CI_PENDING",
+    "frostNonceRestartLimitations": "DKG_SHARES_STILL_JSON_NOT_PROTECTED_STORAGE_MEMORY_SNAPSHOT_CLONE_ECONOMIC_ROLLBACK_OR_POWER_LOSS_PROOF",
+    "frostAbortLimitations": "INSTANCE_REFUSAL_NOT_DURABLE_GLOBAL_STOP",
+    "frostTranscriptReview": "AUTHENTICATED_INNER_DKG_TRANSPORT_AND_DURABLE_SERVICE_FENCING_REQUIRE_HARDENING",
     "frostRustCrate": "SUPPORTING_POLICY_STATE_MODEL_ONLY",
     "solanaPrograms": "SBF_AND_DEPOSIT_HAPPY_PATH_TESTED_LOCALNET_ONLY",
     "attestations": "PROJECT_ATTESTED_2_OF_2_ED25519",
@@ -81,7 +83,8 @@
   },
   "localValidation": {
     "windows": {
-      "nodeTestsPass": 442,
+      "nodeTestsPass": 458,
+      "volatileNonceRestartRegressionsIncluded": 16,
       "frostStateLifecycleRegressionsIncluded": 13,
       "coordinatedNonceAbortRegressionsIncluded": 23,
       "fullIntentEnrollmentRegressionsIncluded": 11,
@@ -99,7 +102,8 @@
       "serviceAclProtectedStorage": "NOT_RUN"
     },
     "wsl": {
-      "nodeTestsPass": 442,
+      "nodeTestsPass": 458,
+      "volatileNonceRestartRegressionsIncluded": 16,
       "frostStateLifecycleRegressionsIncluded": 13,
       "coordinatedNonceAbortRegressionsIncluded": 23,
       "fullIntentEnrollmentRegressionsIncluded": 11,
@@ -163,7 +167,7 @@
     "externalReview": "NOT_RUN"
   },
   "phase08Remaining": [
-    "Harden authenticated inner DKG transcripts/transport and uncertain nonce restart recovery; current synchronous both-peer abort and instance refusal do not establish durable global fencing. Review the explicitly unaudited upstream FROST component; local policy/request/DKG binding is not evidence truth or state authentication",
+    "Harden authenticated inner DKG transcripts/transport and complete service recovery; V2 volatile nonce/SIGKILL tests and synchronous both-peer abort do not establish durable global fencing, protected storage or memory-snapshot/clone rollback assurance. Review the explicitly unaudited upstream FROST component; local metadata binding is not evidence truth or state authentication",
     "Implement and test post-mint deep-reorg hard stops; ten pre-mint race/fork checks pass but are not compensation or production finality assurance",
     "Configure production Native evidence sources; current raw-header/Merkle integration is REGTEST-only with explicit local-node UTXO trust",
     "Review remaining account and source-validation dependencies",
@@ -177,7 +181,7 @@
     "LOCAL_E2E_PASS": "NATIVE_TO_SOLANA_HAPPY_PATH_ONLY_WITHDRAWAL_NOT_RUN",
     "DEVNET_VALIDATION_PASS": "NOT_RUN",
     "FROST_NATIVE_SIGNATURE_PASS": "PASS_LOCAL_NATIVE_REGTEST_NODE",
-    "NONCE_SAFETY_PASS": "LOCAL_TESTS_ONLY_PRODUCTION_ROLLBACK_NOT_PROVEN",
+    "NONCE_SAFETY_PASS": "V2_VOLATILE_LOCAL_CRASH_FAILURE_TESTS_PASS_LEASES_PROTECTED_STORAGE_FULL_ROLLBACK_NOT_PROVEN",
     "SOLANA_PROGRAM_AUDIT_PASS": "AUDIT_REQUIRED",
     "NATIVE_VALIDATION_PASS": "RAW_NATIVE_DEPOSIT_E2E_PASS_REGTEST_ONLY_PRODUCTION_UNCONFIGURED",
     "RECONCILIATION_PASS": "SINGLE_LOCAL_DEPOSIT_ONLY",

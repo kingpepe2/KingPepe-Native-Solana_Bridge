@@ -1,6 +1,41 @@
 # KingPepe Native - Solana Bridge Task Status
 
-## Current Phase 08 explicit signer-state lifecycle (2026-09-10)
+## Current Phase 08 volatile nonce and signer restart (2026-09-10)
+
+Implemented locally: V2 full-request/public-reservation state with secret nonce
+bytes only in a private Map; persist-before-exposure, remove-before-consumption,
+failure-safe clearing, abort/close disposal and whole-snapshot validation before
+burning uncertain sessions on reopen. Exact completed-share retries remain.
+V1 is rejected without migration, replacement or deletion. Initial 125 PASS /
+8 FAIL, then 129 PASS / 4 FAIL exposed a detached-copy persistence bug; fixed,
+then 133 PASS. Expanded 138 PASS / 1 FAIL exposed extra tombstone metadata; fixed.
+An intermediate full run passed 457 Node tests per platform, 93 Rust tests and
+55 real checks. A late isolated missing-active-epoch regression failed and was
+fixed. Final Windows/WSL each 458 Node tests (16 new), two vectors PASS; WSL 93 Rust tests,
+fmt/clippy/audits PASS. Real SIGKILL restart and storage-failure tests PASS.
+The final fresh rerun after the active-epoch fix passes both SBF builds and the
+real Native REGTEST/Solana-local-validator deposit, including all 55 checks;
+reserve/supply each 100000000 atomic, pending credits zero, no
+per-transfer team approval. Withdrawal E2E/full multi-service restart NOT_RUN.
+
+Current tree and all 159 existing commits scan clean; provenance, nine JSON
+parsers and private-path/IP checks PASS. Private origin verified. Staged/outgoing
+scans, private push and exact-SHA CI pending. Provenance remains 179 files; no new,
+deleted/moved files, dependency/license changes or production actions. Phase 08
+INCOMPLETE; Phase 09 NOT_STARTED; Mainnet DISABLED. Remaining: protected/authenticated
+share storage, ongoing signer leases, full rollback/global fencing/service
+recovery, inner DKG transport and external review. Next: finish publication gates,
+then those security dependencies before Phase 09.
+See [detailed evidence](development-status.md#current-phase-08-volatile-nonce-and-signer-restart-2026-09-10).
+
+## Previous Phase 08 explicit signer-state lifecycle (verified source)
+
+Source `cdd95747db9e45b5a31a440f380cc1dcc2f13623`, message
+`fix(phase-08): require explicit local signer state creation`, privately pushed;
+[all four exact-SHA CI jobs PASS](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34494000161).
+CI confirms 442 Node tests, 93 Rust tests and two vectors per platform, both SBF
+builds, real deposit and 55 checks. Current/staged/outgoing/all-159-history scans
+clean; zero artifacts. Evidence below belongs to that source.
 
 Implemented locally: explicit local-policy-gated exclusive creation of an empty
 role-bound envelope; missing/corrupt/foreign existing state stops ordinary load,
@@ -12,14 +47,15 @@ Both SBF builds and the fresh real REGTEST/local-validator deposit PASS all 55
 checks; reserve/supply each 100000000 atomic and pending credits zero. No normal
 per-transfer team approval. Withdrawal E2E and full service restart remain NOT_RUN.
 Current/all-158-history scans, 179-file provenance, nine JSON parses and private
-path/IP/terminology checks PASS. Staged/outgoing scans/private push/exact-SHA CI pending.
+path/IP/terminology checks PASS. Staged/outgoing/all-159-commit scans, private push
+and exact-SHA CI passed as recorded above.
 
 Provenance remains 179 files, no additions/deletions/moves, dependency/license
 changes or production actions. Phase 08 INCOMPLETE; Phase 09 NOT_STARTED;
 Mainnet DISABLED. Exclusive creation is not a running signer lease or atomic
 update fence; authentication, protected storage and nonce restart remain open.
-Next: finish validation/publication, then volatile nonce and restart safety.
-See [detailed evidence](development-status.md#current-phase-08-explicit-signer-state-lifecycle-2026-09-10).
+Next: volatile nonce and restart safety.
+See [detailed evidence](development-status.md#previous-phase-08-explicit-signer-state-lifecycle-verified-source).
 
 ## Previous Phase 08 coordinated nonce abort (verified source)
 
