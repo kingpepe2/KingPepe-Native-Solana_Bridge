@@ -1,6 +1,43 @@
 # KingPepe Native - Solana Bridge Development Status
 
-## Current Phase 08 recovery validation (2026-09-10)
+## Current Phase 08.5 retrospective audit (2026-09-10)
+
+Baseline HEAD/origin/main: 9ea5e198b57f48086a0c7861123a6d79d14e8560, clean at
+takeover, PRIVATE. Reviewed source fixes are described in
+[the audit report](phase-08-5-audit.md). Phase 09 remains NOT_STARTED.
+The Team explicitly authorized this audit/fix/private-publication workflow while
+Actions is account-blocked, superseding earlier blanket pauses on local fixes.
+
+Current worktree validation: Windows/WSL each 501 Node tests and two vectors PASS;
+WSL 97 Rust tests (66 Solana, 31 Native), all five check/fmt/all-features Clippy
+gates, both SBF builds, 55 fresh deposit/recovery/retry checks and 26 finalized
+fresh withdrawal-record regressions PASS. Deposit reaches COMPLETED with reserve
+and supply 100000000 atomic, pending credit zero and no per-transfer Team approval.
+The withdrawal probe does not construct a Native payout. Earlier IllegalOwner is
+fixed; failed rollback probes leave no partial burn/record. No pins/dependencies
+changed and no base tools or production services were installed.
+
+Source/provenance guardrails and declared dependency-license checks PASS; npm audit
+zero vulnerabilities; five Rust lock audits have no vulnerability and retain the
+bincode unmaintained warning. Gitleaks current/staged scans and all 163 existing
+commits found no leaks. The additional publication-boundary scan reviewed 1168
+historical blobs: four URL-userinfo candidates were inert negative-test inputs,
+not service credentials; no broad scanner exception or history rewrite was added.
+Current exact provenance covers 185 files (99 original code, 57 original docs,
+one derived public-vector file, eight generated files, 20 build/config metadata).
+Outgoing-commit scanning and a clean-clone rerun remain required after commit.
+Do not infer exact-SHA CI from these worktree results.
+
+Baseline [CI 34509774457 attempt 2](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34509774457)
+again rejected all four jobs before steps: GITHUB_ACTIONS_ACCOUNT_EXECUTION_BLOCKED,
+tests NOT_RUN. No billing/privacy/protection/gate changes. Fresh clone remains
+pending publication at this entry. Full audit gate FAILS Phases 04, 07 and 08 for
+the open state/isolation/global-stop/upgrade-observation/reorg findings in the
+report; successful local tests do not close those gaps. SAFE_TO_BEGIN_PHASE_09=false.
+Next: finish scans/private publication and exact-SHA fresh clone, report, then wait
+for explicit KingPepe Team direction. Mainnet remains DISABLED, productionReady=false.
+
+## Historical Phase 08 recovery validation (2026-09-10)
 
 Validated HEAD: `f3166cded981ee92f63841e7ea09f9ed948ad7ea`; latest implementation:
 `0133a6cc7f22bf880249a72a62502aa4bf3a638b`. PRIVATE origin/main matched HEAD;

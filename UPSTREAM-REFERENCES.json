@@ -40,7 +40,8 @@
     "selectedCommit": "250d810d42b005526e4fb7e3aea75d2d2ab8fdbb",
     "license": "Apache-2.0",
     "rationale": "Reference for Solana manager/transceiver layout, replay structure, and message organization.",
-    "verificationDate": "2026-09-07"
+    "verificationDate": "2026-09-10",
+    "phase085Review": "Actual main/tree and releases rechecked: main remains the selected commit (Sui rate-limit fixes); latest inspected CLI 1.10.0+cli. Programs, messages, versioned TS IDLs, tests/fuzz and license inspected. Reference only; no copied or modified NTT implementation or upstream audit coverage. See docs/architecture/ntt-comparison.md."
   },
   "nativeSourceReference": {
     "project": "kingpepe2/king-pepe-source-code",
@@ -141,8 +142,8 @@
     },
     {
       "area": "canonical-message module layout",
-      "status": "planned",
-      "notes": "Implemented in KingPepe-specific code in later phases"
+      "status": "comparison-only",
+      "notes": "Original KingPepe canonical module is implemented; no NTT serialization code copied."
     }
   ],
   "excluded": [
@@ -156,7 +157,7 @@
     },
     {
       "area": "direct source imports",
-      "reason": "Phase 02 is structure and comparison only"
+      "reason": "No NTT source imported through the Phase 08.5 audit; dependency APIs and architecture references are not vendored implementations."
     }
   ]
 }

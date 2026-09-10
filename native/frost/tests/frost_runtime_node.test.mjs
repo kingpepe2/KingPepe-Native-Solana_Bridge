@@ -31,6 +31,14 @@ import { initialSignerState } from "../state/file-state-store.mjs";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
 
+test("coordinator construction requires the exact A+B set without extra signers", () => {
+  const [a, b] = REQUIRED_FROST_SIGNERS;
+  for (const ids of [[], [a], [b], [a, b, "UNAUTHORIZED_PARTICIPANT"], [a, "UNAUTHORIZED_PARTICIPANT"], [a, a]]) {
+    assert.throws(() => new NativeFrostCoordinator({ signers: ids.map(signerId => ({ signerId })),
+      publicPackage: {}, aggregateTweakedXOnlyPublicKey: "01".repeat(32) }));
+  }
+});
+
 function h(label) {
   return createHash("sha256").update(label).digest("hex");
 }

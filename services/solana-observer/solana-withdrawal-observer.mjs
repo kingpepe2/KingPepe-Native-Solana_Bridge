@@ -6,6 +6,7 @@ import {
   isHash32Hex,
   normalizeHex,
 } from "../../shared/protocol/canonical-message.mjs";
+import { findProgramAddress } from "../bridge-validator/solana-deposit-claim-transaction-plan.mjs";
 
 export const SOLANA_TRUST_LEVELS = Object.freeze([
   "RPC_OBSERVATION",
@@ -22,7 +23,9 @@ export const GLOBAL_HARD_STOP = "GLOBAL_HARD_STOP";
 
 export function evaluateFinalizedWithdrawalObservation(config, observation) {
   const expected = normalizeObserverConfig(config);
-  if (expected.environment === "mainnet" && expected.productionObserverConfigured !== true) {
+  // No production source is implemented by this observation policy model.
+  // A caller-controlled configured=true flag is not activation authority.
+  if (expected.environment !== "localnet" || expected.cluster !== "localnet") {
     return observerDecision(HARD_STOP, "PRODUCTION_SOLANA_OBSERVER_BLOCKED");
   }
   if (!SOLANA_TRUST_LEVELS.includes(observation.trust)) {
@@ -51,7 +54,11 @@ export function evaluateFinalizedWithdrawalObservation(config, observation) {
   if (!observation.transaction || observation.transaction.err !== null) {
     return observerDecision(REJECTED, "SOLANA_TRANSACTION_FAILED_OR_MISSING");
   }
-  if (observation.commitment !== "finalized" || observation.rootSlot < observation.slot) {
+  let slot;
+  let rootSlot;
+  try { slot = exactSlot(observation.slot); rootSlot = exactSlot(observation.rootSlot); }
+  catch { return observerDecision(REJECTED, "SOLANA_SLOT_INVALID"); }
+  if (observation.commitment !== "finalized" || rootSlot < slot) {
     return observerDecision(WAITING_FOR_FINALITY, "SOLANA_FINALITY_NOT_REACHED");
   }
 
@@ -154,11 +161,7 @@ export function evaluateProgramAndAuthorityIdentity(expected, observation) {
 export function deriveWithdrawalRecordPdaHex(managerProgramIdHex, withdrawalIdHex) {
   const managerProgramId = hexToBytes(managerProgramIdHex, "managerProgramIdHex");
   const withdrawalId = hexToBytes(withdrawalIdHex, "withdrawalIdHex");
-  return hashJson({
-    prefix: "KINGPEPE_BRIDGE_WITHDRAWAL_RECORD_PDA_V1",
-    managerProgramIdHex: bytesToHex(managerProgramId),
-    withdrawalIdHex: bytesToHex(withdrawalId),
-  });
+  return findProgramAddress([Buffer.from("kingpepe-withdrawal-record"), withdrawalId], managerProgramId).hex;
 }
 
 export function withdrawalObservationEvidenceDigestHex(expected, observation, message) {
@@ -188,6 +191,9 @@ function normalizeObserverConfig(config) {
     environment: config.environment,
     cluster: config.cluster,
     solanaDeploymentHex: normalizeHashLike(config.solanaDeploymentHex, "solanaDeploymentHex"),
+    nativeGenesisHex: normalizeHashLike(config.nativeGenesisHex, "nativeGenesisHex"),
+    protocolId: config.protocolId,
+    nativeNetwork: config.nativeNetwork,
     managerProgramIdHex: normalizeHashLike(config.managerProgramIdHex, "managerProgramIdHex"),
     transceiverProgramIdHex: normalizeHashLike(config.transceiverProgramIdHex, "transceiverProgramIdHex"),
     managerProgramDataAddressHex: normalizeHashLike(config.managerProgramDataAddressHex, "managerProgramDataAddressHex"),
@@ -216,6 +222,9 @@ function checkWithdrawalMessageDomain(expected, message) {
   if (message.action !== "WithdrawalRequest" || message.direction !== "SolanaToNative") {
     return "WRONG_MESSAGE_KIND";
   }
+  if (message.deployment.protocolId !== expected.protocolId) return "MESSAGE_PROTOCOL_MISMATCH";
+  if (message.deployment.nativeNetwork !== expected.nativeNetwork) return "MESSAGE_NATIVE_NETWORK_MISMATCH";
+  if (bytesToHex(message.deployment.nativeGenesis) !== expected.nativeGenesisHex) return "MESSAGE_NATIVE_GENESIS_MISMATCH";
   if (bytesToHex(message.deployment.solanaDeployment) !== expected.solanaDeploymentHex) {
     return "MESSAGE_SOLANA_DEPLOYMENT_MISMATCH";
   }
@@ -298,4 +307,12 @@ function normalizeHashLike(value, label) {
     throw new Error(`${label}:Expected32Bytes`);
   }
   return normalized;
+}
+
+function exactSlot(value) {
+  if (typeof value === "number" && (!Number.isSafeInteger(value) || value < 0)) throw new Error("SOLANA_SLOT_INVALID");
+  if (!["number", "string", "bigint"].includes(typeof value) || !/^(0|[1-9][0-9]*)$/u.test(String(value))) throw new Error("SOLANA_SLOT_INVALID");
+  const parsed = BigInt(value);
+  if (parsed > 0xffff_ffff_ffff_ffffn) throw new Error("SOLANA_SLOT_INVALID");
+  return parsed;
 }

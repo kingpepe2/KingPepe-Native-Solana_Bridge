@@ -23,6 +23,9 @@ function config(overrides = {}) {
     environment: "localnet",
     cluster: "localnet",
     solanaDeploymentHex: withdrawalVector.deployment.solanaDeployment,
+    protocolId: withdrawalVector.deployment.protocolId,
+    nativeNetwork: withdrawalVector.deployment.nativeNetwork,
+    nativeGenesisHex: withdrawalVector.deployment.nativeGenesis,
     managerProgramIdHex: withdrawalVector.deployment.managerProgramId,
     transceiverProgramIdHex: withdrawalVector.deployment.transceiverProgramId,
     managerProgramDataAddressHex: h("manager-programdata"),
@@ -214,4 +217,31 @@ test("production observer remains blocked without production-grade source config
   );
   assert.equal(result.state, "HARD_STOP");
   assert.equal(result.reason, "PRODUCTION_SOLANA_OBSERVER_BLOCKED");
+});
+
+test("configured flag cannot turn the local observation model into a production source", () => {
+  assert.equal(evaluateFinalizedWithdrawalObservation(config({ environment: "mainnet", cluster: "mainnet", productionObserverConfigured: true }), observation()).state, "HARD_STOP");
+});
+
+test("missing, malformed or unsafe slot/root values never authorize a withdrawal", () => {
+  for (const field of ["slot", "rootSlot"]) for (const value of [undefined, null, NaN, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, "01", "-1", "18446744073709551616"]) {
+    assert.equal(evaluateFinalizedWithdrawalObservation(config(), observation({ [field]: value })).reason, "SOLANA_SLOT_INVALID");
+  }
+});
+
+test("withdrawal observation enforces Native network/genesis and protocol identity", () => {
+  for (const [patch, reason] of [[{ protocolId: 2 }, "MESSAGE_PROTOCOL_MISMATCH"],
+    [{ nativeNetwork: 3 }, "MESSAGE_NATIVE_NETWORK_MISMATCH"], [{ nativeGenesisHex: h("wrong-native-genesis") }, "MESSAGE_NATIVE_GENESIS_MISMATCH"]]) {
+    assert.equal(evaluateFinalizedWithdrawalObservation(config(patch), observation()).reason, reason);
+  }
+});
+
+test("withdrawal record identity is the Solana PDA, not the old JSON hash", () => {
+  const actual = deriveWithdrawalRecordPdaHex(config().managerProgramIdHex, decodedWithdrawal.withdrawalIdHex);
+  // Golden identity is additionally checked against a REAL program-created PDA
+  // by local-withdrawal-record.mjs, not just this host identity regression.
+  const old = createHash("sha256").update(JSON.stringify({ managerProgramIdHex: config().managerProgramIdHex,
+    prefix: "KINGPEPE_BRIDGE_WITHDRAWAL_RECORD_PDA_V1", withdrawalIdHex: decodedWithdrawal.withdrawalIdHex })).digest("hex");
+  assert.notEqual(actual, old);
+  assert.match(actual, /^[0-9a-f]{64}$/u);
 });

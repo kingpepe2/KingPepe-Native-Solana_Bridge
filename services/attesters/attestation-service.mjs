@@ -17,6 +17,9 @@ export const REJECTED = "REJECTED";
 export const HARD_STOP = "HARD_STOP";
 
 export class ProjectAttester {
+  #secretKey;
+  #policy;
+  #closed = false;
   constructor({ role, secretKey, policy }) {
     if (!ATTESTATION_ROLES.includes(role)) {
       throw new Error("InvalidAttesterRole");
@@ -24,15 +27,21 @@ export class ProjectAttester {
     if (!secretKey) {
       throw new Error("MissingAttesterSecretKeyRef");
     }
-    this.role = role;
-    this.secretKey = toBytes(secretKey, "secretKey");
-    this.publicKey = ed25519.getPublicKey(this.secretKey);
-    this.publicKeyHex = bytesToHex(this.publicKey);
-    this.policy = normalizePolicy(policy);
-    if (this.policy.role !== role || this.policy.attesterPublicKeyHex !== this.publicKeyHex) {
+    this.#secretKey = Uint8Array.from(toBytes(secretKey, "secretKey"));
+    const publicKeyHex = bytesToHex(ed25519.getPublicKey(this.#secretKey));
+    this.#policy = normalizePolicy(structuredClone(policy));
+    Object.defineProperties(this, { role: { value: role, enumerable: true },
+      publicKeyHex: { value: publicKeyHex, enumerable: true } });
+    if (this.#policy.role !== role || this.#policy.attesterPublicKeyHex !== this.publicKeyHex) {
+      this.#secretKey.fill(0);
       throw new Error("AttesterPolicyIdentityMismatch");
     }
+    Object.freeze(this);
   }
+
+  get policy() { return this.#policy; }
+  get publicKey() { return hexToBytes(this.publicKeyHex, "attesterPublicKeyHex"); }
+  close() { this.#closed = true; this.#secretKey.fill(0); }
 
   evaluateDepositCredit(request, nowUnix = undefined) {
     const decoded = decodeCanonicalBridgeMessage(hexToBytes(request.encodedMessageHex, "encodedMessageHex"));
@@ -45,6 +54,7 @@ export class ProjectAttester {
   }
 
   signDepositCredit(request, nowUnix = undefined) {
+    if (this.#closed) throw new Error("AttesterClosed");
     const decoded = decodeCanonicalBridgeMessage(hexToBytes(request.encodedMessageHex, "encodedMessageHex"));
     const decision = evaluateDepositCredit({
       policy: this.policy,
@@ -57,7 +67,7 @@ export class ProjectAttester {
       error.decision = decision;
       throw error;
     }
-    const signature = ed25519.sign(decoded.encoded, this.secretKey);
+    const signature = ed25519.sign(decoded.encoded, this.#secretKey);
     return {
       protocol: ATTESTATION_PROTOCOL,
       mode: ATTESTATION_MODE,
@@ -210,7 +220,7 @@ function normalizePolicy(policy) {
   if (!policy || typeof policy !== "object") {
     throw new Error("MissingAttestationPolicy");
   }
-  return {
+  return Object.freeze({
     role: policy.role,
     attesterPublicKeyHex: normalizeHashLike(policy.attesterPublicKeyHex, "attesterPublicKeyHex"),
     protocolId: policy.protocolId,
@@ -222,10 +232,10 @@ function normalizePolicy(policy) {
     mintHex: normalizeHashLike(policy.mintHex, "mintHex"),
     policyEpoch: policy.policyEpoch,
     keyEpoch: policy.keyEpoch,
-    acceptedNativeTrust: policy.acceptedNativeTrust ?? ["LOCALLY_VALIDATED_CHAIN_STATE"],
+    acceptedNativeTrust: Object.freeze([...(policy.acceptedNativeTrust ?? ["LOCALLY_VALIDATED_CHAIN_STATE"])]),
     depositsPaused: policy.depositsPaused === true,
     hardStop: policy.hardStop === true,
-  };
+  });
 }
 
 function normalizeDepositEvidence(evidence) {
@@ -267,10 +277,7 @@ function checkDomain(policy, message) {
 }
 
 function checkValidityWindow(message, nowUnix) {
-  if (nowUnix === undefined) {
-    return null;
-  }
-  const now = BigInt(nowUnix);
+  const now = BigInt(nowUnix ?? Math.floor(Date.now() / 1000));
   if (now < message.validFrom) {
     return { state: WAITING_FOR_DEPENDENCY, reason: "MESSAGE_NOT_YET_VALID" };
   }

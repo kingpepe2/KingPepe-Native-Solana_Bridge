@@ -279,6 +279,9 @@ test("deposit claim RPC client is loopback-only and method-restricted", async ()
   const credentialedEndpoint = `http://${["u", "p"].join(":")}@127.0.0.1:8899`;
   assert.throws(() => normalizeSolanaDepositClaimRpcEndpoint(credentialedEndpoint), /CredentialsRejected/);
   assert.throws(() => normalizeSolanaDepositClaimRpcEndpoint("http://192.0.2.10:8899"), /MustBeLoopback/);
+  for (const suffix of ["/?token=not-a-credential", "/rpc", "/#fragment"]) {
+    assert.throws(() => normalizeSolanaDepositClaimRpcEndpoint(`http://127.0.0.1:8899${suffix}`), /PathRejected/);
+  }
 
   const server = createServer((request, response) => {
     let body = "";
@@ -313,3 +316,39 @@ test("deposit claim RPC client is loopback-only and method-restricted", async ()
     await once(server, "close");
   }
 });
+
+// These are real HTTP transport tests, not chain-consensus evidence.
+for (const [name, reply, options, expected] of [
+  ["mismatched response ID", (r, p) => r.end(JSON.stringify({ jsonrpc: "2.0", id: p.id + 1, result: 90 })), {}, /InvalidEnvelope/],
+  ["missing result", (r, p) => r.end(JSON.stringify({ jsonrpc: "2.0", id: p.id })), {}, /InvalidEnvelope/],
+  ["error body redaction", (r, p) => r.end(JSON.stringify({ jsonrpc: "2.0", id: p.id, error: { message: "PRIVATE_TEST_DETAIL" } })), {}, /InvalidEnvelope/],
+  ["malformed JSON", r => r.end("invalid"), {}, /MalformedResponse/],
+  ["declared oversized body", r => { r.setHeader("content-length", "10000000"); r.end("x"); }, {}, /ResponseTooLarge/],
+  ["chunked oversized body", r => { r.writeHead(200, { "transfer-encoding": "chunked" }); r.end("x".repeat(512)); }, { maxResponseBytes: 128 }, /ResponseTooLarge/],
+  ["redirect", r => { r.writeHead(302, { location: "http://192.0.2.1/" }); r.end(); }, {}, /Unavailable/],
+  ["timeout", () => {}, { timeoutMs: 50 }, /Timeout/],
+]) {
+  test(`deposit claim RPC bounds and rejects ${name}`, async () => {
+    const server = createServer((request, response) => {
+      let body = "";
+      request.on("data", b => { body += b; });
+      request.on("end", () => reply(response, JSON.parse(body)));
+    });
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    try {
+      const client = new SolanaDepositClaimRpcClient({ endpoint: `http://127.0.0.1:${server.address().port}`, ...options });
+      await assert.rejects(() => client.getFinalizedSlot(), error => {
+        assert.match(error.message, expected);
+        assert.doesNotMatch(error.message, /PRIVATE_TEST_DETAIL|http:/u);
+        assert.equal(error.cause, undefined);
+        return true;
+      });
+    } finally {
+      const closing = once(server, "close");
+      server.closeAllConnections();
+      server.close();
+      await closing;
+    }
+  });
+}

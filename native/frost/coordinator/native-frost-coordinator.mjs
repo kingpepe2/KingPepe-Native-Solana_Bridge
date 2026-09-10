@@ -186,8 +186,15 @@ export class NativeFrostCoordinator {
 }
 
 function signerMap(signers) {
+  if (Array.isArray(signers) && signers.length < REQUIRED_FROST_SIGNERS.length) {
+    throw new Error("missing required FROST signer");
+  }
+  if (!Array.isArray(signers) || signers.length !== REQUIRED_FROST_SIGNERS.length) {
+    throw new Error("FROST participant set must remain exactly A+B");
+  }
   const map = new Map();
   for (const signer of signers) {
+    if (!REQUIRED_FROST_SIGNERS.includes(signer?.signerId)) throw new Error("unknown FROST signer");
     if (map.has(signer.signerId)) throw new Error("duplicate FROST signer");
     map.set(signer.signerId, signer);
   }

@@ -536,6 +536,10 @@ pub struct LedgerSnapshot {
     pub broadcast_payout_liabilities: u128,
     pub finalized_payouts: u128,
     pub fees_accrued: u128,
+    // Miner-fee allowance remains encumbered until a finalized payout pays it.
+    // It is not project income or operator-withdrawable surplus.
+    pub network_fees_reserved: u128,
+    pub network_fees_paid: u128,
     pub change_reserved: u128,
     pub unsettled_operations: u64,
 }
@@ -557,6 +561,8 @@ impl LedgerSnapshot {
             broadcast_payout_liabilities: 0,
             finalized_payouts: 0,
             fees_accrued: 0,
+            network_fees_reserved: 0,
+            network_fees_paid: 0,
             change_reserved: 0,
             unsettled_operations: 0,
         }
@@ -569,6 +575,7 @@ impl LedgerSnapshot {
             self.burned_unpaid_withdrawals,
             self.reserved_utxo_liabilities,
             self.broadcast_payout_liabilities,
+            self.network_fees_reserved,
             self.change_reserved,
         ])
     }
@@ -640,7 +647,8 @@ impl LedgerSnapshot {
             next.minted_supply = checked_sub(next.minted_supply, gross_amount as u128)?;
             next.burned_unpaid_withdrawals =
                 checked_add(next.burned_unpaid_withdrawals, net_payout as u128)?;
-            next.fees_accrued = checked_add(next.fees_accrued, fee_amount as u128)?;
+            next.network_fees_reserved =
+                checked_add(next.network_fees_reserved, fee_amount as u128)?;
             next.unsettled_operations = next
                 .unsettled_operations
                 .checked_add(1)
@@ -672,17 +680,26 @@ impl LedgerSnapshot {
     }
 
     pub fn record_payout_settlement(&mut self, net_amount: u64) -> Result<(), LedgerError> {
+        self.record_payout_settlement_with_fee(net_amount, 0)
+    }
+
+    // The caller must supply the finalized payout's exact fee from the same
+    // operation/snapshot. This aggregate model is not a payout authorization.
+    pub fn record_payout_settlement_with_fee(
+        &mut self,
+        net_amount: u64,
+        network_fee: u64,
+    ) -> Result<(), LedgerError> {
         require_positive_amount(net_amount)?;
         let net_amount = net_amount as u128;
         self.apply_transition(|next| {
-            if next.broadcast_payout_liabilities >= net_amount {
-                next.broadcast_payout_liabilities =
-                    checked_sub(next.broadcast_payout_liabilities, net_amount)?;
-            } else {
-                next.burned_unpaid_withdrawals =
-                    checked_sub(next.burned_unpaid_withdrawals, net_amount)?;
-            }
-            next.canonical_reserve = checked_sub(next.canonical_reserve, net_amount)?;
+            next.broadcast_payout_liabilities =
+                checked_sub(next.broadcast_payout_liabilities, net_amount)?;
+            next.network_fees_reserved =
+                checked_sub(next.network_fees_reserved, network_fee as u128)?;
+            next.network_fees_paid = checked_add(next.network_fees_paid, network_fee as u128)?;
+            let spent = checked_add(net_amount, network_fee as u128)?;
+            next.canonical_reserve = checked_sub(next.canonical_reserve, spent)?;
             next.finalized_payouts = checked_add(next.finalized_payouts, net_amount)?;
             next.unsettled_operations = next
                 .unsettled_operations
@@ -1010,8 +1027,17 @@ mod tests {
         ledger.record_burn_request(1_000, 5).expect("burn request");
         assert_eq!(ledger.minted_supply, 9_000);
         assert_eq!(ledger.burned_unpaid_withdrawals, 995);
-        assert_eq!(ledger.coverage_required().unwrap(), 9_995);
-        assert_eq!(ledger.surplus().unwrap(), 5);
+        assert_eq!(ledger.network_fees_reserved, 5);
+        assert_eq!(ledger.coverage_required().unwrap(), 10_000);
+        assert_eq!(ledger.surplus().unwrap(), 0);
+        ledger.reserve_withdrawal_utxos(995).unwrap();
+        ledger.record_payout_broadcast(995).unwrap();
+        assert_eq!(ledger.surplus().unwrap(), 0);
+        ledger.record_payout_settlement_with_fee(995, 5).unwrap();
+        assert_eq!(ledger.canonical_reserve, 9_000);
+        assert_eq!(ledger.network_fees_reserved, 0);
+        assert_eq!(ledger.network_fees_paid, 5);
+        assert_eq!(ledger.surplus().unwrap(), 0);
     }
 
     #[test]
@@ -1084,7 +1110,7 @@ mod tests {
             ledger.record_validated_deposit(100, 0).unwrap();
             ledger.record_mint(100, 0).unwrap();
             if overflow_fee {
-                ledger.fees_accrued = u128::MAX;
+                ledger.network_fees_reserved = u128::MAX;
             } else {
                 ledger.unsettled_operations = u64::MAX;
             }
@@ -1117,6 +1143,30 @@ mod tests {
             assert_eq!(ledger.record_payout_settlement(10), Err(error));
             assert_eq!(ledger, before);
         }
+    }
+
+    #[test]
+    fn payout_cannot_settle_unbroadcast_or_unreserved_fee() {
+        let mut ledger = LedgerState::new();
+        ledger.record_validated_deposit(100, 0).unwrap();
+        ledger.record_mint(100, 0).unwrap();
+        ledger.record_burn_request(20, 2).unwrap();
+        let before = ledger.clone();
+        assert_eq!(
+            ledger.record_payout_settlement_with_fee(18, 2),
+            Err(LedgerError::InsufficientFunds)
+        );
+        assert_eq!(ledger, before);
+        ledger.reserve_withdrawal_utxos(18).unwrap();
+        ledger.record_payout_broadcast(18).unwrap();
+        let before = ledger.clone();
+        assert_eq!(
+            ledger.record_payout_settlement_with_fee(18, 3),
+            Err(LedgerError::InsufficientFunds)
+        );
+        assert_eq!(ledger, before);
+        ledger.record_payout_settlement_with_fee(18, 2).unwrap();
+        assert_eq!(ledger.surplus().unwrap(), 0);
     }
 
     #[test]

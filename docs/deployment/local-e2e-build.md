@@ -92,6 +92,23 @@ CI also verifies the pinned cargo-audit binary and audits all five Cargo.lock
 files. The retained bincode unmaintained warning remains visible. No advisory
 ignore or production activation exception is added.
 
+Phase 08.5 adds `node solana/tests/local-withdrawal-record.mjs` with a separate
+fresh external root. It first completes a real Native-to-Solana deposit, then
+executes 26 finalized burn/record prerequisite checks, including fresh and
+pre-funded PDAs, wrong domains/accounts, duplicate requests, insufficient rent,
+later-instruction rollback and direct burns without entitlement. Negative
+transactions use skipPreflight so validator execution, not simulation, supplies
+the failure evidence. The disposable 600000-unit budget is explicit: the default
+200000-unit budget was measured to fail. No production compute/fee policy is set.
+These probes leave unpaid test withdrawals and never construct Native payouts.
+
+For clean-clone verification, use a new clone and new CARGO_TARGET_DIR and
+KINGPEPE_LOCAL_BUILD_ROOT outside it. Locked downloads/compiler installations may
+be reused after verification; compiled project artifacts may not. Run Node,
+vectors, all Rust workspaces/quality checks, both local daemon suites, source
+guardrails, complete history scans and license/dependency audits. A fresh clone
+that only passes host tests is not a fresh real-chain validation.
+
 Tool references: [Agave 4.2.2 release](https://github.com/anza-xyz/agave/releases/tag/v4.2.2),
 [SBF builder](https://github.com/anza-xyz/cargo-build-sbf),
 [Native source pin](https://github.com/kingpepe2/king-pepe-source-code/tree/3f2621820ffefae59cbe48b350f5f8f6ec8a6da5).

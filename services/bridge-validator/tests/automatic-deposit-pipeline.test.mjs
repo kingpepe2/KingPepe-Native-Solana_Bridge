@@ -332,17 +332,22 @@ function createPipeline(overrides = {}) {
       },
     };
   }
+  // Fault injection decorates transport adapters, never the immutable signing
+  // objects or their policy/key material. Delegates still perform real signing.
+  const attesters = [attesterA, attesterB].map(attester => ({
+    signDepositCredit: (...args) => attester.signDepositCredit(...args),
+  }));
   const pipeline = new AutomaticNativeToSolanaDepositPipeline({
     config,
     frostCoordinator: frost.coordinator,
-    attesters: [attesterA, attesterB],
+    attesters,
     nativeRelayer,
     reserveVerifier,
     solanaBridge,
     journal: overrides.journal,
     ledger: overrides.ledger,
   });
-  return { config, operation, frost, attesters: [attesterA, attesterB], nativeRelayer, reserveVerifier, solanaBridge, pipeline };
+  return { config, operation, frost, attesters, nativeRelayer, reserveVerifier, solanaBridge, pipeline };
 }
 
 function feePayerKeypairForPipelineTest() {

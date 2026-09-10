@@ -488,6 +488,10 @@ impl BridgeProgram {
             return Err(BridgeError::Replay);
         }
 
+        let minted_supply = self
+            .minted_supply
+            .checked_add(message.amount_atomic as u128)
+            .ok_or(BridgeError::ArithmeticOverflow)?;
         transceiver
             .consume_receipt(&digest)
             .map_err(BridgeError::Transceiver)?;
@@ -497,10 +501,7 @@ impl BridgeProgram {
             amount_atomic: message.amount_atomic,
             recipient: message.destination.clone(),
         };
-        self.minted_supply = self
-            .minted_supply
-            .checked_add(message.amount_atomic as u128)
-            .ok_or(BridgeError::ArithmeticOverflow)?;
+        self.minted_supply = minted_supply;
         self.deposit_claims
             .insert(message.operation_id, record.clone());
         self.consumed_receipts.insert(digest);
@@ -527,6 +528,15 @@ impl BridgeProgram {
         }
         validate_burn(config, message, burn)?;
 
+        let supply_after_burn = self
+            .minted_supply
+            .checked_sub(message.amount_atomic as u128)
+            .ok_or(BridgeError::BurnMismatch)?;
+        let unpaid_after_burn = self
+            .burned_unpaid_withdrawals
+            .checked_add(message.amount_atomic as u128)
+            .ok_or(BridgeError::ArithmeticOverflow)?;
+
         let digest = message
             .message_digest()
             .map_err(|_| BridgeError::InvalidMessage)?;
@@ -541,10 +551,8 @@ impl BridgeProgram {
         };
         self.withdrawal_records
             .insert(message.withdrawal_id, record.clone());
-        self.burned_unpaid_withdrawals = self
-            .burned_unpaid_withdrawals
-            .checked_add(message.amount_atomic as u128)
-            .ok_or(BridgeError::ArithmeticOverflow)?;
+        self.burned_unpaid_withdrawals = unpaid_after_burn;
+        self.minted_supply = supply_after_burn;
         Ok(record)
     }
 
@@ -837,6 +845,11 @@ fn process_accept_deposit_claim_accounts(
     }
     validate_recipient_token_account(recipient_token_account, mint.key)?;
 
+    let supply_after_mint = unpack_mint(mint)?
+        .supply
+        .checked_add(message.amount_atomic)
+        .ok_or(BridgeError::ArithmeticOverflow)?;
+
     invoke_mint_to_checked_if_enabled(
         &config,
         mint,
@@ -847,10 +860,7 @@ fn process_accept_deposit_claim_accounts(
         token_cpi_mode,
     )?;
 
-    state.minted_supply = state
-        .minted_supply
-        .checked_add(message.amount_atomic as u128)
-        .ok_or(BridgeError::ArithmeticOverflow)?;
+    state.minted_supply = supply_after_mint as u128;
     let record = DepositClaimRecord {
         operation_id: message.operation_id,
         message_digest: digest,
@@ -882,6 +892,9 @@ fn process_record_withdrawal_accounts(
     let mint = next_required_account(&mut account_iter)?;
     let burn_authority = next_required_account(&mut account_iter)?;
     let token_program = next_required_account(&mut account_iter)?;
+    let transceiver_config = next_required_account(&mut account_iter)?;
+    let payer = next_required_account(&mut account_iter)?;
+    let system_program_account = next_required_account(&mut account_iter)?;
     require_no_extra_accounts(&mut account_iter)?;
 
     require_writable(bridge_state)?;
@@ -890,10 +903,24 @@ fn process_record_withdrawal_accounts(
     require_writable(mint)?;
     require_signer(burn_authority)?;
     require_account_owner(bridge_state, program_id)?;
-    require_account_owner(withdrawal_record, program_id)?;
     require_account_len(bridge_state, BRIDGE_STATE_ACCOUNT_LENGTH)?;
-    require_account_len(withdrawal_record, WITHDRAWAL_RECORD_ACCOUNT_LENGTH)?;
-    require_zeroed_account(withdrawal_record)?;
+    require_signer(payer)?;
+    require_writable(payer)?;
+    require_account_key(system_program_account, &system_program::id().to_bytes())?;
+    // The user's signer may also pay rent; no economic account may be a payer.
+    for account in [
+        bridge_state,
+        withdrawal_record,
+        source_token_account,
+        mint,
+        token_program,
+        transceiver_config,
+        system_program_account,
+    ] {
+        if payer.key == account.key || burn_authority.key == account.key {
+            return Err(BridgeError::AccountAliasing.into());
+        }
+    }
 
     let mut state = read_bridge_state_account(bridge_state)?;
     require_ready_for_action(&state.state, &state.config, false)?;
@@ -930,12 +957,42 @@ fn process_record_withdrawal_accounts(
         return Err(BridgeError::WrongMessageKind.into());
     }
     validate_burn(&config, &message, &burn)?;
+    validate_withdrawal_native_domain(&config, &message, transceiver_config)?;
     validate_source_token_account(
         source_token_account,
         mint.key,
         burn_authority.key,
         burn.amount_atomic,
     )?;
+
+    // Do all accounting arithmetic before either CPI. The runtime also
+    // rolls back allocation, rent, burn and these writes on ANY later failure.
+    let new_unpaid = state
+        .burned_unpaid_withdrawals
+        .checked_add(message.amount_atomic as u128)
+        .ok_or(BridgeError::ArithmeticOverflow)?;
+    let supply_after_burn = unpack_mint(mint)?
+        .supply
+        .checked_sub(burn.amount_atomic)
+        .ok_or(BridgeError::BurnMismatch)?;
+    let (_, bump) = Pubkey::find_program_address(
+        &[WITHDRAWAL_RECORD_PDA_SEED_PREFIX, &message.withdrawal_id],
+        program_id,
+    );
+    ensure_program_pda_account(
+        withdrawal_record,
+        Some(payer),
+        Some(system_program_account),
+        program_id,
+        &derive_withdrawal_record_pda(&config.manager_program_id, &message.withdrawal_id),
+        &[
+            WITHDRAWAL_RECORD_PDA_SEED_PREFIX,
+            &message.withdrawal_id,
+            &[bump],
+        ],
+        WITHDRAWAL_RECORD_ACCOUNT_LENGTH,
+    )?;
+    require_zeroed_account(withdrawal_record)?;
 
     invoke_burn_checked_if_enabled(
         source_token_account,
@@ -959,15 +1016,52 @@ fn process_record_withdrawal_accounts(
         native_destination: message.destination,
         burn_authority: burn.authority,
     };
-    state.burned_unpaid_withdrawals = state
-        .burned_unpaid_withdrawals
-        .checked_add(message.amount_atomic as u128)
-        .ok_or(BridgeError::ArithmeticOverflow)?;
+    state.burned_unpaid_withdrawals = new_unpaid;
+    // A burn changes the liability's form, not the total amount owed. This is
+    // the last bridge-operation snapshot; direct SPL burns require Mint reads.
+    state.minted_supply = supply_after_burn as u128;
     write_account_data(
         withdrawal_record,
         &encode_withdrawal_record_account(&record)?,
     )?;
     write_account_data(bridge_state, &encode_bridge_state_account(&state)?)?;
+    Ok(())
+}
+
+fn validate_withdrawal_native_domain(
+    config: &BridgeConfig,
+    message: &CanonicalBridgeMessage,
+    account: &AccountInfo,
+) -> Result<(), EntrypointError> {
+    require_account_owner(
+        account,
+        &Pubkey::new_from_array(config.transceiver_program_id),
+    )?;
+    require_account_key(
+        account,
+        &kingpepe_transceiver::derive_transceiver_config_pda(
+            &config.transceiver_program_id,
+            &config.mint_binding.mint,
+        ),
+    )?;
+    let data = account
+        .try_borrow_data()
+        .map_err(|_| EntrypointError::AccountBorrowFailed)?;
+    let transceiver = kingpepe_transceiver::decode_transceiver_config_account(&data)
+        .map_err(|_| EntrypointError::InvalidAccountData)?
+        .config;
+    if !transceiver.active
+        || transceiver.manager_program_id != config.manager_program_id
+        || transceiver.transceiver_program_id != config.transceiver_program_id
+        || transceiver.mint != config.mint_binding.mint
+        || transceiver.solana_deployment != config.solana_deployment
+        || transceiver.key_epoch != config.key_epoch
+        || transceiver.protocol_id != message.deployment.protocol_id
+        || transceiver.native_network != message.deployment.native_network
+        || transceiver.native_genesis != message.deployment.native_genesis
+    {
+        return Err(BridgeError::MessageDomainMismatch.into());
+    }
     Ok(())
 }
 
@@ -1177,6 +1271,10 @@ fn ensure_program_pda_account<'a>(
         system_program_account.ok_or(EntrypointError::NotEnoughAccounts)?;
     require_signer(payer)?;
     require_writable(payer)?;
+    require_account_owner(payer, &system_program::id())?;
+    if payer.key == account.key || payer.data_len() != 0 {
+        return Err(EntrypointError::InvalidAccountData);
+    }
     if system_program_account.key != &system_program::id() {
         return Err(EntrypointError::AccountKeyMismatch);
     }
@@ -1185,18 +1283,47 @@ fn ensure_program_pda_account<'a>(
     let lamports = Rent::get()
         .map_err(|_| EntrypointError::RentUnavailable)?
         .minimum_balance(expected_len);
-    let instruction =
-        system_instruction::create_account(payer.key, account.key, lamports, space, program_id);
-    invoke_signed(
-        &instruction,
-        &[
-            payer.clone(),
-            account.clone(),
-            system_program_account.clone(),
-        ],
-        &[signer_seeds],
-    )
-    .map_err(|_| EntrypointError::SystemCpiFailed)?;
+    if account.lamports() == 0 {
+        let instruction =
+            system_instruction::create_account(payer.key, account.key, lamports, space, program_id);
+        invoke_signed(
+            &instruction,
+            &[
+                payer.clone(),
+                account.clone(),
+                system_program_account.clone(),
+            ],
+            &[signer_seeds],
+        )
+        .map_err(|_| EntrypointError::SystemCpiFailed)?;
+    } else {
+        // Anyone can send lamports to a PDA. Only an empty System account at
+        // the exact derived key can take this path; occupied data never can.
+        let missing = lamports.saturating_sub(account.lamports());
+        if missing > 0 {
+            invoke(
+                &system_instruction::transfer(payer.key, account.key, missing),
+                &[
+                    payer.clone(),
+                    account.clone(),
+                    system_program_account.clone(),
+                ],
+            )
+            .map_err(|_| EntrypointError::SystemCpiFailed)?;
+        }
+        invoke_signed(
+            &system_instruction::allocate(account.key, space),
+            &[account.clone(), system_program_account.clone()],
+            &[signer_seeds],
+        )
+        .map_err(|_| EntrypointError::SystemCpiFailed)?;
+        invoke_signed(
+            &system_instruction::assign(account.key, program_id),
+            &[account.clone(), system_program_account.clone()],
+            &[signer_seeds],
+        )
+        .map_err(|_| EntrypointError::SystemCpiFailed)?;
+    }
     require_account_owner(account, program_id)?;
     require_account_len(account, expected_len)
 }
@@ -1516,6 +1643,15 @@ fn validate_burn(
         return Err(BridgeError::BurnMismatch);
     }
     if burn.authority == [0u8; 32] {
+        return Err(BridgeError::BurnMismatch);
+    }
+    // The implemented Native transaction path supports P2TR outputs only.
+    // An arbitrary nonempty byte string is not a supported payment script.
+    if message.destination.len() != 34
+        || message.destination[..2] != [0x51, 0x20]
+        || message.destination[2..].iter().all(|byte| *byte == 0)
+        || message.fee_atomic >= message.amount_atomic
+    {
         return Err(BridgeError::BurnMismatch);
     }
     Ok(())
@@ -2057,7 +2193,7 @@ mod tests {
             withdrawal_id: h(13),
             gross_amount_atomic: 4_000,
             fee_atomic: 25,
-            native_destination: vec![0x51, 0x20, 0xAB],
+            native_destination: [&[0x51, 0x20][..], &h(0xAB)].concat(),
             epochs: MessageEpochs {
                 policy_epoch: config.policy_epoch,
                 key_epoch: config.key_epoch,
@@ -2690,7 +2826,7 @@ mod tests {
     }
 
     #[test]
-    fn bridge_account_execution_burns_and_records_withdrawal_atomically() {
+    fn bridge_account_model_updates_preallocated_withdrawal_without_token_cpi() {
         let config = account_execution_config();
         let message = withdrawal_message(&config);
         let burn_authority_key = Pubkey::new_unique();
@@ -2766,6 +2902,32 @@ mod tests {
                 mint_account,
                 burn_authority,
                 token_program,
+                test_account(
+                    Pubkey::new_from_array(kingpepe_transceiver::derive_transceiver_config_pda(
+                        &config.transceiver_program_id,
+                        &config.mint_binding.mint,
+                    )),
+                    Pubkey::new_from_array(config.transceiver_program_id),
+                    kingpepe_transceiver::encode_transceiver_config_account(
+                        transceiver(&config).config(),
+                    ),
+                    false,
+                    false,
+                ),
+                test_account(
+                    Pubkey::new_unique(),
+                    system_program::id(),
+                    Vec::new(),
+                    true,
+                    true,
+                ),
+                test_account(
+                    system_program::id(),
+                    Pubkey::new_unique(),
+                    Vec::new(),
+                    false,
+                    false,
+                ),
             ],
             &withdrawal,
             TokenCpiMode::SkipForTest,
@@ -2781,6 +2943,39 @@ mod tests {
         assert_eq!(record.record.gross_amount_atomic, message.amount_atomic);
         assert_eq!(record.record.fee_atomic, message.fee_atomic);
         assert_eq!(record.record.native_destination, message.destination);
+    }
+
+    #[test]
+    fn withdrawal_rejects_unsupported_native_scripts_and_zero_net() {
+        let config = base_config();
+        let valid = withdrawal_message(&config);
+        let burn = BurnChecked {
+            token_program_id: config.mint_binding.token_program_id,
+            mint: config.mint_binding.mint,
+            authority: h(42),
+            amount_atomic: valid.amount_atomic,
+            decimals: config.mint_binding.decimals,
+        };
+        for script in [
+            vec![0x51],
+            vec![0x51, 0x20, 0xab],
+            vec![0x6a],
+            [&[0x51, 0x20][..], &[0u8; 32]].concat(),
+        ] {
+            let mut invalid = valid.clone();
+            invalid.destination = script;
+            assert_eq!(
+                validate_burn(&config, &invalid, &burn),
+                Err(BridgeError::BurnMismatch)
+            );
+        }
+        let mut invalid = valid.clone();
+        invalid.fee_atomic = invalid.amount_atomic;
+        assert_eq!(
+            validate_burn(&config, &invalid, &burn),
+            Err(BridgeError::BurnMismatch)
+        );
+        assert_eq!(validate_burn(&config, &valid, &burn), Ok(()));
     }
 
     #[test]
@@ -2911,6 +3106,7 @@ mod tests {
         let accounts = accounts(&config);
         let mut bridge = BridgeProgram::new();
         bridge.initialize(config.clone()).unwrap();
+        bridge.minted_supply = 4_000; // Aggregate host-model fixture only.
         let message = withdrawal_message(&config);
         let burn = BurnChecked {
             token_program_id: config.mint_binding.token_program_id,
@@ -2925,6 +3121,7 @@ mod tests {
         assert_eq!(record.gross_amount_atomic, 4_000);
         assert_eq!(bridge.withdrawal_count(), 1);
         assert_eq!(bridge.burned_unpaid_withdrawals(), 4_000);
+        assert_eq!(bridge.minted_supply(), 0);
         assert_eq!(
             bridge.record_withdrawal_request(&message, &burn, &accounts),
             Err(BridgeError::Replay)

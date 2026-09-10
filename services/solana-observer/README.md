@@ -1,7 +1,8 @@
 # Solana observer service
 
-The Solana observer validates localnet deposit-claim results and finalized
-withdrawal records before downstream authorization can proceed.
+The implemented RPC adapter reads localnet deposit-claim results. Withdrawal
+validation is a separate policy model over supplied observations, not a running
+withdrawal or deployed-program monitoring service.
 
 Phase 07 implements:
 
@@ -28,5 +29,8 @@ Phase 08 adds a localnet-only deposit-claim observer:
   with freeze authority set.
 - No production RPCs, keys, Program IDs, Mint identities, or operational state.
 
-Production observation remains disabled until a production-grade source policy
-and private deployment configuration are provided outside the repository.
+ProgramData/hash/authority comparisons above do not independently fetch or verify
+deployed bytecode. Localnet RPC is bounded and fail-closed, not trustless consensus.
+Production observation remains disabled; configuration alone cannot enable it.
+See [trust boundaries](../../docs/architecture/attestation-and-observation.md)
+and the Phase 08.5 audit for missing service-wide protections.

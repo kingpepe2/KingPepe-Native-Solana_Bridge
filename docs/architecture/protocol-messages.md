@@ -60,14 +60,25 @@ The Phase 03 ledger model tracks reserve coverage using exact integers:
 - Broadcast payout liabilities.
 - Finalized payouts.
 - Fees accrued.
+- Reserved Native network-fee liabilities and finalized network fees paid.
 - Reserved change.
 - Unsettled operation count.
 
 Coverage is checked as:
 
-`reserve >= minted_supply + authorized_unminted_credits + burned_unpaid_withdrawals + reserved_utxo_liabilities + broadcast_payout_liabilities + change_reserved`
+`reserve >= minted_supply + authorized_unminted_credits + burned_unpaid_withdrawals + reserved_utxo_liabilities + broadcast_payout_liabilities + network_fees_reserved + change_reserved`
 
 A Solana burn moves liability form. It does not remove the bridge's Native payout obligation until the payout is finalized.
+
+Phase 08.5 corrected early fee-surplus recognition. Burning gross 1000 with a
+5-atomic miner-fee allowance creates 995 net unpaid plus 5 reserved fee liability,
+not 5 operator surplus. Reservation and broadcast move only the net liability.
+Finalized settlement requires a broadcast obligation and discharges net and
+actually paid fee together with the reserve decrease. Project fee remains zero;
+network fees are not project income. Unspent fee allowances remain covered until
+an operation-bound settlement policy discharges them; the aggregate model is not
+that future per-withdrawal policy. Finalized payout is discharged even if a later
+Solana acknowledgment is unavailable. No refund/remint or extraction is added.
 
 Every Rust snapshot transition validates a candidate copy before committing it.
 Overflow, underflow, invalid operation count, zero/net-zero amounts or failed

@@ -1,58 +1,58 @@
 # Attestation and Solana observation
 
-## Current Phase 08 boundary
+## Implemented local boundaries
 
-The local deposit observer reports RPC_OBSERVATION, including when its source
-is our disposable local validator. It checks account program ownership,
-derived claim PDA, context freshness, transaction success, exact SPL Mint layout,
-supply, decimals and PDA mint authority. Source outages wait; confirmed account
-or authority contradictions create a persisted HARD_STOP which retry cannot
-clear. Production chain-source/bytecode verification is still BLOCKED.
+Native signing is separate from two project Ed25519 attesters. Each local
+attester's policy checks the same canonical deposit-credit bytes, deployment,
+epochs, reserve transition and evidence digest. The local E2E additionally
+invokes raw Native evidence validation for each role. The generic attester class
+alone accepts evidence through a policy interface; it is not a validating node.
+Two signatures prove who signed, not that their chain assertions are true.
 
-Two Ed25519 attestations now execute in the real local validator over identical
-canonical message bytes. Strict cross-instruction offsets share those bytes
-with the transceiver instruction; final receipt creation precedes a separate
-claim/mint transaction. This verifies who attested, not the truth of Native
-chain evidence. Native full-evidence wiring and recovery races remain Phase 08
-work. Both attesters are KingPepe Team controlled and can share one host/source;
-they are not physically independent or trustless observers.
+Phase 08.5 copies the attester key into a private field, freezes normalized policy
+and identity, isolates caller mutation, makes close irreversible and checks the
+actual clock when no test clock is supplied. Explicit historical vector clocks
+are test inputs, not an expiry bypass or a production clock source.
 
-## Historical Phase 07 implementation
+The real Transceiver requires two distinct authorized Ed25519 verification
+instructions over identical canonical bytes. Instructions sysvar identity,
+program/index/offset/length/key/message constraints are checked. Finalized receipt
+creation precedes a separate atomic claim/mint transaction. The Manager, not
+the Transceiver, holds mint authority through a PDA.
 
-Phase 07 adds service-level attestation and observation code. It does not deploy
-Solana programs, configure production identities, or authorize Mainnet.
+The local deposit observer reports RPC_OBSERVATION, even for a locally launched
+validator. It reads transaction meta, finalized slot, claim account and SPL Mint;
+checks PDA, layout, account program, snapshot freshness, decimals and mint
+authority; and exposes freeze authority for downstream hard-stop policy.
+Its RPC transport is loopback-only, redirect-disabled, timeout/body-bounded and
+requires matching JSON-RPC response IDs. Malformed, oversized, unavailable or
+error responses never become evidence; provider details are not surfaced.
 
-Project attestations use `PROJECT_ATTESTED_2_OF_2_ED25519`:
+The withdrawal observer remains a POLICY MODEL, not a running withdrawal
+service. It checks supplied program/authority, transaction, burn and account
+fields against expected values. Phase 08.5 corrects its PDA helper to real Solana
+derivation, adds Native protocol/network/genesis binding and exact slot/root
+validation, and unconditionally blocks non-localnet use. A configured=true flag
+cannot select a nonexistent production observer.
 
-- Attestation A and Attestation B are distinct Ed25519 identities.
-- Attestation keys are not Native FROST shares.
-- Each attester validates canonical message domain, epochs, Native evidence,
-  finality, reserve transition state, mint-credit availability, amount,
-  recipient, and evidence digest before signing.
-- The attester signs the canonical binary bridge message bytes, not JSON.
-- One attestation or the same attester twice is rejected.
+## Trust and missing guarantees
 
-The transceiver model now validates Solana Ed25519 verifier instruction layout:
+RPC_OBSERVATION, LOCAL_VALIDATION (the current code's local-validation label),
+and PROJECT_ATTESTATION are distinct. LOCAL_VALIDATION labels supplied to a policy
+model are not independent chain proofs. Shared-host services or sources are not
+physically independent observers. The model is KingPepe Team controlled,
+PROJECT_ATTESTED_2_OF_2, not decentralized or trustless.
 
-- Exact Solana Ed25519 verifier program ID.
-- One signature per instruction.
-- Public-key, signature, and message offsets are bounded.
-- The signed message bytes must equal the canonical bridge message bytes.
-- The attester public keys must be two distinct configured identities.
+ProgramData address/hash and upgrade-authority comparisons currently operate on
+supplied identity objects. There is no complete independently sourced, continuous
+deployed-bytecode/authority watcher wired to a durable bridge-wide stop.
+The deposit observer does not independently collect genesis/ProgramData history.
+A static program ID or an arbitrary RPC finalized claim cannot supply those
+missing guarantees. Production observation remains BLOCKED.
 
-The Solana observer validates finalized withdrawal evidence:
-
-- RPC observation is separated from local validation and project attestation.
-- RPC-only evidence is not promoted to local validation.
-- Program IDs, ProgramData addresses, binary hashes, upgrade authorities, Mint,
-  Token Program, mint authority PDA, decimals, and freeze authority are checked.
-- Unauthorized program, binary, authority, or Mint changes create `HARD_STOP`.
-- Direct SPL burns without bridge withdrawal records create no Native payout
-  entitlement.
-
-## Remaining limits
-
-- This is not a trustless Solana light client.
-- Production observer configuration is still absent; Mainnet remains disabled.
-- Local validator end-to-end flows are later phases.
-- External review has not been performed.
+Local claim/accounting hard stops persist in their scoped journals. This does
+not establish a global stop across all services, coordinator replacement,
+co-restored snapshots or post-mint deep reorganizations. Complete service
+recovery, protected attester key storage, authenticated IPC, freshness/fencing
+and production observation still require implementation/review. The local E2E
+is evidence of the exercised flow only. External review is NOT_RUN.

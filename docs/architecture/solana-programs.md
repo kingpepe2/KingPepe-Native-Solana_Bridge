@@ -2,6 +2,32 @@
 
 ## Current Phase 08 update
 
+Phase 08.5 adds the actual withdrawal-record lifecycle prerequisite. Instruction
+tag 3 uses nine accounts, in order: writable bridge state, writable withdrawal
+record PDA, writable source token account, writable Mint, user burn authority
+signer, SPL Token Program, read-only Transceiver config PDA, writable rent payer
+signer, System Program. The payer may equal the user's authority but cannot alias
+an economic/config/program account. The old six-account ABI is rejected.
+
+The record uses seeds ["kingpepe-withdrawal-record", withdrawal_id] under the
+Manager. The program validates its exact PDA, Native domain from the bound
+Transceiver config, message/epoch/time, source authorization, Mint and amount.
+It creates the 283-byte rent-exempt account with System CPI and PDA signing;
+an empty System-owned pre-funded PDA is safely topped up/allocated/assigned.
+Nonzero initialized records and substituted accounts are rejected. There is no
+close/reuse instruction. Native destinations currently require the supported
+34-byte P2TR script format and a nonzero net amount; other formats are not
+silently accepted. This format check is not proof of control of a recipient key.
+
+BurnChecked CPI, record creation and both bridge counters commit atomically.
+Any later instruction failure rolls back allocation, rent, burn and record.
+The bridge-operation supply snapshot is refreshed from the actual SPL Mint;
+gross burned value remains owed. Direct SPL burns change actual Mint supply but
+create no record, and observers must read Mint supply instead of trusting a stale
+last-operation counter. This implements no Native withdrawal payout or Phase 09.
+The real-validator suite is solana/tests/local-withdrawal-record.mjs; host models
+explicitly do not prove Token CPI or fresh-account creation.
+
 Both direct Rust programs compile to SBF and execute the real local deposit
 path. The historical Phase 05 model description below is not a complete
 on-chain security certification. Initial enrollment requires the exact Mint

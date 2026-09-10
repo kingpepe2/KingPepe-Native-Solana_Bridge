@@ -283,7 +283,7 @@ pub fn assert_finality(
     tip: &HeaderMeta,
     minimum_confirmations: u32,
 ) -> Result<(), NativeProofError> {
-    if tip.height < block.height || tip.chainwork < block.chainwork {
+    if minimum_confirmations == 0 || tip.height < block.height || tip.chainwork < block.chainwork {
         return Err(NativeProofError::FinalityNotSatisfied);
     }
     let confirmations = confirmations_at_tip(block.height, tip.height)
@@ -319,6 +319,15 @@ mod tests {
             assert!(verify_proof_of_work(&header, &params.pow_limit()));
             assert!(block_proof(header.bits, &params.pow_limit()).unwrap() > BigUint::from(0_u8));
         }
+    }
+
+    #[test]
+    fn zero_confirmation_policy_cannot_authorize_finality() {
+        let chain = HeaderChain::from_genesis(NativeChainParams::regtest()).unwrap();
+        assert_eq!(
+            assert_finality(chain.tip(), chain.tip(), 0),
+            Err(NativeProofError::FinalityNotSatisfied)
+        );
     }
 
     #[test]

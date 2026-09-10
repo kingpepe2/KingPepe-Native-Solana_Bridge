@@ -29,7 +29,7 @@ jobs:
           expected=$(jq -r .gitleaks.linuxArchiveSha256 scripts/local-e2e-toolchain.json)
           printf '%s  %s\n' "${expected}" "${tool_root}/gitleaks.tar.gz" | sha256sum --check
           tar -xzf "${tool_root}/gitleaks.tar.gz" -C "${tool_root}" --no-same-owner
-          "${tool_root}/gitleaks" git . --redact=100 --no-banner
+          "${tool_root}/gitleaks" git . --log-opts=--all --redact=100 --no-banner --ignore-gitleaks-allow
 
   linux-sbf:
     name: Linux SBF and Native-Solana local E2E
@@ -139,6 +139,27 @@ jobs:
           '
           test "${flow_exit}" -eq 0
           test -z "$(find . -path './.git' -prune -o -name '*-keypair.json' -print)"
+      - name: Real atomic withdrawal-record prerequisite (no Native payout)
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="${KINGPEPE_CI_TOOL_ROOT}/solana-release/bin:${KINGPEPE_CI_TOOL_ROOT}/native-build/bin:${PATH}"
+          export KINGPEPE_LOCAL_E2E_ROOT="${KINGPEPE_CI_TOOL_ROOT}/withdrawal-record-run"
+          export KINGPEPE_LOCAL_BUILD_ROOT="${KINGPEPE_CI_TOOL_ROOT}/build"
+          node solana/tests/local-withdrawal-record.mjs > "${KINGPEPE_CI_TOOL_ROOT}/withdrawal-record-result.json"
+          node --input-type=module -e '
+            import {readFileSync} from "node:fs";
+            const r = JSON.parse(readFileSync(process.env.KINGPEPE_CI_TOOL_ROOT + "/withdrawal-record-result.json", "utf8"));
+            console.log(JSON.stringify({sourceSha: process.env.GITHUB_SHA, ...r}));
+            if (r.withdrawalRecord?.pass !== 26 || r.withdrawalRecord?.fail !== 0 || r.phase09 !== "NOT_STARTED") process.exit(1);
+            for (const check of ["FRESH_USER_FRESH_PDA_FINALIZED_BURN_AND_RECORD",
+              "DUPLICATE_WITHDRAWAL_NEW_NONCE_REJECTED", "MISSING_USER_SIGNATURE_REJECTED",
+              "INSUFFICIENT_RECORD_RENT_ROLLS_BACK", "PREFUNDED_SYSTEM_PDA_SAFELY_INITIALIZED",
+              "LATER_INSTRUCTION_FAILURE_ROLLS_BACK_BURN_RECORD_AND_RENT",
+              "DIRECT_SPL_BURN_CREATES_NO_WITHDRAWAL_ENTITLEMENT"]) {
+              if (!r.withdrawalRecord.passed.includes(check)) process.exit(1);
+            }
+          '
 
   foundation-guardrails:
     name: Foundation Guardrails
@@ -161,6 +182,8 @@ jobs:
           node-version: "24.21.0"
       - name: Install locked Node dependencies
         run: npm ci --ignore-scripts
+      - name: Check exact provenance coverage and publication boundary
+        run: node scripts/source-audit.mjs
       - name: Audit Node dependencies
         run: npm audit --audit-level=low
       - name: Pin rust toolchain
@@ -268,6 +291,8 @@ jobs:
           node-version: "24.21.0"
       - name: Install locked Node dependencies
         run: npm ci --ignore-scripts
+      - name: Check exact provenance coverage and publication boundary
+        run: node scripts/source-audit.mjs
       - name: Audit Node dependencies
         run: npm audit --audit-level=low
       - name: Validate Solana workspace

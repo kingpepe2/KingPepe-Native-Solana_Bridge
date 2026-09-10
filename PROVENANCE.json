@@ -3,6 +3,15 @@
   "generatedAt": "2026-09-10T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
   "purpose": "file-by-file provenance classification for local tracked content",
+  "phase085AuditReview": {
+    "baseline": "9ea5e198b57f48086a0c7861123a6d79d14e8560",
+    "filesBefore": 180,
+    "filesAfter": 185,
+    "filesDeleted": 0,
+    "filesMoved": 0,
+    "scope": "Phases 01-08 audit fixes only; Phase 09 NOT_STARTED. Original PDA lifecycle/Native domain and script checks, independent real validator tests, exact fee-liability correction, attester policy boundary and source audit checks. No upstream source code imported.",
+    "legalBoundary": "Original changes are proprietary; existing BIP-341 vector attribution and third-party dependency licenses remain unchanged. Generated lockfiles are classified as generated metadata, not third-party source ownership. Existing origin history includes Apache-licensed foundation d7778be782054fe77a42133b01a799b19833cb96; this audit neither imports nor rewrites it and makes no retroactive revocation or fresh-history claim."
+  },
   "phase08RecoveryRevalidationReview": {
     "filesBefore": 180,
     "filesAfter": 180,
@@ -261,6 +270,11 @@
     ]
   },
   "trackedFiles": [
+    { "path": "docs/phase-08-5-audit.md", "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION", "notes": "Original retrospective audit, measured local coverage and explicit unresolved security dependencies; not external certification or private deployment data." },
+    { "path": "docs/phase-08-5-blocker-inventory.json", "classification": "GENERATED_FILE", "notes": "Generated source-keyword location inventory with reviewed classifications; no runtime state, live identities or secret content." },
+    { "path": "solana/tests/local-withdrawal-record.mjs", "classification": "ORIGINAL_KINGPEPE_CODE", "notes": "Original isolated real-validator audit regression for atomic burn/withdrawal record lifecycle only; no Phase 09 payout implementation or imported code." },
+    { "path": "scripts/source-audit.mjs", "classification": "ORIGINAL_KINGPEPE_CODE", "notes": "Original exact provenance coverage and non-secret publication-boundary checks." },
+    { "path": "scripts/tests/source-audit.test.mjs", "classification": "ORIGINAL_KINGPEPE_CODE", "notes": "Original executable publication/provenance guard regressions; synthetic non-operational values only." },
     {
       "path": "native/frost/policy/dkg-messages.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
@@ -443,7 +457,7 @@
     },
     {
       "path": "package-lock.json",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "classification": "GENERATED_FILE",
       "notes": "Generated npm lockfile pinning Node runtime dependencies."
     },
     {
@@ -588,7 +602,7 @@
     },
     {
       "path": "native/frost/Cargo.lock",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "classification": "GENERATED_FILE",
       "notes": "Rust dependency lockfile for frost crate."
     },
     {
@@ -713,7 +727,7 @@
     },
     {
       "path": "native/proof/Cargo.lock",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "classification": "GENERATED_FILE",
       "notes": "Generated Rust lockfile for the Phase 06 Native proof crate."
     },
     {
@@ -773,7 +787,7 @@
     },
     {
       "path": "native/recovery/Cargo.lock",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "classification": "GENERATED_FILE",
       "notes": "Generated Rust lockfile for the Phase 06 Native recovery crate."
     },
     {
@@ -793,7 +807,7 @@
     },
     {
       "path": "native/reserve/Cargo.lock",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "classification": "GENERATED_FILE",
       "notes": "Generated Rust lockfile for the Phase 06 Native reserve crate."
     },
     {
@@ -1043,7 +1057,7 @@
     },
     {
       "path": "solana/Cargo.lock",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "classification": "GENERATED_FILE",
       "notes": "Rust dependency lockfile for Solana workspace, including Solana program dependency graph and compatible transitive pins for the repository toolchain."
     },
     {

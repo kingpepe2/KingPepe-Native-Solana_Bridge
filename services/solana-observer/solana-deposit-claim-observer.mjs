@@ -111,9 +111,14 @@ export class SolanaDepositClaimObserver {
 
 export class SolanaDepositClaimRpcClient {
   #endpoint;
+  #requestId = 0;
+  #timeoutMs;
+  #maxResponseBytes;
 
   constructor(options = {}) {
     this.#endpoint = normalizeSolanaDepositClaimRpcEndpoint(options.endpoint);
+    this.#timeoutMs = boundedLimit(options.timeoutMs ?? 10_000, 10, 30_000);
+    this.#maxResponseBytes = boundedLimit(options.maxResponseBytes ?? 2_097_152, 128, 4_194_304);
   }
 
   async getTransaction(solanaSignature) {
@@ -145,25 +150,56 @@ export class SolanaDepositClaimRpcClient {
     if (!ALLOWED_RPC_METHODS.has(method)) {
       throw new Error(`SolanaDepositClaimRpcMethodNotAllowed:${method}`);
     }
-    const response = await fetch(this.#endpoint, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: "kingpepe-solana-deposit-claim-observer",
-        method,
-        params,
-      }),
-    });
-    if (!response.ok) {
-      throw new Error(`SolanaDepositClaimRpcHttpError:${response.status}`);
+    const id = ++this.#requestId;
+    if (!Number.isSafeInteger(id)) throw new Error("SolanaDepositClaimRpcRequestIdExhausted");
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), this.#timeoutMs);
+    let reader;
+    try {
+      const response = await fetch(this.#endpoint, {
+        method: "POST", redirect: "error", signal: abort.signal,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
+      });
+      if (!response.ok) throw new Error("SolanaDepositClaimRpcHttpRejected");
+      const length = response.headers.get("content-length");
+      if (length !== null && (!/^[0-9]+$/u.test(length) || Number(length) > this.#maxResponseBytes)) {
+        throw new Error("SolanaDepositClaimRpcResponseTooLarge");
+      }
+      if (!response.body) throw new Error("SolanaDepositClaimRpcEmptyResponse");
+      reader = response.body.getReader();
+      const chunks = [];
+      let size = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.length;
+        if (size > this.#maxResponseBytes) throw new Error("SolanaDepositClaimRpcResponseTooLarge");
+        chunks.push(value);
+      }
+      let payload;
+      try { payload = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks, size))); }
+      catch { throw new Error("SolanaDepositClaimRpcMalformedResponse"); }
+      if (!payload || Array.isArray(payload) || payload.jsonrpc !== "2.0" || payload.id !== id
+          || !Object.hasOwn(payload, "result") || Object.hasOwn(payload, "error")) {
+        throw new Error("SolanaDepositClaimRpcInvalidEnvelope");
+      }
+      return payload.result;
+    } catch (error) {
+      // Never surface an RPC error body, redirect target, endpoint or exception cause.
+      if (/^SolanaDepositClaimRpc[A-Za-z]+$/u.test(error?.message)) throw new Error(error.message);
+      throw new Error(abort.signal.aborted ? "SolanaDepositClaimRpcTimeout" : "SolanaDepositClaimRpcUnavailable");
+    } finally {
+      clearTimeout(timer);
+      abort.abort();
+      if (reader) { try { await reader.cancel(); } catch {} reader.releaseLock(); }
     }
-    const payload = await response.json();
-    if (payload?.error) {
-      throw new Error(`SolanaDepositClaimRpcError:${payload.error.code ?? "UNKNOWN"}`);
-    }
-    return payload?.result;
   }
+}
+
+function boundedLimit(value, min, max) {
+  if (!Number.isSafeInteger(value) || value < min || value > max) throw new Error("SolanaDepositClaimRpcInvalidLimit");
+  return value;
 }
 
 export function normalizeSolanaDepositClaimRpcEndpoint(endpoint) {
@@ -180,6 +216,7 @@ export function normalizeSolanaDepositClaimRpcEndpoint(endpoint) {
   if (!LOOPBACK_HOSTS.has(url.hostname)) {
     throw new Error("SolanaDepositClaimRpcEndpointMustBeLoopback");
   }
+  if (url.search || url.hash || url.pathname !== "/") throw new Error("SolanaDepositClaimRpcEndpointPathRejected");
   return url.toString();
 }
 
