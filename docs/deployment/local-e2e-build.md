@@ -9,7 +9,7 @@ confirmed against the source repository, independently of the recovery notes.
 Its source and required third-party notices stay together outside this checkout.
 No legacy files or history are required to build the test node.
 
-Use Linux or WSL with Node 22.23.2, Rust 1.89.0 for Solana host tests and
+Use Linux or WSL with Node 24.21.0 / npm 11.19.0, Rust 1.89.0 for Solana host tests and
 nightly-2023-10-29 for the Native supporting crates. Build the
 referenced KingPepe source in an external build directory using CMake/Ninja,
 with wallet support enabled, GUI/tests/IPC/external signing disabled, and the
@@ -75,6 +75,17 @@ height expiry, and reopens the signed-claim journal without providing keys.
 Allow several additional minutes for the real validator to advance. It does not
 fake an expired height or claim complete service/power-loss recovery. Worker
 inputs and all journal data remain local; CI reports only sanitized results.
+
+The harness persists a canonical pending credit after reserve verification,
+before Solana setup/attestation. A separately created disposable authentication
+key and the database both remain under the external test root, in separate
+directories. Reopening requires the existing key and database; missing material
+is never replaced automatically. It reopens pending and settled accounting at
+the workflow boundaries. This is a single-deposit test, not complete service
+restart or production backup tooling. See
+[local accounting boundaries](../security/local-deposit-accounting.md).
+The SQLite API is release-candidate stability 1.2; its inclusion in the pinned
+Node runtime is not production approval. `.npmrc` requires exact engine pins.
 
 Run `node .github/scripts/dependency-license-audit.mjs` after locked installation.
 CI also verifies the pinned cargo-audit binary and audits all five Cargo.lock

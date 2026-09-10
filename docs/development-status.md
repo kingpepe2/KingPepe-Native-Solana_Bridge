@@ -1,8 +1,79 @@
 # KingPepe Native - Solana Bridge Development Status
 
-## Current Phase 08 integration evidence (2026-09-10)
+## Current Phase 08 authenticated credit increment (2026-09-10)
 
-Current runtime-path increment is UNPUBLISHED / LOCALLY_TESTED. A read-only
+UNPUBLISHED / LOCALLY_TESTED. The real deposit harness now commits
+the canonical user credit after finalized reserve validation, before Solana
+setup or attestation. It closes/reopens pending credit, retains it on downstream
+failure, and commits/reopens mint settlement only after finalized observation
+and single-deposit reconciliation. No per-transfer team approval is introduced.
+
+The original SQLite/HMAC journal reuses ExactDepositLedger through independent
+forks. It authenticates a fixed binary context/event chain, commits event and
+head atomically, rejects backing reuse and altered replay, retains sticky local
+stops, bounds resources and checks main/auxiliary filesystem paths. Cooperative
+connections/processes are fenced by an exclusive local SQLite lease. Create and
+reopen are explicit; missing authentication material or databases are not replaced.
+No production keys, services, data or deployment settings were created.
+
+Pinned Node 24.21.0 / npm 11.19.0 / SQLite 3.53.4 were selected after checking
+official release/API/security sources, archive checksums, portable Windows/WSL
+behavior and a real-chain compatibility run. Package engines and CI use the
+same pins. No npm/Cargo dependency graph change or native addon; Node/SQLite
+are third-party runtime components, not proprietary KingPepe code.
+node:sqlite remains release-candidate stability 1.2, not production approval.
+
+Current executed tests: Windows and WSL each 273 Node tests + two canonical
+vectors PASS, zero failures/skips in the final suites. The 43 added Node tests
+comprise 37 actual SQLite/filesystem/process tests and six orchestration failure
+tests using the actual external journal with modeled chain adapters.
+WSL: 64 Solana + 29 Native Rust tests, fmt/clippy PASS. npm audit and all five
+Rust lockfile audits report no known vulnerabilities; bincode 1.3.3 retains its
+RUSTSEC-2025-0141 unmaintained warning. Combined declared-license audit PASS in
+WSL. Native Windows combined license check could not obtain Cargo metadata:
+Cargo is not installed/on PATH there; do not label that invocation PASS.
+
+The initial journal tests exposed an unavailable StatementSync.close API in
+the actual pinned binaries (3 PASS / 24 FAIL); bounded cached statements now
+finalize with database.close. A subsequent wrong-key test exposed an error
+classification mismatch (26 PASS / 1 FAIL), corrected without accepting invalid
+state. The auxiliary-file test initially collided with SQLite's retained active
+rollback journal (36 PASS / 1 FAIL); the fixture now uses inactive WAL, leaving
+the active journal intact and retaining the strict rejection assertion.
+All final tests above pass; no security requirement or failing gate was waived.
+
+The first fresh integrated run passes the automatic real deposit, 22 security,
+seven CSV, four wallet PSBT, ten pre-mint race, five claim-worker retry and five
+new accounting checks. The final auxiliary-path source revision also passes
+a second fresh REGTEST/local-validator run and both SBF rebuilds: all 53 checks
+PASS; canonical reserve and observed SPL supply each equal 100000000 atomic,
+pending credits equal zero after settlement, and no per-transfer approval occurs.
+Current source and all 150 existing commits scanned clean; private-path/IP
+checks, nine JSON parses and exact 175-file provenance coverage PASS. Publication
+still requires staged/outgoing scans, reviewed private push and all four
+exact-SHA CI jobs. No artifacts are uploaded.
+
+Provenance: 171 -> 175 files; two original code/test files, one original
+engineering document and one build-metadata file. No files deleted/moved or
+upstream code imported. AGENTS was condensed while preserving historical
+evidence here and in task-status. No economic policy duplicate was added.
+
+Limitations: this is one disposable deposit journal, not multi-operation service
+restart, automatic recovery of the broadcast-to-credit persistence gap, message
+refresh after expiry, global hard-stop/reconciliation, production protected
+storage or authenticated FROST/claim/sweep state. A retained checkpoint rejects
+an older database; restoring it together with that database does not prove
+freshness. Process exit and SQLite quota exhaustion are not power-loss/physical
+disk-full tests. See [local accounting boundaries](security/local-deposit-accounting.md).
+Phase 08 INCOMPLETE; Phase 09 NOT_STARTED; Mainnet DISABLED.
+
+## Previous runtime filesystem boundary (verified source)
+
+Source `60b873a001fb8b72a3d56daa27cea31b1943c8ef`, message
+`fix(phase-08): enforce external runtime filesystem boundaries`, pushed privately;
+[all four exact-SHA CI jobs PASS](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34461051003).
+Current/staged/outgoing source and all 150 commits scanned clean; zero workflow
+artifacts were uploaded. The following 230-test evidence belongs to that SHA. A read-only
 probe reproduced acceptance of a source child named `..runtime` by the old
 prefix check; no state or keys were created by that probe. The common guard
 now checks path components, existing parents, filesystem identities and file
@@ -32,8 +103,8 @@ dependency-license metadata passes.
 
 Provenance: 169 -> 171 tracked files; two original code/test additions, no source
 imports, dependency/license changes, file deletions or moves. No operational data
-was removed. Publication still requires current/staged/outgoing secret scans,
-private push and all exact-SHA CI jobs. No runtime/build artifacts are uploaded.
+was removed. Current/staged/outgoing/history scans, private push and exact-SHA
+CI passed as recorded above. No runtime/build artifacts were uploaded.
 
 These are path safety checks, not authenticated journals, atomic file-open
 security against concurrent replacement, complete mount-alias detection,

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, renameSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -29,6 +29,7 @@ import {
   validateLocalNativeSourceSnapshot,
   validateRawDepositTransaction,
   runLocalNativeToSolanaE2e,
+  openLocalnetDepositCreditLedger,
   validateDepositUtxo,
 } from "../local-e2e-native-to-solana.mjs";
 import { createLocalE2ePlan } from "../local-e2e-orchestrator.mjs";
@@ -292,6 +293,49 @@ test("either attester changing raw evidence prevents claim submission in the orc
     } finally { rmSync(runRoot, { recursive: true, force: true }); }
   }
 });
+
+for (const scenario of ["setup-waits", "setup-throws", "claim-throws", "claim-hard-stop", "wrong-mint-amount", "wrong-observed-supply"]) {
+  test(`real local journal preserves owed credit when orchestration model ${scenario}`, async () => {
+    const runRoot = mkdtempSync(path.join(os.tmpdir(), "kingpepe-pending-credit-model-"));
+    let setupInput;
+    try {
+      const result = await runLocalNativeToSolanaE2e({ plan: readyPlan(runRoot), executor: new FakeExecutor(),
+        programArtifactExists: () => true, healthAttempts: 1, custodyFactory: fakeCustodyFactory,
+        reserveSweepSigner: fakeReserveSweepSigner, localSolanaSetupFactory: fakeLocalSolanaSetupFactory,
+        nativeEvidenceVerifierFactory: fakeNativeEvidenceVerifierFactory,
+        solanaSetup: async input => {
+          setupInput = input;
+          assert.equal(input.depositAccounting.snapshot.authorizedUnmintedCredits, "100000000");
+          assert.equal(input.depositAccounting.checkpoint.sequence, "1");
+          if (scenario === "setup-waits") return { state: "WAITING_FOR_DEPENDENCY", reason: "MODEL_SETUP_UNAVAILABLE" };
+          if (scenario === "setup-throws") throw new Error("MODEL_SETUP_INTERRUPTED");
+          return fakeSolanaSetup(input);
+        },
+        solanaDepositClaim: async input => {
+          if (scenario === "claim-throws") throw new Error("MODEL_CLAIM_INTERRUPTED");
+          if (scenario === "claim-hard-stop") return { state: "HARD_STOP", reason: "MODEL_CLAIM_INTEGRITY_FAILURE" };
+          const claim = await fakeSolanaDepositClaim(input);
+          return { ...claim, ...(scenario === "wrong-mint-amount" ? { mintedAmountAtomic: "1" } : { mintSupplyAtomic: "1" }) };
+        }, flowConfig: { runId: "pending-credit", amountNative: "1.00000000" } });
+      assert.notEqual(result.state, "COMPLETED");
+      const ledger = openLocalnetDepositCreditLedger({ ...setupInput, credit: setupInput.depositCredit });
+      try {
+        assert.equal(ledger.snapshot().authorizedUnmintedCredits, "100000000");
+        assert.equal(ledger.snapshot().mintedSupply, "0");
+        assert.equal(ledger.pendingCredits().length, 1);
+        const stopped = ["claim-hard-stop", "wrong-mint-amount", "wrong-observed-supply"].includes(scenario);
+        assert.equal(ledger.status().state, stopped ? "HARD_STOP" : "OPEN_LOCAL_ACCOUNTING_ONLY");
+        if (stopped) assert.throws(() => ledger.recordValidatedDeposit(setupInput.depositCredit), /HardStop/u);
+      } finally { ledger.close(); }
+      // Reopen never generates a missing key. Preserve this disposable test key
+      // elsewhere inside the same external test directory, then check absence.
+      const keyFile = path.join(setupInput.flowConfig.stateRoot, "credit-authentication", "local-test-key.bin");
+      renameSync(keyFile, path.join(runRoot, "retained-local-test-key.bin"));
+      assert.throws(() => openLocalnetDepositCreditLedger({ ...setupInput, credit: setupInput.depositCredit }), /StorageRejected/u);
+      assert.equal(existsSync(keyFile), false);
+    } finally { rmSync(runRoot, { recursive: true, force: true }); }
+  });
+}
 
 test("local FROST Taproot custody context derives disposable rkpepe P2TR custody outside the repository", async () => {
   const runRoot = mkdtempSync(path.join(os.tmpdir(), "kingpepe-native-to-solana-frost-custody-"));

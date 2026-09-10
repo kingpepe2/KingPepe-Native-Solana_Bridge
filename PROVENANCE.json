@@ -3,6 +3,18 @@
   "generatedAt": "2026-09-10T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
   "purpose": "file-by-file provenance classification for local tracked content",
+  "phase08AuthenticatedCreditReview": {
+    "filesBefore": 171,
+    "filesAfter": 175,
+    "filesDeleted": 0,
+    "filesMoved": 0,
+    "newFiles": [".npmrc", "services/bridge-validator/local-deposit-ledger.mjs", "services/bridge-validator/tests/local-deposit-ledger.test.mjs", "docs/security/local-deposit-accounting.md"],
+    "changes": "Original SQLite/HMAC local deposit accounting, existing exact-ledger fork reuse, real pending-credit/finalized-mint integration, bounded replay and auxiliary-file guards, sticky local stops and actual process/filesystem regression tests.",
+    "sourceImports": "Node/SQLite API, runtime and security documentation used as reference. No source implementation or vector copied. Existing third-party attributions and licenses retained; runtime binaries remain external.",
+    "dependencyChanges": "Node 24.21.0 / npm 11.19.0 / bundled SQLite 3.53.4 pinned after compatibility and upstream security review. No npm or Rust graph change and no SQLite addon. Added strict engine configuration.",
+    "terminologyReview": "New original files contain no prohibited KingPepe project-role terms; official protocol and third-party terms remain unchanged.",
+    "scope": "Local single-deposit authenticated credit/settlement journal, not production protected storage, complete rollback detection or full multi-operation service recovery. No operational data deleted, moved or published."
+  },
   "phase08Review": {
     "filesBefore": 152,
     "filesAfter": 155,
@@ -120,6 +132,26 @@
     ]
   },
   "trackedFiles": [
+    {
+      "path": ".npmrc",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Exact package engine enforcement only; no registry credentials or private endpoints."
+    },
+    {
+      "path": "services/bridge-validator/local-deposit-ledger.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original local-only authenticated SQLite accounting journal and replay. Uses existing exact accounting and Node APIs; no upstream implementation copied or operational state included."
+    },
+    {
+      "path": "services/bridge-validator/tests/local-deposit-ledger.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original actual-filesystem, SQLite, concurrency and process-exit regressions; ephemeral authentication material is created outside source. Public message fixtures, not operational wallets."
+    },
+    {
+      "path": "docs/security/local-deposit-accounting.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Sanitized engineering contract, canonical journal encoding, tests and limitations. No private deployment values or recovery inventory."
+    },
     {
       "path": "shared/runtime-path-boundary.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",

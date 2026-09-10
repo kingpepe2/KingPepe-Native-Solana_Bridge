@@ -15,8 +15,8 @@
   },
   "evidenceScope": "Current local integration increment; its CI result must be checked at the exact source SHA. Earlier per-component CI booleans were historical, not proof of this tree.",
   "previousVerifiedSource": {
-    "sha": "4018556befe8485c6e374404dfc6ef1cce647455",
-    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34457447371",
+    "sha": "60b873a001fb8b72a3d56daa27cea31b1943c8ef",
+    "ci": "https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34461051003",
     "status": "PASS"
   },
   "sourceState": {
@@ -35,9 +35,13 @@
     "runtimePathBoundary": "COMMON_CHECKOUT_LINK_FILE_TYPE_GUARDS_AND_40_REAL_FILESYSTEM_TESTS_PASS_WINDOWS_WSL",
     "runtimePathLimitations": "NOT_OS_ACL_ISOLATION_ATOMIC_RACE_PROOF_FILE_ACCESS_OR_COMPLETE_MOUNT_ALIAS_PROTECTION",
     "canonicalMessages": "IMPLEMENTED_AND_TESTED_LOCALLY",
-    "accounting": "CANONICAL_OPERATION_BOUND_IN_MEMORY_CREDITS_AND_FAILURE_ATOMIC_RUST_PRIMITIVES_TESTED",
-    "pendingCreditRetry": "SOURCE_LEVEL_SYNC_ASYNC_TESTED_NOT_DURABLE_RESTART_ACCOUNTING",
-    "durableUnmintedCredits": "NOT_IMPLEMENTED",
+    "accounting": "EXACT_POLICY_REUSED_BY_AUTHENTICATED_LOCAL_JOURNAL_FAILURE_ATOMIC_RUST_PRIMITIVES_TESTED",
+    "pendingCreditRetry": "PENDING_AND_FINALIZED_MINT_DATABASE_REOPEN_TESTED_SINGLE_REAL_LOCAL_DEPOSIT",
+    "durableUnmintedCredits": "IMPLEMENTED_AND_TESTED_LOCAL_SINGLE_DEPOSIT_NOT_COMPLETE_SERVICE_RECOVERY",
+    "depositJournal": "CONTEXT_HMAC_ATOMIC_EVENT_HEAD_EXCLUSIVE_LOCAL_LEASE_BOUNDED_AUTHENTICATED_REPLAY",
+    "depositJournalHardStop": "STICKY_LOCAL_ACCOUNTING_STOP_NOT_BRIDGE_WIDE_HARD_STOP",
+    "depositJournalRollback": "RETAINED_CHECKPOINT_TESTED_CO_RESTORED_DATABASE_AND_ANCHOR_CANNOT_PROVE_FRESHNESS",
+    "depositJournalRuntime": "NODE_24_21_0_SQLITE_3_53_4_RELEASE_CANDIDATE_API_NOT_PRODUCTION_APPROVAL",
     "frost": "REAL_NODE_ACCEPTED_2_OF_2_BIP340_LOCALNET",
     "frostRustCrate": "SUPPORTING_POLICY_STATE_MODEL_ONLY",
     "solanaPrograms": "SBF_AND_DEPOSIT_HAPPY_PATH_TESTED_LOCALNET_ONLY",
@@ -57,15 +61,20 @@
   },
   "localValidation": {
     "windows": {
-      "nodeTestsPass": 230,
+      "nodeTestsPass": 273,
       "runtimePathTestsIncluded": 40,
+      "localJournalTestsIncluded": 37,
+      "journalOrchestrationFailureTestsIncluded": 6,
       "protocolVectorsPass": 2,
       "nativeSbf": "NOT_RUN_NOT_SUPPORTED",
+      "localRustAndCombinedLicenseAudit": "NOT_RUN_CARGO_NOT_INSTALLED_ON_WINDOWS_PATH_WSL_AUDIT_PASS",
       "serviceAclProtectedStorage": "NOT_RUN"
     },
     "wsl": {
-      "nodeTestsPass": 230,
+      "nodeTestsPass": 273,
       "runtimePathTestsIncluded": 40,
+      "localJournalTestsIncluded": 37,
+      "journalOrchestrationFailureTestsIncluded": 6,
       "protocolVectorsPass": 2,
       "solanaRustTestsPass": 64,
       "nativeRustTestsPass": 29,
@@ -85,6 +94,8 @@
       "nativePreMintRaceChecksFail": 0,
       "solanaClaimProcessRetryChecksPass": 5,
       "solanaClaimProcessRetryChecksFail": 0,
+      "authenticatedAccountingChecksPass": 5,
+      "authenticatedAccountingChecksFail": 0,
       "solanaClaimExpiry": "ACTUAL_VALIDATOR_BLOCK_HEIGHT_PASSED_LAST_VALID_HEIGHT_BEFORE_WORKER_REOPEN",
       "rawInputHeaders": 33,
       "rawReserveHeaders": 39,
@@ -112,14 +123,16 @@
       }
     ],
     "dependencyLicenses": "PASS_DECLARED_METADATA_NOT_ARTIFACT_OR_EXTERNAL_LEGAL_REVIEW",
+    "runtimeReview": "NODE_SQLITE_VERSION_API_SECURITY_AND_EXTERNAL_DISTRIBUTION_NOTICES_CHECKED_SEPARATELY_FROM_NPM_CARGO",
     "externalReview": "NOT_RUN"
   },
   "phase08Remaining": [
     "Implement and test post-mint deep-reorg hard stops; ten pre-mint race/fork checks pass but are not compensation or production finality assurance",
     "Configure production Native evidence sources; current raw-header/Merkle integration is REGTEST-only with explicit local-node UTXO trust",
     "Review remaining account and source-validation dependencies",
-    "Exercise full-service restart beyond the tested signed-claim worker crashes; persist unminted credit liabilities and complete authenticated/fenced journal and rollback guarantees",
-    "Persist global integrity hard stops; current in-memory accounting and per-adapter journals do not establish complete bridge-wide restart safety",
+    "Exercise full multi-operation service restart beyond claim-worker crashes and single-deposit authenticated credit reopen; recover the broadcast-to-credit persistence gap and expired claim refresh safely",
+    "Complete authentication/fencing of other journals and FROST state; local SQLite leases and co-restorable checkpoints are not complete production rollback guarantees",
+    "Persist bridge-wide integrity hard stops; the authenticated local credit stop and other adapter journals do not establish complete global restart safety",
     "Enforce service ACLs, protected storage and authenticated IPC; path prechecks do not close hostile filesystem race or privileged mount/host-compromise boundaries"
   ],
   "readinessGates": {

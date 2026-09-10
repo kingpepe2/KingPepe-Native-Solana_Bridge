@@ -587,6 +587,18 @@ export class ExactDepositLedger {
     });
   }
 
+  // Immutable credit records can be shared; mutable collections cannot. Used
+  // to validate a journal transition before committing either durable or RAM state.
+  fork() {
+    const fork = new ExactDepositLedger();
+    fork.#totals = this.#totals;
+    fork.#deploymentHex = this.#deploymentHex;
+    fork.#credits = new Map(this.#credits);
+    fork.#backing = new Set(this.#backing);
+    fork.#allocations = new Set(this.#allocations);
+    return fork;
+  }
+
   #assertDeployment(credit) {
     if (this.#deploymentHex !== undefined && this.#deploymentHex !== credit.deploymentHex) {
       throw new Error("LedgerDeploymentMismatch");

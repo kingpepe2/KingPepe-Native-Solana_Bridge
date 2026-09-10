@@ -5,8 +5,10 @@
   "description": "Proprietary KingPepe Native to Solana bridge source and tests.",
   "license": "UNLICENSED",
   "type": "module",
+  "packageManager": "npm@11.19.0",
   "engines": {
-    "node": ">=20.19.0"
+    "node": "24.21.0",
+    "npm": "11.19.0"
   },
   "scripts": {
     "doctor:local-e2e": "node scripts/local-e2e-readiness.mjs",
