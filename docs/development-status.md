@@ -2,14 +2,52 @@
 
 ## Current Phase 08 integration evidence (2026-09-10)
 
-Latest verified source: `38cabeccd14c9e011e1c91fe1224d0b7bb721961`, message
+Current recovery-race increment is UNPUBLISHED / LOCALLY_TESTED. Both possible
+first winners (real FROST A+B sweep or Native-wallet CSV recovery) are exercised
+with separate test deposits and fees. Equal-fee mempool conflict, finalized
+exclusion, disconnected reserve rejection and an alternative pre-mint branch
+are checked against the actual Native node. Ten checks pass; these operations
+do not request a Solana mint. The original automatic deposit remains reconciled
+at 100000000 atomic reserve/supply. Post-mint deep forks are NOT covered.
+
+Current Windows/WSL: 164 Node tests + two vectors each PASS. WSL: 58 Solana Rust
+and 26 Native Rust tests, fmt/clippy and both SBF builds PASS. Real automatic
+deposit + 22 security + seven CSV + four PSBT + ten race checks PASS, zero
+failures/skips in executed final suites. Five new unit tests enforce the REGTEST CLI
+boundary, prohibit fork controls through the ordinary RPC adapter and distinguish
+unconfirmed transactions from parser/RPC failures. Race rejection checks require
+specific chain-state errors; infrastructure failure cannot count as PASS. Five Rust
+audits and npm audit find no known vulnerabilities; bincode's unmaintained
+warning remains. Declared dependency licenses pass. Provenance 167 -> 168 files,
+one original test added; no deletions/moves/dependency or licensing changes.
+Current source and all 146 existing commits scan clean; private-path/IP checks
+and exact 168-file provenance coverage pass. Staged/outgoing scans, private push
+and exact-SHA CI remain required. No runtime/build artifacts are uploaded.
+
+The stricter real run initially FAILED when a never-broadcast losing sweep was
+queried. The Native adapter discarded the structured RPC error on HTTP 500,
+which obscured transaction-not-found. The pinned Native `JSONErrorReply` source
+confirms this legacy behavior. The adapter now parses bounded, request-matched
+400/404/500 error envelopes and reports only signed-32-bit numeric codes. It
+never accepts a success result on a failing HTTP status or echoes provider error
+text. Transport, malformed, oversized and wrong-ID responses remain failures.
+This is a real adapter correction, not an expanded catch-all passing assertion.
+The fresh complete rerun passes all ten strict race checks and the original
+deposit/security/CSV/PSBT checks. No gate was removed or weakened.
+
+PSBT source `710ad4afce5ca169868dc618acc870fdb221bf3f`, message
+`feat(phase-08): support Native wallet recovery PSBTs`, is pushed privately;
+[all four exact-SHA CI jobs PASS](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34449370653).
+The following 159-test evidence belongs to that source, not the new race tests.
+
+Previous verified source: `38cabeccd14c9e011e1c91fe1224d0b7bb721961`, message
 `feat(phase-08): sweep recoverable deposits with real FROST tapscript signatures`,
 has been pushed privately. [All four exact-SHA CI jobs passed](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34447032014).
 That SHA passed 155 Node tests + two vectors, 58 Solana Rust + 26 Native Rust tests,
 both SBF builds, the recoverable deposit, 22 security checks and six recovery checks.
 
-Current PSBT increment: locally tested, awaiting its own commit/private push and
-exact-SHA CI. Bounded offline PSBTv0/BIP371 preparation includes only public
+PSBT increment: locally tested and pushed, with exact-SHA CI PASS as above.
+Bounded offline PSBTv0/BIP371 preparation includes only public
 recovery information, never a private key. The unsigned inspector rejects
 duplicate/alternate/unknown fields, signed inputs, version/domain/tree
 substitution, trailing bytes and oversized data; it does not grant authorization.

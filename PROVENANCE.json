@@ -62,6 +62,16 @@
     "dependencyChanges": "None",
     "terminologyReview": "New original files contain no prohibited project-role terminology; protocol and required third-party terminology preserved."
   },
+  "phase08RecoveryRaceReview": {
+    "filesBefore": 167,
+    "filesAfter": 168,
+    "filesDeleted": 0,
+    "filesMoved": 0,
+    "newFiles": ["solana/tests/local-recovery-races.mjs"],
+    "changes": "Original real-daemon tests for competing mature FROST sweep and Native-wallet recovery, both winner orders and forced pre-mint alternative forks. REGTEST CLI controls remain unavailable through the ordinary RPC adapter. Explicit unconfirmed classification and bounded legacy HTTP/JSON-RPC error parsing distinguish chain state from infrastructure/parser failures without exposing provider text.",
+    "sourceImports": "No code copied; pinned Native generateblock and invalidateblock behavior reviewed. Existing provenance and notices preserved.",
+    "dependencyChanges": "None"
+  },
   "provenancePolicy": {
     "originalCodeLicense": "Proprietary (Copyright (c) 2026 KingPepe Team)",
     "provenanceClassifications": [
@@ -74,6 +84,11 @@
     ]
   },
   "trackedFiles": [
+    {
+      "path": "solana/tests/local-recovery-races.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated REGTEST competing FROST/user-wallet spend and forced-fork test; separate non-production funding, no minted credit or upstream code copied."
+    },
     {
       "path": "solana/tests/local-recovery-psbt.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",

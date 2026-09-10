@@ -26,12 +26,20 @@
 ## Current phase and evidence
 
 PHASE 08: real local Native-to-Solana happy-path integration is now exercised.
-Recoverable-deposit integration 38cabeccd14c9e011e1c91fe1224d0b7bb721961 is pushed
-privately; all four exact-SHA CI jobs PASS:
-https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34447032014
-That SHA measured 155 Node tests, two vectors, 84 Rust tests and a real deposit
-with 22 security and six CSV recovery checks. It does not certify newer code.
-The current PSBT increment is locally tested, awaiting its own private push/CI.
+PSBT increment 710ad4afce5ca169868dc618acc870fdb221bf3f is pushed privately;
+all four exact-SHA CI jobs PASS:
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34449370653
+The current recovery-race increment is unpublished and locally tested. It adds
+ten real pre-mint sweep/recovery competing-spend/fork checks and five unit tests
+for isolated fork controls and unconfirmed/error classification. Infrastructure
+failure cannot count as a passing economic rejection. Current Node count is
+164 on Windows/WSL; 84 Rust tests, two vectors, both SBF builds and
+the real deposit with 22 security + seven CSV + four PSBT + ten race checks pass.
+Post-mint deep-reorg detection/response and durable restart remain incomplete.
+The stricter real test exposed HTTP 500 RPC-error flattening. The adapter now
+parses Native's bounded request-matched error envelopes, never provider text or
+success on a failing HTTP status. See status files for the initial failure.
+The verified PSBT source's evidence follows; it does not certify newer changes:
 Windows/WSL each pass 159 Node tests + two vectors; WSL passes 84 Rust tests and
 both SBF builds. Real deposit + 22 security + seven CSV + four wallet PSBT checks
 pass. Recovery PSBTs are signed by the isolated Native user wallet, without key
@@ -66,7 +74,7 @@ selection still explicitly trusts the configured local validating Native node.
 Native RPC bodies and external verifier input/output are bounded and fail closed.
 
 This does NOT prove the complete bridge is finished. Phase 08 security
-dependencies still need review: recovery races/reorgs and end-user wallet onboarding,
+dependencies still need review: post-mint deep reorgs and end-user wallet onboarding,
 production evidence sources, remaining account/source validation,
 failure/restart scenarios and durable storage guarantees. Phase 09 has not
 started. Production observers, configuration, review and activation are absent.
@@ -100,7 +108,8 @@ Safe checks:
 - node solana/tests/local-deposit-security.mjs uses the same isolated tools/root
   and runs the real recoverable deposit plus 22 raw Native/local-validator
   security checks, seven real Native CSV recovery checks and four real Native
-  wallet PSBT checks. Recovery/sweep race and reorg coverage remain incomplete.
+  wallet PSBT checks and ten pre-mint recovery/sweep race/fork checks. This does
+  not prove post-mint deep-reorg handling or production finality.
 - CI runs cargo-audit against all five lockfiles without ignored advisories.
   bincode 1.3.3 has a retained, reported unmaintained warning, not a clean bill
   of health or production approval.

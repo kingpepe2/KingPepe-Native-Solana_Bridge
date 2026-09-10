@@ -70,8 +70,9 @@ the local Solana program mint the credit. The same user's recovery leaf is not
 present in the canonical reserve. Windows orchestration tests reject missing,
 watch-only or malformed recovery public identities before any deposit payment.
 
-Not yet proved: competing sweep/recovery race and reorg handling. End-user
-wallet onboarding remains future SDK/app work. The Rust
+Competing pre-mint sweep/recovery tests are described below; post-mint deep-reorg
+response remains unproved. End-user wallet onboarding remains future SDK/app
+work. The Rust
 eligibility model is not a substitute for actual script tests. Mainnet stays
 disabled; a happy-path local run is not production activation approval.
 
@@ -121,3 +122,24 @@ Standard references (not copied implementations): [BIP341](https://github.com/bi
 [BIP174](https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki) and
 [BIP371](https://github.com/bitcoin/bips/blob/master/bip-0371.mediawiki). Native
 activation/interpreter facts are pinned in `UPSTREAM-REFERENCES.json`.
+
+## Real pre-mint competing-spend/fork checks
+
+`solana/tests/local-recovery-races.mjs` uses separate ephemeral FROST groups and
+Native-wallet recovery keys, two new test deposits and separately funded miner
+fees. Each FROST role validates raw evidence, the committed script and transaction
+policy before signing. Native independently accepts both the FROST sweep and
+mature user recovery as candidates before either is broadcast.
+
+Both first-winner orders are exercised. The equal-fee conflict is rejected in
+the mempool; a confirmed winner consumes the temporary outpoint and excludes
+the other spend. Disconnecting only that test operation's six new blocks makes
+its reserve ineligible. The pinned Native test miner then validates and connects
+a block with the alternative spend; the old winner is rejected and reserve
+verification follows the actual canonical outcome. Ten checks pass.
+
+No mint is requested for these race-test operations. These tests do not prove
+post-mint deep-reorg handling, compensation, general RBF/CPFP policy, independent
+fork choice or production finality. Forced-fork commands exist only in the
+REGTEST CLI test allowlist, never in the ordinary Native RPC adapter. No
+production chain, key, data directory or previously minted backing is modified.

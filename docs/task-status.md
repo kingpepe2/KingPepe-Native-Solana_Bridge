@@ -1,5 +1,42 @@
 # KingPepe Native - Solana Bridge Task Status
 
+Current unpublished Phase 08 increment adds real pre-mint recovery/sweep races
+and forced-fork tests. Both candidate spends use actual signatures: FROST A+B for
+the sweep and the Native user wallet for recovery. Ten node-backed checks pass,
+including both winner orders, equal-fee mempool conflicts, disconnected reserve
+rejection and an alternative chain winner. The ordinary RPC adapter cannot use
+the REGTEST-only fork controls. No additional Solana mint is requested.
+
+Windows/WSL each: 164 Node tests + two vectors PASS. WSL: 84 Rust tests,
+fmt/clippy, two SBF builds and the real deposit + 22 security + seven CSV + four
+PSBT + ten race checks PASS. No final suite failures/skips. Reserve/supply for
+the original operation remain 100000000 atomic. Audits find no known
+vulnerabilities; bincode's unmaintained warning is retained. Provenance 167 ->
+168 files, one original test addition, no deletion/move/dependency changes.
+Current source and 146 existing commits scan clean; private-path/IP and exact
+provenance coverage checks pass. Specific chain-state rejection errors are
+required; infrastructure failures cannot count as successful race checks. Five
+new unit tests cover that distinction and fork-control isolation. Staged/outgoing scans, commit/private push and
+exact-SHA CI remain required. No runtime/build artifacts are uploaded.
+
+An initially stricter real run FAILED: the Native adapter flattened HTTP 500
+structured errors into transport errors when the losing transaction was absent.
+Pinned Native source confirms the legacy error envelope. The correction accepts
+only bounded request-matched numeric RPC error codes on HTTP 400/404/500, never
+successful results or provider text; malformed/transport responses still fail.
+A fresh full run passes all ten strict race checks and the existing deposit,
+security, CSV and PSBT checks. No security gate was removed or weakened.
+
+PSBT increment `710ad4afce5ca169868dc618acc870fdb221bf3f`, message
+`feat(phase-08): support Native wallet recovery PSBTs`, is pushed privately;
+all four exact-SHA CI jobs PASS:
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34449370653.
+Next: publish/verify race tests, then address durable unminted
+credits, crash/restart, remaining account/source validation and post-mint reorg
+hard stops. Phase 08 incomplete; Phase 09 NOT_STARTED; Mainnet DISABLED.
+
+Prior increment details follow; their counts do not certify the new race tests.
+
 Recoverable-deposit increment `38cabeccd14c9e011e1c91fe1224d0b7bb721961`,
 `feat(phase-08): sweep recoverable deposits with real FROST tapscript signatures`,
 is pushed privately; all four exact-SHA CI jobs PASS:
@@ -7,8 +44,8 @@ https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34447032
 That SHA passed 155 Node tests + two vectors, 84 Rust tests, both SBF builds,
 the real deposit and 22 security + six CSV recovery checks.
 
-Current Phase 08 PSBT increment: locally tested, awaiting commit/private push
-and exact-SHA CI. Implements bounded offline unsigned PSBT preparation/inspection,
+Phase 08 PSBT increment: locally tested and privately pushed, exact-SHA CI PASS
+as above. Implements bounded offline unsigned PSBT preparation/inspection,
 public key origins and V2 Miniscript-compatible intent scripts. An initial real
 wallet test failed for V1's OP_DROP prefix; V2 fixes wallet compatibility without
 removing the public intent binding, signature or CSV checks. Old outputs are not
