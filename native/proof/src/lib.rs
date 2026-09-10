@@ -9,6 +9,7 @@ pub mod bytes;
 pub mod chain;
 pub mod deposit;
 pub mod difficulty;
+pub mod evidence;
 pub mod header;
 pub mod merkle;
 pub mod node;
@@ -38,6 +39,12 @@ pub enum NativeProofError {
     BadDifficulty,
     #[error("outdated block version for activation height")]
     OutdatedBlockVersion,
+    #[error("Native header time violates median-time-past or future-time bounds")]
+    InvalidHeaderTime,
+    #[error("raw Native evidence is malformed or does not bind the requested transaction")]
+    InvalidEvidence,
+    #[error("validated header tip does not match the observed Native source snapshot")]
+    EvidenceTipMismatch,
     #[error("chainwork overflow")]
     ChainworkOverflow,
     #[error("wrong Native network or genesis")]

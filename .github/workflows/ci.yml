@@ -114,10 +114,11 @@ jobs:
             console.log(JSON.stringify({sourceSha: process.env.GITHUB_SHA, state: r.state, reason: r.reason,
               failedStep: r.infrastructure?.failedStep,
               localSecurity: r.localSecurity,
+              nativeEvidence: f?.nativeRawEvidence,
               nativeToSolana: r.fullNativeToSolanaE2e, reserve: f?.reconciliation?.canonicalReserve,
               observedMintSupply: f?.reconciliation?.mintedSupply, productionReady: false, mainnetActivation: "DISABLED"}));
             if (r.state !== "COMPLETED" || r.fullNativeToSolanaE2e !== "PASS") process.exit(1);
-            if (r.localSecurity?.pass !== 6 || r.localSecurity?.fail !== 0) process.exit(1);
+            if (r.localSecurity?.pass !== 17 || r.localSecurity?.fail !== 0) process.exit(1);
           '
           test "${flow_exit}" -eq 0
           test -z "$(find . -path './.git' -prune -o -name '*-keypair.json' -print)"

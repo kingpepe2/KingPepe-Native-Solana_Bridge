@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { performance } from "node:perf_hooks";
 import { schnorr_FROST } from "@noble/curves/secp256k1.js";
 import {
   REQUIRED_FROST_SIGNERS,
@@ -20,6 +21,8 @@ export class NativeFrostSigner {
   #policy;
   #stateStore;
   #available = true;
+  #nativeEvidenceValidator;
+  #validatedNativeIntents = new Map();
 
   constructor(options) {
     if (!REQUIRED_FROST_SIGNERS.includes(options.signerId)) throw new Error("unsupported KingPepe FROST signer ID");
@@ -28,6 +31,10 @@ export class NativeFrostSigner {
     this.index = options.index;
     this.#policy = options.policy;
     this.#stateStore = options.stateStore;
+    if (options.nativeEvidenceValidator !== undefined && typeof options.nativeEvidenceValidator !== "function") {
+      throw new Error("FROST native evidence validator must be a function");
+    }
+    this.#nativeEvidenceValidator = options.nativeEvidenceValidator;
     const state = this.#stateStore.load();
     if (state.signerId !== this.signerId) throw new Error("FROST signer state identity mismatch");
   }
@@ -42,6 +49,20 @@ export class NativeFrostSigner {
 
   isAvailable() {
     return this.#available;
+  }
+
+  async verifyNativeEvidence(intent) {
+    this.#requireAvailable();
+    if (this.#nativeEvidenceValidator === undefined) throw new Error("FROST native evidence verifier required");
+    const snapshot = structuredClone(intent);
+    assertNativeSigningApproved(this.#policy, snapshot);
+    const digest = nativeSigningIntentDigest(snapshot);
+    this.#validatedNativeIntents.delete(digest);
+    const result = await this.#nativeEvidenceValidator(structuredClone(snapshot));
+    if (result?.digestHex !== snapshot.proofFingerprint) throw new Error("FROST Native evidence digest mismatch");
+    // Local runtime freshness fence, not persistent rollback assurance.
+    this.#validatedNativeIntents.clear();
+    this.#validatedNativeIntents.set(digest, performance.now());
   }
 
   dkgRound1(request) {
@@ -251,6 +272,12 @@ export class NativeFrostSigner {
     const state = this.#stateStore.load();
     const key = this.#activeKey(state, request.epoch);
     validateSigningRequestEnvelope(request, this.#policy);
+    if (this.#nativeEvidenceValidator !== undefined) {
+      const checkedAt = this.#validatedNativeIntents.get(request.intentDigest);
+      if (checkedAt === undefined || performance.now() - checkedAt > 30_000) {
+        throw new Error("FROST fresh independent Native evidence required");
+      }
+    }
     return { state, key };
   }
 

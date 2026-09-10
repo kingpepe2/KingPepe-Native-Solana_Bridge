@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runLocalNativeToSolanaE2e, submitLocalnetSolanaDepositClaim } from "../../scripts/local-e2e-native-to-solana.mjs";
+import { createLocalNativeEvidenceVerifier } from "../../scripts/local-native-evidence-verifier.mjs";
 import { combineProjectAttestations } from "../../services/attesters/attestation-service.mjs";
 import { SolanaLocalRpcClient } from "../../services/bridge-validator/solana-deposit-claim-submitter.mjs";
 import { prepareSignedLocalnetSolanaDepositReceiptTransaction } from "../../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs";
@@ -15,6 +16,54 @@ export async function runLocalDepositSecurityE2e(repoRoot) {
   const passed = [];
   const result = await runLocalNativeToSolanaE2e({
     repoRoot,
+    nativeEvidenceVerifierFactory: async (options) => {
+      const verifier = await createLocalNativeEvidenceVerifier(options);
+      let testedInputs = false;
+      let testedSigning = false;
+      let testedReserve = false;
+      return {
+        verifyInputs: async (input) => {
+          if (!testedInputs) {
+            testedInputs = true;
+            for (const [label, patch] of [["NATIVE_INPUT_AMOUNT_SUBSTITUTION_REJECTED", { amountAtomic: "1" }],
+              ["NATIVE_INPUT_SCRIPT_SUBSTITUTION_REJECTED", { scriptPubKeyHex: "51" }]]) {
+              const wrong = structuredClone(input); Object.assign(wrong.inputs[0], patch);
+              await assert.rejects(() => verifier.verifyInputs(wrong), /RAW_NATIVE_INPUT_SUBSTITUTED/u);
+              passed.push(label);
+            }
+          }
+          return verifier.verifyInputs(input);
+        },
+        verifySweepSigning: async (input) => {
+          if (!testedSigning) {
+            testedSigning = true;
+            for (const [label, patch] of [
+              ["NATIVE_SIGNING_TXID_SUBSTITUTION_REJECTED", { unsignedNativeTransactionId: "ff".repeat(32) }],
+              ["NATIVE_SIGNING_SIGHASH_SUBSTITUTION_REJECTED", { taprootSighashHex: "ff".repeat(32) }],
+              ["NATIVE_SIGNING_RECIPIENT_SUBSTITUTION_REJECTED", { recipientScriptPubKeyHex: "51" }],
+              ["NATIVE_SIGNING_AMOUNT_SUBSTITUTION_REJECTED", { amountAtomic: "1" }],
+              ["NATIVE_SIGNING_FEE_SUBSTITUTION_REJECTED", { feeAtomic: "0" }],
+              ["NATIVE_SIGNING_CHANGE_SUBSTITUTION_REJECTED", { changeAtomic: "1" }],
+            ]) {
+              const wrong = structuredClone(input); Object.assign(wrong.intent, patch);
+              await assert.rejects(() => verifier.verifySweepSigning(wrong), /RAW_NATIVE_SIGNING_INTENT_SUBSTITUTED/u);
+              passed.push(label);
+            }
+          }
+          return verifier.verifySweepSigning(input);
+        },
+        verifyReserve: async (input) => {
+          if (!testedReserve) {
+            testedReserve = true;
+            await assert.rejects(() => verifier.verifyInputs({ inputs: [input.deposit], minimumConfirmations: 1 }), /RAW_NATIVE_INPUT_NOT_AVAILABLE/u);
+            passed.push("SPENT_TEMPORARY_DEPOSIT_NOT_REUSABLE");
+            await assert.rejects(() => verifier.verifyReserve({ ...input, feeAtomic: "0" }), /RAW_NATIVE_SWEEP_VALUE_MISMATCH/u);
+            passed.push("NATIVE_RESERVE_FEE_SUBSTITUTION_REJECTED");
+          }
+          return verifier.verifyReserve(input);
+        },
+      };
+    },
     solanaDepositClaim: async (context) => {
       const completed = await submitLocalnetSolanaDepositClaim(context);
       if (completed.state !== "COMPLETED") return completed;
@@ -110,8 +159,26 @@ export async function runLocalDepositSecurityE2e(repoRoot) {
       return completed;
     },
   });
-  return { ...result, localSecurity: { passed, pass: passed.length, fail: result.state === "COMPLETED" && passed.length === 6 ? 0 : 1,
-    scope: "Real local-validator happy path, idempotent retry, duplicate backing and protocol/Native domain preflight rejection; not complete adversarial coverage." } };
+  if (result.state === "COMPLETED") {
+    const raw = result.nativeToSolanaE2e.nativeRawEvidence;
+    assert.equal(raw.signers.length, 4);
+    for (const entry of raw.signers) {
+      assert.equal(entry.status, "RAW_HEADERS_AND_MERKLE_VALIDATED");
+      assert.equal(entry.digestHex, raw.inputEvidence.digestHex);
+      assert.equal(entry.transactions, 2);
+    }
+    assert.deepEqual(raw.signers.map((entry) => `${entry.signerId}:${entry.signingInputIndex}`),
+      ["KINGPEPE_FROST_A:0", "KINGPEPE_FROST_B:0", "KINGPEPE_FROST_A:1", "KINGPEPE_FROST_B:1"]);
+    for (const role of ["ATTESTER_A", "ATTESTER_B"]) {
+      assert.equal(raw.attesters[role].status, "RAW_HEADERS_AND_MERKLE_VALIDATED");
+      assert.equal(raw.attesters[role].digestHex, raw.reserveEvidence.digestHex);
+      assert.equal(raw.attesters[role].transactions, 3);
+      assert.equal(raw.attesters[role].utxoTrust, "CONFIGURED_LOCAL_VALIDATING_NODE_RPC_OBSERVATION");
+    }
+    passed.push("BOTH_SIGNERS_AND_ATTESTERS_VALIDATE_RAW_EVIDENCE");
+  }
+  return { ...result, localSecurity: { passed, pass: passed.length, fail: result.state === "COMPLETED" && passed.length === 17 ? 0 : 1,
+    scope: "Real raw Native evidence/policy rejection, local-validator deposit, idempotent retry, backing replay and domain checks; not complete adversarial coverage." } };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

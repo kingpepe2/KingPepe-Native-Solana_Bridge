@@ -80,6 +80,16 @@ export class NativeFrostCoordinator {
     return REQUIRED_FROST_SIGNERS.map((signerId) => ({ signerId, online: this.#signers.get(signerId)?.isAvailable() === true }));
   }
 
+  async signAutomaticallyWithNativeEvidence(intent) {
+    const snapshot = structuredClone(intent);
+    // Verification executes in each participant's configured boundary; a
+    // coordinator assertion cannot populate either participant's private fence.
+    for (const signerId of REQUIRED_FROST_SIGNERS) {
+      await this.#signers.get(signerId).verifyNativeEvidence(structuredClone(snapshot));
+    }
+    return this.signAutomatically(snapshot);
+  }
+
   signAutomatically(intent, options = {}) {
     const requestId = assertHashHex(intent.signingRequestId, "FROST signing request ID");
     const existing = this.#completed.get(requestId);
