@@ -268,7 +268,7 @@ function checkedBoolean(value, label) {
 // Capture ordinary data once. Reject accessors, proxies, sparse arrays and
 // custom prototypes before invoking any caller-supplied getter or iterator.
 // This is an API integrity boundary, not a sandbox for hostile in-process code.
-function dataRecord(value, label) {
+export function dataRecord(value, label) {
   if (value === null || typeof value !== "object" || types.isProxy(value) || Array.isArray(value) ||
       ![Object.prototype, null].includes(Object.getPrototypeOf(value))) throw new Error(`${label}:PlainDataRequired`);
   const keys = Reflect.ownKeys(value);
@@ -282,7 +282,7 @@ function dataRecord(value, label) {
   return snapshot;
 }
 
-function dataArray(value, limit, label) {
+export function dataArray(value, limit, label) {
   if (!Array.isArray(value) || types.isProxy(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > limit) {
     throw new Error(`${label}:BoundedArrayRequired`);
   }

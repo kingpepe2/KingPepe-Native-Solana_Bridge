@@ -28,10 +28,32 @@ These controls protect cooperative API use, not arbitrary hostile code with
 process/host access. Policy enrollment is not proof of chain truth; each signing
 participant still needs its independent configured raw-evidence checks. The
 current in-memory policy is reconstructed from validated evidence, not restored
-from caller JSON. Request-envelope/intent identity and DKG deployment transcript
-binding need further hardening. Signer-state authentication, service access and
+from caller JSON. DKG deployment/active-key binding, full authorization-intent
+enrollment and coordinator failure cleanup need further hardening.
+Signer-state authentication, service access and
 rollback assurance remain incomplete. No production signing is authorized and
 none of these deficiencies requires a second physical host.
+
+## Signing-request boundary
+
+The current shared V1 builder and validator snapshot plain data and bind request
+ID/epoch to the normalized intent, require a positive u32 attempt and exact A+B
+ordering, and recompute the session ID from the complete existing V1 transcript.
+All nine wire fields are mandatory; unknown fields, accessors and custom
+iterators are rejected. Each participant validates the envelope and its local
+policy before loading signing state or reading an active key. Commitment and
+signature-share calls both enforce the boundary. Coordinator callbacks use the
+same immutable normalized intent; original input mutation cannot substitute it.
+
+The Native signature still signs the exact Taproot sighash. Project intent and
+session digests are metadata bindings, not a replacement Native message or new
+cryptography. Valid V1 transcripts remain identical to the independent fixture.
+An unrelated invalid packet is rejected before touching a valid pending session;
+this is not complete protocol-abort, uncertain-session recovery or rollback
+assurance. The pinned library's own mathematical commitment check is preserved.
+Application-specific participant input checks are discussed in
+[RFC 9591 section 7.7](https://www.rfc-editor.org/rfc/rfc9591.html#section-7.7);
+that reference does not audit this bridge or specify its project DKG protocol.
 
 ## Phase 04 implementation
 

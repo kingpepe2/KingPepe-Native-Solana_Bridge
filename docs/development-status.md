@@ -1,8 +1,60 @@
 # KingPepe Native - Solana Bridge Development Status
 
-## Current Phase 08 signer-policy isolation (2026-09-10)
+## Current Phase 08 signing-request binding (2026-09-10)
 
-UNPUBLISHED / LOCALLY_TESTED, including a fresh real-chain rerun.
+UNPUBLISHED / LOCALLY_TESTED, including a fresh real-chain run. A shared original
+V1 request builder/validator binds envelope request ID and epoch to the immutable
+intent, requires a positive u32 attempt and exact A+B order, and recomputes the
+session ID. Unknown/missing fields, malformed metadata, accessors and custom
+iterators fail before signing-state/key access. Both commitment and share paths
+use the validated snapshot. Coordinator construction and asynchronous evidence
+checks no longer read mutable original intent fields after validation. Superseded
+inline construction/validation and an unused import were removed.
+
+The Native message remains its actual Taproot sighash; no cryptographic algorithm,
+threshold, economic authorization rule or valid V1 transcript representation
+changed. No per-transfer team approval. The pinned library's own mathematical
+nonce-commitment check remains independent. Metadata validation is not proof of
+Native chain truth, DKG deployment binding, persistent state authentication or a
+complete protocol-abort/restart implementation.
+
+Six focused regressions initially failed (40 PASS / 6 FAIL): five altered packet
+forms were accepted; the epoch mismatch instead reached active-key lookup rather
+than envelope validation. After correction and eight further tests, focused
+FROST suite 54/54 PASS. Windows/WSL each: 371 Node tests (14 new) plus two canonical
+protocol vectors PASS, zero failures/skips. WSL: 64 Solana + 29 Native Rust tests,
+fmt/clippy, five lockfile audits and declared-license metadata PASS. npm reports
+zero vulnerabilities; bincode 1.3.3's unmaintained advisory remains reported.
+Native Windows Cargo/combined license and service ACL/protected-storage tests
+remain NOT_RUN locally.
+
+Both SBF builds and a fresh real REGTEST/local-validator deposit PASS, including
+Native-node-accepted FROST signatures, separate project attestations, actual SPL
+mint and all 55 checks: 22 security, seven CSV, four wallet PSBT, ten pre-mint
+races, seven claim-worker and five accounting. Reserve/supply each 100000000
+atomic, pending credits zero. This is not a withdrawal or full-service restart
+E2E result. Current source and all 154 existing commits scan clean. Exact
+178-file provenance, nine JSON parses and private-path/IP checks PASS.
+Staged/outgoing scans, private publication and exact-SHA CI are pending.
+
+Provenance 177 -> 178 files: one original request module, no deleted/moved files
+or imported third-party/legacy source. No dependency/toolchain/license changes
+or production actions. Phase 08 INCOMPLETE; Phase 09 NOT_STARTED; Mainnet
+DISABLED. Next: DKG deployment/active-key binding, full authorization-intent
+enrollment, authenticated/fenced signer state and coordinator failure/restart
+handling. Upstream FROST remains explicitly unaudited.
+
+## Previous Phase 08 signer-policy isolation (verified source)
+
+Source `c7bf77b18df30e5565d38d5011eb10a909dd8448`, message
+`fix(phase-08): isolate local FROST authorization policies`, privately pushed;
+[all four exact-SHA CI jobs PASS](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34475711434).
+CI confirms the real deposit and all 55 checks, reserve/supply each 100000000
+atomic. Current/staged/outgoing source and all 154 commits scanned clean;
+zero workflow artifacts were uploaded. The 357-test evidence below belongs to
+that SHA, not a newer source revision.
+
+LOCALLY_AND_CI_TESTED, including a fresh real-chain rerun.
 The original local signing policy now requires explicit localnet plus the pinned
 REGTEST genesis, keeps authorization lookup module-private, and exposes only
 frozen detached inspection records. Caller-built/cloned policies, duplicate
@@ -43,8 +95,8 @@ No source files added/deleted/moved: provenance remains exactly 177 files.
 No dependency, toolchain or third-party license change, no upstream/legacy
 source imported, and no production data or services touched. Current source and
 all 153 existing commits scan clean; nine JSON files parse, exact provenance
-coverage passes and private-path/IP findings are zero. Staged/outgoing scans,
-private publication and exact-SHA CI are pending.
+coverage passes and private-path/IP findings are zero. Staged/outgoing/all-154-
+commit scans, private publication and exact-SHA CI passed as recorded above.
 Phase 08 INCOMPLETE; Phase 09 NOT_STARTED; Mainnet DISABLED. Next dependencies:
 request-envelope/intent identity and DKG deployment transcript binding, then
 authenticated/fenced signer state, full restart, broadcast-to-credit persistence,

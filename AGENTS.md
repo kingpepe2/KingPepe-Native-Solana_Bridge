@@ -25,10 +25,10 @@
 ## Current phase
 
 PHASE 08 INCOMPLETE. Phase 09 NOT_STARTED.
-Last verified source: ee011923da423475c4ccae3c9685d8a1ce257f23, private push and
+Last verified source: c7bf77b18df30e5565d38d5011eb10a909dd8448, private push and
 all four exact-SHA CI jobs PASS:
-https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34472369148
-Its current/staged/outgoing source and all 153 commits scanned clean; zero
+https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34475711434
+Its current/staged/outgoing source and all 154 commits scanned clean; zero
 workflow artifacts were uploaded. That evidence does not certify newer source.
 
 Absorbing-stop source 2bdff8f1687085d63de8c628ae12a4f2efed163e was pushed
@@ -43,7 +43,7 @@ Its 324 Node tests per platform include 45 stop regressions and six CI-gate test
 exact-SHA CI completes the real deposit and all 55 integration checks. No global
 restart/fencing claim follows from these cooperating-worker guards.
 
-Current unpublished policy increment: explicit localnet/verified REGTEST genesis,
+The verified policy increment enforces localnet/verified REGTEST genesis,
 immutable private authorization lookup, frozen inspection records and strict
 bounded fields. Local DKG-only capability cannot sign transactions. Windows/WSL
 each pass 357 Node tests (33 new), two vectors; WSL passes 93 Rust tests and audits.
@@ -51,6 +51,14 @@ An initial 355-test run exposed two undefined-policy DKG setup calls and the fir
 fresh E2E failed there. The harness now uses the explicit DKG-only capability;
 the guard was not bypassed. See development-status for subsequent real-chain,
 scan and publication evidence. These are API boundaries, not a hostile-code sandbox.
+
+Current unpublished request increment: a shared immutable V1 request builder and
+validator bind request ID, epoch, attempt, intent/message digest and exact A+B
+ordering to the recomputed session before any signing-state/key access. The actual
+Native sighash/ciphersuite is unchanged. Initial focused tests: 40 PASS / 6 FAIL;
+final focused: 54 PASS. Windows/WSL: 371 Node tests (14 new) and two vectors PASS;
+WSL 93 Rust tests and audits PASS. Fresh real E2E/publication results are tracked
+in development-status. DKG deployment binding and signer state remain incomplete.
 Node 24.21.0 / npm 11.19.0 / bundled SQLite 3.53.4 are required. The SQLite
 API remains release-candidate stability 1.2, not production approval.
 See docs/development-status.md for current measured tests and publication state.
@@ -75,8 +83,9 @@ Production observation, service ACLs/protected storage/IPC, full restart,
 global hard stops, post-mint deep-reorg response and external review remain open.
 Read-only review reproduced matching Mainnet policy approval and exposed Map
 mutation on the preceding source. Current regression-tested changes close these
-configuration/API paths. Request-envelope/intent identity and DKG deployment
-transcript binding still need hardening before signer-state work. The pinned
+configuration/API paths. The current request changes close envelope/intent ID
+and session mismatches. DKG deployment/active-key binding, complete authorization
+intent enrollment and coordinator failure cleanup still need hardening. The pinned
 upstream FROST code is explicitly unaudited; never claim broader library audit
 coverage applies to it. The approved same-host topology is not the cause of
 these blockers. See docs/security/software-frost.md.

@@ -1,6 +1,32 @@
 # KingPepe Native - Solana Bridge Task Status
 
-## Current Phase 08 signer-policy isolation (2026-09-10)
+## Current Phase 08 signing-request binding (2026-09-10)
+
+Implemented locally: shared immutable V1 request/session metadata validation in
+coordinator and both signer paths, before signing-state/key access. Actual Native
+sighash and valid V1 transcript unchanged; no threshold or approval-model change.
+Focused tests first 40 PASS / 6 FAIL, then 54 PASS. Windows/WSL each 371 Node tests
+(14 new) plus two vectors PASS; WSL 93 Rust tests, fmt/clippy/audits PASS.
+Fresh real deposit, both SBF builds and all 55 checks PASS; reserve/supply each
+100000000 atomic, pending credit zero, no per-transfer team approval.
+
+Provenance 177 -> 178 files: one original request module, no deletions/moves,
+dependency/license/toolchain changes or production actions. Current source and
+all 154 existing commits scan clean; exact provenance, nine JSON parses and
+private-path/IP checks PASS. Staged/outgoing scans, private push and exact-SHA
+CI pending. Phase 08 INCOMPLETE;
+Phase 09 NOT_STARTED; Mainnet DISABLED. Next: DKG deployment/active-key binding,
+full intent enrollment, signer-state authentication/fencing and failure/restart.
+See [current detailed evidence](development-status.md#current-phase-08-signing-request-binding-2026-09-10).
+
+## Previous Phase 08 signer-policy isolation (verified source)
+
+Source `c7bf77b18df30e5565d38d5011eb10a909dd8448`, message
+`fix(phase-08): isolate local FROST authorization policies`, privately pushed;
+[all four exact-SHA CI jobs PASS](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34475711434).
+Exact-SHA CI confirms the real deposit and all 55 checks. Current/staged/outgoing
+source and all 154 commits scanned clean; zero artifacts uploaded. The following
+357-test evidence belongs to that SHA.
 
 Implemented locally: localnet/REGTEST-only immutable policy capability, private
 authorization lookup, bounded data and explicit local DKG-only setup that cannot
@@ -13,7 +39,7 @@ disabled there. The subsequent fresh real deposit, both SBF builds and all 55
 integration checks PASS; reserve/supply each 100000000 atomic, pending credit
 zero, no per-transfer team approval. Current source and all 153 existing commits
 scan clean; nine JSON files and exact provenance/private-data checks pass.
-Staged/outgoing scans, commit/private push and exact-SHA CI are pending.
+Staged/outgoing/all-154-commit scans, private push and exact-SHA CI passed above.
 No dependency/license changes, file additions/deletions/moves or
 production actions. Provenance remains 177 files.
 
@@ -21,7 +47,7 @@ Phase 08 INCOMPLETE; Phase 09 NOT_STARTED; Mainnet DISABLED. Next: validate/publ
 this increment, then harden request-envelope/intent identities and DKG deployment
 transcripts, authenticated/fenced signer state and full restart/reconciliation.
 Local policy and signature tests are not external FROST audit or host isolation.
-See [full current evidence](development-status.md#current-phase-08-signer-policy-isolation-2026-09-10).
+See [full evidence](development-status.md#previous-phase-08-signer-policy-isolation-verified-source).
 
 ## Previous Phase 08 absorbing-stop correction (verified source)
 

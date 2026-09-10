@@ -13,6 +13,7 @@ export {
 } from "./policy/native-signing-policy.mjs";
 
 export { FileBackedFrostStateStore } from "./state/file-state-store.mjs";
+export { createNativeFrostSigningRequest, validateNativeFrostSigningRequest } from "./policy/signing-request.mjs";
 export { NativeFrostSigner } from "./signer/native-frost-signer.mjs";
 export {
   NativeFrostCoordinator,

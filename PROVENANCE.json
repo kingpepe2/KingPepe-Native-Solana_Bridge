@@ -3,6 +3,17 @@
   "generatedAt": "2026-09-10T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
   "purpose": "file-by-file provenance classification for local tracked content",
+  "phase08SigningRequestReview": {
+    "filesBefore": 177,
+    "filesAfter": 178,
+    "newFiles": ["native/frost/policy/signing-request.mjs"],
+    "filesDeleted": 0,
+    "filesMoved": 0,
+    "changes": "Original shared immutable V1 signing-request construction/validation, participant-bound session recomputation before state/key access, removal of superseded inline request validation/construction and 14 original regressions.",
+    "sourceImports": "None. RFC 9591 consulted for input-validation and nonce/protocol-failure boundaries only; no pseudocode or vectors copied. Native message/ciphersuite and valid existing V1 transcript representation unchanged.",
+    "dependencyChanges": "None; pinned dependencies, lockfiles, toolchains and third-party notices preserved.",
+    "scope": "Request metadata/API safety only, not DKG deployment binding, complete nonce abort/restart, protected storage or production signing. No operational material moved or deleted."
+  },
   "phase08SignerPolicyReview": {
     "filesBefore": 177,
     "filesAfter": 177,
@@ -166,6 +177,11 @@
     ]
   },
   "trackedFiles": [
+    {
+      "path": "native/frost/policy/signing-request.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original immutable project request/session metadata helpers, retaining existing V1 representation and the actual Native Taproot sighash. No cryptographic implementation or third-party source copied."
+    },
     {
       "path": "scripts/tests/ci-local-e2e-contract.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",

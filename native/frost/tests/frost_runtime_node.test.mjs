@@ -14,11 +14,13 @@ import {
   REQUIRED_FROST_SIGNERS,
   createNativeSigningPolicy,
   createLocalNativeDkgPolicy,
+  createNativeFrostSigningRequest,
   evaluateNativeSigningPolicy,
   nativeSigningIntentDigest,
   runTwoPartyDkg,
   sha256Canonical,
   validateNativeSigningIntent,
+  validateNativeFrostSigningRequest,
 } from "../index.mjs";
 import { REGTEST_GENESIS } from "../../node/native-raw-evidence.mjs";
 
@@ -515,6 +517,143 @@ test("local DKG capability applies the same environment and activation guards", 
     { nativeGenesisHash: h("another-network") }, { productionSigningAuthorized: true }]) {
     assert.throws(() => createLocalNativeDkgPolicy({ ...options, ...overrides }), /LocalnetOnly|RegtestOnly|RegtestGenesis|ActivationDisabled/u);
   }
+});
+
+for (const [name, change, reason] of [
+  ["request ID", (r) => { r.requestId = h("substituted-request-id"); }, /FrostRequestBinding:requestId/u],
+  ["epoch", (r) => { r.epoch = 2; }, /FrostRequestBinding:epoch/u],
+  ["session ID", (r) => { r.sessionId = h("substituted-session-id"); }, /FrostRequestBinding:sessionId/u],
+  ["attempt", (r) => { r.attempt = 0; }, /FrostRequestAttempt/u],
+  ["participant order", (r) => { r.participantIds.reverse(); }, /FrostRequestParticipants/u],
+  ["unknown field", (r) => { r.extra = true; }, /FrostRequestFields/u],
+]) {
+  test(`each signer rejects altered request ${name} before nonce reservation`, () => {
+    const runtime = createRuntime();
+    try {
+      const request = frostRequestFor(intentFromAuthorization(runtime.auth));
+      change(request);
+      for (const signer of [runtime.signerA, runtime.signerB]) {
+        assert.throws(() => signer.signingCommitment(request), reason);
+        assert.throws(() => signer.signatureShare(request, []), reason);
+      }
+      for (const role of ["frost-a", "frost-b"]) {
+        const state = JSON.parse(readFileSync(path.join(runtime.root, role, "frost-signer-state.json"), "utf8"));
+        assert.equal(state.nonceReservationCounter, "0");
+        assert.equal(Object.keys(state.signing).length, 0);
+      }
+    } finally { runtime.cleanup(); }
+  });
+}
+
+test("shared FROST request builder agrees with the independent V1 transcript fixture", () => {
+  const intent = intentFromAuthorization(baseAuthorization());
+  for (const attempt of [1, 2, 0xffff_ffff]) {
+    const expected = frostRequestFor(intent, attempt);
+    const request = createNativeFrostSigningRequest(intent, { attempt });
+    assert.deepEqual(request, expected);
+    assert.deepEqual(validateNativeFrostSigningRequest(expected), request);
+    assert.equal(request.messageHex, intent.taprootSighashHex);
+    assert.notEqual(request.messageHex, request.intentDigest);
+  }
+});
+
+test("FROST request construction and wire validation reject malformed attempt values", () => {
+  const intent = intentFromAuthorization(baseAuthorization());
+  for (const attempt of [undefined, null, 0, -1, 1.5, "1", 0x1_0000_0000, Number.MAX_SAFE_INTEGER]) {
+    assert.throws(() => createNativeFrostSigningRequest(intent, { attempt }), /FrostRequestAttempt/u);
+    assert.throws(() => validateNativeFrostSigningRequest({ ...frostRequestFor(intent), attempt }), /FrostRequestAttempt/u);
+  }
+  assert.equal(createNativeFrostSigningRequest(intent).attempt, 1);
+});
+
+test("FROST wire metadata must match the canonical intent and required field set", () => {
+  const request = frostRequestFor(intentFromAuthorization(baseAuthorization()));
+  for (const field of ["protocol", "intentDigest", "messageHex"]) {
+    assert.throws(() => validateNativeFrostSigningRequest({ ...request, [field]: h("substituted") }),
+      new RegExp(`FrostRequestBinding:${field}`, "u"));
+  }
+  for (const field of Object.keys(request)) {
+    const missing = { ...request };
+    delete missing[field];
+    assert.throws(() => validateNativeFrostSigningRequest(missing), /FrostRequestFields/u);
+  }
+  for (const participantIds of [[], [REQUIRED_FROST_SIGNERS[0]], [REQUIRED_FROST_SIGNERS[0], REQUIRED_FROST_SIGNERS[0]],
+    [REQUIRED_FROST_SIGNERS[1], REQUIRED_FROST_SIGNERS[0]]]) {
+    assert.throws(() => validateNativeFrostSigningRequest({ ...request, participantIds }), /FrostRequestParticipants/u);
+  }
+});
+
+test("FROST request snapshots remain immutable when original data is modified", () => {
+  const intent = intentFromAuthorization(baseAuthorization());
+  const raw = frostRequestFor(intent);
+  const snapshot = validateNativeFrostSigningRequest(raw);
+  raw.intent.amountAtomic = "1";
+  raw.intent.inputOutpoints[0] = outpoint("different");
+  raw.participantIds.reverse();
+  assert.equal(snapshot.intent.amountAtomic, "250000000");
+  assert.deepEqual(snapshot.participantIds, REQUIRED_FROST_SIGNERS);
+  assert.deepEqual(validateNativeFrostSigningRequest(snapshot), snapshot);
+  assert.throws(() => { snapshot.attempt = 2; }, TypeError);
+  assert.throws(() => { snapshot.intent.amountAtomic = "1"; }, TypeError);
+  assert.throws(() => snapshot.participantIds.reverse(), TypeError);
+  assert.throws(() => snapshot.intent.inputOutpoints.push(outpoint("extra")), TypeError);
+});
+
+test("request accessors and participant iterators cannot run during validation", () => {
+  let calls = 0;
+  const request = frostRequestFor(intentFromAuthorization(baseAuthorization()));
+  Object.defineProperty(request, "requestId", { get() { calls += 1; return h("unexpected"); } });
+  assert.throws(() => validateNativeFrostSigningRequest(request), /PlainDataRequired/u);
+  const iterated = frostRequestFor(intentFromAuthorization(baseAuthorization()));
+  iterated.participantIds[Symbol.iterator] = () => { calls += 1; return [][Symbol.iterator](); };
+  assert.throws(() => validateNativeFrostSigningRequest(iterated), /PlainArrayRequired/u);
+  assert.equal(calls, 0);
+});
+
+test("request and policy rejection happen before any signing-state load", () => {
+  let loads = 0;
+  const auth = baseAuthorization();
+  const signer = new NativeFrostSigner({ signerId: REQUIRED_FROST_SIGNERS[0], index: 0, policy: makePolicy(auth),
+    stateStore: { load() { loads += 1; return { signerId: REQUIRED_FROST_SIGNERS[0] }; } } });
+  assert.equal(loads, 1);
+  const badBinding = { ...frostRequestFor(intentFromAuthorization(auth)), requestId: h("wrong-request") };
+  const badPolicy = frostRequestFor(intentFromAuthorization(auth, { amountAtomic: "1" }));
+  for (const request of [badBinding, badPolicy]) {
+    assert.throws(() => signer.signingCommitment(request), /FrostRequestBinding|authorizedOperationExact/u);
+    assert.throws(() => signer.signatureShare(request, []), /FrostRequestBinding|authorizedOperationExact/u);
+  }
+  assert.equal(loads, 1);
+});
+
+test("an altered share request cannot consume an already reserved valid nonce", () => {
+  const runtime = createRuntime();
+  try {
+    const request = frostRequestFor(intentFromAuthorization(runtime.auth));
+    const a = runtime.signerA.signingCommitment(request);
+    const b = runtime.signerB.signingCommitment(request);
+    const altered = { ...request, attempt: 2 };
+    for (const signer of [runtime.signerA, runtime.signerB]) {
+      assert.throws(() => signer.signatureShare(altered, [a, b]), /FrostRequestBinding:sessionId/u);
+    }
+    for (const role of ["frost-a", "frost-b"]) {
+      const state = JSON.parse(readFileSync(path.join(runtime.root, role, "frost-signer-state.json"), "utf8"));
+      assert.equal(state.signing[request.sessionId].state, "RESERVED");
+      assert.equal(state.nonceReservationCounter, "1");
+    }
+    assert.equal(runtime.coordinator.signAutomatically(request.intent).state, "SIGNED");
+  } finally { runtime.cleanup(); }
+});
+
+test("coordinator rejects getter-backed intent without calling user code", async () => {
+  const runtime = createRuntime();
+  try {
+    let calls = 0;
+    const intent = intentFromAuthorization(runtime.auth);
+    Object.defineProperty(intent, "taprootSighashHex", { get() { calls += 1; return runtime.auth.taprootSighashHex; } });
+    assert.throws(() => runtime.coordinator.signAutomatically(intent), /PlainDataRequired/u);
+    await assert.rejects(() => runtime.coordinator.signAutomaticallyWithNativeEvidence(intent), /PlainDataRequired/u);
+    assert.equal(calls, 0);
+  } finally { runtime.cleanup(); }
 });
 
 test("nonce state is persisted before commitments and tombstoned after share generation", () => {
