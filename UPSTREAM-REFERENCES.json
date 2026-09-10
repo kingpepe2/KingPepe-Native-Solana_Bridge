@@ -1,5 +1,28 @@
 {
   "generatedAt": "2026-09-10T00:00:00Z",
+  "phase08LocalAccountingRuntime": {
+    "nodeVersion": "24.21.0",
+    "npmVersion": "11.19.0",
+    "sqliteVersion": "3.53.4",
+    "checkedAt": "2026-09-10",
+    "urls": [
+      "https://nodejs.org/en/blog/release/v24.21.0",
+      "https://nodejs.org/en/blog/release/v24.20.0",
+      "https://nodejs.org/dist/v24.21.0/SHASUMS256.txt",
+      "https://github.com/nodejs/node/blob/v24.21.0/doc/api/sqlite.md",
+      "https://github.com/nodejs/node/blob/v24.21.0/src/node_sqlite.cc",
+      "https://github.com/nodejs/node/blob/v24.21.0/deps/sqlite/sqlite3.h",
+      "https://www.sqlite.org/security.html",
+      "https://www.sqlite.org/pragma.html",
+      "https://www.sqlite.org/atomiccommit.html",
+      "https://www.sqlite.org/cves.html",
+      "https://www.sqlite.org/copyright.html"
+    ],
+    "use": "Node built-in SQLite runtime dependency, not copied source. Original authenticated local accounting journal and tests use defensive mode, bounded fixed SQL, an authorization callback, exclusive local leases and authenticated replay. Exact runtime binaries were tested; no reliance on unavailable StatementSync.close.",
+    "licenseBoundary": "Node is MIT with separately licensed bundled components; SQLite deliverable code is dedicated to the public domain. Runtime distribution notices remain with the external archives. No claim of exclusive KingPepe rights over either runtime.",
+    "runtimeSelection": "Compared pinned Node 22.23.2, 24.20.0 and 24.21.0. Selected 24.21.0 with SQLite 3.53.4 and additional binding error-handling fixes; hashes in scripts/local-e2e-toolchain.json. No native addon added.",
+    "limitations": "node:sqlite API is release-candidate stability 1.2. Runtime CVEs require separate review from npm/Cargo audits. Not production approval, proof of full rollback detection, service isolation or power-loss safety."
+  },
   "phase08DevelopmentTools": {
     "agaveRelease": "https://github.com/anza-xyz/agave/releases/tag/v4.2.2",
     "solanaProgramCrate": "3.0.0",

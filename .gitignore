@@ -28,8 +28,9 @@ data/
 *.db
 *.sqlite
 *.sqlite3
+*.sqlite-*
+local-test-key.bin
 
-# Logs and crash artifacts
 # Logs and crash artifacts
 *.log
 crash.log

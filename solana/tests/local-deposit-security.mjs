@@ -3,7 +3,8 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runLocalNativeToSolanaE2e, submitLocalnetSolanaDepositClaim } from "../../scripts/local-e2e-native-to-solana.mjs";
+import { runLocalNativeToSolanaE2e, submitLocalnetSolanaDepositClaim, submitLocalnetSolanaSetup,
+  openLocalnetDepositCreditLedger } from "../../scripts/local-e2e-native-to-solana.mjs";
 import { createLocalNativeEvidenceVerifier } from "../../scripts/local-native-evidence-verifier.mjs";
 import { testLocalNativeRecovery } from "./local-native-recovery.mjs";
 import { testRecoveryPsbtWithNativeWallet } from "./local-recovery-psbt.mjs";
@@ -25,8 +26,20 @@ export async function runLocalDepositSecurityE2e(repoRoot) {
   let recoveryRaces;
   let claimRetry;
   let reserveVerificationInput;
+  let accountingInput;
+  const accountingChecks = [];
   const result = await runLocalNativeToSolanaE2e({
     repoRoot,
+    solanaSetup: async input => {
+      accountingInput = { plan: input.plan, flowConfig: input.flowConfig, credit: input.depositCredit };
+      assert.equal(input.depositAccounting.snapshot.authorizedUnmintedCredits, input.flowConfig.amountAtomic);
+      assert.equal(input.depositAccounting.snapshot.mintedSupply, "0");
+      assert.equal(input.depositAccounting.checkpoint.sequence, "1");
+      accountingChecks.push("PENDING_CREDIT_REOPENED_BEFORE_SOLANA_SETUP");
+      assert.throws(() => openLocalnetDepositCreditLedger(accountingInput), /LocalLedgerLeaseUnavailable/u);
+      accountingChecks.push("ACTIVE_CREDIT_LEDGER_EXCLUSIVE");
+      return submitLocalnetSolanaSetup(input);
+    },
     nativeEvidenceVerifierFactory: async (options) => {
       const verifier = await createLocalNativeEvidenceVerifier(options);
       let testedInputs = false;
@@ -222,8 +235,27 @@ export async function runLocalDepositSecurityE2e(repoRoot) {
       assert.deepEqual(evidence.witnessSignatures, { scriptPathInputs: 1, keyPathInputs: 1 });
     }
     passed.push("RECOVERABLE_DEPOSIT_TO_DISTINCT_RESERVE_VERIFIED");
+    const accounting = result.nativeToSolanaE2e.depositAccounting;
+    const ledger = openLocalnetDepositCreditLedger({ ...accountingInput, minimumCheckpoint: accounting.checkpoint });
+    try {
+      assert.equal(ledger.checkpoint().sequence, "2");
+      assert.equal(ledger.pendingCredits().length, 0);
+      assert.deepEqual(ledger.snapshot(), accounting.snapshot);
+      accountingChecks.push("FINALIZED_MINT_REPLAYED_AFTER_CLOSE");
+      ledger.recordValidatedDeposit(accountingInput.credit);
+      ledger.recordMint({ ...accountingInput.credit, mintedAmountAtomic: result.nativeToSolanaE2e.solanaDepositClaim.mintedAmountAtomic });
+      assert.deepEqual(ledger.checkpoint(), accounting.checkpoint);
+      accountingChecks.push("IDENTICAL_CREDIT_AND_MINT_RETRIES_DO_NOT_APPEND");
+      assert.equal(ledger.snapshot().canonicalReserve, result.nativeToSolanaE2e.reconciliation.canonicalReserve);
+      assert.equal(ledger.snapshot().mintedSupply, result.nativeToSolanaE2e.reconciliation.mintedSupply);
+      assert.equal(ledger.snapshot().authorizedUnmintedCredits, "0");
+      accountingChecks.push("JOURNAL_TOTALS_MATCH_FINALIZED_RESERVE_AND_SUPPLY");
+    } finally { ledger.close(); }
   }
   return { ...result, localRecovery: recovery, localRecoveryPsbt: recoveryPsbt, localRecoveryRaces: recoveryRaces, localClaimRetry: claimRetry,
+    localAccounting: { passed: accountingChecks, pass: accountingChecks.length,
+      fail: result.state === "COMPLETED" && accountingChecks.length === 5 ? 0 : 1,
+      scope: "Authenticated pending-credit and finalized-mint database reopen on a real single-deposit flow; not complete service or power-loss recovery." },
     localSecurity: { passed, pass: passed.length, fail: result.state === "COMPLETED" && passed.length === 22 ? 0 : 1,
     scope: "Real raw Native evidence/policy rejection, local-validator deposit, idempotent retry, backing replay and domain checks; not complete adversarial coverage." } };
 }
@@ -232,7 +264,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   try {
     const result = await runLocalDepositSecurityE2e(process.argv[2] ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../.."));
     console.log(JSON.stringify(result));
-    if (result.state !== "COMPLETED" || result.localSecurity.fail !== 0) process.exitCode = 1;
+    if (result.state !== "COMPLETED" || result.localSecurity.fail !== 0 || result.localAccounting.fail !== 0) process.exitCode = 1;
   } catch {
     console.error("LOCAL_DEPOSIT_SECURITY_RUN_FAILED");
     process.exitCode = 1;
