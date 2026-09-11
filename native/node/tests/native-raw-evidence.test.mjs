@@ -5,7 +5,8 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import os from "node:os";
 import { test } from "node:test";
-import { collectRegtestEvidence, encodeRegtestEvidence, MAX_RAW_EVIDENCE_BYTES,
+import { createHash } from "node:crypto";
+import { collectRegtestEvidence, encodeRegtestEvidence, encodeRegtestEvidenceAtCheckpoint, MAX_RAW_EVIDENCE_BYTES,
   REGTEST_GENESIS, verifyRegtestEvidencePacket } from "../native-raw-evidence.mjs";
 import { parseNativeTransactionHex } from "../native-taproot-transaction.mjs";
 
@@ -24,6 +25,36 @@ function rpcModel(overrides = {}) {
   getRawTransaction: async () => ({ hex: raw, blockhash: h("08") }),
   getBlock: async () => ({ height: 1, hash: h("08"), tx: [txid] }), ...overrides };
 }
+
+function checkpointFixture() {
+  const b = bundle(); b.tipHash = createHash("sha256").update(createHash("sha256").update(Buffer.from(b.headers[0], "hex")).digest()).digest().reverse().toString("hex");
+  const packet = encodeRegtestEvidence(b);
+  const checkpoint = { protocol: "KINGPEPE_REGTEST_ACCEPTANCE_CHECKPOINT_V1", genesis: REGTEST_GENESIS,
+    tipHash: b.tipHash, tipHeight: b.tipHeight, chainworkHex: b.chainworkHex, minimumConfirmations: b.minimumConfirmations,
+    evidenceDigestHex: createHash("sha256").update(packet).digest("hex") };
+  return { b, packet, checkpoint };
+}
+
+test("retained acceptance encoding reproduces the exact prefix as the current tip advances", () => {
+  const { b, packet, checkpoint } = checkpointFixture();
+  const advanced = { ...b, tipHash: h("02"), tipHeight: 2, chainworkHex: h("03"), headers: [...b.headers, "04".repeat(80)] };
+  const repeated = encodeRegtestEvidenceAtCheckpoint(advanced, checkpoint);
+  assert.deepEqual(repeated, packet); assert.notDeepEqual(encodeRegtestEvidence(advanced), packet);
+  checkpoint.evidenceDigestHex = h("05"); assert.deepEqual(repeated, packet);
+  assert.equal(repeated.status, undefined, "EncodingIsNotConsensusVerification");
+});
+
+test("acceptance checkpoint rejects domain, field, prefix, finality and digest substitution", () => {
+  const { b, checkpoint } = checkpointFixture();
+  for (const change of [{ genesis: h("01") }, { protocol: "old" }, { tipHeight: 2 }, { tipHash: h("01") },
+    { minimumConfirmations: 2 }, { evidenceDigestHex: h("01") }, { chainworkHex: h("01") }, { approved: true }]) {
+    assert.throws(() => encodeRegtestEvidenceAtCheckpoint(b, { ...checkpoint, ...change }), /RAW_NATIVE_/u);
+  }
+  const changed = structuredClone(b); changed.proofs[0].blockHeight = 2;
+  assert.throws(() => encodeRegtestEvidenceAtCheckpoint(changed, checkpoint), /RAW_NATIVE_/u);
+  changed.proofs[0].blockHeight = 1; changed.proofs[0].rawTransactionHex = raw.replace("8813", "8913");
+  assert.throws(() => encodeRegtestEvidenceAtCheckpoint(changed, checkpoint), /RAW_NATIVE_/u);
+});
 
 test("raw evidence packet has fixed-width canonical fields and immutable encoded bytes", () => {
   const input = bundle();

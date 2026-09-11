@@ -17,6 +17,22 @@ reconciliation succeed. It closes/reopens settlement before reporting completion
 Failed setup or attestation leaves an owed credit. Contradictory mint results
 create an authenticated sticky stop; there is no reset API.
 
+The Native acceptance checkpoint is a versioned, exact genesis/height/block/work/
+confirmation-policy/raw-packet-digest record. Delayed signing and attestation
+must reproduce that original digest from the current canonical raw data. The
+independent Rust verifier checks both the current branch and the accepted prefix;
+current UTXO observations must match the freshly verified tip, followed by another
+tip check. Prefix inclusion alone never proves an output is unspent. A forged
+checkpoint is not trusted even if its attacker-controlled digest is internally
+consistent. A removed or insufficiently finalized basis fails closed.
+
+This fixes evidence identity during delay, not the separate crash window between
+Native broadcast/finality and creation of the durable credit. Full recovery must
+persist the operation intent and acceptance basis with correct ordering; the
+checkpoint helper does not automatically discover missing operation context or
+repair accounting. It cannot refresh an expired canonical message, create another
+allocation, change a recipient or authorize a production checkpoint policy.
+
 The fixed context is `KPDECL01` (8 ASCII bytes), environment byte 1, 32-byte
 journal identity and the canonical 168-byte deployment identity. Each event MAC
 is HMAC-SHA256 over context, little-endian sequence u64, kind u8, payload length
