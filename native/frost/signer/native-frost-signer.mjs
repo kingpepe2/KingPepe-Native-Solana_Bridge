@@ -21,6 +21,7 @@ import { createTwoPartyDkgRequest, nativeFrostKeyContext, sameNativeFrostKeyDepl
   validateNativeFrostDkgRequest } from "../policy/dkg-request.mjs";
 import { assertFrostStateEnvelope } from "../state/file-state-store.mjs";
 import { WindowsProtectedFrostStateStore } from "../state/windows-protected-state-store.mjs";
+import { WindowsFencedFrostStateStore } from "../state/windows-fenced-state-store.mjs";
 import { dkgFinalizationDigest, normalizeDkgRound1, validateDkgRound1Set,
   validateDkgRound2Set } from "../policy/dkg-messages.mjs";
 
@@ -55,6 +56,7 @@ export class NativeFrostSigner {
     this.#dkgRequest = createTwoPartyDkgRequest({ epoch: this.#keyContext.keyEpoch, context: this.#keyContext });
     this.#stateStore = options.stateStore;
     if (this.#stateStore instanceof WindowsProtectedFrostStateStore) this.#stateStore.assertPolicy(this.#policy);
+    if (this.#stateStore instanceof WindowsFencedFrostStateStore) this.#stateStore.assertPolicy(this.#policy);
     if (options.nativeEvidenceValidator !== undefined && typeof options.nativeEvidenceValidator !== "function") {
       throw new Error("FROST native evidence validator must be a function");
     }
@@ -79,6 +81,11 @@ export class NativeFrostSigner {
 
   isAvailable() {
     return this.#available && !this.#closed;
+  }
+
+  hasProtectedLifetimeFence() {
+    if (!(this.#stateStore instanceof WindowsFencedFrostStateStore)) return false;
+    this.#stateStore.assertLifetime(); return true;
   }
 
   close() {
@@ -536,6 +543,7 @@ export class NativeFrostSigner {
 
   #requireAvailable() {
     if (this.#closed) throw new Error("FrostSignerClosed");
+    if (this.#stateStore instanceof WindowsFencedFrostStateStore) this.#stateStore.assertLifetime();
     if (!this.#available) throw new Error(`${this.signerId} is unavailable`);
   }
 

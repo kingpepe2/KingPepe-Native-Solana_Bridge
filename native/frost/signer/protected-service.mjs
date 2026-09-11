@@ -7,7 +7,9 @@ import { ProtectedServiceIpc } from "../../../shared/windows/service-ipc.mjs";
 // No DKG secret, private-share export, arbitrary method dispatch or shell API.
 export function nativeFrostIpcHandler(signer) {
   if (!(signer instanceof NativeFrostSigner)) throw new Error("IpcNativeSignerRequired");
+  if (!signer.hasProtectedLifetimeFence()) throw new Error("IpcFencedSignerRequired");
   return async ({ method, operationId, payload, peerRole }) => {
+    if (!signer.hasProtectedLifetimeFence()) throw new Error("IpcFencedSignerRequired");
     if (peerRole !== "COORDINATOR") throw new Error("IpcCoordinatorRequired");
     if (method === "verifyNativeEvidence") {
       const intent = validateNativeSigningIntent(payload);

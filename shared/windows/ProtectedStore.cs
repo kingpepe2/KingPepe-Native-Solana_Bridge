@@ -180,6 +180,7 @@ namespace KingPepe.LocalProtection {
           Require(!Directory.Exists(root)&&!Directory.Exists(anchorRoot)&&!File.Exists(root)&&!File.Exists(anchorRoot));
           CreatePrivateDirectory(root,sid);CreatePrivateDirectory(anchorRoot,sid);
           WriteNew(Path.Combine(anchorRoot,"lock.protected"),new byte[0],sid);
+          WriteNew(Path.Combine(anchorRoot,"lifetime.protected"),new byte[0],sid);
           using(var gate=Open(Path.Combine(anchorRoot,"lock.protected"),FileMode.Open,sid)) {
             byte[] state=Seal(payload,1,binding,"state"),anchor=Seal(Hash(state),1,binding,"anchor");
             WriteNew(Path.Combine(root,StateName),state,sid);WriteNew(Path.Combine(anchorRoot,StateName),anchor,sid);
@@ -205,6 +206,16 @@ namespace KingPepe.LocalProtection {
           return new Dictionary<string,object>{{"revision",next.ToString(System.Globalization.CultureInfo.InvariantCulture)}};
         }
       } finally {if(payload!=null)Array.Clear(payload,0,payload.Length);}
+    }
+
+    public static IDisposable AcquireLifetimeLease(IDictionary<string,object> request,string sourceRoot) {
+      Require(request.Count==5 && Text(request,"protocol")=="KINGPEPE_WINDOWS_PROTECTED_STORE_V1");
+      string identity=Text(request,"serviceSid");Require(identity==Identity());var sid=new SecurityIdentifier(identity);
+      string root=Root(Text(request,"root"),sourceRoot),anchor=Root(Text(request,"anchorRoot"),sourceRoot);
+      Require(!ContainsPath(root,anchor)&&!ContainsPath(anchor,root));CheckAcl(root,true,sid);CheckAcl(anchor,true,sid);
+      // This file must have been explicitly provisioned with the protected store.
+      // Never create/adopt an absent lease on ordinary open/restart.
+      return Open(Path.Combine(anchor,"lifetime.protected"),FileMode.Open,sid);
     }
   }
 }
