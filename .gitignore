@@ -16,6 +16,7 @@ seedphrase.txt
 recovery.json
 secret.*
 *.seed
+*.protected
 
 # FROST / signer runtime state and recovery artifacts (kept out of repository)
 frost-state/

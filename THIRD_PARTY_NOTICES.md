@@ -2,6 +2,13 @@
 
 This repository tracks selected upstream references for architectural guidance.
 
+The original Windows protected-store adapter invokes DPAPI, .NET Framework and
+Windows filesystem security APIs. It does not copy Microsoft implementation or
+sample code, and does not vendor Microsoft assemblies or binaries. The installed
+OS/runtime retains its applicable terms; no exclusive KingPepe rights over it are
+claimed. API references and review limits are in UPSTREAM-REFERENCES.json and
+docs/security/windows-protected-storage.md.
+
 - Node.js `24.21.0` and its built-in SQLite `3.53.4`
   - Node license: MIT, with separately licensed bundled components retained in
     the runtime distribution's LICENSE. Node is not KingPepe-exclusive code.

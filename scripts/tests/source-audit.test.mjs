@@ -12,7 +12,7 @@ test("source audit enforces exact provenance coverage and valid unique classific
   assert.throws(() => checkProvenance([entry.path, "unreviewed.rs"], { trackedFiles: [entry] }), /PROVENANCE_COVERAGE_MISMATCH/u);
 });
 test("source audit rejects operational file names without reading real secret material", () => {
-  for (const name of ["wallet.dat", ".env", ".env.private", ".cookie", "a-keypair.json", "signer/frost-signer-state.json", "data.db", "diagnostic.log", "certificate.pfx"]) {
+  for (const name of ["wallet.dat", ".env", ".env.private", ".cookie", "a-keypair.json", "signer/frost-signer-state.json", "data.db", "diagnostic.log", "certificate.pfx", "state.protected"]) {
     assert.ok(publicationRisks(name, "{}").includes("OPERATIONAL_FILE"));
   }
 });

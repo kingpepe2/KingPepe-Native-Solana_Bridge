@@ -20,6 +20,7 @@ import { createNativeFrostAbortReceipt, validateNativeFrostSigningRequest } from
 import { createTwoPartyDkgRequest, nativeFrostKeyContext, sameNativeFrostKeyDeployment,
   validateNativeFrostDkgRequest } from "../policy/dkg-request.mjs";
 import { assertFrostStateEnvelope } from "../state/file-state-store.mjs";
+import { WindowsProtectedFrostStateStore } from "../state/windows-protected-state-store.mjs";
 import { dkgFinalizationDigest, normalizeDkgRound1, validateDkgRound1Set,
   validateDkgRound2Set } from "../policy/dkg-messages.mjs";
 
@@ -53,6 +54,7 @@ export class NativeFrostSigner {
     this.#keyContext = nativeFrostKeyContext(this.#policy);
     this.#dkgRequest = createTwoPartyDkgRequest({ epoch: this.#keyContext.keyEpoch, context: this.#keyContext });
     this.#stateStore = options.stateStore;
+    if (this.#stateStore instanceof WindowsProtectedFrostStateStore) this.#stateStore.assertPolicy(this.#policy);
     if (options.nativeEvidenceValidator !== undefined && typeof options.nativeEvidenceValidator !== "function") {
       throw new Error("FROST native evidence validator must be a function");
     }

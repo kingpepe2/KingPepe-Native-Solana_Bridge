@@ -1,5 +1,10 @@
 # Software FROST A+B
 
+The Phase 08.5 [Windows protected-storage component](windows-protected-storage.md)
+adds real DPAPI-backed DKG/share persistence and local encrypted restart tests.
+It does not close the service-isolation, IPC, persistent-fencing or full-rollback
+findings. The Linux local-chain harness remains an isolated test-file runtime.
+
 ## Review boundary (2026-09-10)
 
 The pinned upstream release explicitly identifies its FROST implementation as

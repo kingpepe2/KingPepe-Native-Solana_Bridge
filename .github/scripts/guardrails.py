@@ -28,7 +28,7 @@ SENSITIVE_PATH_PATTERNS = [
     re.compile(r"(^|/)wallet.*\.json$", re.IGNORECASE),
 ]
 
-SENSITIVE_EXTENSIONS = {".pem", ".p12", ".pfx", ".jks", ".key", ".secret", ".seed"}
+SENSITIVE_EXTENSIONS = {".pem", ".p12", ".pfx", ".jks", ".key", ".secret", ".seed", ".protected"}
 
 SECRET_TOKEN_PATTERNS = [
     re.compile(r"(?i)\bBEGIN [A-Z ]+ PRIVATE KEY\b"),

@@ -1,4 +1,5 @@
 import { ed25519 } from "@noble/curves/ed25519.js";
+import { assertWindowsProtectedStore } from "../../shared/windows/protected-store.mjs";
 import {
   bytesToHex,
   decodeCanonicalBridgeMessage,
@@ -20,6 +21,21 @@ export class ProjectAttester {
   #secretKey;
   #policy;
   #closed = false;
+  static fromWindowsProtectedStore({ store, role, policy }) {
+    // Snapshot before the storage binding checks; never check one policy and
+    // construct the attester from a second read of mutable/accessor input.
+    policy = normalizePolicy(structuredClone(policy));
+    assertWindowsProtectedStore(store, role, "attester-seed");
+    if (store.context.environment !== "localnet") throw new Error("ProtectedAttesterLocalOnly");
+    if (store.context.nativeGenesis !== policy.nativeGenesisHex ||
+        store.context.solanaDeployment !== policy.solanaDeploymentHex ||
+        store.context.keyEpoch !== policy.keyEpoch) throw new Error("ProtectedAttesterContextMismatch");
+    const result = store.read();
+    try {
+      if (result.payload.length !== 32) throw new Error("ProtectedAttesterKeyInvalid");
+      return new ProjectAttester({ role, secretKey: result.payload, policy });
+    } finally { result.payload.fill(0); }
+  }
   constructor({ role, secretKey, policy }) {
     if (!ATTESTATION_ROLES.includes(role)) {
       throw new Error("InvalidAttesterRole");
