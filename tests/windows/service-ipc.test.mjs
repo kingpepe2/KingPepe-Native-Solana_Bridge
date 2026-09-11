@@ -11,6 +11,7 @@ import { WindowsProtectedStore, windowsCurrentServiceSid } from "../../shared/wi
 import { ProtectedServiceIpc, encodeIpcEnrollment } from "../../shared/windows/service-ipc.mjs";
 import { nativeFrostIpcHandler, ProtectedRemoteFrostPeer } from "../../native/frost/signer/protected-service.mjs";
 import { WindowsProtectedFrostStateStore } from "../../native/frost/state/windows-protected-state-store.mjs";
+import { WindowsFencedFrostStateStore } from "../../native/frost/state/windows-fenced-state-store.mjs";
 import { NativeFrostSigner, NativeFrostCoordinator, createNativeSigningPolicy, runTwoPartyDkg,
   FROST_SIGNING_INTENT_PROTOCOL, FROST_SIGNING_MODE, REQUIRED_FROST_SIGNERS } from "../../native/frost/index.mjs";
 import { REGTEST_GENESIS } from "../../native/node/native-raw-evidence.mjs";
@@ -20,9 +21,13 @@ if (process.platform !== "win32") throw new Error("WINDOWS_IPC_TESTS_REQUIRE_WIN
 const repoRoot = path.resolve(import.meta.dirname, "../.."), serviceSid = windowsCurrentServiceSid();
 const h = v => createHash("sha256").update(v).digest("hex");
 const deployment = h("protected-ipc-local-deployment"), protocol = "KINGPEPE_SERVICE_IPC_V1";
+const cleanups = new Map();
 function temporary(t) {
   const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-ipc-test-"));
-  t.after(() => {
+  cleanups.set(root, []);
+  t.after(async () => {
+    for (const fn of cleanups.get(root)) await fn();
+    cleanups.delete(root);
     assert(path.dirname(root) === path.resolve(os.tmpdir()) && path.basename(root).startsWith("kingpepe-ipc-test-"), "UnsafeTestCleanup");
     try { rmSync(root, { recursive: true }); } catch { throw new Error("IpcTestCleanupFailed"); }
   }); return root;
@@ -152,9 +157,15 @@ test("actual protected A+B FROST signing through authenticated endpoints", async
   const policy = createNativeSigningPolicy({ environment: "localnet", nativeNetwork: "regtest", nativeGenesisHash: REGTEST_GENESIS,
     solanaDeployment: deployment, bridgeProgramId: intent.bridgeProgramId, transceiverProgramId: intent.transceiverProgramId, mint: intent.mint, keyEpoch: 1,
     maxAmountAtomic: "10000", maxFeeAtomic: "100", reserveScriptPubKeyHex: intent.changeScriptPubKeyHex, authorizedOperations: [intent] });
-  const signers = f.map((v, i) => new NativeFrostSigner({ signerId: v.role, index: i, policy,
-    stateStore: WindowsProtectedFrostStateStore.createLocal(options(v.root, "native-state", v.role, "frost-state"), policy),
-    nativeEvidenceValidator: async value => ({ digestHex: value.proofFingerprint }) }));
+  const signers = [];
+  for (const [i, v] of f.entries()) {
+    const base = WindowsProtectedFrostStateStore.createLocal(options(v.root, "native-state", v.role, "frost-state"), policy);
+    const fenceOptions = options(v.root, "native-fence", v.role, "signer-fence"); fenceOptions.context.instanceId = base.context.instanceId;
+    const stateStore = await WindowsFencedFrostStateStore.createLocal({ base, fenceOptions, policy });
+    cleanups.get(v.root).push(() => stateStore.close());
+    signers.push(new NativeFrostSigner({ signerId: v.role, index: i, policy, stateStore,
+      nativeEvidenceValidator: async value => ({ digestHex: value.proofFingerprint }) }));
+  }
   t.after(() => signers.forEach(s => s.close()));
   const dkg = runTwoPartyDkg(signers, { epoch: 1 });
   const ports = [];

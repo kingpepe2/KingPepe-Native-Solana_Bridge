@@ -1,5 +1,35 @@
 # KingPepe Native - Solana Bridge Development Status
 
+## Phase 08.5 lifetime fencing increment (2026-09-11)
+
+Authenticated IPC was published PRIVATE at
+9ad57981aac1aec209737cc4a420b4ee7e19ce4c. Exact Actions run
+[34555746195](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34555746195)
+started zero steps in all four jobs: NOT_RUN_ACCOUNT_BLOCKED. GitHub reported:
+"The job was not started because recent account payments have failed or your
+spending limit needs to be increased. Please check the 'Billing & plans' section
+in your settings". No policy bypass or passing CI claim.
+
+The next worktree increment adds an exclusive process-lifetime Windows handle,
+independent protected fence, persistent instance epoch, revision/image CAS and
+nonce high-water checks. Remote signer handlers require the fenced adapter.
+Fourteen new Windows tests exercise actual duplicate/killed processes, restored
+state, stale epochs/revisions, nonce rollback, prepared-write recovery and real
+FROST recovery after reservation/commitment/share boundaries. Full Windows Node
+508 and Windows security 58 passed, with zero failures/skips; vectors 2 passed.
+WSL Node 508 and two vectors passed. Rust 97 plus check/fmt/Clippy passed. Two
+fresh SBF builds and 55 real regtest/local-validator checks passed; Native to
+Solana reached COMPLETED, minted 100000000 atomic units and RECONCILED. No
+per-transfer Team approval was introduced. These are worktree results, not
+clean-clone or full protected Windows service-wide certification. Source audit
+and guardrails cover 202 files; npm audit reports zero vulnerabilities.
+
+See security/signer-fencing.md for limits. Full co-restore of every enforcement
+record is not detectable by this local-only mechanism. Cross-service Windows
+tokens still require an elevated isolated environment. Global stop, complete
+service/broadcast-credit recovery, deployment monitor and deep-reorg/freshness
+remain required. Phase 09 NOT_STARTED; productionReady false; Mainnet disabled.
+
 ## Phase 08.5 authenticated transport increment (2026-09-11)
 
 Baseline 84ef95fba316944dd9c205e0f965d3b9ff725e64 is PRIVATE and clean.

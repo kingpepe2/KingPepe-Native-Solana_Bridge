@@ -2,6 +2,15 @@
   "schemaVersion": "1.0",
   "generatedAt": "2026-09-11T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
+  "phase085FencingReview": {
+    "baseline": "9ad57981aac1aec209737cc4a420b4ee7e19ce4c",
+    "filesBefore": 198,
+    "filesAfter": 202,
+    "filesDeleted": 0,
+    "filesMoved": 0,
+    "sourceImports": "None. Original lifetime-handle helper, protected signer fence/CAS adapter, process-kill tests and documentation; reference-only Windows/.NET API use. Noble cryptography, third-party notices and locked dependencies are unchanged.",
+    "scope": "Localnet protected signer-instance component, not full-host rollback, cross-account certification, durable global stop or full bridge service recovery."
+  },
   "phase085IpcReview": {
     "baseline": "84ef95fba316944dd9c205e0f965d3b9ff725e64",
     "sourceImports": "None. Original Node TLS framing, protected credential/replay glue, restricted service handlers and regression tests. Existing Noble aggregate verification reused without changing its cryptography. Node/OpenSSL implementations are not copied or vendored.",
@@ -287,6 +296,26 @@
     ]
   },
   "trackedFiles": [
+    {
+      "path": "shared/windows/protected-lease-driver.ps1",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original fixed private-parent-pipe helper holding an existing restrictive Windows lifetime file handle; no Microsoft code imported."
+    },
+    {
+      "path": "native/frost/state/windows-fenced-state-store.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original protected lifetime fence, role/domain/epoch/revision/high-water binding and prepared-image recovery adapter."
+    },
+    {
+      "path": "tests/windows/signer-fencing.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original actual DPAPI, duplicate-process, SIGKILL, rollback and real FROST recovery tests with external disposable state."
+    },
+    {
+      "path": "docs/security/signer-fencing.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original non-operational fencing design and explicit retained-anchor/full-host assurance limits."
+    },
     { "path": ".gitattributes", "classification": "BUILD_OR_CONFIGURATION_METADATA", "notes": "Original text-only LF checkout policy for reproducible Windows/WSL source inspection; binary files are not normalized." },
     { "path": "docs/phase-08-5-audit.md", "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION", "notes": "Original retrospective audit, measured local coverage and explicit unresolved security dependencies; not external certification or private deployment data." },
     { "path": "docs/phase-08-5-blocker-inventory.json", "classification": "GENERATED_FILE", "notes": "Generated source-keyword location inventory with reviewed classifications; no runtime state, live identities or secret content." },

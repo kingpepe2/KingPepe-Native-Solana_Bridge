@@ -1,5 +1,16 @@
 # KingPepe Native - Solana Bridge Task Status
 
+## Current continuation: lifetime signer fencing
+
+IPC is published PRIVATE at 9ad57981aac1aec209737cc4a420b4ee7e19ce4c; exact CI
+34555746195 started zero steps (account restriction). The fencing worktree adds
+retained DPAPI fence/CAS, lifetime OS leases, instance epochs and nonce high-water
+checks. Windows/WSL Node 508 each, Windows security 58, Rust 97/quality, new SBF
+builds and 55 real deposit checks passed; E2E COMPLETED and RECONCILED. After scan/review/private
+publication, continue global stop, durable service recovery, live deployment
+monitoring and post-mint reorg/freshness controls. No Phase 09, production or
+full-audit PASS claim. The older sections below are historical evidence only.
+
 ## Current continuation: authenticated transport
 
 Baseline: 84ef95fba316944dd9c205e0f965d3b9ff725e64. Original protected mTLS

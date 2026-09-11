@@ -23,46 +23,23 @@
 
 ## Current task: Phase 08.5 security remediation
 
-The current continuation starts at 84ef95fba316944dd9c205e0f965d3b9ff725e64.
-That SHA's clean clone passed Windows/WSL Node 505 each, Windows security 27,
-Rust 97/quality, two SBF builds, deposit 55 and withdrawal-record 26; E2E
-COMPLETED. These are historical baseline results, not new-commit certification.
-The next increment adds DPAPI-backed mutual TLS and persistent transport replay
-checks, with restricted FROST and attester service handlers. See
-docs/security/service-ipc.md. All five remaining control groups must still be
-implemented/integrated and validated; do not stop merely because the elevated
-Windows cross-service environment or Actions is unavailable. Neither condition
-authorizes weaker tests, Phase 09, production provisioning or live funds.
+Current published IPC increment: 9ad57981aac1aec209737cc4a420b4ee7e19ce4c,
+from audited baseline 84ef95fba316944dd9c205e0f965d3b9ff725e64. Exact CI
+34555746195 started zero steps: NOT_RUN_ACCOUNT_BLOCKED. Fencing worktree adds
+a separate retained DPAPI fence, lifetime OS handle, persistent instance epoch,
+revision CAS and nonce high-water checks. Windows Node 508, Windows security 58,
+two vectors and Rust quality/tests pass. See docs/security/signer-fencing.md
+and current development-status for evidence and remaining limits.
 
-The latest Team request starts from 2b5c82971834d6299969c05a9889c950dae2ef91
-and authorizes remediation of the remaining Phase 01-08 security findings, not
-Phase 09. See docs/security/windows-protected-storage.md for the new DPAPI
-component, its tests and limits. Distinct Windows service-identity execution is
-BLOCKED on the present non-elevated token. No production accounts, keys or
-services have been provisioned. Do not equate current-user DPAPI tests with
-cross-service isolation, full rollback assurance or secured service-wide E2E.
-No plaintext fallback is permitted. Keep the remaining IPC, persistent fencing,
-global-stop, service recovery, deployment watcher and post-mint reorg gaps open.
-Historical audit results below do not certify this remediation's source SHA.
-
-Protected-store implementation published PRIVATE at
-cba77159f5afbbea5aa1f95030e1b90c5fc990df. That exact clean clone passed 505 Node
-tests per platform, 25 Windows security tests, 97 Rust tests/quality gates, two
-new SBF builds, 55 deposit checks and 26 withdrawal-record checks. Actions
-34545506371 started zero steps. A follow-up removes secret-bearing byte values
-from test assertion failures and adds a fixed-error regression: 26 Windows
-security tests pass locally. It changes tests/status, not cryptographic/runtime
-logic. Verify its own SHA after publication; never infer CI success. The full
-remediation gate remains blocked; next requires isolated Windows service-test
-capability and further IPC/fencing/recovery/monitor/reorg implementation.
-
-Test-output correction published at f212983a67a43d7f988eb3ec878a322c2c16190d;
-its clean clone passed Windows/WSL Node 505 each, Windows security 26, Rust 97/quality, SBF, deposit 55
-and withdrawal-record 26. CI 34546962076 started no steps. The next file-policy
-correction adds OS fixed-volume checks and explicit per-file security descriptors;
-27 Windows security tests passed on that worktree. Validate the new SHA rather
-than attributing f212983 evidence to it. Cross-service testing still needs a
-privileged isolated Windows test environment, not production credentials.
+All remaining control groups still need implementation/integration and fresh
+validation: durable global stop, complete service and broadcast-credit recovery,
+live Solana deployment monitoring, post-mint deep reorg and persistent chain
+freshness. Do not stop merely because elevated Windows cross-service testing or
+Actions is unavailable. Do not equate current-user DPAPI or local component tests
+with distinct-service certification. Full-host co-restore remains a limitation.
+No production provisioning or plaintext fallback is authorized. Phase 09 is
+NOT_STARTED and must not begin automatically. Historical notes below do not
+certify newer commits.
 
 ## Previous retrospective audit context
 

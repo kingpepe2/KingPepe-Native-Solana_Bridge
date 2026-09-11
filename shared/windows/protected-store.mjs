@@ -1,6 +1,6 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 import { createHash } from "node:crypto";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { types } from "node:util";
 import path from "node:path";
 import { validateRuntimeStateRoot, isSameOrInside } from "../runtime-path-boundary.mjs";
@@ -77,6 +77,7 @@ export class WindowsProtectedStore {
   #context;
   #highestRevision = 0n;
   #closed = false;
+  #lease;
   constructor({ root, anchorRoot, context, repoRoot }) {
     if (process.platform !== "win32") throw new Error("WindowsProtectedStorageRequired");
     this.#context = normalizeProtectedContext(context);
@@ -94,7 +95,14 @@ export class WindowsProtectedStore {
     return store;
   }
   get context() { return this.#context; }
-  close() { this.#closed = true; }
+  close() { this.#closed = true; this.#lease?.close().catch(() => {}); }
+  async acquireLifetimeLease() {
+    this.#ready();
+    if (this.#lease) throw new Error("ProtectedLeaseAlreadyRequested");
+    this.#lease = new ProtectedLifetimeLease(this.#request);
+    try { await this.#lease.ready(); this.#ready(); return this.#lease; }
+    catch { await this.#lease.close(); throw new Error("ProtectedLifetimeLeaseRejected"); }
+  }
   #ready() { if (this.#closed) throw new Error("ProtectedStoreClosed"); }
   read() {
     this.#ready();
@@ -129,4 +137,38 @@ export class WindowsProtectedStore {
 
 export function assertWindowsProtectedStore(store, role, purpose) {
   if (!INSTANCES.has(store) || store.context.role !== role || store.context.purpose !== purpose) throw new Error("ProtectedStoreRoleMismatch");
+}
+
+class ProtectedLifetimeLease {
+  #child; #ready; #closed = false; #ended; #confirmed = false;
+  constructor(request) {
+    const windowsRoot = process.env.SystemRoot;
+    if (typeof windowsRoot !== "string" || !/^[A-Z]:\\[^\r\n\0]+$/iu.test(windowsRoot)) throw new Error("WindowsSystemRootRequired");
+    this.#child = spawn(path.join(windowsRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
+      ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", path.join(import.meta.dirname, "protected-lease-driver.ps1")],
+      { windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
+    const child = this.#child;
+    this.#ended = new Promise(resolve => child.once("close", resolve));
+    this.#ready = new Promise((resolve, reject) => {
+      let output = "";
+      const failed = () => { this.#closed = true; clearTimeout(timer); child.kill(); reject(new Error("ProtectedLifetimeLeaseRejected")); };
+      const timer = setTimeout(failed, 15000);
+      child.once("error", failed); child.once("exit", () => { this.#closed = true; clearTimeout(timer); reject(new Error("ProtectedLifetimeLeaseLost")); });
+      child.stderr.on("data", failed); child.stdin.on("error", failed);
+      child.stdout.on("data", chunk => {
+        if (this.#confirmed) return failed();
+        output += chunk.toString("utf8");
+        if (output.length > 64) return failed();
+        if (output === "KINGPEPE_LEASE_READY_V1\r\n" || output === "KINGPEPE_LEASE_READY_V1\n") {
+          if (this.#confirmed) return failed();
+          this.#confirmed = true; clearTimeout(timer); resolve();
+        }
+      });
+      child.stdin.write(JSON.stringify(request) + "\n");
+    });
+    this.#ready.catch(() => {});
+  }
+  ready() { return this.#ready; }
+  assertHeld() { if (this.#closed || !this.#confirmed || this.#child.exitCode !== null || this.#child.signalCode !== null || this.#child.killed) throw new Error("ProtectedLifetimeLeaseLost"); }
+  async close() { this.#closed = true; this.#child.stdin.end(); await this.#ended; }
 }

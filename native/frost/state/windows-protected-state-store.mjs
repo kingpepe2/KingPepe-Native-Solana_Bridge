@@ -29,6 +29,12 @@ export class WindowsProtectedFrostStateStore {
     if (this.#store.context.environment !== bound.environment || this.#store.context.nativeGenesis !== bound.nativeGenesisHash ||
         this.#store.context.solanaDeployment !== bound.solanaDeployment || this.#store.context.keyEpoch !== bound.keyEpoch) throw new Error("ProtectedFrostPolicyMismatch");
   }
+  get context() { return this.#store.context; }
+  revisionOf(state) {
+    const revision = this.#revisions.get(state);
+    if (!revision) throw new Error("ProtectedFrostLoadRequired");
+    return revision;
+  }
   load() {
     const result = this.#store.read();
     try {
