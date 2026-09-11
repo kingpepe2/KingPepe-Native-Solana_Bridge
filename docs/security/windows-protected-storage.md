@@ -21,6 +21,10 @@ non-inherited DACL granting only the configured identity full access. Existing
 directories are never silently re-permissioned or adopted. Reads and updates
 require existing state and exact permissions; missing state cannot create keys.
 Roots must be local, separate, non-nested and outside the actual source checkout.
+The helper requires Windows to classify the drive as Fixed; a drive-letter path
+alone is insufficient. Network, removable and unknown drive types fail closed.
+New files receive an explicit identity-bound, protected DACL and security owner
+at creation rather than relying on the process token's default file descriptor.
 Linked/reparse paths, hard-linked files and broadened state ACLs are rejected.
 
 Each DPAPI envelope binds role, purpose, service identity, environment, Native
@@ -107,4 +111,6 @@ prerequisites, not KingPepe-exclusive dependencies. Reference semantics:
 [ProtectedData](https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.protecteddata),
 [FileShare](https://learn.microsoft.com/en-us/dotnet/api/system.io.fileshare) and
 [service access rights](https://learn.microsoft.com/en-us/windows/win32/services/service-security-and-access-rights).
+Also reviewed: [DriveInfo](https://learn.microsoft.com/en-us/dotnet/api/system.io.driveinfo.drivetype)
+and the [FileStream security-descriptor overload](https://learn.microsoft.com/en-us/dotnet/api/system.io.filestream.-ctor).
 These references and local tests are not an independent security audit.
