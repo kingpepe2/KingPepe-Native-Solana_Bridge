@@ -23,6 +23,17 @@
 
 ## Current task: Phase 08.5 security remediation
 
+The current continuation starts at 84ef95fba316944dd9c205e0f965d3b9ff725e64.
+That SHA's clean clone passed Windows/WSL Node 505 each, Windows security 27,
+Rust 97/quality, two SBF builds, deposit 55 and withdrawal-record 26; E2E
+COMPLETED. These are historical baseline results, not new-commit certification.
+The next increment adds DPAPI-backed mutual TLS and persistent transport replay
+checks, with restricted FROST and attester service handlers. See
+docs/security/service-ipc.md. All five remaining control groups must still be
+implemented/integrated and validated; do not stop merely because the elevated
+Windows cross-service environment or Actions is unavailable. Neither condition
+authorizes weaker tests, Phase 09, production provisioning or live funds.
+
 The latest Team request starts from 2b5c82971834d6299969c05a9889c950dae2ef91
 and authorizes remediation of the remaining Phase 01-08 security findings, not
 Phase 09. See docs/security/windows-protected-storage.md for the new DPAPI

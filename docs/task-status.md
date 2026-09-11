@@ -1,5 +1,17 @@
 # KingPepe Native - Solana Bridge Task Status
 
+## Current continuation: authenticated transport
+
+Baseline: 84ef95fba316944dd9c205e0f965d3b9ff725e64. Original protected mTLS
+transport/replay implementation, restricted FROST/attester handlers and tests
+passed Windows/WSL Node 508 each, Windows security 44, canonical vectors, new
+SBF builds and 55 real deposit checks; E2E COMPLETED and RECONCILED. See
+development-status and security/service-ipc for the measured scope.
+Next: finish scan/private publication, then persistent lifetime
+fencing and durable shared integrity/recovery controls. Do not start Phase 09.
+The non-elevated Windows cross-service test limitation and account-blocked CI
+remain explicit; they do not block remaining source implementation work.
+
 ## Phase 08.5 security remediation, partial increment (2026-09-11)
 
 The test-output correction is PRIVATE at f212983a67a43d7f988eb3ec878a322c2c16190d.

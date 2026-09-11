@@ -12,6 +12,7 @@ import {
 import { createNativeFrostSigningRequest, validateNativeFrostAbortReceipt } from "../policy/signing-request.mjs";
 import { createTwoPartyDkgRequest, normalizeNativeFrostKeyContext } from "../policy/dkg-request.mjs";
 import { deserializeFrostPublic } from "../signer/native-frost-signer.mjs";
+import { ProtectedRemoteFrostPeer } from "../signer/protected-service.mjs";
 
 export { createTwoPartyDkgRequest } from "../policy/dkg-request.mjs";
 
@@ -80,6 +81,31 @@ export class NativeFrostCoordinator {
     return this.signAutomatically(snapshot);
   }
 
+  async signAutomaticallyOverIpc(intent, options = {}) {
+    this.#requireReady();
+    const request = createNativeFrostSigningRequest(intent, options);
+    const signers = REQUIRED_FROST_SIGNERS.map(id => this.#signers.get(id));
+    if (!signers.every(signer => signer instanceof ProtectedRemoteFrostPeer)) throw new Error("ProtectedRemoteSignersRequired");
+    this.#coordinating = true;
+    try {
+      for (const signer of signers) await signer.verifyNativeEvidence(structuredClone(request.intent));
+      const commitments = [];
+      for (const signer of signers) commitments.push(await signer.signingCommitment(request));
+      validateCommitmentEnvelopes(request, commitments);
+      const shares = [];
+      for (const signer of signers) shares.push(await signer.signatureShare(request, commitments));
+      return this.#aggregate(request, commitments, shares);
+    } catch (error) {
+      let confirmed = true;
+      for (const signer of signers) {
+        try { validateNativeFrostAbortReceipt(await signer.abortSigningSession(request), request, signer.signerId); }
+        catch { confirmed = false; }
+      }
+      if (!confirmed) this.#hardStop = true;
+      throw error;
+    } finally { this.#coordinating = false; }
+  }
+
   signAutomatically(intent, options = {}) {
     this.#requireReady();
     const request = createNativeFrostSigningRequest(intent, options);
@@ -132,14 +158,21 @@ export class NativeFrostCoordinator {
   }
 
   #signRequest(request) {
-    const { requestId, intentDigest, messageHex, participantIds } = request;
+    const { participantIds } = request;
     const signers = participantIds.map((signerId) => this.#signers.get(signerId));
     const commitments = signers.map((signer) => signer.signingCommitment(request));
     validateCommitmentEnvelopes(request, commitments);
 
+    const shareEnvelopes = signers.map((signer) => signer.signatureShare(request, commitments));
+    return this.#aggregate(request, commitments, shareEnvelopes);
+  }
+
+  #aggregate(request, commitments, shareEnvelopes) {
+    const { requestId, intentDigest, messageHex, participantIds } = request;
+    validateCommitmentEnvelopes(request, commitments);
+    if (shareEnvelopes.length !== 2 || new Set(shareEnvelopes.map(s => s.signerId)).size !== 2) throw new Error("FrostShareParticipantSetRejected");
     const publicPackage = deserializeFrostPublic(this.#publicPackage);
     const nativeCommitments = commitments.map((entry) => deserializeCommitment(entry.commitment));
-    const shareEnvelopes = signers.map((signer) => signer.signatureShare(request, commitments));
     const validShares = {};
     for (const envelope of shareEnvelopes) {
       validateShareEnvelope(request, envelope);

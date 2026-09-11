@@ -292,7 +292,16 @@ jobs:
       - name: Install locked Node dependencies
         run: npm ci --ignore-scripts
       - name: Windows DPAPI and protected-state failure regressions (current test identity)
-        run: npm run test:windows-security
+        shell: pwsh
+        run: |
+          # Use the runner's installed Git OpenSSL for disposable TEST certificates.
+          # Never install from an unreviewed mirror or skip if unavailable.
+          $gitRoot = Split-Path (Split-Path (Get-Command git).Source)
+          $env:KINGPEPE_TEST_OPENSSL = Join-Path $gitRoot 'usr/bin/openssl.exe'
+          if (-not (Test-Path -LiteralPath $env:KINGPEPE_TEST_OPENSSL)) { throw 'TEST_OPENSSL_REQUIRED' }
+          & $env:KINGPEPE_TEST_OPENSSL version
+          if ($LASTEXITCODE -ne 0) { throw 'TEST_OPENSSL_UNAVAILABLE' }
+          npm run test:windows-security
       - name: Check exact provenance coverage and publication boundary
         run: node scripts/source-audit.mjs
       - name: Audit Node dependencies

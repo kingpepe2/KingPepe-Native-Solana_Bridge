@@ -2,6 +2,11 @@
   "schemaVersion": "1.0",
   "generatedAt": "2026-09-11T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
+  "phase085IpcReview": {
+    "baseline": "84ef95fba316944dd9c205e0f965d3b9ff725e64",
+    "sourceImports": "None. Original Node TLS framing, protected credential/replay glue, restricted service handlers and regression tests. Existing Noble aggregate verification reused without changing its cryptography. Node/OpenSSL implementations are not copied or vendored.",
+    "scope": "Localnet protected transport and handler increment, not complete Windows service isolation, lifetime fencing or service-wide recovery. No production/legacy changes or secret material in source."
+  },
   "purpose": "file-by-file provenance classification for local tracked content",
   "phase085ProtectedStoreReview": {
     "baseline": "2b5c82971834d6299969c05a9889c950dae2ef91",
@@ -1222,6 +1227,31 @@
       "path": "docs/security/windows-protected-storage.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
       "notes": "Original non-operational description of the protected-store implementation, measured limits, API references and outstanding security requirements."
+    },
+    {
+      "path": "shared/windows/service-ipc.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original mutually pinned TLS framing and DPAPI credential/replay adapter; reference-only use of Node TLS APIs."
+    },
+    {
+      "path": "native/frost/signer/protected-service.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original restricted FROST service handler and authenticated peer client; no private-share export or cryptographic algorithm replacement."
+    },
+    {
+      "path": "services/attesters/protected-service.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original operation-bound attester handler requiring a separately configured evidence verifier."
+    },
+    {
+      "path": "tests/windows/service-ipc.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original real TLS/DPAPI adversarial and FROST signature tests; disposable credentials generated externally, no operational material included."
+    },
+    {
+      "path": "docs/security/service-ipc.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original engineering description, test prerequisites and explicit remaining integration limitations."
     }
   ]
 }

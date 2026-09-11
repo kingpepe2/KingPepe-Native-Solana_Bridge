@@ -1,5 +1,29 @@
 # KingPepe Native - Solana Bridge Development Status
 
+## Phase 08.5 authenticated transport increment (2026-09-11)
+
+Baseline 84ef95fba316944dd9c205e0f965d3b9ff725e64 is PRIVATE and clean.
+The new transport uses actual TLS 1.3, DPAPI-held credentials, certificate pins,
+exact role/domain/session binding and persist-before-dispatch replay rejection.
+The restricted remote coordinator reuses Native FROST verification. Attesters
+require their own evidence verifier, not validator-supplied proof flags.
+Seventeen new Windows transport tests passed, including real A+B Schnorr over
+TLS, and three new attester-handler tests passed. Full worktree regression:
+Windows Node 508, Windows security 44, WSL Node 508, two canonical vectors per
+platform, fresh SBF builds and 55 deposit/recovery checks all passed. The real
+Native to Solana E2E reached COMPLETED and RECONCILED with no per-transfer Team
+approval. Source/provenance covers 198 files; guardrails and npm audit pass.
+These are worktree results; publication/final SHA evidence is separate. The
+Linux E2E remains the explicit isolated test-file adapter, not a Windows
+multi-service end-to-end certification.
+
+The Windows token remains non-elevated. Cross-account DPAPI/ACL certification is
+BLOCKED_ENVIRONMENT. IPC integration for supervisor/global stop, lifetime fencing,
+complete crash/broadcast-credit recovery, live deployment monitoring and deep
+reorg/freshness controls remain pending. Phase 09 NOT_STARTED; productionReady
+false; Mainnet disabled. CI baseline run 34548649999 has zero executed steps due
+to the account restriction; no bypass or passing CI claim.
+
 ## Phase 08.5 protected-store remediation increment (2026-09-11)
 
 The assertion-output correction was published PRIVATE at

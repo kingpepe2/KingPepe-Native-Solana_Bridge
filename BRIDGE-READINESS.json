@@ -8,6 +8,16 @@
   "lastUpdated": "2026-09-11",
   "currentPhase": "PHASE_08_5",
   "phase09": "NOT_STARTED",
+  "phase085FinalContinuation": {
+    "baselineSha": "84ef95fba316944dd9c205e0f965d3b9ff725e64",
+    "authenticatedIpc": "IMPLEMENTED_LOCALNET_COMPONENT_AND_FROST_PATH_TESTED_FULL_SERVICE_INTEGRATION_PENDING",
+    "newWindowsTransportTests": 17,
+    "newAttesterHandlerTests": 3,
+    "windowsCrossService": "BLOCKED_ENVIRONMENT_NON_ELEVATED_TOKEN",
+    "remainingControls": "LIFETIME_FENCING_GLOBAL_STOP_FULL_RECOVERY_DEPLOYMENT_MONITOR_DEEP_REORG_FRESHNESS",
+    "fullAudit": "INCOMPLETE",
+    "phase09": "NOT_STARTED"
+  },
   "securityRemediation": {
     "baselineSha": "2b5c82971834d6299969c05a9889c950dae2ef91",
     "publishedImplementationSha": "cba77159f5afbbea5aa1f95030e1b90c5fc990df",
