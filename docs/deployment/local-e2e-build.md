@@ -123,6 +123,13 @@ for the eight real post-mint regtest fork/incident tests. Fork controls apply
 only to the disposable regtest daemon; the runtime RPC adapter does not permit
 them. The completed mint and retained incident are not automatic economic repair.
 
+`node solana/tests/local-acceptance-checkpoint.mjs` uses another fresh external
+root and runs 13 real-chain checks. It advances Native blocks between preparation,
+FROST signing and attestations; current-chain/UTXO validation must still reproduce
+the original accepted proof and mint message. It also submits a forged prefix
+work/digest to the independent verifier and invalidates an accepted sweep. The
+saved checkpoint is public test evidence, not protected production recovery state.
+
 For clean-clone verification, use a new clone and new CARGO_TARGET_DIR and
 KINGPEPE_LOCAL_BUILD_ROOT outside it. Locked downloads/compiler installations may
 be reused after verification; compiled project artifacts may not. Run Node,

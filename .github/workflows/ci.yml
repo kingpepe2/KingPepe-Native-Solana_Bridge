@@ -139,6 +139,26 @@ jobs:
           '
           test "${flow_exit}" -eq 0
           test -z "$(find . -path './.git' -prune -o -name '*-keypair.json' -print)"
+      - name: Real delayed signing and immutable acceptance checkpoint (regtest only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="${KINGPEPE_CI_TOOL_ROOT}/solana-release/bin:${KINGPEPE_CI_TOOL_ROOT}/native-build/bin:${PATH}"
+          export KINGPEPE_LOCAL_E2E_ROOT="${KINGPEPE_CI_TOOL_ROOT}/acceptance-checkpoint-run"
+          export KINGPEPE_LOCAL_BUILD_ROOT="${KINGPEPE_CI_TOOL_ROOT}/build"
+          node solana/tests/local-acceptance-checkpoint.mjs > "${KINGPEPE_CI_TOOL_ROOT}/acceptance-checkpoint-result.json"
+          node --input-type=module -e '
+            import {readFileSync} from "node:fs";
+            const r = JSON.parse(readFileSync(process.env.KINGPEPE_CI_TOOL_ROOT + "/acceptance-checkpoint-result.json", "utf8"));
+            console.log(JSON.stringify({sourceSha: process.env.GITHUB_SHA, ...r}));
+            if (r.acceptanceCheckpoint?.pass !== 13 || r.acceptanceCheckpoint?.fail !== 0 || r.phase09 !== "NOT_STARTED" || r.fullNativeToSolanaE2e !== "COMPLETED") process.exit(1);
+            for (const check of ["REAL_NATIVE_ACCEPTED_FROST_AND_SOLANA_MINT_AFTER_TIP_ADVANCE",
+              "FORGED_PREFIX_WORK_AND_DIGEST_REJECTED_BY_INDEPENDENT_RUST", "HISTORICALLY_INCLUDED_BUT_NOW_SPENT_INPUT_REJECTED",
+              "REORGANIZED_ACCEPTED_SWEEP_REJECTED_WITHOUT_NEW_CREDIT"]) {
+              if (!r.acceptanceCheckpoint.passed.includes(check)) process.exit(1);
+            }
+          '
+
       - name: Real atomic withdrawal-record prerequisite (no Native payout)
         shell: bash
         run: |

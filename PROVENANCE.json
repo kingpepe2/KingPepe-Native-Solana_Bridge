@@ -2,6 +2,13 @@
   "schemaVersion": "1.0",
   "generatedAt": "2026-09-11T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
+  "phase085AcceptanceRecoveryReview": {
+    "baseline": "858dc041c922add58f0af1c98efeca8094774339",
+    "filesBefore": 219,
+    "filesAfter": 220,
+    "sourceImports": "None. Original retained acceptance-prefix revalidation, existing independent Rust verifier integration and real local-chain regression.",
+    "scope": "Fixed evidence identity for delayed signing/attestation; current chain and UTXO checks remain mandatory. This is not complete durable operation recovery."
+  },
   "phase085SourceHealthReview": {
     "baseline": "3dc8288aeb25e19608dc37b35b06428632b4d4cb",
     "filesBefore": 216,
@@ -331,6 +338,11 @@
     ]
   },
   "trackedFiles": [
+    {
+      "path": "solana/tests/local-acceptance-checkpoint.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original real regtest/local-validator acceptance-prefix, delayed signing and immutable-credit regression; isolated generated test state remains external."
+    },
     {
       "path": "tests/windows/integrity-authority-actor.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",

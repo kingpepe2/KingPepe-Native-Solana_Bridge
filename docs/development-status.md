@@ -1,5 +1,41 @@
 # KingPepe Native - Solana Bridge Development Status
 
+## Phase 08.5 immutable Native acceptance recovery under validation
+
+Source-health admission is PRIVATE at 858dc041c922add58f0af1c98efeca8094774339.
+Exact Actions [34574760811](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34574760811)
+started zero steps in four jobs and produced zero artifacts. The unchanged
+recent-payment/spending-limit annotation applies: NOT_RUN_ACCOUNT_BLOCKED.
+The final source/staged scans and its single outgoing commit passed before push.
+
+Native proof identity previously moved with the tip, preventing delayed signing
+or attestations from reproducing a pending operation's exact message digest.
+New code retains a versioned acceptance checkpoint. Every reuse verifies the
+current branch with the independent Rust verifier, reconstructs and verifies the
+accepted raw prefix, and checks UTXO availability at the current verified tip.
+It never treats historical inclusion as current unspent state or a caller-supplied
+checkpoint as proof. The credit message is not rewritten to follow the tip.
+
+The new real-chain regression passed 13 checks: tip advancement before FROST and
+attestations still reaches COMPLETED, exact pending credit is minted/reconciled
+once, restored public checkpoint data is reverified, forged prefix work/digest is
+rejected by Rust, spent inputs fail and invalidated accepted sweeping fails.
+The nine raw-evidence unit tests and 17 CI-contract tests also pass. Adding the
+new CI step exposed a positional extraction assumption in the contract test;
+unique result-file selection now checks the actual gate, including six new
+negative/positive report fixtures. This tests CI logic, not chain execution.
+Full Windows/WSL Node 557, vectors two each and Rust 97/check/fmt/all-features Clippy
+pass. Rust project sources are unchanged; this Rust rerun reuses the separately
+built external targets, not final clean-clone evidence. New SBF builds and the
+existing real chains passed 55 deposit, 26 withdrawal-record and 18 deployment
+checks; all eight reorg checks also pass. npm reports zero vulnerabilities;
+provenance covers 220 files, declared-license metadata passes and all 175 prior
+commits passed Gitleaks. Cross-service Windows certification remains blocked by
+the non-elevated token; no temporary accounts or production services were created.
+Complete operation-state,
+broadcast-to-credit and protected Windows chain recovery remain unfinished.
+Phase 09 NOT_STARTED; productionReady=false; Mainnet disabled.
+
 ## Phase 08.5 source-health admission under validation
 
 Retained profile-witness source was published PRIVATE at

@@ -24,8 +24,8 @@
 ## Current task: Phase 08.5 security remediation
 
 Phase 09 is NOT_STARTED. The current published source is
-3dc8288aeb25e19608dc37b35b06428632b4d4cb, PRIVATE. Exact Actions
-34571360200 started zero steps in four jobs and produced zero artifacts:
+858dc041c922add58f0af1c98efeca8094774339, PRIVATE. Exact Actions
+34574760811 started zero steps in four jobs and produced zero artifacts:
 NOT_RUN_ACCOUNT_BLOCKED. No account, billing, privacy or protection bypass.
 
 The Native accepted-basis/reorg increment is published. Windows/WSL Node 537,
@@ -47,7 +47,7 @@ witness survives file-package restore while
 the service profile remains current, not full profile/host co-restore. No
 runtime reset, automatic legacy enrollment or production provisioning was added.
 
-Current uncommitted work adds source-health admission after supervisor restart.
+The source-health admission increment is published after supervisor restart.
 Persisted RUNNING policy is effectively paused until all three source roles
 complete fresh one-use checks in the current supervisor generation. Windows/WSL
 Node 549 and vectors two each, fresh Rust 97/check/fmt/Clippy and the real chain
@@ -56,6 +56,14 @@ security regression passes 82 with zero failures/skips. Protected A+B passes wit
 separate supervisor process; no signing deadline or freshness gate was relaxed.
 Its source watchdog is synthetic component-test evidence only, never runtime or
 chain/reconciliation evidence. See development-status for failed-run corrections.
+
+Current uncommitted recovery work retains a fixed Native acceptance checkpoint
+while independently verifying the current chain and UTXOs. The new real-chain
+13-check regression passes through Native-accepted FROST, both attestations,
+mint and reconciliation after deliberate tip advancement. Full Windows/WSL Node
+557, vectors two each, Rust 97/check/fmt/Clippy and existing chain checks 55/26/18/8
+pass. No complete operation-journal or
+crash-recovery claim is made.
 
 Implemented local components: protected CurrentUser DPAPI/file boundaries;
 mutual TLS role-bound IPC; separate retained signer fence and lifetime handle;
@@ -120,6 +128,7 @@ Use verified process-local tools; do not modify global defaults just for tests.
 - node solana/tests/local-deployment-integrity.mjs (requires the exact reviewed
   KINGPEPE_TEST_SOURCE_SHA; no inferred worktree certification).
 - node solana/tests/local-native-reorg.mjs.
+- node solana/tests/local-acceptance-checkpoint.mjs.
   Each daemon run requires a NEW external KINGPEPE_LOCAL_E2E_ROOT. Never reset an
   existing ledger. See the build guide for external outputs and locked SBF builds.
 - Fresh-clone proof requires new compiled project outputs, not copied targets.

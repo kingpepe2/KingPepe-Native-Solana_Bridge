@@ -534,6 +534,7 @@ export async function executeNativeDepositObservationFlow({
       validateDepositIntent();
       return nativeVerifier.verifySweepSigning({
         inputs: evidenceInputs, minimumConfirmations: config.depositFinalityBlocks,
+        acceptedCheckpoint: inputEvidence.acceptedCheckpoint,
         unsignedTransactionHex: reserveSweepDraft.unsignedNativeTransactionHex,
         reserveAmountAtomic: config.amountAtomic, feeAtomic: config.reserveMinerFeeAtomic,
         reserveScriptHex: custodyScriptPubKeyHex, intent, tapscriptSpends,
@@ -630,7 +631,7 @@ export async function executeNativeDepositObservationFlow({
       operationIdHex,
       nativeEvidenceValidator: async (role) => {
         validateDepositIntent();
-        const result = await nativeVerifier.verifyReserve(reserveEvidenceInput);
+        const result = await nativeVerifier.verifyReserve({ ...reserveEvidenceInput, acceptedCheckpoint: reserveEvidence.acceptedCheckpoint });
         attesterEvidence[role] = result;
         return result;
       },

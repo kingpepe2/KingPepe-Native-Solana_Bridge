@@ -8,10 +8,45 @@ import test from "node:test";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../..");
 const workflow = readFileSync(path.join(REPO_ROOT, ".github/workflows/ci.yml"), "utf8");
-const code = workflow.match(/node --input-type=module -e '\r?\n([\s\S]*?)^ {10}'/mu)?.[1];
+const gates = [...workflow.matchAll(/node --input-type=module -e '\r?\n([\s\S]*?)^ {10}'/gmu)].map(match => match[1]);
+function gateFor(file) {
+  const matches = gates.filter(block => block.includes('"/' + file + '"'));
+  assert.equal(matches.length, 1, "ExactUniqueWorkflowResultGateRequired");
+  assert(matches[0].length < 16_384, "WorkflowGateSizeBoundRequired"); return matches[0];
+}
+const code = gateFor("result.json");
 assert.ok(code?.includes("localClaimRetry") && code.length < 16_384, "LocalE2eWorkflowGateRequired");
-const withdrawalCode = [...workflow.matchAll(/node --input-type=module -e '\r?\n([\s\S]*?)^ {10}'/gmu)][1]?.[1];
+const withdrawalCode = gateFor("withdrawal-record-result.json");
 assert.ok(withdrawalCode?.includes("withdrawalRecord") && withdrawalCode.length < 16_384, "WithdrawalRecordWorkflowGateRequired");
+const acceptanceCode = gateFor("acceptance-checkpoint-result.json");
+assert(acceptanceCode.includes("acceptanceCheckpoint"), "AcceptanceCheckpointWorkflowGateRequired");
+
+for (const [name, change, expected] of [
+  ["accepts all thirteen actual-chain checks", () => {}, 0],
+  ["rejects an incomplete count", r => { r.acceptanceCheckpoint.pass = 12; }, 1],
+  ["requires independent forged-work rejection", r => { r.acceptanceCheckpoint.passed.splice(1, 1); }, 1],
+  ["rejects any failure", r => { r.acceptanceCheckpoint.fail = 1; }, 1],
+  ["requires the completed economic flow", r => { r.fullNativeToSolanaE2e = "NOT_RUN"; }, 1],
+  ["rejects starting Phase 09", r => { r.phase09 = "STARTED"; }, 1],
+]) test(`CI immutable acceptance gate ${name}`, () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-ci-gate-test-"));
+  try {
+    const result = { phase09: "NOT_STARTED", fullNativeToSolanaE2e: "COMPLETED", acceptanceCheckpoint: { pass: 13, fail: 0,
+      passed: ["REAL_NATIVE_ACCEPTED_FROST_AND_SOLANA_MINT_AFTER_TIP_ADVANCE", "FORGED_PREFIX_WORK_AND_DIGEST_REJECTED_BY_INDEPENDENT_RUST",
+        "HISTORICALLY_INCLUDED_BUT_NOW_SPENT_INPUT_REJECTED", "REORGANIZED_ACCEPTED_SWEEP_REJECTED_WITHOUT_NEW_CREDIT"] } };
+    change(result);
+    writeFileSync(path.join(root, "acceptance-checkpoint-result.json"), JSON.stringify(result), { flag: "wx", mode: 0o600 });
+    const child = spawnSync(process.execPath, ["--input-type=module", "-e", acceptanceCode], {
+      cwd: REPO_ROOT, env: { ...process.env, KINGPEPE_CI_TOOL_ROOT: root, GITHUB_SHA: "0".repeat(40) },
+      encoding: "utf8", timeout: 10_000, maxBuffer: 8192, windowsHide: true,
+    });
+    assert.equal(child.error, undefined, "WorkflowGateExecutionFailed"); assert.equal(child.signal, null);
+    assert.equal(child.status, expected); assert.equal(JSON.parse(child.stdout).sourceSha, "0".repeat(40));
+  } finally {
+    assert.equal(path.dirname(root), path.resolve(os.tmpdir())); assert(path.basename(root).startsWith("kingpepe-ci-gate-test-"));
+    assert(lstatSync(root).isDirectory() && !lstatSync(root).isSymbolicLink()); rmSync(root, { recursive: true, force: true });
+  }
+});
 
 function completeResult() {
   return {

@@ -1,5 +1,16 @@
 # KingPepe Native - Solana Bridge Task Status
 
+## Current continuation: immutable Native acceptance checkpoint
+
+Published PRIVATE: 858dc041c922add58f0af1c98efeca8094774339. Exact Actions
+34574760811: four jobs, zero steps/artifacts, NOT_RUN_ACCOUNT_BLOCKED.
+The retained acceptance-prefix fix passes 13 new real-chain checks through
+COMPLETED with deliberately advancing Native headers. Full Windows/WSL Node 557,
+vectors two each, Rust 97/quality and real chain checks 55/26/18/8 pass.
+Finish scans/review/publication, then complete durable operation and
+broadcast-credit recovery, live reconciliation and protected Windows chain
+integration. No complete Phase 08.5 or Phase 09 entry-gate PASS is claimed.
+
 ## Current continuation: restart source-health admission
 
 Witness increment published PRIVATE: 3dc8288aeb25e19608dc37b35b06428632b4d4cb.
