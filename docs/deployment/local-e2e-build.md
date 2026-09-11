@@ -108,6 +108,21 @@ the failure evidence. The disposable 600000-unit budget is explicit: the default
 200000-unit budget was measured to fail. No production compute/fee policy is set.
 These probes leave unpaid test withdrawals and never construct Native payouts.
 
+Run `node solana/tests/local-deployment-integrity.mjs` in another fresh external
+root for the 18 real deployment/authority/bytecode checks. Set
+`KINGPEPE_TEST_SOURCE_SHA` to the exact reviewed source commit being tested;
+the manifest rejects an absent or malformed SHA. CI supplies `GITHUB_SHA`.
+An uncommitted worktree may be tested, but the report must identify it as worktree
+evidence, not certification of its parent commit. This probe builds explicit
+SBPF v3 upgrade-test binaries; normal program builds remain SBPF v0. The hashes
+are different and must not be interchanged in manifests. The real upgrade test
+uses the required ProgramData extension and waits for a later finalized bank.
+
+Run `node solana/tests/local-native-reorg.mjs` in another fresh external root
+for the eight real post-mint regtest fork/incident tests. Fork controls apply
+only to the disposable regtest daemon; the runtime RPC adapter does not permit
+them. The completed mint and retained incident are not automatic economic repair.
+
 For clean-clone verification, use a new clone and new CARGO_TARGET_DIR and
 KINGPEPE_LOCAL_BUILD_ROOT outside it. Locked downloads/compiler installations may
 be reused after verification; compiled project artifacts may not. Run Node,

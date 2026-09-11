@@ -1,5 +1,55 @@
 # KingPepe Native - Solana Bridge Development Status
 
+## Phase 08.5 source-health admission under validation
+
+Retained profile-witness source was published PRIVATE at
+3dc8288aeb25e19608dc37b35b06428632b4d4cb. Its exact Actions
+[34571360200](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34571360200)
+started zero steps in four jobs and produced zero artifacts. GitHub's message:
+"The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings".
+CI is NOT_RUN_ACCOUNT_BLOCKED. Working/staged scans and the single outgoing
+commit passed before publication. No runtime material or artifacts were uploaded.
+
+New admission code separates durable policy from fresh source readiness. A
+supervisor restart never restores old health permission. Exactly the Native
+observer, Solana observer and reconciliation roles must complete current-generation
+one-use challenges. Health expires from challenge issue, not response receipt;
+an outage, stale result or missing source suspends authorization. Pending polls
+cannot extend a previous verified lease, which retains its original expiry.
+Healthy reports cannot clear PAUSED_POLICY or HARD_STOP_INTEGRITY. Observers
+publish health only after their actual verification and protected progress write.
+This service assertion is not independent consensus or a transfer approval.
+
+Twelve pure policy tests, both actual mTLS admission tests and the protected
+deployment monitor target pass (three Windows targeted checks). Final Windows/WSL
+Node 549, two canonical vectors each, fresh Rust 97/check/fmt/all-features Clippy
+and both attester TLS targets pass. The initial FROST target failed its unchanged
+response deadline because the fixture's synthetic health watchdog did synchronous
+DPAPI work in the same process as signing. Moving that fixture supervisor/watchdog
+to a separate actual process passed the protected A+B rerun. The final full Windows
+security suite passed 82 with zero failures/skips, including process-killed FROST
+sessions and retained-witness rollback tests. No signing deadline, freshness requirement or
+gate was relaxed. Selected
+Windows signature component fixtures have an explicitly synthetic source watchdog;
+it is not used by the runtime, real E2E harness or live observer tests.
+
+Fresh SBF builds and real chains passed 55 deposit checks, 26 withdrawal-record
+prerequisite checks, 18 deployment-integrity checks and eight Native reorg checks;
+each fresh Native-to-Solana deposit reached COMPLETED. An initial deployment
+probe was rejected before its assertions because the invocation omitted the
+required source SHA. The corrected invocation passed from a new isolated root.
+The build guide now states that prerequisite; no default or manifest bypass was
+added. These are worktree results, not certification of the parent SHA or a final
+fresh clone. Program sources are unchanged from the parent commit.
+
+Exact provenance covers 219 files; declared-license metadata passes. npm reports
+zero vulnerabilities. Current/staged source and all 174 prior commits passed
+Gitleaks; guardrails pass. All five Cargo audits pass their configured error gates
+with the Solana bincode RUSTSEC-2025-0141 unmaintained warning retained. Full
+reconciliation publishing, durable operation/broadcast-credit recovery and protected
+Windows chain integration remain unfinished. The final clean-clone audit and
+Phase 09 entry gate remain incomplete; productionReady=false; Mainnet disabled.
+
 ## Phase 08.5 retained Windows profile witness validated for publication
 
 Native reorg component published PRIVATE at

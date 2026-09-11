@@ -10,6 +10,40 @@ and validates the protected state, not just an in-memory flag. Confirmed inciden
 records are persisted before acknowledgement. Repeated identical reports are
 idempotent. The incident log is bounded and never automatically pruned.
 
+## Fresh source admission
+
+The authority now separates persisted policy from effective service readiness.
+Opening it, including with persisted RUNNING policy, creates an empty source
+health window. Effective state is PAUSED_POLICY until NATIVE_OBSERVER,
+SOLANA_OBSERVER and RECONCILIATION each complete a new challenge over their
+role-bound authenticated channel. Each challenge binds the supervisor generation,
+role and observation operation ID, is random and one-use, and expires thirty
+seconds after issuance. Delayed replies do not renew the deadline. A pending
+poll may retain only the preceding verified result's unexpired lease; it cannot
+extend that lease or manufacture new evidence. An unavailable result revokes it
+immediately, and a lost reporter expires without renewal. This prevents routine
+periodic polling from starving valid transfers while preserving the fixed age
+bound. Initial/restarted authorities have no preceding health lease. Clock rollback,
+wrong role/generation, substitution and replay fail closed. State is bounded to
+three pending and three completed checks; no observation queue grows indefinitely.
+
+The Native and Solana monitor wrappers request the challenge before reading the
+source. They report a match only after verification and durable progress update;
+unavailability produces safe suspension, not an invented reserve deficit. Failed
+health reports cannot renew authorization. A healthy report changes neither the
+durable policy nor an integrity incident. Even all three healthy sources cannot
+clear PAUSED_POLICY or HARD_STOP_INTEGRITY. Ordinary service recovery is automatic;
+there is no per-transfer Team approval or automatic integrity-stop clearing.
+
+Authenticated source reports identify a trusted detector; they do not prove chain
+consensus and are not economic authorization. The signers and attesters still
+perform their own transaction/evidence checks. Current role/generation admission
+tests with synthetic source payloads are explicitly component tests, not proof
+of complete reconciliation or protected real-chain execution. A live, independently
+checking reconciliation publisher and full operation recovery remain required.
+Source health does not bypass the IPC's explicit bounded replay-store capacity;
+capacity exhaustion remains fail-closed, not automatic record pruning.
+
 Authenticated service clients use mutually pinned TLS. Exact roles control
 allowed actions and incident types. Native/Solana observers, reconciliation and
 signers can report their respective contradictions; an indexer cannot authorize

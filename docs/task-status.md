@@ -1,5 +1,18 @@
 # KingPepe Native - Solana Bridge Task Status
 
+## Current continuation: restart source-health admission
+
+Witness increment published PRIVATE: 3dc8288aeb25e19608dc37b35b06428632b4d4cb.
+Exact CI 34571360200: zero steps/artifacts, NOT_RUN_ACCOUNT_BLOCKED. Source-health
+worktree validation passes Windows/WSL Node 549, vectors two each, fresh Rust 97
+and quality gates, new SBF builds and real chains 55/26/18/8. Protected A+B targeted
+signing passes after separating its synthetic supervisor fixture process. The
+full Windows security run passes 82, zero failures/skips. Source health code is
+validated for publication;
+scan/review/publish, then complete the remaining operation and broadcast-credit
+recovery plus protected chain integration. Synthetic test health assertions are
+not chain evidence. Final fresh-clone audit remains required. Phase 09 NOT_STARTED.
+
 ## Current continuation: retained protected-store witness
 
 Published PRIVATE: 00a6cf10024bec5b4ba3a644f7560c1ac64df5e4. Exact Actions

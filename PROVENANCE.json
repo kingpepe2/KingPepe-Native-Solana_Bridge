@@ -2,6 +2,13 @@
   "schemaVersion": "1.0",
   "generatedAt": "2026-09-11T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
+  "phase085SourceHealthReview": {
+    "baseline": "3dc8288aeb25e19608dc37b35b06428632b4d4cb",
+    "filesBefore": 216,
+    "filesAfter": 219,
+    "sourceImports": "None. Original generation-bound source admission window, authenticated authority methods, observer integration and tests.",
+    "scope": "Freshness gating is not chain proof, completed reconciliation/recovery wiring or production activation. Windows component fixtures explicitly identify synthetic source evidence."
+  },
   "phase085RetainedWitnessReview": {
     "baseline": "00a6cf10024bec5b4ba3a644f7560c1ac64df5e4",
     "filesBefore": 215,
@@ -324,6 +331,21 @@
     ]
   },
   "trackedFiles": [
+    {
+      "path": "tests/windows/integrity-authority-actor.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated current-principal test supervisor with bounded private child-control frames and explicitly synthetic health reports; no runtime fallback or cross-account certification."
+    },
+    {
+      "path": "shared/source-health-window.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original bounded one-use current-supervisor-generation source admission state; no transfer or consensus authority."
+    },
+    {
+      "path": "scripts/tests/source-health-window.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original pure freshness/replay/role/restart tests with explicit non-chain fixtures and a unit clock; no operational state."
+    },
     {
       "path": "tests/windows/protected-witness-test-helper.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",

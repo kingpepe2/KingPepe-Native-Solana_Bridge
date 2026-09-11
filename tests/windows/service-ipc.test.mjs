@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { existsSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { createHash, randomBytes } from "node:crypto";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import tls from "node:tls";
 import http from "node:http";
 import path from "node:path";
@@ -29,6 +29,7 @@ import { LocalNativeEvidenceVerifier } from "../../native/node/native-raw-eviden
 import { ProtectedNativeIntegrityMonitor, compareNativeProgress } from "../../native/node/native-integrity.mjs";
 import { nativeProgressFixture } from "../integration/native-progress-fixture.mjs";
 import { witnessTestAction } from "./protected-witness-test-helper.mjs";
+import { SOURCE_HEALTH_ROLES } from "../../shared/source-health-window.mjs";
 
 if (process.platform !== "win32") throw new Error("WINDOWS_IPC_TESTS_REQUIRE_WINDOWS");
 const repoRoot = path.resolve(import.meta.dirname, "../.."), serviceSid = windowsCurrentServiceSid();
@@ -93,6 +94,101 @@ async function integrityFixture(t, initialState = "RUNNING") {
       return { ...f, port, guard: new RemoteIntegrityGuard({ ipc: f.client, port }) };
     } };
 }
+
+async function isolatedIntegrityFixture(t) {
+  // Real process separation keeps the synthetic source watchdog independent of
+  // synchronous signer DPAPI work. No private FROST material crosses this pipe.
+  const root = temporary(t), opts = options(root, "authority", "SUPERVISOR", "global-integrity");
+  const child = spawn(process.execPath, [path.join(import.meta.dirname, "integrity-authority-actor.mjs")], { windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
+  let id = 0, buffer = ""; const pending = new Map(), ended = new Promise(resolve => child.once("close", resolve));
+  const failed = () => { for (const p of pending.values()) { clearTimeout(p.timer); p.reject(new Error("TestAuthorityActorUnavailable")); } pending.clear(); };
+  child.on("error", failed); child.on("close", failed); child.stderr.on("data", failed); child.stdin.on("error", failed);
+  child.stdout.on("data", b => {
+    buffer += b.toString("utf8"); if (buffer.length > 16384) { failed(); child.kill(); return; }
+    for (;;) {
+      const at = buffer.indexOf("\n"); if (at < 0) break;
+      const line = buffer.slice(0, at); buffer = buffer.slice(at + 1);
+      try {
+        const [responseId, ok, result] = JSON.parse(line), p = pending.get(responseId); assert(p);
+        clearTimeout(p.timer); pending.delete(responseId); if (ok) p.resolve(result); else p.reject(new Error("TestAuthorityActorRejected"));
+      } catch { failed(); child.kill(); }
+    }
+  });
+  const call = (method, payload = {}) => new Promise((resolve, reject) => {
+    const requestId = ++id, timer = setTimeout(() => { pending.delete(requestId); reject(new Error("TestAuthorityActorTimeout")); }, 15000);
+    pending.set(requestId, { resolve, reject, timer }); child.stdin.write(JSON.stringify([requestId, method, payload]) + "\n");
+  });
+  cleanups.get(root).push(async () => {
+    try { await call("CLOSE"); } finally { child.stdin.end();
+      const timer = setTimeout(() => child.kill(), 10000); try { await ended; } finally { clearTimeout(timer); } }
+  });
+  await call("INIT", opts);
+  return { authority: { status: () => call("STATUS") }, restart: () => call("REOPEN"), enableTestSources: () => call("WATCH_TEST_SOURCES"),
+    async peer(role) {
+      const f = fixture(t, "SUPERVISOR", role), port = await f.server.listen(input => call("HANDLE", input));
+      return { ...f, port, guard: new RemoteIntegrityGuard({ ipc: f.client, port }) };
+    } };
+}
+
+// ONLY the synthetic FROST/attester component fixtures use this watchdog.
+// It does not represent a chain or reconciliation check. Dedicated admission
+// tests below use real mutually authenticated reports and never this helper.
+function testOnlyHealthySources(t, global) {
+  const pulse = () => {
+    for (const peerRole of SOURCE_HEALTH_ROLES) {
+      const operationId = h("synthetic-health-" + peerRole);
+      const { check } = global.authority.handle({ peerRole, operationId, method: "beginSourceCheck", payload: {} });
+      global.authority.handle({ peerRole, operationId, method: "finishSourceCheck", payload: {
+        generation: check.generation, challenge: check.challenge, state: "OBSERVED_MATCH", evidenceDigest: h("TEST_ONLY_SOURCE_FIXTURE") } });
+    }
+  };
+  pulse();
+  const timer = setInterval(() => { try { pulse(); } catch { clearInterval(timer); } }, 10000);
+  t.after(() => clearInterval(timer));
+}
+
+test("persisted RUNNING requires fresh mutually authenticated source checks after restart", async t => {
+  const f = await integrityFixture(t), peers = [];
+  for (const role of SOURCE_HEALTH_ROLES) peers.push(await f.peer(role));
+  const signer = await f.peer("KINGPEPE_FROST_A");
+  assert.equal(f.authority.status().policyState, "RUNNING");
+  assert.deepEqual(f.authority.status().missingSources, SOURCE_HEALTH_ROLES);
+  await assert.rejects(signer.guard.assertRunning(h("not-ready"), "FROST_SIGN"));
+  await assert.rejects(signer.guard.beginSourceCheck(h("impersonated-observer")));
+  const finish = async p => {
+    const ticket = await p.guard.beginSourceCheck(h("test-observation"));
+    await p.guard.finishSourceCheck(ticket, { state: "OBSERVED_MATCH", evidenceDigest: h("SYNTHETIC_ADMISSION_TEST_ONLY") }); return ticket;
+  };
+  for (const peer of peers) await finish(peer);
+  await signer.guard.assertRunning(h("admission-only-not-a-signature"), "FROST_SIGN");
+  const unavailable = await peers[0].guard.beginSourceCheck(h("source-unavailable"));
+  await peers[0].guard.finishSourceCheck(unavailable, { state: "WAITING_FOR_DEPENDENCY", evidenceDigest: h("unavailable") });
+  await assert.rejects(signer.guard.assertRunning(h("source-unavailable"), "FROST_SIGN"));
+  const old = await peers[0].guard.beginSourceCheck(h("old-incarnation"));
+  await f.restart();
+  assert.equal(f.authority.status().policyState, "RUNNING");
+  assert.equal(f.authority.status().state, "PAUSED_POLICY");
+  assert.deepEqual(f.authority.status().missingSources, SOURCE_HEALTH_ROLES);
+  await assert.rejects(peers[0].guard.finishSourceCheck(old, { state: "OBSERVED_MATCH", evidenceDigest: h("old-result") }));
+  await assert.rejects(signer.guard.assertRunning(h("after-restart"), "FROST_SIGN"));
+});
+
+test("authenticated source admission rejects unauthorized role, token substitution and replay", async t => {
+  const f = await integrityFixture(t), native = await f.peer("NATIVE_OBSERVER"), solana = await f.peer("SOLANA_OBSERVER"), relayer = await f.peer("RELAYER");
+  const operationId = h("source-binding");
+  await assert.rejects(relayer.client.request(relayer.port, { method: "beginSourceCheck", operationId, payload: {} }));
+  const ticket = await native.guard.beginSourceCheck(operationId), result = { state: "OBSERVED_MATCH", evidenceDigest: h("TEST_ONLY_SOURCE_FIXTURE") };
+  await assert.rejects(solana.guard.finishSourceCheck(ticket, result));
+  await assert.rejects(native.guard.finishSourceCheck({ ...ticket }, result));
+  await assert.rejects(native.client.request(native.port, { method: "finishSourceCheck", operationId: h("wrong-operation"),
+    payload: { ...result, generation: ticket.generation, challenge: ticket.challenge } }));
+  await native.guard.finishSourceCheck(ticket, { ...result, state: "WAITING_FOR_DEPENDENCY" });
+  await assert.rejects(native.guard.finishSourceCheck(ticket, result));
+  assert.equal(f.authority.status().state, "PAUSED_POLICY"); assert.equal(f.authority.status().incidentCount, 0);
+  await native.guard.report(operationId, "NATIVE_DEEP_REORG", h("confirmed-test-incident"));
+  await native.guard.finishSourceCheck(await native.guard.beginSourceCheck(operationId), result);
+  assert.equal(f.authority.status().state, "HARD_STOP_INTEGRITY");
+});
 
 for (const role of REQUIRED_FROST_SIGNERS) test("real mutual TLS and protected replay persistence: " + role, async t => {
   const f = fixture(t, role); let calls = 0;
@@ -190,7 +286,7 @@ test("an admitted request cannot return a late result", async t => {
 });
 
 test("actual protected A+B FROST signing through authenticated endpoints", async t => {
-  const global = await integrityFixture(t);
+  const global = await isolatedIntegrityFixture(t);
   const guards = await Promise.all(REQUIRED_FROST_SIGNERS.map(role => global.peer(role)));
   const coordinatorGuard = (await global.peer("COORDINATOR")).guard;
   const f = [fixture(t, "KINGPEPE_FROST_A"), fixture(t, "KINGPEPE_FROST_B")];
@@ -229,6 +325,7 @@ test("actual protected A+B FROST signing through authenticated endpoints", async
   }
   const peers = f.map((v, i) => new ProtectedRemoteFrostPeer({ ipc: v.client, port: ports[i], signerId: v.role }));
   const coordinator = new NativeFrostCoordinator({ signers: peers, publicPackage: dkg.publicPackage, aggregateTweakedXOnlyPublicKey: dkg.aggregateTweakedXOnlyPublicKey, integrity: coordinatorGuard });
+  await global.enableTestSources();
   let signed;
   try { signed = await coordinator.signAutomaticallyOverIpc(intent); }
   catch { throw new Error("ProtectedFrostIpcFailure:" + f.map(v => v.server.lastRejection ?? "UNREPORTED").join(",") + ":" + handlerFaults.join(",")); }
@@ -236,7 +333,7 @@ test("actual protected A+B FROST signing through authenticated endpoints", async
   assert(verificationCounts.every(count => count >= 3), "FreshEvidenceRequiredAtEverySigningBoundary");
   await assert.rejects(f[0].client.request(ports[0], { method: "verifyNativeEvidence", operationId: h("wrong-operation"), payload: intent }));
   await assert.rejects(coordinator.signAutomaticallyOverIpc({ ...intent, amountAtomic: "999" }));
-  assert.equal(global.authority.status().state, "RUNNING", "UncertaintyIsNotConfirmedContradiction");
+  assert.equal((await global.authority.status()).policyState, "RUNNING", "UncertaintyIsNotConfirmedContradiction");
   await guards[0].guard.report(intent.operationId, "SIGNER_ROLLBACK", h("confirmed-test-rollback"));
   await global.restart();
   await assert.rejects(f[0].client.request(ports[0], { method: "signingCommitment", operationId: intent.operationId, payload: { request: createNativeFrostSigningRequest(intent) } }));
@@ -249,7 +346,7 @@ test("actual protected A+B FROST signing through authenticated endpoints", async
 test("durable global stop propagates to every service role and survives authority/client restart", async t => {
   const f = await integrityFixture(t), peers = [];
   for (const role of INTEGRITY_ROLES) peers.push(await f.peer(role));
-  for (const p of peers) assert.equal((await p.guard.status(h("status"))).state, "RUNNING");
+  for (const p of peers) assert.equal((await p.guard.status(h("status"))).state, "PAUSED_POLICY");
   const native = peers.find(p => p.client.role === "NATIVE_OBSERVER");
   await native.guard.report(h("affected-operation"), "NATIVE_DEEP_REORG", h("raw-reorg-evidence"));
   assert.equal(f.authority.status().incidentCount, 1);
@@ -273,7 +370,7 @@ for (const [role, code] of [["SOLANA_OBSERVER", "SOLANA_DEPLOYMENT_CHANGED"], ["
   test("protected global integrity report and durable reopen: " + role, async t => {
     const f = await integrityFixture(t), peer = await f.peer(role);
     await assert.rejects(peer.guard.report(h("test"), "SOURCE_UNAVAILABLE", h("not-a-contradiction")));
-    assert.equal(f.authority.status().state, "RUNNING");
+    assert.equal(f.authority.status().policyState, "RUNNING");
     await peer.guard.report(h("test"), code, h("confirmed-evidence"));
     await f.restart(); assert.equal((await peer.guard.status(h("test"))).state, "HARD_STOP_INTEGRITY");
   });
@@ -321,6 +418,7 @@ for (const role of ["ATTESTER_A", "ATTESTER_B"]) test("real protected attester T
   } });
   const port = await f.server.listen(handler), input = { method: "attestDeposit", operationId: decoded.operationIdHex,
     payload: { encodedMessageHex: encoded, rawEvidence: {} } };
+  testOnlyHealthySources(t, global);
   const signed = await f.client.request(port, input); assert(verifyProjectAttestation(signed, encoded)); assert.equal(verifications, 1);
   await guard.report(decoded.operationIdHex, "CONFLICTING_RESERVE_EVIDENCE", h("contradiction"));
   await global.restart(); await assert.rejects(f.client.request(port, input)); assert.equal(verifications, 1);
@@ -360,9 +458,9 @@ test("protected deployment monitor persists progress, detects change and propaga
   await assert.rejects(ProtectedSolanaDeploymentMonitor.open({ manifest, rpc, integrity: peer.guard, store: new WindowsProtectedStore(opts) }));
   await monitor.close(); monitor = await ProtectedSolanaDeploymentMonitor.open({ manifest, rpc, integrity: peer.guard, store: new WindowsProtectedStore(opts) });
   unavailable = true; assert.equal((await monitor.poll()).state, "WAITING_FOR_DEPENDENCY");
-  assert.equal(f.authority.status().state, "RUNNING"); unavailable = false;
+  assert.equal(f.authority.status().state, "PAUSED_POLICY"); assert.equal(f.authority.status().incidentCount, 0); unavailable = false;
   response = { ...snapshot, slot: 9 }; assert.equal((await monitor.poll()).state, "WAITING_FOR_DEPENDENCY");
-  assert.equal(f.authority.status().state, "RUNNING");
+  assert.equal(f.authority.status().state, "PAUSED_POLICY"); assert.equal(f.authority.status().incidentCount, 0);
   response = structuredClone(snapshot); response.slot = 11;
   const data = Buffer.from(response.accounts[5].data[0], "base64"); data[13] ^= 1; response.accounts[5].data[0] = data.toString("base64");
   assert.equal((await monitor.poll()).state, "HARD_STOP_INTEGRITY");
@@ -391,7 +489,8 @@ test("protected Native observer rejects unavailable validation and reports corru
   const verifier = new LocalNativeEvidenceVerifier({ rpc: { async getBlockchainInfo() { throw new Error("TEST_SOURCE_UNAVAILABLE"); } }, executable: path.join(peer.root, "unavailable-native-verifier") });
   const monitor = await ProtectedNativeIntegrityMonitor.open({ expectedPolicy, verifier, integrity: peer.guard, store });
   cleanups.get(peer.root).push(() => monitor.close());
-  assert.equal((await monitor.poll()).state, "WAITING_FOR_DEPENDENCY"); assert.equal(f.authority.status().state, "RUNNING");
+  assert.equal((await monitor.poll()).state, "WAITING_FOR_DEPENDENCY"); assert.equal(f.authority.status().state, "PAUSED_POLICY");
+  assert.equal(f.authority.status().incidentCount, 0);
   const value = store.read(); value.payload.fill(0); store.write(Buffer.from("invalid-test-progress"), value.revision);
   assert.equal((await monitor.poll()).state, "HARD_STOP_INTEGRITY");
   await f.restart(); await assert.rejects(signer.guard.assertRunning(h("after-native-corruption"), "FROST_SIGN"));

@@ -199,8 +199,10 @@ export class ProtectedSolanaDeploymentMonitor {
   }
   async poll() {
     check(!this.#busy && !this.#closed, "DeploymentMonitorUnavailable"); this.#busy = true;
+    let ticket;
     try {
-      const old = this.#progress(), snapshot = await this.#rpc.snapshot(this.#manifest, old.value.minimumSlot);
+      const old = this.#progress(); ticket = await this.#guard.beginSourceCheck(this.#digest);
+      const snapshot = await this.#rpc.snapshot(this.#manifest, old.value.minimumSlot);
       const result = verifyDeploymentSnapshot(this.#manifest, snapshot);
       check(uint(result.slot) >= uint(old.value.minimumSlot), "DeploymentSourceStale");
       if (old.value.snapshotDigest !== null && result.slot === old.value.minimumSlot && old.value.snapshotDigest !== result.snapshotDigest) different("FINALIZED_SOLANA_CONFLICT", { prior: old.value.snapshotDigest, next: result.snapshotDigest, slot: result.slot });
@@ -208,7 +210,7 @@ export class ProtectedSolanaDeploymentMonitor {
       check(Date.now() - lastAdvanceAt <= this.#manifest.maximumStallMs, "DeploymentSourceStale");
       const bytes = Buffer.from(JSON.stringify({ ...old.value, minimumSlot: result.slot, observedAt: Date.now(), lastAdvanceAt, snapshotDigest: result.snapshotDigest }));
       try { this.#lease.assertHeld(); this.#store.write(bytes, old.revision); } finally { bytes.fill(0); }
-      const global = await this.#guard.status(this.#digest);
+      const global = await this.#guard.finishSourceCheck(ticket, { state: "OBSERVED_MATCH", evidenceDigest: result.snapshotDigest }); ticket = undefined;
       if (global.state === "HARD_STOP_INTEGRITY") this.#stopped = true;
       return Object.freeze({ state: this.#stopped ? "HARD_STOP_INTEGRITY" : "OBSERVED_MATCH", ...result });
     } catch (error) {
@@ -219,6 +221,9 @@ export class ProtectedSolanaDeploymentMonitor {
       }
       // Malformed/outage/stale observations suspend authorization; they are not
       // fabricated accounting deficits or acknowledged durable incidents.
+      if (ticket) {
+        try { await this.#guard.finishSourceCheck(ticket, { state: "WAITING_FOR_DEPENDENCY", evidenceDigest: this.#digest }); } catch { /* No health permission is renewed by a failed report. */ }
+      }
       return Object.freeze({ state: this.#stopped ? "HARD_STOP_INTEGRITY" : "WAITING_FOR_DEPENDENCY", reason: "DEPLOYMENT_OBSERVATION_UNAVAILABLE" });
     } finally { this.#busy = false; }
   }
