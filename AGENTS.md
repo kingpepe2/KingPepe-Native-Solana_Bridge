@@ -23,6 +23,18 @@
 
 ## Current task: Phase 08.5 security remediation
 
+Current published global-stop component: fd6aca9ebbe508e26818b0f33c67fad37bfb193f.
+PRIVATE push succeeded; exact Actions 34561370027 again ran zero steps due to
+the account restriction. Windows Node 508/security 70 passed for that increment.
+The current live-deployment-monitor work has Windows/WSL Node 529, Windows
+security 72, two vectors per platform and 18 real deployment checks passing.
+The upgrade probe uses pinned SBPF v3 builds and requires a later finalized bank
+after extending ProgramData. Actual authority/bytecode changes were detected and
+its fresh Native-to-Solana deposit reached COMPLETED. Normal build architecture
+is unchanged; no validator feature was disabled. Full protected bridge recovery,
+progress witness, reorg and clean-clone audit remain open. The notes below
+describe previous increments only.
+
 Current published fencing increment: e60902646bde39855a1686a9295ab20ff59ef09b.
 Its CI run 34557854092 started zero steps (account blocked). Current uncommitted
 global integrity authority/remote guards passed Windows Node 508/security 70 and

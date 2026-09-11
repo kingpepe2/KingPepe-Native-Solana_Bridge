@@ -2,6 +2,13 @@
   "schemaVersion": "1.0",
   "generatedAt": "2026-09-11T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
+  "phase085DeploymentMonitorReview": {
+    "baseline": "fd6aca9ebbe508e26818b0f33c67fad37bfb193f",
+    "filesBefore": 205,
+    "filesAfter": 210,
+    "sourceImports": "None. Original RPC/manifest/loader validation, protected progress wrapper and tests. Wire/account facts referenced from official Solana documentation, installed SDK loader definitions and existing original Rust codecs; no upstream implementation copied.",
+    "scope": "Component work under validation, not whole-bridge recovery or production observation certification."
+  },
   "phase085GlobalIntegrityReview": {
     "baseline": "e60902646bde39855a1686a9295ab20ff59ef09b",
     "filesBefore": 202,
@@ -303,6 +310,31 @@
     ]
   },
   "trackedFiles": [
+    {
+      "path": "services/solana-observer/deployment-integrity.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original strict manifest, bounded read-only RPC, executable/config checks and protected monitor integration. No upstream implementation copied."
+    },
+    {
+      "path": "services/solana-observer/tests/deployment-integrity.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original parser, substitution, exact-integer and bounded HTTP regressions; not chain evidence."
+    },
+    {
+      "path": "solana/tests/local-deployment-integrity.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated real-validator upgradeable deployment/mutation regression; external disposable keys only."
+    },
+    {
+      "path": "tests/integration/deployment-fixture.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original synthetic account/parser fixture, explicitly not executable bytecode or chain proof."
+    },
+    {
+      "path": "docs/security/solana-deployment-monitor.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original non-operational monitoring model, source trust, validation scopes and remaining limitations."
+    },
     {
       "path": "shared/service-integrity-policy.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",

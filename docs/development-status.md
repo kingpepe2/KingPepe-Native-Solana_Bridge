@@ -1,5 +1,42 @@
 # KingPepe Native - Solana Bridge Development Status
 
+## Phase 08.5 deployment monitor work in progress (2026-09-11)
+
+Global-stop component published PRIVATE at
+fd6aca9ebbe508e26818b0f33c67fad37bfb193f. Exact Actions
+[34561370027](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34561370027)
+started zero steps in all four jobs with the unchanged billing/spending message:
+NOT_RUN_ACCOUNT_BLOCKED. Current/staged source, 170 prior commits and its outgoing
+commit passed secret scanning. Local results for that increment are below.
+
+The current monitor work validates actual genesis, a consistent account bank,
+loader/ProgramData, binary hash, authorities, Mint and original Rust configuration
+layouts. Windows/WSL Node 529 and two vectors each pass; 21 parser/HTTP regressions
+are included. Full Windows security 72 passed (zero failures/skips), including
+two actual DPAPI/mTLS monitor tests using parser fixtures, not real chain data.
+The expanded separate real-validator test passed 18 checks, including a fresh
+completed Native-to-Solana deposit, an actual upgrade-authority change, a real
+replacement executable upgrade and a separately created unauthorized freeze
+authority. Runtime state and credentials remained outside source.
+
+The replacement binary is larger than the original ProgramData allocation;
+the probe follows Agave's minimum extension size and waits for a later finalized
+bank before upgrade preflight. Both fresh SBPF v3 probe builds compile and run
+on pinned Agave 4.2.2. Normal SBPF v0 build settings remain unchanged; v3 is
+explicit in the upgrade probe. No feature deactivation or weaker test has been
+used. Complete protected service
+recovery, independent freshness witness, post-mint Native reorg response and final
+clean-clone certification remain open. Phase 09 NOT_STARTED.
+
+Regression on this monitor worktree also passed all 97 Rust tests plus locked
+check/fmt/all-features Clippy, 55 existing real deposit/recovery checks and
+26 finalized withdrawal-record checks (no Native payout). Fresh normal SBPF v0
+builds reproduce the prior Manager/Transceiver hashes; the deposit reached
+COMPLETED/RECONCILED. Source audit covers 210 files; declared-license metadata,
+guardrails, npm audit and working/staged/full 171-commit scans passed. Five Rust
+lockfile audits retained the bincode RUSTSEC-2025-0141 unmaintained warning.
+These are worktree results, not final clean-clone or full service certification.
+
 ## Phase 08.5 protected global integrity increment (2026-09-11)
 
 Fencing was published PRIVATE at e60902646bde39855a1686a9295ab20ff59ef09b.

@@ -26,7 +26,7 @@ const meta = (key, writable = false, signer = false) => ({ key, writable, signer
 
 // Intentionally test-only transaction compiler: allows malformed account/data
 // substitutions to reach the real runtime. It is not a production withdrawal SDK.
-async function packet(payer, signers, blockhash, instructions) {
+export async function packet(payer, signers, blockhash, instructions) {
   const merged = new Map([[payer.publicKeyBase58, meta(payer.publicKeyBase58, true, true)]]);
   for (const ix of instructions) for (const a of [...ix.accounts, meta(ix.program)]) {
     const old = merged.get(a.key);

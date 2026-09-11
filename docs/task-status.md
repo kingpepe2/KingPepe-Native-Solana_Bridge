@@ -1,5 +1,16 @@
 # KingPepe Native - Solana Bridge Task Status
 
+## Current continuation: live deployment identity
+
+Global integrity component is PRIVATE at fd6aca9ebbe508e26818b0f33c67fad37bfb193f;
+exact CI 34561370027 ran zero steps (account blocked). Uncommitted monitor source
+and tests have Windows/WSL Node 529, Windows security 72, two vectors each and
+18 actual deployment/upgrade checks passing. The probe's fresh Native-to-Solana
+deposit reached COMPLETED. See development-status for scope and build variants.
+Next: rerun existing chain regressions, scan/review/publish, then complete
+durable operation/source-progress recovery and
+Native deep-reorg response. No Phase 09, production or final-audit PASS claim.
+
 ## Current continuation: protected global integrity integration
 
 Published fencing: e60902646bde39855a1686a9295ab20ff59ef09b, PRIVATE. CI run

@@ -1,5 +1,11 @@
 {
   "generatedAt": "2026-09-11T00:00:00Z",
+  "phase085DeploymentMonitor": {
+    "use": "Reference-only RPC bank-context/genesis definitions and loader metadata layout; no upstream code imported. Existing original Rust account codecs define bridge configuration. Actual pinned Agave 4.2.2 validator tests check upgradeable Program/ProgramData relationships.",
+    "urls": ["https://solana.com/docs/rpc/http/getgenesishash", "https://solana.com/docs/rpc/http/getmultipleaccounts", "https://raw.githubusercontent.com/anza-xyz/agave/v4.2.2/programs/bpf_loader/src/lib.rs"],
+    "loaderLayoutReference": "Installed solana-program 1.18.26 SDK bpf_loader_upgradeable.rs, UpgradeableLoaderState metadata definitions; layout checked against actual Agave 4.2.2 local state, not assumed to certify all loaders.",
+    "limits": "RPC observation, not full chain validation or external audit. No production identities or operational configuration included."
+  },
   "phase085ServiceIpc": {
     "use": "Reference-only Node TLS 1.3 APIs; existing pinned Node 24.21.0 runtime. No source or binaries copied. Windows tests used installed Git for Windows OpenSSL 3.5.7 solely to generate disposable certificates outside source.",
     "urls": ["https://nodejs.org/api/tls.html", "https://github.com/nodejs/node/blob/v24.21.0/doc/api/tls.md"],

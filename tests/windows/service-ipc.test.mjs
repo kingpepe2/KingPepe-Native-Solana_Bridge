@@ -5,6 +5,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSyn
 import { createHash, randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import tls from "node:tls";
+import http from "node:http";
 import path from "node:path";
 import os from "node:os";
 import { WindowsProtectedStore, windowsCurrentServiceSid } from "../../shared/windows/protected-store.mjs";
@@ -22,6 +23,8 @@ import { ed25519 } from "@noble/curves/ed25519.js";
 import { ProjectAttester, verifyProjectAttestation } from "../../services/attesters/attestation-service.mjs";
 import { attesterIpcHandler } from "../../services/attesters/protected-service.mjs";
 import { decodeCanonicalBridgeMessage, encodeCanonicalBridgeMessage } from "../../shared/protocol/canonical-message.mjs";
+import { deploymentFixture } from "../integration/deployment-fixture.mjs";
+import { LocalDeploymentRpc, ProtectedSolanaDeploymentMonitor } from "../../services/solana-observer/deployment-integrity.mjs";
 
 if (process.platform !== "win32") throw new Error("WINDOWS_IPC_TESTS_REQUIRE_WINDOWS");
 const repoRoot = path.resolve(import.meta.dirname, "../.."), serviceSid = windowsCurrentServiceSid();
@@ -323,4 +326,47 @@ test("failed incident persistence cannot reopen authorization in the active auth
     payload: { code: "NATIVE_DEEP_REORG", evidenceDigest: h("verified-incident") } }), /TEST_PERSISTENCE_UNAVAILABLE/u);
   store.write = persist;
   assert.throws(() => authority.handle({ peerRole: "RELAYER", method: "assertRunning", operationId: h("claim"), payload: { action: "SUBMIT_CLAIM" } }), /IntegrityStopRollback/u);
+});
+
+test("protected deployment monitor persists progress, detects change and propagates durable stop", async t => {
+  // Network bytes here are a parser fixture, NOT a real chain. Independent
+  // solana/tests/local-deployment-integrity.mjs runs the real upgrade mutations.
+  const f = await integrityFixture(t), peer = await f.peer("SOLANA_OBSERVER"), signer = await f.peer("KINGPEPE_FROST_A");
+  const { manifest, snapshot } = deploymentFixture(); let response = snapshot, unavailable = false;
+  const server = http.createServer(async (req, res) => {
+    let text = ""; for await (const b of req) text += b; const q = JSON.parse(text);
+    if (unavailable) { res.writeHead(503); res.end(); return; }
+    res.end(JSON.stringify({ jsonrpc: "2.0", id: q.id, result: q.method === "getGenesisHash" ? response.genesis : { context: { slot: response.slot }, value: response.accounts } }));
+  });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve)); t.after(() => { server.closeAllConnections(); server.close(); });
+  const rpc = new LocalDeploymentRpc({ endpoint: `http://127.0.0.1:${server.address().port}` });
+  const opts = options(peer.root, "progress", "SOLANA_OBSERVER", "chain-progress"), initial = ProtectedSolanaDeploymentMonitor.initialProgress(manifest);
+  const store = WindowsProtectedStore.create(opts, initial); initial.fill(0);
+  let monitor = await ProtectedSolanaDeploymentMonitor.open({ manifest, rpc, integrity: peer.guard, store });
+  cleanups.get(peer.root).push(() => monitor.close());
+  assert.equal((await monitor.poll()).state, "OBSERVED_MATCH");
+  await assert.rejects(ProtectedSolanaDeploymentMonitor.open({ manifest, rpc, integrity: peer.guard, store: new WindowsProtectedStore(opts) }));
+  await monitor.close(); monitor = await ProtectedSolanaDeploymentMonitor.open({ manifest, rpc, integrity: peer.guard, store: new WindowsProtectedStore(opts) });
+  unavailable = true; assert.equal((await monitor.poll()).state, "WAITING_FOR_DEPENDENCY");
+  assert.equal(f.authority.status().state, "RUNNING"); unavailable = false;
+  response = { ...snapshot, slot: 9 }; assert.equal((await monitor.poll()).state, "WAITING_FOR_DEPENDENCY");
+  assert.equal(f.authority.status().state, "RUNNING");
+  response = structuredClone(snapshot); response.slot = 11;
+  const data = Buffer.from(response.accounts[5].data[0], "base64"); data[13] ^= 1; response.accounts[5].data[0] = data.toString("base64");
+  assert.equal((await monitor.poll()).state, "HARD_STOP_INTEGRITY");
+  await f.restart(); await monitor.close();
+  monitor = await ProtectedSolanaDeploymentMonitor.open({ manifest, rpc, integrity: peer.guard, store: new WindowsProtectedStore(opts) });
+  response = { ...snapshot, slot: 12 };
+  assert.equal((await monitor.poll()).state, "HARD_STOP_INTEGRITY");
+  await assert.rejects(signer.guard.assertRunning(h("after-upgrade"), "FROST_SIGN"));
+});
+
+test("protected deployment progress rejects a restored manifest identity and reports its integrity failure", async t => {
+  const f = await integrityFixture(t), peer = await f.peer("SOLANA_OBSERVER"), { manifest } = deploymentFixture();
+  const opts = options(peer.root, "progress", "SOLANA_OBSERVER", "chain-progress"), initial = ProtectedSolanaDeploymentMonitor.initialProgress(manifest);
+  const store = WindowsProtectedStore.create(opts, initial); initial.fill(0);
+  const obsolete = structuredClone(manifest); obsolete.identityVersion++;
+  await assert.rejects(ProtectedSolanaDeploymentMonitor.open({ manifest: obsolete, rpc: new LocalDeploymentRpc({ endpoint: "http://127.0.0.1:54321" }), integrity: peer.guard, store }));
+  assert.equal(f.authority.status().state, "HARD_STOP_INTEGRITY");
+  await f.restart(); assert.equal((await peer.guard.status(h("after-restore"))).state, "HARD_STOP_INTEGRITY");
 });

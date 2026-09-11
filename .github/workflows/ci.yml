@@ -161,6 +161,27 @@ jobs:
             }
           '
 
+      - name: Real deployment-integrity and upgrade regression (localnet only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="${KINGPEPE_CI_TOOL_ROOT}/solana-release/bin:${KINGPEPE_CI_TOOL_ROOT}/native-build/bin:${PATH}"
+          export KINGPEPE_LOCAL_E2E_ROOT="${KINGPEPE_CI_TOOL_ROOT}/deployment-monitor-run"
+          export KINGPEPE_LOCAL_BUILD_ROOT="${KINGPEPE_CI_TOOL_ROOT}/monitor-build"
+          export KINGPEPE_TEST_SOURCE_SHA="${GITHUB_SHA}"
+          node solana/tests/local-deployment-integrity.mjs > "${KINGPEPE_CI_TOOL_ROOT}/deployment-monitor-result.json"
+          node --input-type=module -e '
+            import {readFileSync} from "node:fs";
+            const r = JSON.parse(readFileSync(process.env.KINGPEPE_CI_TOOL_ROOT + "/deployment-monitor-result.json", "utf8"));
+            console.log(JSON.stringify({sourceSha: process.env.GITHUB_SHA, state: r.state,
+              deploymentIntegrity: r.deploymentIntegrity, fullNativeToSolanaE2e: r.fullNativeToSolanaE2e, phase09: r.phase09}));
+            if (r.deploymentIntegrity?.pass !== 18 || r.deploymentIntegrity?.fail !== 0 || r.phase09 !== "NOT_STARTED" || r.fullNativeToSolanaE2e !== "COMPLETED") process.exit(1);
+            for (const check of ["ACTUAL_FINALIZED_UPGRADE_AUTHORITY_CHANGE_DETECTED",
+              "ACTUAL_FINALIZED_WRONG_PROGRAM_BYTECODE_DETECTED", "FINALIZED_UNAPPROVED_MINT_WITH_FREEZE_AUTHORITY_REJECTED"]) {
+              if (!r.deploymentIntegrity.passed.includes(check)) process.exit(1);
+            }
+          '
+
   foundation-guardrails:
     name: Foundation Guardrails
     runs-on: ubuntu-latest
