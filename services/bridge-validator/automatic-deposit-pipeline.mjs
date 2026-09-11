@@ -234,7 +234,7 @@ export class AutomaticNativeToSolanaDepositPipeline {
 
     const preparedSweep = validatePreparedReserveSweep(normalized, decodedMessage);
     this.#journal.record(decodedMessage.operationIdHex, DEPOSIT_STATES.SIGNING, "FROST_A_B_AUTOMATIC_RESERVE_SWEEP");
-    const frostResult = this.#frostCoordinator.signAutomatically(preparedSweep.signingIntent);
+    const frostResult = await this.#frostCoordinator.signAutomatically(preparedSweep.signingIntent);
     const stopAfterFrost = this.#atBoundary(decodedMessage, encodedMessageHex, frostResult);
     if (stopAfterFrost !== undefined) return stopAfterFrost;
     if (frostResult.state !== "SIGNED") {
@@ -302,7 +302,7 @@ export class AutomaticNativeToSolanaDepositPipeline {
     for (const attester of this.#attesters) {
       const stopBeforeAttestation = this.#atBoundary(decodedMessage, encodedMessageHex);
       if (stopBeforeAttestation !== undefined) return stopBeforeAttestation;
-      const attestation = attester.signDepositCredit(attestationRequest, nowUnix);
+      const attestation = await attester.signDepositCredit(attestationRequest, nowUnix);
       const stopAfterAttestation = this.#atBoundary(decodedMessage, encodedMessageHex, attestation);
       if (stopAfterAttestation !== undefined) return stopAfterAttestation;
       attestations.push(attestation);

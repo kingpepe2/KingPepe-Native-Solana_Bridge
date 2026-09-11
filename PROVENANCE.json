@@ -2,6 +2,13 @@
   "schemaVersion": "1.0",
   "generatedAt": "2026-09-11T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
+  "phase085AttesterRecoveryReview": {
+    "baseline": "f99c08c6bb50803b7db9ddbd0c3c7862f5d23d15",
+    "filesBefore": 220,
+    "filesAfter": 224,
+    "sourceImports": "None. Original protected attester operation journal, strict retained-image validation and isolated Windows process-kill regressions. Existing Noble Ed25519 and Windows protected storage are reused unchanged.",
+    "scope": "Attester boundary only; full deposit operation and broadcast-credit service recovery remain incomplete."
+  },
   "phase085AcceptanceRecoveryReview": {
     "baseline": "858dc041c922add58f0af1c98efeca8094774339",
     "filesBefore": 219,
@@ -338,6 +345,26 @@
     ]
   },
   "trackedFiles": [
+    {
+      "path": "services/attesters/authorization-journal.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original strict protected attester binding/result journal and authenticated global-stop integration; no imported cryptographic or OS implementation."
+    },
+    {
+      "path": "services/attesters/tests/authorization-journal.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original portable retained-image codec regressions using public messages and ephemeral in-memory attestation keys; not protected-service or chain evidence."
+    },
+    {
+      "path": "tests/windows/attester-recovery-actor.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated same-principal Windows process-kill test actor with real DPAPI/mTLS and explicitly synthetic Native evidence."
+    },
+    {
+      "path": "docs/security/attester-authorization-recovery.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original attester persistence ordering, test scope and residual risk documentation; no operational identities or private deployment values."
+    },
     {
       "path": "solana/tests/local-acceptance-checkpoint.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",

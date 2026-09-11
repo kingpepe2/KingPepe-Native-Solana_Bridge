@@ -15,6 +15,13 @@ const TIMEOUT = 10000;
 // distinct thirty-second response deadline; it never accepts a late result.
 const EXECUTION_TIMEOUT = 30000;
 const HASH = /^[0-9a-f]{64}$/u;
+// Diagnostic codes only, never arbitrary exception text, paths or peer data.
+// They do not grant retry permission, clear integrity stops or change deadlines.
+function rejectionCode(error) {
+  const codes = ["IpcTimeout", "IpcExpiredResult", "IpcTransportClosed", "IpcTransportRejected", "IpcAuthenticationFailed",
+    "IpcStaleRequest", "IpcContextRejected", "IpcReplayRejected", "IpcSizeRejected", "IpcBusy", "IpcStaleEndpoint"];
+  return codes.includes(error?.message) ? error.message : "IpcRejected";
+}
 const edges = Object.freeze({
   SUPERVISOR: Object.fromEntries(INTEGRITY_ROLES.map(role => [role, INTEGRITY_METHODS])),
   KINGPEPE_FROST_A: { COORDINATOR: ["verifyNativeEvidence", "signingCommitment", "signatureShare", "abortSigningSession"] },
@@ -130,8 +137,7 @@ export class ProtectedServiceIpc {
     let server;
     try { server = tls.createServer({ ...this.#credential, requestCert: true, handshakeTimeout: TIMEOUT, sessionTimeout: 1 }, socket => {
       this.#serve(socket, handler).catch(error => {
-        const codes = ["IpcTimeout", "IpcExpiredResult", "IpcTransportClosed", "IpcStaleRequest", "IpcContextRejected", "IpcReplayRejected", "IpcSizeRejected"];
-        this.#lastRejection = codes.includes(error?.message) ? error.message : "IpcRejected";
+        this.#lastRejection = rejectionCode(error);
         socket.destroy();
       });
     }); } catch { throw new Error("IpcTlsContextRejected"); }
@@ -197,7 +203,7 @@ export class ProtectedServiceIpc {
       requireValue(Date.now() < completeBy, "IpcExpiredResult");
       requireValue(result[0] === VERSION && result[1] === "RESPONSE" && result[2] === requestId && result[3] === operationId && result[4] === binding);
       return result[5];
-    } catch { throw new Error("IpcRequestRejected"); }
+    } catch (error) { this.#lastRejection = rejectionCode(error); throw new Error("IpcRequestRejected"); }
     finally { socket?.destroy(); this.#connections.delete(socket); }
   }
   close() { this.#closed = true; for (const socket of this.#connections) socket.destroy(); this.#server?.close(); this.#credential?.key.fill(0); this.#credential = undefined; }

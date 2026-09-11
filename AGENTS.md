@@ -23,9 +23,9 @@
 
 ## Current task: Phase 08.5 security remediation
 
-Phase 09 is NOT_STARTED. The current published source is
-858dc041c922add58f0af1c98efeca8094774339, PRIVATE. Exact Actions
-34574760811 started zero steps in four jobs and produced zero artifacts:
+Phase 09 is NOT_STARTED. The validation-resumption baseline is
+f99c08c6bb50803b7db9ddbd0c3c7862f5d23d15, verified PRIVATE. Its exact Actions
+34576782766 started zero steps in four jobs and produced zero artifacts:
 NOT_RUN_ACCOUNT_BLOCKED. No account, billing, privacy or protection bypass.
 
 The Native accepted-basis/reorg increment is published. Windows/WSL Node 537,
@@ -57,13 +57,49 @@ separate supervisor process; no signing deadline or freshness gate was relaxed.
 Its source watchdog is synthetic component-test evidence only, never runtime or
 chain/reconciliation evidence. See development-status for failed-run corrections.
 
-Current uncommitted recovery work retains a fixed Native acceptance checkpoint
+The published acceptance recovery work retains a fixed Native acceptance checkpoint
 while independently verifying the current chain and UTXOs. The new real-chain
 13-check regression passes through Native-accepted FROST, both attestations,
 mint and reconciliation after deliberate tip advancement. Full Windows/WSL Node
 557, vectors two each, Rust 97/check/fmt/Clippy and existing chain checks 55/26/18/8
 pass. No complete operation-journal or
 crash-recovery claim is made.
+
+The current increment adds a mandatory protected attester authorization journal
+to the actual attester IPC handler. It retains one exact canonical message per
+operation/outpoint/allocation, persists preparation before signing and the result
+before release, and keeps conflicts fail-closed across reopen. Portable codec
+tests and real Windows process-kill/DPAPI/mTLS tests have separate evidence;
+synthetic Native evidence in component tests is not chain verification. Full
+operation recovery and protected Windows chain integration remain incomplete.
+
+Validation resumed after separately authorized host storage recovery and a
+successful WSL startup check. The prior Node bus error, WSL I/O failures and
+protected-fixture creation failure occurred during storage exhaustion; they are
+not passing evidence or demonstrated source defects. The interrupted
+authenticated-malformed-journal test was rerun first and PASSED its intended
+durable global-stop/reopen assertions. No source work was discarded. Keep all
+new test state external and monitor headroom; do not repair or relocate WSL.
+
+The attester increment has completed its pre-publication local regression. Fresh resumed
+Windows/WSL Node 576, vectors two each, Rust 97/check/fmt/Clippy, npm zero and
+declared-license metadata pass. All five renewed Cargo advisory scans pass with
+the existing unmaintained bincode warning retained. Fresh real-chain withdrawal
+record 26, deployment 18, Native reorg eight, acceptance 13 and deposit/security
+55 checks pass, each following a COMPLETED deposit prerequisite. The first
+full Windows security run was 89 PASS / 2 FAIL / 0 SKIP: rejected IPC calls in a
+signed-result restart and conflict fixture. Isolated reruns passed but do NOT
+replace the failed full gate. Fixed-code diagnostics, a retained-result path
+without a nonexistent new-signing step, and a final expiry recheck passed the
+complete Windows security rerun: 93 PASS / 0 FAIL / 0 SKIP. Security files run
+serially; deadlines and actual competing-process tests are unchanged. The
+earlier failed run remains recorded, not relabeled as a pass.
+The async deposit pipeline now awaits both coordinator and attester results;
+five added tests cover genuine cryptographic computation with fixture chains,
+rejected promises and late hard stops. Source export and all 176 existing commits
+passed Gitleaks before the final status edit. Staged/outgoing scans and exact-SHA
+publication evidence follow this local evidence; final clean-clone validation
+and full service recovery remain incomplete.
 
 Implemented local components: protected CurrentUser DPAPI/file boundaries;
 mutual TLS role-bound IPC; separate retained signer fence and lifetime handle;

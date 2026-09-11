@@ -1,5 +1,25 @@
 # Phase 08.5 retrospective audit
 
+## Current continuation resumed after host storage recovery
+
+Resumption baseline is f99c08c6bb50803b7db9ddbd0c3c7862f5d23d15, PRIVATE. Protected
+attester authorization recovery passed the complete 93-test current-principal
+Windows security rerun after the recorded 89/2 failure. Actual increment
+results and failed/interrupted runs are in development-status.md. Storage recovery
+and WSL startup checks now permit validation to resume. The malformed protected
+journal regression was rerun first and passed its durable global-stop assertions;
+the earlier exhaustion prevented fixture creation and was not a code-test verdict.
+No final 01-08 re-audit or fresh clone has completed. An exact baseline-HEAD CI
+retry still ran zero steps because of the GitHub account execution restriction.
+
+The previously published IPC, lifetime fence, profile witness, global authority,
+deployment monitor, reorg detector and acceptance-checkpoint increments are
+component evidence, not completion of all service recovery dependencies. Full
+operation/broadcast-credit recovery and protected Windows real-chain integration
+remain MUST_FIX_BEFORE_PHASE09. Phase 04, 07 and 08 therefore remain FAIL; earlier
+Phase 01/02/03/05/06 passes are not a newly completed retrospective audit of this
+dirty tree. SAFE_TO_BEGIN_PHASE_09=false, productionReady=false, Mainnet disabled.
+
 ## Remediation checkpoint (2026-09-11)
 
 The protected-store increment starts at `2b5c82971834d6299969c05a9889c950dae2ef91`.

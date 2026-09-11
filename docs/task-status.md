@@ -1,5 +1,51 @@
 # KingPepe Native - Solana Bridge Task Status
 
+## Current continuation: attester/async increment locally validated
+
+Published PRIVATE baseline: f99c08c6bb50803b7db9ddbd0c3c7862f5d23d15. Storage and
+WSL startup are recovered; no source work was discarded. The interrupted malformed
+journal test passed its intended assertion on the first resumed targeted run.
+Current Windows/WSL Node 576, two vectors each, Rust 97/quality, five Cargo audits,
+npm zero vulnerabilities, license metadata and provenance 224 pass. Fresh real
+checks 55/26/18/8/13 pass through their Native-to-Solana deposit prerequisites.
+The async coordinator/attester awaits were fixed with five new regressions.
+
+First full Windows security: 89 PASS / 2 FAIL / 0 SKIP (rejected IPC requests).
+Isolated reruns did not replace that failed gate. The subsequent complete
+Windows security run passed 93 / failed 0 / skipped 0, including the new redacted
+diagnostics and final-expiry check. Serial test-file execution did not change
+deadlines, thresholds, stop rules or actual competing-process tests. Source
+export and all 176 existing commits passed Gitleaks. Final staged/outgoing scans,
+review and publication follow this pre-commit evidence. Actions attempt 2 on 34576782766 is still
+NOT_RUN_ACCOUNT_BLOCKED with zero steps in four jobs.
+
+Next: finish staged/outgoing scans and review, then publish this
+coherent increment; then complete durable operation/broadcast-credit recovery,
+live reconciliation, protected Windows chain integration and clean-clone audit.
+Phase 09 NOT_STARTED; no production activation or key provisioning.
+
+## Prior continuation interrupted by host storage exhaustion (historical)
+
+Published PRIVATE: f99c08c6bb50803b7db9ddbd0c3c7862f5d23d15. Exact Actions
+34576782766: four jobs, zero steps/artifacts, NOT_RUN_ACCOUNT_BLOCKED.
+Uncommitted journal worktree passes Windows/WSL Node 571, vectors two per platform,
+npm audit zero, provenance 224 and a fresh 55-check real deposit regression through
+COMPLETED/RECONCILED. Four actual Windows attester process-kill boundaries pass
+with synthetic Native evidence and real DPAPI/mTLS/Ed25519. Corrected conflict,
+rollback and unavailable-storage targets pass; Rust 97/quality and license
+metadata pass. The host system volume exhausted free space during further
+validation. WSL now reports exec I/O failures and a protected Windows fixture
+could not be created. Final Windows security, further chain suites, renewed
+Cargo advisory scans, Gitleaks and fresh-clone checks are incomplete. No new
+commit/push. No production or other-session data was removed; one task-generated
+test verifier was moved intact to separate test storage.
+Next: obtain adequate host storage/WSL health, then rerun interrupted/current
+source tests, scans and review before publication. Do not launch more daemon or
+signing tests on the exhausted host, or relocate/repair the development
+distribution without appropriate direction.
+Then finish full durable operation/broadcast-credit recovery, live reconciliation
+and protected Windows chain integration. Phase 09 remains NOT_STARTED.
+
 ## Current continuation: immutable Native acceptance checkpoint
 
 Published PRIVATE: 858dc041c922add58f0af1c98efeca8094774339. Exact Actions

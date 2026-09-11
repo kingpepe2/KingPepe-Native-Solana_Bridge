@@ -22,6 +22,7 @@ import { INTEGRITY_ROLES } from "../../shared/service-integrity-policy.mjs";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { ProjectAttester, verifyProjectAttestation } from "../../services/attesters/attestation-service.mjs";
 import { attesterIpcHandler } from "../../services/attesters/protected-service.mjs";
+import { ProtectedAttesterAuthorizationJournal } from "../../services/attesters/authorization-journal.mjs";
 import { decodeCanonicalBridgeMessage, encodeCanonicalBridgeMessage } from "../../shared/protocol/canonical-message.mjs";
 import { deploymentFixture } from "../integration/deployment-fixture.mjs";
 import { LocalDeploymentRpc, ProtectedSolanaDeploymentMonitor } from "../../services/solana-observer/deployment-integrity.mjs";
@@ -285,6 +286,15 @@ test("an admitted request cannot return a late result", async t => {
   assert.equal(accepted, false); assert.equal(calls, 1); assert.equal(f.server.lastRejection, "IpcExpiredResult");
 });
 
+test("IPC diagnostics expose fixed codes only and preserve request rejection", async t => {
+  const f = fixture(t), privateDiagnostic = path.join(os.tmpdir(), "unpublished-ipc-diagnostic");
+  const port = await f.server.listen(() => { throw new Error(privateDiagnostic); });
+  await assert.rejects(f.client.request(port, { method: "verifyNativeEvidence", operationId: h("redaction"), payload: {} }), /IpcRequestRejected/u);
+  assert.equal(f.server.lastRejection, "IpcRejected");
+  assert(["IpcTransportClosed", "IpcTransportRejected"].includes(f.client.lastRejection), "Client diagnostic must remain a fixed transport code");
+  assert(!JSON.stringify([f.server.lastRejection, f.client.lastRejection]).includes(privateDiagnostic), "IpcDiagnosticLeakedPrivateContext");
+});
+
 test("actual protected A+B FROST signing through authenticated endpoints", async t => {
   const global = await isolatedIntegrityFixture(t);
   const guards = await Promise.all(REQUIRED_FROST_SIGNERS.map(role => global.peer(role)));
@@ -392,8 +402,8 @@ test("integrity role, authority lease, pause, missing and corrupt storage fail c
   assert.throws(() => new RemoteIntegrityGuard({ ipc: {}, port: peer.port }));
 });
 
-for (const role of ["ATTESTER_A", "ATTESTER_B"]) test("real protected attester TLS is gated by durable integrity state: " + role, async t => {
-  const global = await integrityFixture(t), guard = (await global.peer(role)).guard;
+async function protectedAttesterFixture(t, role = "ATTESTER_A") {
+  const global = await isolatedIntegrityFixture(t), supervisor = await global.peer(role), guard = supervisor.guard;
   const f = fixture(t, role, "BRIDGE_VALIDATOR"), seed = randomBytes(32);
   const vector = JSON.parse(readFileSync(path.join(repoRoot, "solana/modules/bridge-messages/vectors/canonical-v1.json"))).vectors.find(v => v.name === "deposit-claim-v1");
   const identity = { ...vector.deployment, nativeGenesis: REGTEST_GENESIS, solanaDeployment: deployment };
@@ -405,23 +415,243 @@ for (const role of ["ATTESTER_A", "ATTESTER_B"]) test("real protected attester T
     keyEpoch: 1, policyEpoch: vector.policyEpoch, acceptedNativeTrust: ["LOCALLY_VALIDATED_CHAIN_STATE"], depositsPaused: false, hardStop: false };
   const opts = options(f.root, "attester-seed", role, "attester-seed");
   const store = WindowsProtectedStore.create(opts, seed); seed.fill(0);
-  const attester = ProjectAttester.fromWindowsProtectedStore({ store, role, policy }); t.after(() => { attester.close(); store.close(); });
-  let verifications = 0;
+  const attester = ProjectAttester.fromWindowsProtectedStore({ store, role, policy });
+  cleanups.get(f.root).push(() => { attester.close(); store.close(); });
+  const journalOptions = options(f.root, "attester-authorizations", role, "attester-authorizations", opts.context.instanceId);
+  const bytes = ProtectedAttesterAuthorizationJournal.initialState(attester);
+  const journalStore = WindowsProtectedStore.create(journalOptions, bytes); bytes.fill(0);
+  cleanups.get(f.root).push(() => journalStore.close());
   const evidence = { trust: "LOCALLY_VALIDATED_CHAIN_STATE", nativeNetwork: identity.nativeNetwork, nativeGenesisHash: identity.nativeGenesis,
     operationIdHex: decoded.operationIdHex, depositOutpoint: decoded.depositOutpointText, amountAtomic: decoded.amountAtomic.toString(),
     solanaRecipientHex: decoded.destinationHex, evidenceDigestHex: decoded.evidenceDigestHex, reserveAllocationIdHex: h("attester-test-allocation"),
     reserveTransitionState: "CANONICAL_RESERVE", mintCreditState: "AUTHORIZED_UNCONSUMED", finalitySatisfied: true, sweepFinalized: true,
     utxoUnspentAtDeposit: true, noPriorConsumption: true };
-  // Policy/evidence fixture, not a chain-validation claim. TLS/DPAPI/signature/stop are real.
-  const handler = attesterIpcHandler({ attester, integrity: guard, verifyNativeDeposit: async () => {
+  return { ...f, global, guard, supervisor, opts, store, policy, attester, journalOptions, journalStore, evidence, decoded, encoded,
+    input: { method: "attestDeposit", operationId: decoded.operationIdHex, payload: { encodedMessageHex: encoded, rawEvidence: {} } } };
+}
+
+function attesterFixtureFailure(error) {
+  return error?.path !== undefined || error?.dest !== undefined ? new Error("AttesterRecoveryTestFilesystemFailure") : error;
+}
+test("attester fixture filesystem failure redacts private diagnostic fields", () => {
+  const privatePath = path.join(os.tmpdir(), "unpublished-attester-fixture");
+  const original = Object.assign(new Error("TEST " + privatePath), { path: privatePath, code: "ENOENT" });
+  const safe = attesterFixtureFailure(original);
+  assert.equal(safe.message, "AttesterRecoveryTestFilesystemFailure");
+  assert.equal(safe.path, undefined); assert.equal(safe.cause, undefined); assert(!safe.stack.includes(privatePath));
+});
+function attesterRecoveryTest(name, body) {
+  test(name, async t => {
+    try { await body(t); }
+    catch (error) {
+      // Unexpected fixture I/O failures must not put a profile/runtime path in
+      // a test reporter or artifact. Preserve failure, not its private context.
+      throw attesterFixtureFailure(error);
+    }
+  });
+}
+
+for (const role of ["ATTESTER_A", "ATTESTER_B"]) attesterRecoveryTest("real protected attester TLS is gated by durable integrity state: " + role, async t => {
+  const f = await protectedAttesterFixture(t, role), { global, guard, attester, evidence, decoded, encoded } = f;
+  let journal = await ProtectedAttesterAuthorizationJournal.open({ attester, integrity: guard, store: f.journalStore });
+  cleanups.get(f.root).push(() => journal.close());
+  let verifications = 0;
+  const verifyNativeDeposit = async () => {
     verifications++; return { operationIdHex: decoded.operationIdHex, messageDigestHex: decoded.messageDigestHex, evidence };
-  } });
-  const port = await f.server.listen(handler), input = { method: "attestDeposit", operationId: decoded.operationIdHex,
-    payload: { encodedMessageHex: encoded, rawEvidence: {} } };
-  testOnlyHealthySources(t, global);
-  const signed = await f.client.request(port, input); assert(verifyProjectAttestation(signed, encoded)); assert.equal(verifications, 1);
+  };
+  // Synthetic Native evidence only; DPAPI, mTLS, Ed25519 and durable stop are real.
+  let handler = attesterIpcHandler({ attester, integrity: guard, journal, verifyNativeDeposit });
+  assert.throws(() => attesterIpcHandler({ attester, integrity: guard, verifyNativeDeposit }), /ProtectedAttesterJournalRequired/u);
+  let handlerFailure = "NONE";
+  const port = await f.server.listen(async input => {
+    try { return await handler(input); } catch (error) {
+      const safe = ["AttesterJournalInvalid", "AttesterJournalPolicyRejected", "AttesterJournalAuthenticatedStateInvalid", "AttesterJournalConcurrentMutation",
+        "IntegrityAuthorizationStopped", "IpcRequestRejected", "ProtectedLifetimeLeaseLost", "WindowsProtectedStoreRejected"];
+      handlerFailure = safe.includes(error?.message) ? error.message : "UNCLASSIFIED"; throw error;
+    }
+  }), { input } = f;
+  await global.enableTestSources();
+  let signed;
+  try { signed = await f.client.request(port, input); }
+  catch { throw new Error("ProtectedAttesterIpcFailure:" + (f.server.lastRejection ?? "UNREPORTED") + ":" + handlerFailure); }
+  assert(verifyProjectAttestation(signed, encoded)); assert.equal(verifications, 1);
+  const revision = f.journalStore.read().revision;
+  assert.deepEqual(await f.client.request(port, input), signed); assert.equal(verifications, 2);
+  assert.equal(f.journalStore.read().revision, revision, "Same authorization must not be appended twice");
+  await journal.close(); journal = await ProtectedAttesterAuthorizationJournal.open({ attester, integrity: guard, store: new WindowsProtectedStore(f.journalOptions) });
+  handler = attesterIpcHandler({ attester, integrity: guard, journal, verifyNativeDeposit });
+  assert.deepEqual(await f.client.request(port, input), signed); assert.equal(verifications, 3);
+  evidence.noPriorConsumption = false;
+  await assert.rejects(f.client.request(port, input)); assert.equal(verifications, 4);
+  evidence.noPriorConsumption = true;
   await guard.report(decoded.operationIdHex, "CONFLICTING_RESERVE_EVIDENCE", h("contradiction"));
-  await global.restart(); await assert.rejects(f.client.request(port, input)); assert.equal(verifications, 1);
+  await global.restart(); await assert.rejects(f.client.request(port, input)); assert.equal(verifications, 4);
+});
+
+async function attesterActor(f, selectedBoundary = "NONE") {
+  const child = spawn(process.execPath, [path.join(import.meta.dirname, "attester-recovery-actor.mjs")], { windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
+  const pending = new Map(), buffered = new Map(); let text = "", closed = false;
+  const ended = new Promise(resolve => child.once("close", () => { closed = true; resolve(); }));
+  const failed = () => { for (const p of pending.values()) { clearTimeout(p.timer); p.reject(new Error("TestAttesterActorUnavailable")); } pending.clear(); };
+  child.on("error", failed); child.on("close", failed); child.stderr.on("data", failed); child.stdin.on("error", failed);
+  child.stdout.on("data", bytes => {
+    text += bytes.toString("utf8"); if (text.length > 32768) { failed(); child.kill(); return; }
+    for (;;) {
+      const at = text.indexOf("\n"); if (at < 0) break;
+      const line = text.slice(0, at); text = text.slice(at + 1);
+      try {
+        const v = JSON.parse(line); assert(Array.isArray(v) && v.length === 2 && ["READY", "BOUNDARY", "STATS", "DIAGNOSTICS", "CLOSED", "ERROR"].includes(v[0]));
+        if (v[0] === "ERROR") { failed(); child.kill(); continue; }
+        const p = pending.get(v[0]);
+        if (p) { clearTimeout(p.timer); pending.delete(v[0]); p.resolve(v[1]); }
+        else { assert(!buffered.has(v[0])); buffered.set(v[0], v[1]); }
+      } catch { failed(); child.kill(); }
+    }
+  });
+  const receive = name => {
+    if (buffered.has(name)) { const v = buffered.get(name); buffered.delete(name); return Promise.resolve(v); }
+    return new Promise((resolve, reject) => {
+      if (closed || pending.has(name)) { reject(new Error("TestAttesterActorUnavailable")); return; }
+      const timer = setTimeout(() => { pending.delete(name); reject(new Error("TestAttesterActorTimeout")); }, 60000);
+      pending.set(name, { resolve, reject, timer });
+    });
+  };
+  const stop = async () => { if (!closed) child.kill(); await ended; };
+  cleanups.get(f.root).push(stop);
+  const ready = receive("READY");
+  child.stdin.write(JSON.stringify(["INIT", { role: f.role, boundary: selectedBoundary, seedOptions: f.opts, policy: f.policy,
+    journalOptions: f.journalOptions, serverOptions: f.serverOptions, supervisorOptions: f.supervisor.clientOptions,
+    supervisorPort: f.supervisor.port, encodedMessageHex: f.encoded, evidence: f.evidence }]) + "\n");
+  return { port: await ready, receive, stop, async stats() { const result = receive("STATS"); child.stdin.write('["STATS",null]\n'); return result; },
+    async diagnostics() { const result = receive("DIAGNOSTICS"); child.stdin.write('["DIAGNOSTICS",null]\n'); return result; } };
+}
+
+for (const boundary of ["PREPARED", "SIGNATURE_CREATED", "SIGNED_PERSISTED", "RESULT_READY"]) {
+  attesterRecoveryTest("protected attester process-kill recovery at " + boundary, async t => {
+    const f = await protectedAttesterFixture(t);
+    const actor = await attesterActor(f, boundary); await f.global.enableTestSources();
+    const reached = actor.receive("BOUNDARY");
+    const lostResponse = f.client.request(actor.port, f.input).then(() => "UNEXPECTED_SUCCESS", () => "LOST_RESPONSE");
+    assert.equal(await reached, boundary); await actor.stop(); assert.equal(await lostResponse, "LOST_RESPONSE");
+    const restarted = await attesterActor(f);
+    let signed;
+    try { signed = await f.client.request(restarted.port, f.input); }
+    catch {
+      const diagnostic = await restarted.diagnostics();
+      throw new Error("TestAttesterResumeRejected:" + f.client.lastRejection + ":" + diagnostic.transportFailure + ":" + diagnostic.handlerFailure);
+    }
+    assert(verifyProjectAttestation(signed, f.encoded));
+    const expectedSigns = ["PREPARED", "SIGNATURE_CREATED"].includes(boundary) ? 1 : 0;
+    assert.deepEqual(await restarted.stats(), { verifications: 1, signs: expectedSigns });
+    assert.deepEqual(await f.client.request(restarted.port, f.input), signed);
+    assert.deepEqual(await restarted.stats(), { verifications: 2, signs: expectedSigns });
+    const bytes = f.journalStore.read().payload;
+    try {
+      const state = JSON.parse(bytes.toString()); assert.equal(state.records.length, 1);
+      assert.equal(state.records[0].encodedMessageHex, f.encoded); assert.deepEqual(state.records[0].signature, signed);
+    } finally { bytes.fill(0); }
+  });
+}
+
+attesterRecoveryTest("protected attester rejects duplicate process, changed backing binding and retained conflict after restart", async t => {
+  const f = await protectedAttesterFixture(t), { attester, guard } = f;
+  const journal = await ProtectedAttesterAuthorizationJournal.open({ attester, integrity: guard, store: f.journalStore });
+  cleanups.get(f.root).push(() => journal.close());
+  await assert.rejects(ProtectedAttesterAuthorizationJournal.open({ attester, integrity: guard, store: new WindowsProtectedStore(f.journalOptions) }));
+  await assert.rejects(attesterActor(f)); // Actual second service process cannot acquire the journal lifetime lease.
+  await f.global.enableTestSources();
+  let evidence = f.evidence;
+  const handler = attesterIpcHandler({ attester, journal, integrity: guard, verifyNativeDeposit: async ({ encodedMessageHex }) => {
+    const d = decodeCanonicalBridgeMessage(encodedMessageHex);
+    return { operationIdHex: d.operationIdHex, messageDigestHex: d.messageDigestHex, evidence };
+  } });
+  let handlerFailure = "NONE";
+  const port = await f.server.listen(async input => {
+    try { return await handler(input); } catch (error) {
+      const safe = ["AttesterJournalInvalid", "AttesterJournalPolicyRejected", "AttesterJournalAuthenticatedStateInvalid",
+        "AttesterJournalConcurrentMutation", "IntegrityAuthorizationStopped", "IpcRequestRejected", "ProtectedLifetimeLeaseLost", "WindowsProtectedStoreRejected"];
+      handlerFailure = safe.includes(error?.message) ? error.message : "UNCLASSIFIED"; throw error;
+    }
+  });
+  let signed;
+  try { signed = await f.client.request(port, f.input); }
+  catch { throw new Error("TestAttesterConflictSetupRejected:" + f.client.lastRejection + ":" + (f.server.lastRejection ?? "NONE") + ":" + handlerFailure); }
+  assert(verifyProjectAttestation(signed, f.encoded));
+  const changed = Buffer.from(encodeCanonicalBridgeMessage({ ...f.decoded, operationId: undefined, nonce: h("different-attester-request") })).toString("hex");
+  const d = decodeCanonicalBridgeMessage(changed); evidence = { ...evidence, operationIdHex: d.operationIdHex };
+  await assert.rejects(f.client.request(port, { ...f.input, operationId: d.operationIdHex, payload: { encodedMessageHex: changed, rawEvidence: {} } }));
+  assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+  await journal.close(); await f.global.restart();
+  await assert.rejects(ProtectedAttesterAuthorizationJournal.open({ attester, integrity: guard, store: new WindowsProtectedStore(f.journalOptions) }));
+  assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+});
+
+attesterRecoveryTest("protected attester file-package rollback is rejected by retained witness and stops authority", async t => {
+  const f = await protectedAttesterFixture(t), { attester, guard } = f;
+  const image = readFileSync(path.join(f.journalOptions.root, "state.protected"));
+  const anchor = readFileSync(path.join(f.journalOptions.anchorRoot, "state.protected"));
+  const journal = await ProtectedAttesterAuthorizationJournal.open({ attester, integrity: guard, store: f.journalStore });
+  cleanups.get(f.root).push(() => journal.close()); await f.global.enableTestSources();
+  const signed = await journal.authorize({ encodedMessageHex: f.encoded, evidence: f.evidence }); assert(verifyProjectAttestation(signed, f.encoded));
+  await journal.close();
+  writeFileSync(path.join(f.journalOptions.root, "state.protected"), image); image.fill(0);
+  writeFileSync(path.join(f.journalOptions.anchorRoot, "state.protected"), anchor); anchor.fill(0);
+  await assert.rejects(ProtectedAttesterAuthorizationJournal.open({ attester, integrity: guard, store: new WindowsProtectedStore(f.journalOptions) }));
+  assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+  await f.global.restart(); assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+});
+
+attesterRecoveryTest("protected attester rejects wrong seed instance and unavailable or corrupt journal without signing", async t => {
+  const f = await protectedAttesterFixture(t), { attester, guard } = f;
+  for (const patch of [{ instanceId: h("wrong-instance") }, { role: "ATTESTER_B" }, { solanaDeployment: h("wrong-deployment") }, { keyEpoch: 2 }]) {
+    const store = new WindowsProtectedStore({ ...f.journalOptions, context: { ...f.journalOptions.context, ...patch } });
+    try { await assert.rejects(ProtectedAttesterAuthorizationJournal.open({ attester, integrity: guard, store })); }
+    finally { store.close(); }
+  }
+  const journal = await ProtectedAttesterAuthorizationJournal.open({ attester, integrity: guard, store: f.journalStore });
+  cleanups.get(f.root).push(() => journal.close()); await f.global.enableTestSources();
+  let signs = 0; const original = ProjectAttester.prototype.signDepositCredit;
+  ProjectAttester.prototype.signDepositCredit = function(...args) { signs++; return original.apply(this, args); };
+  t.after(() => { ProjectAttester.prototype.signDepositCredit = original; });
+  const file = path.join(f.journalOptions.root, "state.protected"), saved = readFileSync(file), corrupt = Buffer.from(saved);
+  corrupt[corrupt.length - 1] ^= 1; writeFileSync(file, corrupt); corrupt.fill(0);
+  await assert.rejects(journal.authorize({ encodedMessageHex: f.encoded, evidence: f.evidence })); assert.equal(signs, 0);
+  unlinkSync(file);
+  await assert.rejects(journal.authorize({ encodedMessageHex: f.encoded, evidence: f.evidence })); assert.equal(signs, 0);
+  // Exact current ciphertext restored only in this isolated fault test. No runtime
+  // repair path exists and a stale authenticated image remains witness-rejected.
+  writeFileSync(file, saved); saved.fill(0);
+});
+
+attesterRecoveryTest("authenticated malformed attester journal triggers durable global integrity stop", async t => {
+  const f = await protectedAttesterFixture(t), prior = f.journalStore.read();
+  let bytes;
+  try {
+    const state = JSON.parse(prior.payload.toString()); state.identityDigest = h("different-attester-policy");
+    bytes = Buffer.from(JSON.stringify(state)); f.journalStore.write(bytes, prior.revision);
+  } finally { prior.payload.fill(0); bytes?.fill(0); }
+  // Deliberate authenticated bad-payload injection, not a forged DPAPI envelope.
+  await assert.rejects(ProtectedAttesterAuthorizationJournal.open({ attester: f.attester, integrity: f.guard, store: f.journalStore }));
+  assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+  await f.global.restart(); assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+});
+
+attesterRecoveryTest("retained attestation rechecks validity after the final asynchronous integrity check", async t => {
+  const f = await protectedAttesterFixture(t), { attester, guard } = f;
+  const journal = await ProtectedAttesterAuthorizationJournal.open({ attester, integrity: guard, store: f.journalStore });
+  cleanups.get(f.root).push(() => journal.close()); await f.global.enableTestSources();
+  const request = { encodedMessageHex: f.encoded, evidence: f.evidence };
+  assert(verifyProjectAttestation(await journal.authorize(request), f.encoded));
+  const revision = f.journalStore.read().revision;
+  const assertRunning = guard.assertRunning.bind(guard), evaluate = ProjectAttester.prototype.evaluateDepositCredit;
+  let checks = 0, expired = false;
+  // Inject passage of policy time AFTER the real final authenticated check;
+  // never change the host clock, transport deadline or chain evidence.
+  guard.assertRunning = async (...args) => { await assertRunning(...args); if (++checks === 2) expired = true; };
+  ProjectAttester.prototype.evaluateDepositCredit = function(value, now) { return evaluate.call(this, value, expired ? f.decoded.validUntil + 1n : now); };
+  t.after(() => { ProjectAttester.prototype.evaluateDepositCredit = evaluate; });
+  await assert.rejects(journal.authorize(request), /AttesterJournalPolicyRejected/u);
+  assert.equal(checks, 2); assert.equal(f.journalStore.read().revision, revision, "Expired retry must not replace a retained authorization");
 });
 
 test("failed incident persistence cannot reopen authorization in the active authority", async t => {

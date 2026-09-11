@@ -583,6 +583,41 @@ test("async Native to Solana pipeline awaits promise-based adapters without a pe
   }
 });
 
+// Real FROST/Ed25519 computation behind delayed adapters; chain responses remain
+// fixtures here. This is async-boundary evidence, not protected chain execution.
+test("async deposit pipeline awaits coordinator and both attesters before downstream effects", async () => {
+  const runtime = createPipeline({ asyncAdapters: true });
+  try {
+    for (const [target, method] of [[runtime.frost.coordinator, "signAutomatically"],
+      ...runtime.attesters.map(attester => [attester, "signDepositCredit"])]) {
+      const original = target[method].bind(target);
+      target[method] = async (...args) => { await Promise.resolve(); return original(...args); };
+    }
+    const result = await runtime.pipeline.processDepositAsync(runtime.operation, 1_700_000_600);
+    assert.equal(result.state, DEPOSIT_STATES.COMPLETED);
+    assert.deepEqual(result.signerIds, REQUIRED_FROST_SIGNERS);
+    assert.equal(result.threshold, 2);
+    assert.equal(runtime.nativeRelayer.broadcasts.length, 1);
+    assert.equal(runtime.solanaBridge.submissions.length, 1);
+    assert.equal(runtime.pipeline.ledgerSnapshot().authorizedUnmintedCredits, "0");
+  } finally { runtime.frost.cleanup(); }
+});
+
+for (const boundary of ["frost", "attester"]) {
+  test(`async deposit pipeline preserves liabilities and blocks effects after rejected ${boundary} request`, async () => {
+    const runtime = createPipeline({ asyncAdapters: true });
+    try {
+      const [target, method] = boundary === "frost" ? [runtime.frost.coordinator, "signAutomatically"] : [runtime.attesters[0], "signDepositCredit"];
+      target[method] = async () => { throw new Error("TestSigningServiceUnavailable"); };
+      await assert.rejects(runtime.pipeline.processDepositAsync(runtime.operation, 1_700_000_600), /TestSigningServiceUnavailable/u);
+      assert.equal(runtime.nativeRelayer.broadcasts.length, boundary === "frost" ? 0 : 1);
+      assert.equal(runtime.solanaBridge.submissions.length, 0);
+      assert.equal(runtime.pipeline.ledgerSnapshot().authorizedUnmintedCredits, boundary === "frost" ? "0" : "250000000");
+      assert.equal(runtime.pipeline.ledgerSnapshot().mintedSupply, "0");
+    } finally { runtime.frost.cleanup(); }
+  });
+}
+
 test("automatic Native to Solana pipeline submits through localnet Solana bridge and observer", async () => {
   const config = baseConfig();
   const operation = operationWithComputedId(config);
@@ -1110,14 +1145,15 @@ for (const asyncAdapters of [false, true]) {
   });
 }
 
-for (const boundary of ["native", "reserve", "mint"]) {
+for (const boundary of ["frost", "attester", "native", "reserve", "mint"]) {
   test(`async pipeline rechecks a reopened journal after pending ${boundary} response`, async () => {
     const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-pipeline-late-stop-"));
     const journal = new FileBackedDepositJournal({ root, repoRoot: REPO_ROOT });
     const ledger = new ExactDepositLedger();
     const runtime = createPipeline({ asyncAdapters: true, journal, ledger });
     try {
-      const [target, method] = { native: [runtime.nativeRelayer, "broadcastReserveSweep"],
+      const [target, method] = { frost: [runtime.frost.coordinator, "signAutomatically"], attester: [runtime.attesters[0], "signDepositCredit"],
+        native: [runtime.nativeRelayer, "broadcastReserveSweep"],
         reserve: [runtime.reserveVerifier, "verifyFinalizedReserveSweep"], mint: [runtime.solanaBridge, "submitDepositClaim"] }[boundary];
       const original = target[method].bind(target);
       const entered = Promise.withResolvers();
@@ -1136,7 +1172,7 @@ for (const boundary of ["native", "reserve", "mint"]) {
       assert.deepEqual(ledger.status(), { state: DEPOSIT_STATES.HARD_STOP, reason: stopped.reason });
       assert.equal(runtime.solanaBridge.submissions.length, boundary === "mint" ? 1 : 0);
       assert.equal(ledger.snapshot().mintedSupply, "0");
-      if (boundary === "mint") assert.equal(ledger.snapshot().authorizedUnmintedCredits, "250000000");
+      if (["attester", "mint"].includes(boundary)) assert.equal(ledger.snapshot().authorizedUnmintedCredits, "250000000");
     } finally { runtime.frost.cleanup(); rmSync(root, { recursive: true, force: true }); }
   });
 }

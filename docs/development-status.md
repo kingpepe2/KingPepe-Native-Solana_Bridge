@@ -1,5 +1,120 @@
 # KingPepe Native - Solana Bridge Development Status
 
+## Phase 08.5 attester recovery and async integration: local regression complete
+
+Published baseline remains f99c08c6bb50803b7db9ddbd0c3c7862f5d23d15. The original
+dirty work was preserved after authorized host storage recovery. WSL startup
+checks succeeded. The interrupted authenticated-malformed-journal regression was
+rerun first and passed its intended durable global-stop/reopen assertions. The
+earlier fixture-creation failure remains an infrastructure failure, not a code
+assertion or passing result.
+
+Fresh worktree validation: locked npm install, Windows/WSL Node 576 each, two
+vectors each, Rust 97/check/fmt/Clippy, declared-license metadata and all five Cargo
+advisory scans pass. npm reports zero vulnerabilities; the unmaintained bincode
+1.3.3 RUSTSEC-2025-0141 warning remains disclosed. Current tree/provenance coverage
+includes 224 files. Source and full-history Gitleaks passed before the latest
+diagnostic/documentation changes; final staged/outgoing scans are still required.
+
+Fresh daemon regressions passed: deposit/security 55, withdrawal record 26,
+deployment identity 18, Native reorg eight and immutable acceptance 13. Each ran
+from a new isolated chain root and reached its required COMPLETED deposit flow.
+The 55-check flow reconciled 100000000 atomic reserve to 100000000 minted supply,
+zero pending credits and zero surplus. Rust and SBF project targets were reused
+for this incremental run; this is NOT final clean-clone reproducibility evidence.
+
+Review reproduced an async pipeline defect: its coordinator and attester calls
+were not awaited, so a valid asynchronous signing result was treated as an
+unavailable dependency. Both awaits are fixed without removing post-response stop
+checks. Five added regressions exercise real FROST/Ed25519 computations behind
+async adapters, rejected requests and late journal stops. Their chain responses
+are fixtures, not protected real-chain service integration evidence.
+
+The first full Windows security run was 89 PASS / 2 FAIL / 0 SKIP. Both failures
+were IpcRequestRejected: a signed-result process restart and the first valid
+request in the conflict fixture. Their isolated reruns passed, which does not
+replace full-suite certification. The generic errors do not establish the exact
+transport cause. Fixed, redacted client/actor diagnostics were added. Security
+test files now run serially to bound unrelated DPAPI fixture contention, while
+all competing-process tests and transport/freshness limits remain unchanged.
+Retained results skip no real signing action: there is no new signing step, and
+key/evidence, final global/revision and post-await expiry checks still apply.
+The complete current Windows security rerun passed 93 tests with zero failures,
+cancellations or skips, including all four actual attester process-kill
+boundaries, final post-await expiry rejection, retained conflicts and rollback,
+global-stop propagation and all signer-fencing regressions. This certifies the
+tested current-principal component boundary, not cross-account separation or
+the complete protected real-chain bridge. The earlier 89/2 run remains failed.
+The revised source export and all 176 existing commits also passed Gitleaks;
+final staged and outgoing scans are required before publication.
+
+Published-HEAD Actions run 34576782766 attempt 2 again started zero steps in all
+four jobs. GitHub reported: "The job was not started because recent account
+payments have failed or your spending limit needs to be increased. Please check
+the 'Billing & plans' section in your settings". Status: NOT_RUN_ACCOUNT_BLOCKED.
+It does not certify this increment. This section records pre-publication
+worktree validation; new exact-SHA publication evidence is recorded separately
+after the reviewed commit/push, without a circular self-SHA update.
+
+Remaining work includes full durable deposit/broadcast-credit recovery, live
+reconciliation admission, protected Windows chain integration and final fresh
+clone/re-audit. Cross-service DPAPI/ACL certification still needs an isolated
+elevated Windows environment with distinct temporary identities. Phase 09 is
+NOT_STARTED; productionReady=false and Mainnet remains disabled.
+
+## Prior attester validation interrupted by storage exhaustion (historical)
+
+The acceptance checkpoint fix is PRIVATE at
+f99c08c6bb50803b7db9ddbd0c3c7862f5d23d15. Exact Actions
+[34576782766](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34576782766)
+started zero steps across four jobs, with zero artifacts. The payment/spending
+restriction is unchanged: NOT_RUN_ACCOUNT_BLOCKED, not CI PASS.
+
+Current work requires a protected journal in the actual attester IPC handler.
+It persists a message/outpoint/allocation reservation before Ed25519 signing and
+the signed result before acknowledgement. Identical retries reverify Native
+evidence and return the retained result; conflicting authorizations cannot replace
+it. Lifetime lease, protected CAS and the retained profile witness apply.
+See [attester recovery boundaries](security/attester-authorization-recovery.md).
+
+Fourteen portable codec regressions pass, and the full Windows and WSL Node
+suites pass 571 each with no failures/skips. Vectors two per platform and npm zero
+vulnerabilities pass. Rust 97, check/fmt/Clippy and declared-license metadata pass;
+Rust sources are unchanged and this rerun reused external targets, not a clean
+clone. New normal SBF outputs and the real deposit suite passed 55 checks through
+COMPLETED/RECONCILED. Provenance coverage passes for all 224 current files.
+The first protected IPC attempt failed; removal of redundant outer authority
+calls preserved the actual preparation/signing/release checks and unchanged
+transport/freshness limits. Both role-specific retry/reopen targets then passed.
+Four actual attester process-kill boundaries passed: after PREPARED, after signing
+but before result persistence, after result persistence and before IPC response.
+Restart reverified the request and kept one binding/result; saved results did not
+cause new signatures. Native evidence in these Windows component tests is
+explicitly synthetic. Corrected negatives passed duplicate-process exclusion,
+conflicting authorization with durable stop/reopen, file-package rollback with
+global stop, and wrong-context/unavailable/corrupt-storage rejection. Two earlier
+fixture defects (nonce encoding and anchor filename) prevented their intended
+checks and were corrected, not counted as passes. A fixture I/O failure exposed
+a temporary path in a local diagnostic; a new reporter-redaction regression
+passes. No such log, protected data or other runtime artifact was published.
+
+The host system volume then exhausted its free space. The additional real-chain
+run exited with a Node bus error; WSL subsequently reported startup and exec I/O
+failures. The authenticated-malformed-journal test failed at protected fixture
+creation during exhaustion, before its intended assertion. It is NOT_RUN for
+that intended coverage, not a pass. Only the task-generated Windows verifier was
+moved to separate test storage and hash-verified; no production or other-session
+data was deleted. Limited recovered headroom did not restore safe validation.
+
+STOP further test writes/builds/publication until host storage and WSL health are
+restored. The final current-source Windows security suite, additional real-chain
+suites, renewed Cargo advisory scans, final Gitleaks and fresh clone remain
+incomplete. No attester-recovery commit/push was made. This is not full service
+recovery, cross-account certification or a final 01-08 audit. Preserve the dirty
+work and rerun the interrupted tests before scans/review/publication.
+
+Phase 09 NOT_STARTED; productionReady=false; Mainnet disabled.
+
 ## Phase 08.5 immutable Native acceptance recovery under validation
 
 Source-health admission is PRIVATE at 858dc041c922add58f0af1c98efeca8094774339.
