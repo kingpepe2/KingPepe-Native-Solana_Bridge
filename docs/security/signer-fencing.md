@@ -34,8 +34,10 @@ unit fixtures, not evidence of Native chain execution. Regtest E2E is separate.
 
 The fence must remain outside signer-state backup/restore packages. Restoring
 state and its own anchor is detected while the independent fence is retained.
-Restoring **every** file, fence and enforcement mechanism can evade a fresh
-process. These are cooperating-process/local filesystem guarantees, not a TPM
+The additional per-store retained registry witness rejects restoration of both
+complete signer/fence file packages while the service profile remains current.
+Restoring **every** file, registry/profile witness and enforcement mechanism can
+still evade a fresh process. These are cooperating-process/local guarantees, not a TPM
 monotonic counter, remote witness, full-host rollback guarantee or protection
 against code running with the signing service's privileges. Host compromise can
 affect both participants. No second signing computer is required.
@@ -43,5 +45,6 @@ affect both participants. No second signing computer is required.
 No machine reboot or power-loss test has been performed. Distinct Windows
 service accounts/profile/ACL denial still require an isolated elevated test
 environment. The current tests must not be labeled cross-service certification.
-Durable global stop propagation, full bridge crash recovery and stronger
-chain-progress freshness are separate remaining control groups.
+Full bridge crash recovery, protected real-chain integration and source-health
+admission are separate remaining controls. Global stop components are not by
+themselves evidence of complete bridge-wide restart recovery.

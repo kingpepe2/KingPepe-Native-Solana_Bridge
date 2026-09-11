@@ -57,11 +57,22 @@ invent state or discard ambiguous evidence. Tests reconstruct actual encrypted
 disk images at each replacement boundary. This is not a sudden-power-loss test
 or a hardware durability guarantee.
 
-A retained checkpoint detects restoration of older state alone. A live wrapper
-also detects a backwards revision. **Restoring both state and checkpoint at their
-original locations can evade a fresh process.** The regression suite explicitly
-demonstrates that limitation. A separate protected directory is not a monotonic
-external authority. Do not present it as complete backup/rollback assurance.
+The retained registry witness increment additionally binds each store to an
+explicitly enrolled, nonvolatile service-profile registry record with a private
+DACL. It contains only a DPAPI-protected revision and hash of encrypted state,
+never a private share or nonce. Encrypted candidate files are flushed before
+advancing the witness; the witness is flushed before replacing committed files
+or acknowledging the write. Recovery admits only the exact witnessed image or
+one authenticated adjacent candidate pair. Missing enrollment is never recreated.
+
+This detects restoration of state, file checkpoint and signer-fence packages
+while the separately retained service profile remains current. It is not an
+unconditional monotonic counter: **restoring the registry/profile together with
+all state files can still evade a fresh process**. Tests explicitly preserve this
+limitation rather than asserting a nonexistent hardware guarantee. Whole-host
+snapshots must not be treated as safe automatic signer restore packages. Existing
+stores without a witness fail closed; no automatic migration or re-enrollment is
+provided. Refer to current status for actual executed test results.
 
 ## Actual tests and outstanding requirements
 
@@ -82,12 +93,12 @@ Windows environment with rights to provision and run distinct test service
 identities. Do not request account passwords or weaken ACLs to manufacture a pass.
 No real service identities or operational paths belong in source or test output.
 
-Remaining Phase 04 requirements include real service account isolation and
-cross-identity access tests, authenticated confidential inter-service IPC,
-persistent lifetime signer fencing and independently retained rollback evidence.
-Per-operation locks are not lifetime process leases. The helper's inherited
-anonymous pipes are not a coordinator-to-signer IPC protocol. Service-authentication
-storage purpose support is not a completed certificate/enrollment lifecycle.
+Separate source components now implement authenticated confidential IPC and
+persistent lifetime signer fencing; see signer-fencing.md and service-ipc.md.
+Cross-identity access, protected real-chain service integration and complete
+recovery remain incomplete. The helper's inherited anonymous pipes are not the
+coordinator-to-signer transport. Storage purpose support is not a completed
+production certificate/enrollment lifecycle.
 
 A process with the same service token, or a privileged host compromise, may
 access protected material or subvert code and ACLs. Host outage affects both A
@@ -97,9 +108,9 @@ directories and backup recovery still require deployment validation. JavaScript
 and .NET string erasure and complete forensic memory zeroization are not proven.
 No protection against hidden privileged clones is claimed.
 
-This change does not implement durable global HARD_STOP propagation, complete
-broadcast-to-credit service recovery, the live Solana deployment watcher or
-post-mint deep-reorg handling. Those remain separate blockers, not passing tests.
+Separate components implement global stop guards, live Solana deployment checks
+and accepted Native reorg incident handling. Complete broadcast-to-credit recovery
+and their full protected-service integration remain separate blockers.
 The upstream `@noble/curves` 2.3.0 FROST implementation remains unaudited.
 
 ## API references and provenance
@@ -113,4 +124,6 @@ prerequisites, not KingPepe-exclusive dependencies. Reference semantics:
 [service access rights](https://learn.microsoft.com/en-us/windows/win32/services/service-security-and-access-rights).
 Also reviewed: [DriveInfo](https://learn.microsoft.com/en-us/dotnet/api/system.io.driveinfo.drivetype)
 and the [FileStream security-descriptor overload](https://learn.microsoft.com/en-us/dotnet/api/system.io.filestream.-ctor).
+Registry semantics: [RegCreateKeyEx](https://learn.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-regcreatekeyexw)
+and [RegistryKey.Flush](https://learn.microsoft.com/en-us/dotnet/api/microsoft.win32.registrykey.flush).
 These references and local tests are not an independent security audit.
