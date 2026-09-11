@@ -1,5 +1,10 @@
 {
   "generatedAt": "2026-09-11T00:00:00Z",
+  "phase085ServiceIpc": {
+    "use": "Reference-only Node TLS 1.3 APIs; existing pinned Node 24.21.0 runtime. No source or binaries copied. Windows tests used installed Git for Windows OpenSSL 3.5.7 solely to generate disposable certificates outside source.",
+    "urls": ["https://nodejs.org/api/tls.html", "https://github.com/nodejs/node/blob/v24.21.0/doc/api/tls.md"],
+    "limits": "Localnet enrollment, not production PKI or cross-service identity certification."
+  },
   "phase085WindowsProtection": {
     "checkedAt": "2026-09-11",
     "use": "Original glue using installed Windows PowerShell 5.1 and .NET Framework DPAPI CurrentUser, protected DACLs and exclusive file handles. No upstream source or sample code copied, no OS binaries vendored, no dependency version change.",

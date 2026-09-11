@@ -2,6 +2,12 @@
 
 This repository tracks selected upstream references for architectural guidance.
 
+The original service IPC adapter uses the existing Node runtime's TLS/OpenSSL
+implementation. Disposable Windows certificate tests invoke installed Git for
+Windows OpenSSL; no upstream code, runtime binary, certificate or private key is
+vendored. Their distribution licenses/notices remain applicable. This does not
+grant KingPepe-exclusive rights over Node, OpenSSL or Git for Windows.
+
 The original Windows protected-store adapter invokes DPAPI, .NET Framework and
 Windows filesystem security APIs. It does not copy Microsoft implementation or
 sample code, and does not vendor Microsoft assemblies or binaries. The installed
