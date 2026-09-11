@@ -3,25 +3,49 @@ import { NativeFrostSigner } from "./native-frost-signer.mjs";
 import { validateNativeSigningIntent } from "../policy/native-signing-policy.mjs";
 import { validateNativeFrostSigningRequest } from "../policy/signing-request.mjs";
 import { ProtectedServiceIpc } from "../../../shared/windows/service-ipc.mjs";
+import { requireIntegrityGuard } from "../../../services/supervisor/protected-integrity.mjs";
+import { createHash } from "node:crypto";
 
 // No DKG secret, private-share export, arbitrary method dispatch or shell API.
-export function nativeFrostIpcHandler(signer) {
+export function nativeFrostIpcHandler(signer, integrity) {
   if (!(signer instanceof NativeFrostSigner)) throw new Error("IpcNativeSignerRequired");
+  requireIntegrityGuard(integrity, signer.signerId);
+  const context = signer.dkgContext();
+  integrity.assertDeployment({ environment: "localnet", nativeGenesis: context.nativeGenesisHash,
+    solanaDeployment: context.solanaDeployment, keyEpoch: context.keyEpoch });
   if (!signer.hasProtectedLifetimeFence()) throw new Error("IpcFencedSignerRequired");
   return async ({ method, operationId, payload, peerRole }) => {
+    try {
     if (!signer.hasProtectedLifetimeFence()) throw new Error("IpcFencedSignerRequired");
     if (peerRole !== "COORDINATOR") throw new Error("IpcCoordinatorRequired");
+    if (method !== "abortSigningSession") await integrity.assertRunning(operationId, "FROST_SIGN");
     if (method === "verifyNativeEvidence") {
       const intent = validateNativeSigningIntent(payload);
       if (operationId !== intent.operationId) throw new Error("IpcOperationBindingRejected");
-      await signer.verifyNativeEvidence(intent); return { state: "NATIVE_EVIDENCE_CHECKED", operationId };
+      await signer.verifyNativeEvidence(intent);
+      await integrity.assertRunning(operationId, "FROST_SIGN"); return { state: "NATIVE_EVIDENCE_CHECKED", operationId };
     }
     const request = validateNativeFrostSigningRequest(payload?.request);
     if (operationId !== request.intent.operationId) throw new Error("IpcOperationBindingRejected");
-    if (method === "signingCommitment") return signer.signingCommitment(request);
-    if (method === "signatureShare") return signer.signatureShare(request, payload.commitments);
     if (method === "abortSigningSession") return signer.abortSigningSession(request);
-    throw new Error("IpcNativeMethodRejected");
+    if (method !== "signingCommitment" && method !== "signatureShare") throw new Error("IpcNativeMethodRejected");
+    // The initial coordinator verification may age while other services work.
+    // Refresh each participant's own evidence at every secret-bearing action;
+    // never extend/bypass the Native signer's existing freshness fence.
+    await signer.verifyNativeEvidence(request.intent);
+    await integrity.assertRunning(operationId, "FROST_SIGN");
+    let result;
+    if (method === "signingCommitment") result = signer.signingCommitment(request);
+    else if (method === "signatureShare") result = signer.signatureShare(request, payload.commitments);
+    else throw new Error("IpcNativeMethodRejected");
+    await integrity.assertRunning(operationId, "FROST_SIGN"); return result;
+    } catch (error) {
+      if (["ProtectedSignerStateIntegrityRejected", "ProtectedSignerFenceRejected", "ProtectedStateRollbackDetected", "ProtectedLifetimeLeaseLost"].includes(error?.message)) {
+        // Do not include private state or paths in the incident evidence digest.
+        await integrity.report(operationId, "SIGNER_ROLLBACK", createHash("sha256").update(error.message).digest("hex"));
+      }
+      throw error;
+    }
   };
 }
 
