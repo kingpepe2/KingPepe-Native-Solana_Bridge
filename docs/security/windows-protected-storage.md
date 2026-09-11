@@ -66,6 +66,10 @@ It fails, rather than skips, on other platforms. The suite exercises real DPAPI,
 ACL rejection, encrypted FROST DKG/sign/reopen, distinct Ed25519 attestation,
 stale writes, copied roots, corrupted/missing files and prepared-commit recovery.
 The ordinary portable suite tests strict immutable context parsing separately.
+Byte comparisons in the Windows suite produce only boolean assertion fields and
+fixed errors, never private bytes or protected envelopes in an assertion diff.
+A forced-failure regression checks that reporter boundary. Cleanup failures are
+also redacted. Passing tests alone would not have exercised these error outputs.
 
 The present workstation token is not elevated. The current-identity tests do not
 prove denial under another Windows service account. Wrong configured SID rejection
