@@ -11,7 +11,8 @@
     "filesMoved": 0,
     "sourceImports": "None. Original C#/PowerShell/Node glue calls existing Windows DPAPI and filesystem APIs; no Microsoft implementation or sample code imported. Noble signing algorithm and all dependency/toolchain pins unchanged.",
     "scope": "User-scoped encrypted local state, protected directory checks, exact context/revision binding, encrypted FROST and separate attester adapters, Windows regressions, publication guard extension and maintenance documentation. No production material or legacy mutation.",
-    "terminology": "GetOwner/SetOwner and Windows ACL ownership are official filesystem API concepts, not KingPepe project governance roles. Synthetic SID constants are non-operational negative-test vectors; actual identities are never committed."
+    "terminology": "GetOwner/SetOwner and Windows ACL ownership are official filesystem API concepts, not KingPepe project governance roles. Synthetic SID constants are non-operational negative-test vectors; actual identities are never committed.",
+    "followUpReview": "Original Windows test-only fixed-error byte comparisons and cleanup errors prevent assertion reporters from printing disposable secrets or protected blobs on failure. One added regression; no runtime implementation, dependency, license, file-count or operational-data change. Implementation clean-clone evidence binds cba77159f5afbbea5aa1f95030e1b90c5fc990df."
   },
   "phase085AuditReview": {
     "baseline": "9ea5e198b57f48086a0c7861123a6d79d14e8560",

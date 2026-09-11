@@ -2,6 +2,17 @@
 
 ## Phase 08.5 security remediation, partial increment (2026-09-11)
 
+Implementation published PRIVATE at cba77159f5afbbea5aa1f95030e1b90c5fc990df.
+Its separate clean clone reproduced all results below, including 26 finalized
+withdrawal-record checks, with new project host/SBF builds and matching program
+hashes. Exact CI 34545506371 again started zero steps; artifacts zero, NOT_RUN.
+Full 166-commit secret scan passed. No runtime data was published.
+
+Follow-up correction removes byte-valued assertion failures from Windows tests
+and adds fixed-error output coverage. Windows security tests increase from 25
+to 26 PASS on the follow-up worktree. No runtime, dependency, program or authority
+change. Scan/review/publish this actual correction and verify its own SHA.
+
 Baseline 2b5c82971834d6299969c05a9889c950dae2ef91 was clean, PRIVATE and equal
 to origin/main. Added real Windows DPAPI protected storage and encrypted FROST/
 attester integration, strict identity/context/ACL checks, encrypted interrupted
@@ -15,8 +26,8 @@ Solana COMPLETED; this is not secured multi-service Windows E2E certification.
 Dependency audits report no vulnerabilities, with the existing bincode
 unmaintained warning retained. No dependency changes or production material.
 
-Must finish publication scans/review, then normal PRIVATE commit/push and
-exact-SHA CI/clean-clone verification. Baseline CI rerun attempt 2 again started
+Implementation publication/scans and exact-SHA clean-clone verification passed;
+the test-log correction needs its own publication validation. Baseline CI rerun attempt 2 again started
 zero steps: GITHUB_ACTIONS_ACCOUNT_EXECUTION_BLOCKED, tests NOT_RUN.
 Remaining blockers: cross-identity Windows service tests need an elevated
 isolated environment; IPC/lifetime fencing/global stop/full service and

@@ -34,6 +34,17 @@ No plaintext fallback is permitted. Keep the remaining IPC, persistent fencing,
 global-stop, service recovery, deployment watcher and post-mint reorg gaps open.
 Historical audit results below do not certify this remediation's source SHA.
 
+Protected-store implementation published PRIVATE at
+cba77159f5afbbea5aa1f95030e1b90c5fc990df. That exact clean clone passed 505 Node
+tests per platform, 25 Windows security tests, 97 Rust tests/quality gates, two
+new SBF builds, 55 deposit checks and 26 withdrawal-record checks. Actions
+34545506371 started zero steps. A follow-up removes secret-bearing byte values
+from test assertion failures and adds a fixed-error regression: 26 Windows
+security tests pass locally. It changes tests/status, not cryptographic/runtime
+logic. Verify its own SHA after publication; never infer CI success. The full
+remediation gate remains blocked; next requires isolated Windows service-test
+capability and further IPC/fencing/recovery/monitor/reorg implementation.
+
 ## Previous retrospective audit context
 
 Phase 09 is NOT_STARTED and MUST NOT start automatically. The Team requested

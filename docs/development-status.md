@@ -2,6 +2,31 @@
 
 ## Phase 08.5 protected-store remediation increment (2026-09-11)
 
+Published implementation: `cba77159f5afbbea5aa1f95030e1b90c5fc990df`,
+`feat(phase-08.5): add user-bound Windows protected state`. Normal PRIVATE push
+succeeded. A completely separate clean clone of that SHA passed locked Windows
+and WSL installation, 505 Node tests and two vectors each, 25 Windows security
+tests, 97 Rust tests plus check/fmt/all-features Clippy, two SBF builds from new
+project targets, 55 deposit/recovery/retry checks and 26 finalized withdrawal-record
+checks. The clone stayed clean, with no legacy-directory dependency. Fresh Native
+to Solana reached COMPLETED; both program binary hashes reproduced exactly.
+All 166 published commits passed Gitleaks; source/provenance/guardrails and
+dependency-license/audit checks passed, with the bincode warning retained.
+
+[Exact-SHA CI 34545506371](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34545506371)
+failed all four jobs before steps: Linux SBF and Native-Solana local E2E,
+Foundation Windows Check, Source history secret scan, Foundation Guardrails.
+Zero artifacts; execution/tests NOT_RUN due to the same account restriction.
+
+The follow-up review found that failed buffer assertions could expose disposable
+secret bytes or encrypted blobs in test reporter output. No such output occurred
+in the passing runs and no production material existed. The follow-up replaces
+these assertions with boolean constant-time equality and fixed errors, redacts
+temporary-cleanup failures and adds a forced-failure redaction regression.
+All 26 Windows security tests pass on that worktree. Runtime/cryptographic code,
+programs, locks and dependency pins are unchanged. Publication and clean-clone
+validation of the follow-up must be bound to its own SHA, not relabeled as cba7715.
+
 Starting source: `2b5c82971834d6299969c05a9889c950dae2ef91`, clean and equal to
 PRIVATE origin/main at inspection. This increment is partial remediation of the
 remaining Phases 01-08 findings, not completion of Phase 04 or permission for 09.
@@ -50,9 +75,9 @@ Durable global HARD_STOP, complete broadcast/credit and service restart recovery
 live Solana deployment monitoring and post-mint deep-reorg response remain open.
 
 Phase 09 stays NOT_STARTED; SAFE_TO_BEGIN_PHASE_09=false. Current-user component
-passes cannot satisfy the full requested remediation/audit gate. After this real
-source fix passes publication scans, commit/push PRIVATE and verify its exact CI
-and separate clean clone. Bind that subsequent evidence to the actual published
+passes cannot satisfy the full requested remediation/audit gate. After the test-log
+correction passes publication scans, commit/push PRIVATE and verify its exact CI
+and separate clean clone. Bind subsequent evidence to the actual published
 SHA, never to this worktree's baseline or a circular self-SHA. Stop for explicit
 Team direction and the required isolated Windows validation capability.
 productionReady=false; mainnetActivation=DISABLED.

@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { mkdtempSync, readFileSync, writeFileSync, readdirSync, rmSync, existsSync, linkSync, unlinkSync } from "node:fs";
-import { randomBytes, createHash } from "node:crypto";
+import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import os from "node:os";
@@ -24,20 +24,34 @@ const serviceSid = windowsCurrentServiceSid(); // Never logged or committed.
 const h = value => createHash("sha256").update(value).digest("hex");
 function fixture(t, role = "KINGPEPE_FROST_A", purpose = "frost-state", overrides = {}) {
   const parent = mkdtempSync(path.join(os.tmpdir(), "kingpepe-protected-test-"));
-  t.after(() => { assert.equal(path.dirname(parent), path.resolve(os.tmpdir())); assert(path.basename(parent).startsWith("kingpepe-protected-test-")); rmSync(parent, { recursive: true }); });
+  t.after(() => {
+    assert(path.dirname(parent) === path.resolve(os.tmpdir()) && path.basename(parent).startsWith("kingpepe-protected-test-"), "UnsafeTemporaryCleanupTarget");
+    try { rmSync(parent, { recursive: true }); } catch { throw new Error("WindowsTestCleanupFailed"); }
+  });
   return { parent, options: { root: path.join(parent, "state"), anchorRoot: path.join(parent, "anchor"), repoRoot,
     context: { role, purpose, serviceSid, environment: "localnet", nativeGenesis: REGTEST_GENESIS,
       solanaDeployment: h("protected-local-deployment"), instanceId: randomBytes(32).toString("hex"), keyEpoch: 1, ...overrides } } };
 }
 const stateFile = options => path.join(options.root, "state.protected");
 const anchorFile = options => path.join(options.anchorRoot, "state.protected");
+function sameProtectedBytes(actual, expected) {
+  // Assertions must never retain secret bytes or encrypted operational blobs
+  // in actual/expected fields that a failing test reporter could print.
+  assert(actual.length === expected.length && timingSafeEqual(actual, expected), "ProtectedBytesMismatch");
+}
+test("protected-byte assertion failures expose only a fixed error", () => {
+  const a = randomBytes(32), b = randomBytes(32); let caught;
+  try { sameProtectedBytes(a, b); } catch (error) { caught = error; }
+  assert(caught?.message === "ProtectedBytesMismatch" && caught.actual === false && caught.expected === true, "ProtectedAssertionRedactionFailed");
+  a.fill(0); b.fill(0);
+});
 
 test("real Windows DPAPI encrypts before disk and restores the exact payload", t => {
   const { options } = fixture(t); const secret = randomBytes(128);
   const store = WindowsProtectedStore.create(options, secret);
   assert.equal(readFileSync(stateFile(options)).includes(secret), false);
   assert.deepEqual(readdirSync(options.root), ["state.protected"]);
-  assert.deepEqual(store.read().payload, secret);
+  sameProtectedBytes(store.read().payload, secret);
   assert.equal(store.write(randomBytes(64), "1").revision, "2");
   assert.equal(new WindowsProtectedStore(options).read().revision, "2");
   secret.fill(0);
@@ -52,7 +66,7 @@ test("protected storage refuses reinitialization without overwriting", t => {
   const { options } = fixture(t); WindowsProtectedStore.create(options, randomBytes(32));
   const before = readFileSync(stateFile(options));
   assert.throws(() => WindowsProtectedStore.create(options, randomBytes(32)));
-  assert.deepEqual(readFileSync(stateFile(options)), before);
+  sameProtectedBytes(readFileSync(stateFile(options)), before);
 });
 test("corrupt protected state fails closed with a redacted error", t => {
   const { options } = fixture(t); const store = WindowsProtectedStore.create(options, randomBytes(32));
@@ -92,7 +106,7 @@ test("compare-and-swap refuses a stale writer without changing current state", t
   const { options } = fixture(t); const a = WindowsProtectedStore.create(options, randomBytes(32)), b = new WindowsProtectedStore(options);
   const old = b.read(); const updated = randomBytes(32); a.write(updated, "1");
   assert.throws(() => b.write(randomBytes(32), old.revision));
-  assert.deepEqual(a.read().payload, updated);
+  sameProtectedBytes(a.read().payload, updated);
 });
 test("current instance notices co-restored snapshots but new instance cannot prove full rollback", t => {
   const { options } = fixture(t); const store = WindowsProtectedStore.create(options, randomBytes(32));
@@ -138,7 +152,7 @@ for (const boundary of ["BOTH_CANDIDATES_FLUSHED", "ANCHOR_REPLACED", "BOTH_REPL
       writeFileSync(path.join(p.options.anchorRoot, "candidate.protected"), p.nextAnchor, { flag: "wx" });
     }
     const store = new WindowsProtectedStore(p.options);
-    assert.equal(store.read().revision, "2"); assert.deepEqual(store.read().payload, p.next);
+    assert.equal(store.read().revision, "2"); sameProtectedBytes(store.read().payload, p.next);
     assert.equal(new WindowsProtectedStore(p.options).read().revision, "2");
     assert.equal(existsSync(path.join(p.options.root, "candidate.protected")), false);
     assert.equal(existsSync(path.join(p.options.anchorRoot, "candidate.protected")), false);
