@@ -2,9 +2,11 @@
 import { WindowsProtectedStore, assertWindowsProtectedStore } from "../../shared/windows/protected-store.mjs";
 import { ProtectedServiceIpc } from "../../shared/windows/service-ipc.mjs";
 import { INTEGRITY_PROTOCOL, INTEGRITY_ROLES, mayPerform, mayReport } from "../../shared/service-integrity-policy.mjs";
+import { SourceHealthWindow, SOURCE_HEALTH_PROTOCOL, SOURCE_HEALTH_ROLES } from "../../shared/source-health-window.mjs";
 
 const HASH = /^[0-9a-f]{64}$/u;
 const GUARDS = new WeakSet();
+const SOURCE_TICKETS = new WeakMap();
 function requireValue(value, code = "IntegrityStateRejected") { if (!value) throw new Error(code); }
 function uint(value) { requireValue(typeof value === "string" && /^(0|[1-9][0-9]{0,19})$/u.test(value) && BigInt(value) <= 0xffff_ffff_ffff_ffffn); return BigInt(value); }
 function increment(value) { requireValue(uint(value) < 0xffff_ffff_ffff_ffffn); return (uint(value) + 1n).toString(); }
@@ -13,7 +15,7 @@ function fields(value, keys) { requireValue(value && !Array.isArray(value) && Ob
 // One explicit, exclusively leased authority. This is localnet enrollment only;
 // it does not install services, authorize production or create missing state.
 export class ProtectedIntegrityAuthority {
-  #store; #lease; #generation; #closed = false; #stopped = false;
+  #store; #lease; #generation; #health; #closed = false; #stopped = false;
   constructor(store) { assertWindowsProtectedStore(store, "SUPERVISOR", "global-integrity"); requireValue(store.context.environment === "localnet"); this.#store = store; }
   static async createLocal(options, initialState = "PAUSED_POLICY") {
     options = structuredClone(options); // One immutable enrollment input snapshot.
@@ -28,7 +30,8 @@ export class ProtectedIntegrityAuthority {
     try {
       authority.#lease = await store.acquireLifetimeLease();
       const { state, revision } = authority.#read(); state.generation = increment(state.generation);
-      authority.#write(state, revision); authority.#generation = state.generation; return authority;
+      authority.#write(state, revision); authority.#generation = state.generation;
+      authority.#health = new SourceHealthWindow({ generation: state.generation }); return authority;
     } catch { await authority.close(); throw new Error("IntegrityAuthorityUnavailable"); }
   }
   #read() {
@@ -56,11 +59,22 @@ export class ProtectedIntegrityAuthority {
   }
   status() {
     const { state, revision } = this.#read();
-    return Object.freeze({ protocol: INTEGRITY_PROTOCOL, state: state.state, generation: state.generation, revision, incidentCount: state.incidents.length });
+    const missingSources = this.#health.missing();
+    return Object.freeze({ protocol: INTEGRITY_PROTOCOL,
+      state: state.state === "RUNNING" && missingSources.length ? "PAUSED_POLICY" : state.state,
+      policyState: state.state, missingSources, generation: state.generation, revision, incidentCount: state.incidents.length });
   }
   handle({ method, peerRole, operationId, payload }) {
     requireValue(INTEGRITY_ROLES.includes(peerRole) && typeof operationId === "string" && HASH.test(operationId), "IntegrityRoleRejected");
     if (method === "integrityStatus") { fields(payload, []); return this.status(); }
+    if (method === "beginSourceCheck" || method === "finishSourceCheck") {
+      requireValue(!this.#closed && this.#lease && SOURCE_HEALTH_ROLES.includes(peerRole), "IntegritySourceRoleRejected"); this.#lease.assertHeld();
+      if (method === "beginSourceCheck") {
+        fields(payload, []);
+        const check = this.#health.begin(peerRole, operationId); return { ...this.status(), check };
+      }
+      this.#health.finish(peerRole, operationId, payload); return this.status();
+    }
     if (method === "assertRunning") {
       fields(payload, ["action"]); requireValue(mayPerform(peerRole, payload.action), "IntegrityActionRejected");
       const status = this.status(); requireValue(status.state === "RUNNING", "IntegrityAuthorizationStopped");
@@ -109,6 +123,21 @@ export class RemoteIntegrityGuard {
     this.#revision = revision; this.#generation = generation; return value;
   }
   async status(operationId) { return this.#observe(await this.#ipc.request(this.#port, { method: "integrityStatus", operationId, payload: {} })); }
+  async beginSourceCheck(operationId) {
+    requireValue(SOURCE_HEALTH_ROLES.includes(this.role), "IntegritySourceRoleRejected");
+    const result = this.#observe(await this.#ipc.request(this.#port, { method: "beginSourceCheck", operationId, payload: {} }));
+    requireValue(result.check?.protocol === SOURCE_HEALTH_PROTOCOL && result.check.generation === result.generation, "IntegritySourceResponseRejected");
+    const ticket = Object.freeze({ ...result.check }); SOURCE_TICKETS.set(ticket, { guard: this, operationId }); return ticket;
+  }
+  async finishSourceCheck(ticket, { state, evidenceDigest }) {
+    const binding = SOURCE_TICKETS.get(ticket); requireValue(binding?.guard === this, "IntegritySourceTicketRejected");
+    requireValue(["OBSERVED_MATCH", "WAITING_FOR_DEPENDENCY"].includes(state) && typeof evidenceDigest === "string" && HASH.test(evidenceDigest));
+    // Consume locally before sending. Lost responses require a NEW observation,
+    // not a replay or a refreshed timestamp on an old chain result.
+    SOURCE_TICKETS.delete(ticket);
+    return this.#observe(await this.#ipc.request(this.#port, { method: "finishSourceCheck", operationId: binding.operationId,
+      payload: { generation: ticket.generation, challenge: ticket.challenge, state, evidenceDigest } }));
+  }
   async assertRunning(operationId, action) {
     requireValue(mayPerform(this.role, action), "IntegrityActionRejected");
     const result = this.#observe(await this.#ipc.request(this.#port, { method: "assertRunning", operationId, payload: { action } }));

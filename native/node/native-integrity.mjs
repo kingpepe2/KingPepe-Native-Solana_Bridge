@@ -154,6 +154,7 @@ export class ProtectedNativeIntegrityMonitor {
   }
   async poll() {
     requireValue(!this.#busy && !this.#closed, "NativeProtectedProgressUnavailable"); this.#busy = true;
+    let ticket;
     try {
       const old = this.#read();
       if (old.value.incident) {
@@ -161,6 +162,7 @@ export class ProtectedNativeIntegrityMonitor {
         await this.#guard.report(digest(this.#policy), "NATIVE_DEEP_REORG", old.value.incident.evidenceDigest);
         return Object.freeze({ state: "HARD_STOP_INTEGRITY", affectedReserveAtomic: old.value.incident.affectedReserveAtomic });
       }
+      ticket = await this.#guard.beginSourceCheck(digest(this.#policy));
       const observed = await this.#verifier.observeChain(); requireVerifiedRegtestChain(observed);
       const next = compareNativeProgress(old.value, observed, this.#policy);
       if (next.incident) {
@@ -172,12 +174,16 @@ export class ProtectedNativeIntegrityMonitor {
         return Object.freeze({ state: "HARD_STOP_INTEGRITY", affectedReserveAtomic: next.incident.affectedReserveAtomic });
       }
       if (next.state === "OBSERVED_MATCH") this.#write(next.progress, old.revision);
-      if ((await this.#guard.status(digest(this.#policy))).state === "HARD_STOP_INTEGRITY") this.#stopped = true;
+      const global = await this.#guard.finishSourceCheck(ticket, { state: next.state, evidenceDigest: digest(next.progress) }); ticket = undefined;
+      if (global.state === "HARD_STOP_INTEGRITY") this.#stopped = true;
       return Object.freeze({ state: this.#stopped ? "HARD_STOP_INTEGRITY" : next.state, reason: next.reason });
     } catch (error) {
       const code = error.message === "RAW_NATIVE_WRONG_GENESIS" ? "NATIVE_GENESIS_CHANGED" :
         ["NativeProgressRejected", "NativeProgressClockRollback", "ProtectedStateRollbackDetected"].includes(error.message) ? "NATIVE_PROGRESS_INTEGRITY" : undefined;
       if (code) { this.#stopped = true; await this.#guard.report(digest(this.#policy), code, digest({ reason: error.message })); }
+      else if (ticket) {
+        try { await this.#guard.finishSourceCheck(ticket, { state: "WAITING_FOR_DEPENDENCY", evidenceDigest: digest(this.#policy) }); } catch { /* Authorization remains suspended; no fabricated contradiction. */ }
+      }
       return Object.freeze({ state: this.#stopped ? "HARD_STOP_INTEGRITY" : "WAITING_FOR_DEPENDENCY", reason: "NATIVE_OBSERVATION_UNAVAILABLE" });
     } finally { this.#busy = false; }
   }

@@ -21,4 +21,4 @@ const reports = {
 };
 export function mayPerform(role, action) { return typeof action === "string" && permissions[role]?.includes(action) === true; }
 export function mayReport(role, code) { return typeof code === "string" && reports[role]?.includes(code) === true; }
-export const INTEGRITY_METHODS = Object.freeze(["integrityStatus", "assertRunning", "reportContradiction"]);
+export const INTEGRITY_METHODS = Object.freeze(["integrityStatus", "assertRunning", "reportContradiction", "beginSourceCheck", "finishSourceCheck"]);
