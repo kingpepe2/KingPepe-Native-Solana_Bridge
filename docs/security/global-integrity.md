@@ -52,9 +52,22 @@ Unreachable/corrupt authority state makes authorization unavailable, not RUNNING
 and not proof of a successfully persisted stop. Read-only status remains possible
 during a valid persisted hard stop. No runtime clear/resume/reset API exists.
 If incident persistence fails, the active authority latches closed and never
-acknowledges durable success. Power loss before any incident write and startup
-recovery from that condition still require the unfinished independent recovery
-and freshness controls; do not claim this component solves that crash window.
+acknowledges durable success. The reporting service now retains the exact
+role/code/operation/evidence digest in its protected authentication store BEFORE
+connecting. A lost report or acknowledgement therefore survives service restart;
+the guard redelivers it and requires a persisted HARD_STOP_INTEGRITY response
+before read-only observations can proceed. It cannot obtain RUNNING permission
+with a retained incident, even through the underlying transport API. Duplicate
+delivery does not duplicate the supervisor incident. Acknowledgement never
+prunes the outbox, and neither a healthy chain nor a new supervisor generation
+clears it. Both outbox and authority have fixed 64-incident bounds.
+
+If the local protected write itself fails, no report is acknowledged or sent
+and the active guard remains stopped. Simultaneous loss of all writable state
+before any incident record exists is not a solved persistence guarantee. Startup
+still needs fresh independent source checks and validated journals; full service
+recovery and those integration boundaries remain required. Retained profile
+witnesses detect file-package rollback, not privileged full-profile/host restore.
 
 Protected FROST handlers and the remote coordinator require a genuine integrity
 client matching their role, genesis, deployment and key epoch. They check before

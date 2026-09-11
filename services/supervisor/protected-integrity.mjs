@@ -1,6 +1,6 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 import { WindowsProtectedStore, assertWindowsProtectedStore } from "../../shared/windows/protected-store.mjs";
-import { ProtectedServiceIpc } from "../../shared/windows/service-ipc.mjs";
+import { isProtectedServiceIpc } from "../../shared/windows/service-ipc.mjs";
 import { INTEGRITY_PROTOCOL, INTEGRITY_ROLES, mayPerform, mayReport } from "../../shared/service-integrity-policy.mjs";
 import { SourceHealthWindow, SOURCE_HEALTH_PROTOCOL, SOURCE_HEALTH_ROLES } from "../../shared/source-health-window.mjs";
 
@@ -106,7 +106,7 @@ export class ProtectedIntegrityAuthority {
 export class RemoteIntegrityGuard {
   #ipc; #port; #revision = 0n; #generation = 0n; #stopped = false;
   constructor({ ipc, port }) {
-    requireValue(ipc instanceof ProtectedServiceIpc && ipc.peerRole === "SUPERVISOR" && INTEGRITY_ROLES.includes(ipc.role), "IntegrityTransportRequired");
+    requireValue(isProtectedServiceIpc(ipc) && ipc.peerRole === "SUPERVISOR" && INTEGRITY_ROLES.includes(ipc.role), "IntegrityTransportRequired");
     this.#ipc = ipc; this.#port = port; GUARDS.add(this);
   }
   get role() { return this.#ipc.role; }
@@ -140,11 +140,26 @@ export class RemoteIntegrityGuard {
   }
   async assertRunning(operationId, action) {
     requireValue(mayPerform(this.role, action), "IntegrityActionRejected");
-    const result = this.#observe(await this.#ipc.request(this.#port, { method: "assertRunning", operationId, payload: { action } }));
+    // A stopped process cannot authorize work, but still attempts delivery of
+    // its retained incident via a read-only status request. Neither a failure
+    // nor a later RUNNING response can clear the latch.
+    if (this.#stopped) { await this.#ipc.request(this.#port, { method: "integrityStatus", operationId, payload: {} }); throw new Error("IntegrityAuthorizationStopped"); }
+    let response;
+    try { response = await this.#ipc.request(this.#port, { method: "assertRunning", operationId, payload: { action } }); }
+    catch (error) {
+      if (error?.message === "IpcIntegrityIncidentRetained") { this.#stopped = true; throw new Error("IntegrityAuthorizationStopped"); }
+      throw error;
+    }
+    const result = this.#observe(response);
     requireValue(result.state === "RUNNING" && result.operationId === operationId && result.action === action && result.role === this.role, "IntegrityAuthorizationStopped");
   }
   async report(operationId, code, evidenceDigest) {
-    requireValue(mayReport(this.role, code), "IntegrityReportRejected");
+    requireValue(mayReport(this.role, code) && typeof operationId === "string" && HASH.test(operationId) &&
+      typeof evidenceDigest === "string" && HASH.test(evidenceDigest), "IntegrityReportRejected");
+    this.#stopped = true;
+    // ProtectedServiceIpc persists the exact incident before opening a socket.
+    // A lost acknowledgement never removes it. Reopen/redelivery cannot grant
+    // RUNNING while the supervisor is unavailable or has not durably stopped.
     const result = this.#observe(await this.#ipc.request(this.#port, { method: "reportContradiction", operationId, payload: { code, evidenceDigest } }));
     requireValue(result.state === "HARD_STOP_INTEGRITY", "IntegrityStopNotAcknowledged"); return result;
   }
