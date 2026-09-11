@@ -35,6 +35,7 @@ export const ALLOWED_REGTEST_CLI_COMMANDS = Object.freeze(
     "gettransaction",
     "gettxout",
     "invalidateblock",
+    "reconsiderblock",
     "sendtoaddress",
     "sendrawtransaction",
     "testmempoolaccept",

@@ -88,7 +88,7 @@ test("orchestrator refuses runtime roots inside the source repository", () => {
 
 test("forced-fork test commands retain explicit REGTEST and isolated datadir arguments", () => {
   const datadir = path.join(os.tmpdir(), "kingpepe-forced-fork-command-test");
-  for (const command of ["generateblock", "invalidateblock"]) {
+  for (const command of ["generateblock", "invalidateblock", "reconsiderblock"]) {
     const args = buildRegtestCliArguments({ datadir, rpcPort: 18443, command, parameters: [] });
     assert.deepEqual(args, ["-regtest=1", `-datadir=${path.resolve(datadir)}`, "-rpcport=18443", command]);
     assert.throws(() => buildRegtestCliArguments({ datadir, rpcPort: 18443, command: command + " -chain=main" }), /allowlisted/u);
