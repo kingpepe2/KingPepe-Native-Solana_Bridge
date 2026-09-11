@@ -3,9 +3,12 @@
 import tls from "node:tls";
 import { createHash, createPrivateKey, createPublicKey, randomBytes, X509Certificate } from "node:crypto";
 import { assertWindowsProtectedStore } from "./protected-store.mjs";
-import { INTEGRITY_ROLES, INTEGRITY_METHODS } from "../service-integrity-policy.mjs";
+import { INTEGRITY_PROTOCOL, INTEGRITY_ROLES, INTEGRITY_METHODS, validateRetainedIntegrityIncidents } from "../service-integrity-policy.mjs";
 
 const VERSION = "KINGPEPE_SERVICE_IPC_V2";
+// Storage version changes do not relax or alter the V2 authenticated wire
+// protocol. Old enrollment is rejected, never silently recreated or migrated.
+const STORAGE_VERSION = "KINGPEPE_SERVICE_AUTH_V3";
 const HOSTNAME = "kingpepe-service.invalid";
 const MAX = 262144;
 const REQUEST_LIMIT = 2048; // Exhaustion fails closed; no automatic pruning/rotation.
@@ -15,6 +18,8 @@ const TIMEOUT = 10000;
 // distinct thirty-second response deadline; it never accepts a late result.
 const EXECUTION_TIMEOUT = 30000;
 const HASH = /^[0-9a-f]{64}$/u;
+const IPC_INSTANCES = new WeakSet();
+export function isProtectedServiceIpc(value) { return IPC_INSTANCES.has(value); }
 // Diagnostic codes only, never arbitrary exception text, paths or peer data.
 // They do not grant retry permission, clear integrity stops or change deadlines.
 function rejectionCode(error) {
@@ -69,11 +74,13 @@ function read(store) {
   const result = store.read(); let state;
   try { state = JSON.parse(result.payload.toString("utf8")); } catch { throw new Error("IpcProtectedStateRejected"); }
   finally { result.payload.fill(0); }
-  requireValue(state?.protocol === VERSION && Object.keys(state).sort().join() === "credential,generation,lastTimeMs,protocol,usedRequestIds", "IpcProtectedStateRejected");
+  requireValue(state?.protocol === STORAGE_VERSION && Object.keys(state).sort().join() === "credential,generation,integrityIncidents,lastTimeMs,protocol,usedRequestIds", "IpcProtectedStateRejected");
   increment(state.generation);
   requireValue(Number.isSafeInteger(state.lastTimeMs) && state.lastTimeMs >= 0 && Date.now() >= state.lastTimeMs, "IpcClockRollback");
   requireValue(Array.isArray(state.usedRequestIds) && state.usedRequestIds.length <= REQUEST_LIMIT &&
     state.usedRequestIds.every(id => typeof id === "string" && HASH.test(id)) && new Set(state.usedRequestIds).size === state.usedRequestIds.length);
+  validateRetainedIntegrityIncidents(state.integrityIncidents, store.context.role);
+  requireValue(state.credential?.peerRole === "SUPERVISOR" || state.integrityIncidents.length === 0, "IpcIncidentRoleRejected");
   return { state, revision: result.revision };
 }
 function persist(store, state, revision) {
@@ -85,7 +92,7 @@ function persist(store, state, revision) {
 // must go directly to WindowsProtectedStore.create(service-auth), never disk/logs.
 export function encodeIpcEnrollment({ certificatePem, privateKeyPem, peerCertificatePem, peerRole }) {
   requireValue(typeof certificatePem === "string" && typeof privateKeyPem === "string" && typeof peerCertificatePem === "string");
-  return Buffer.from(JSON.stringify({ protocol: VERSION, generation: "0", lastTimeMs: 0, usedRequestIds: [],
+  return Buffer.from(JSON.stringify({ protocol: STORAGE_VERSION, generation: "0", lastTimeMs: 0, usedRequestIds: [], integrityIncidents: [],
     credential: { certificatePem, privateKeyPem, peerCertificatePem, peerRole } }));
 }
 
@@ -95,6 +102,7 @@ export class ProtectedServiceIpc {
   #credentialBinding;
   #deployment;
   #lastRejection;
+  #retainedIncidents = new Set();
   constructor(store) {
     assertWindowsProtectedStore(store, store?.context?.role, "service-auth");
     // Production enrollment/activation is outside this remediation's authority.
@@ -117,11 +125,16 @@ export class ProtectedServiceIpc {
       this.#peerFingerprint = digest(peer.raw);
       this.#credential = { key: Buffer.from(c.privateKeyPem), cert: c.certificatePem, ca: c.peerCertificatePem, minVersion: "TLSv1.3", maxVersion: "TLSv1.3", rejectUnauthorized: true };
     } catch { throw new Error("IpcCredentialRejected"); }
+    IPC_INSTANCES.add(this); // Only after actual protected credential validation.
   }
   get role() { return this.#role; }
   get peerRole() { return this.#peerRole; }
   get deployment() { return this.#deployment; }
   get lastRejection() { return this.#lastRejection; }
+  retainedIntegrityIncidents() {
+    requireValue(this.#peerRole === "SUPERVISOR", "IpcIncidentRoleRejected");
+    return validateRetainedIntegrityIncidents(this.#state().state.integrityIncidents, this.#role);
+  }
   #checkPeer(socket) {
     requireValue(!this.#closed && socket.authorized && socket.getProtocol() === "TLSv1.3" && !socket.isSessionReused(), "IpcPeerRejected");
     requireValue(digest(socket.getPeerX509Certificate().raw) === this.#peerFingerprint, "IpcPeerRejected");
@@ -129,6 +142,9 @@ export class ProtectedServiceIpc {
   #binding(socket) { return socket.exportKeyingMaterial(32, VERSION).toString("hex"); }
   #state() { requireValue(!this.#closed, "IpcClosed"); const r = read(this.#store);
     requireValue(digest(Buffer.from(JSON.stringify(r.state.credential))) === this.#credentialBinding, "IpcCredentialChanged");
+    const retained = new Set(validateRetainedIntegrityIncidents(r.state.integrityIncidents, this.#role).map(v => JSON.stringify(v)));
+    requireValue([...this.#retainedIncidents].every(id => retained.has(id)), "IpcIncidentRollback");
+    this.#retainedIncidents = retained;
     if (this.#generation !== undefined) requireValue(r.state.generation === this.#generation, "IpcStaleEndpoint"); return r; }
   async listen(handler) {
     requireValue(!this.#server && typeof handler === "function" && edges[this.#role]?.[this.#peerRole], "IpcServerRoleRejected");
@@ -179,11 +195,35 @@ export class ProtectedServiceIpc {
     } finally { this.#busy = false; }
   }
   async request(port, { method, operationId, payload, requestId = randomBytes(32).toString("hex") }) {
-    this.#state();
+    const { state, revision } = this.#state();
     requireValue(Number.isInteger(port) && port > 0 && port <= 65535 && edges[this.#peerRole]?.[this.#role]?.includes(method), "IpcRequestTargetRejected");
     requireValue(typeof operationId === "string" && HASH.test(operationId) && typeof requestId === "string" && HASH.test(requestId));
-    // Bound payload before connecting. Do not expose private share/state methods.
-    encode(payload);
+    // Capture the bounded wire value before any asynchronous boundary. A caller
+    // must not mutate the validated/persisted request while TLS is connecting.
+    // No private share/state export method exists on this service transport.
+    payload = JSON.parse(encode(payload).subarray(4).toString("utf8"));
+    if (this.#peerRole === "SUPERVISOR" && method !== "reportContradiction" && state.integrityIncidents.length) {
+      // Reuse the mandatory protected preflight read, rather than adding an
+      // extra synchronous DPAPI round trip to EVERY healthy source check.
+      // No incident is cached away: this state is re-read for each request.
+      for (const incident of validateRetainedIntegrityIncidents(state.integrityIncidents, this.#role)) {
+        const acknowledgement = await this.request(port, { method: "reportContradiction", operationId: incident.operationId,
+          payload: { code: incident.code, evidenceDigest: incident.evidenceDigest } });
+        requireValue(acknowledgement?.protocol === INTEGRITY_PROTOCOL && acknowledgement.state === "HARD_STOP_INTEGRITY", "IpcIncidentNotAcknowledged");
+      }
+    }
+    if (method === "reportContradiction") {
+      requireValue(this.#peerRole === "SUPERVISOR" && payload && Object.keys(payload).sort().join() === "code,evidenceDigest", "IpcIncidentRoleRejected");
+      const incident = validateRetainedIntegrityIncidents([{ role: this.#role, code: payload.code, operationId, evidenceDigest: payload.evidenceDigest }], this.#role)[0];
+      if (!state.integrityIncidents.some(v => JSON.stringify(v) === JSON.stringify(incident))) {
+        state.integrityIncidents.push(incident); validateRetainedIntegrityIncidents(state.integrityIncidents, this.#role);
+        state.lastTimeMs = Date.now(); persist(this.#store, state, revision);
+      }
+      this.#retainedIncidents.add(JSON.stringify(incident));
+      // Persist BEFORE connecting, including unavailable endpoints/lost replies.
+      // No private state is included in this durable incident outbox.
+    }
+    if (method === "assertRunning") requireValue(state.integrityIncidents.length === 0, "IpcIntegrityIncidentRetained");
     let socket;
     try {
       socket = tls.connect({ ...this.#credential, host: "127.0.0.1", port, servername: HOSTNAME, handshakeTimeout: TIMEOUT });
@@ -199,7 +239,8 @@ export class ProtectedServiceIpc {
       const response = frame(socket, EXECUTION_TIMEOUT);
       socket.write(encode([VERSION, "REQUEST", this.#domain, this.#environment, this.#role, this.#peerRole, hello[6], hello[7], binding,
         requestId, operationId, method, Date.now() + TIMEOUT - 100, completeBy, payload]));
-      const result = exactArray(await response, 6); this.#state();
+      const result = exactArray(await response, 6), after = this.#state();
+      if (method === "assertRunning") requireValue(after.state.integrityIncidents.length === 0, "IpcIntegrityIncidentRetained");
       requireValue(Date.now() < completeBy, "IpcExpiredResult");
       requireValue(result[0] === VERSION && result[1] === "RESPONSE" && result[2] === requestId && result[3] === operationId && result[4] === binding);
       return result[5];

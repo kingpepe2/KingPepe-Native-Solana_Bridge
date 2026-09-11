@@ -23,6 +23,7 @@ import { ed25519 } from "@noble/curves/ed25519.js";
 import { ProjectAttester, verifyProjectAttestation } from "../../services/attesters/attestation-service.mjs";
 import { attesterIpcHandler } from "../../services/attesters/protected-service.mjs";
 import { ProtectedAttesterAuthorizationJournal } from "../../services/attesters/authorization-journal.mjs";
+import { ProtectedCoordinatorSigningJournal, initialCoordinatorSigningState } from "../../native/frost/coordinator/protected-signing-journal.mjs";
 import { decodeCanonicalBridgeMessage, encodeCanonicalBridgeMessage } from "../../shared/protocol/canonical-message.mjs";
 import { deploymentFixture } from "../integration/deployment-fixture.mjs";
 import { LocalDeploymentRpc, ProtectedSolanaDeploymentMonitor } from "../../services/solana-observer/deployment-integrity.mjs";
@@ -125,6 +126,11 @@ async function isolatedIntegrityFixture(t) {
   });
   await call("INIT", opts);
   return { authority: { status: () => call("STATUS") }, restart: () => call("REOPEN"), enableTestSources: () => call("WATCH_TEST_SOURCES"),
+    async reopenPeerTransport(peer) {
+      const server = new ProtectedServiceIpc(new WindowsProtectedStore(peer.serverOptions));
+      cleanups.get(peer.root).push(() => server.close());
+      return server.listen(input => call("HANDLE", input));
+    },
     async peer(role) {
       const f = fixture(t, "SUPERVISOR", role), port = await f.server.listen(input => call("HANDLE", input));
       return { ...f, port, guard: new RemoteIntegrityGuard({ ipc: f.client, port }) };
@@ -161,7 +167,8 @@ test("persisted RUNNING requires fresh mutually authenticated source checks afte
     await p.guard.finishSourceCheck(ticket, { state: "OBSERVED_MATCH", evidenceDigest: h("SYNTHETIC_ADMISSION_TEST_ONLY") }); return ticket;
   };
   for (const peer of peers) await finish(peer);
-  await signer.guard.assertRunning(h("admission-only-not-a-signature"), "FROST_SIGN");
+  try { await signer.guard.assertRunning(h("admission-only-not-a-signature"), "FROST_SIGN"); }
+  catch { throw new Error("SourceAdmissionRejected:" + f.authority.status().missingSources.join(",")); }
   const unavailable = await peers[0].guard.beginSourceCheck(h("source-unavailable"));
   await peers[0].guard.finishSourceCheck(unavailable, { state: "WAITING_FOR_DEPENDENCY", evidenceDigest: h("unavailable") });
   await assert.rejects(signer.guard.assertRunning(h("source-unavailable"), "FROST_SIGN"));
@@ -210,6 +217,71 @@ test("coordinator restart retains identity and cannot bypass server replay", asy
   const client = new ProtectedServiceIpc(new WindowsProtectedStore(f.clientOptions)); t.after(() => client.close());
   await assert.rejects(client.request(port, request({ requestId: id })));
   assert.equal(await client.request(port, request()), true);
+});
+
+test("protected incident outbox persists before connect and survives lost acknowledgement and restart", async t => {
+  const f = await integrityFixture(t), p = await f.peer("COORDINATOR"), operationId = h("lost-incident-ack");
+  const handle = f.authority.handle.bind(f.authority);
+  f.authority.handle = input => {
+    const result = handle(input);
+    if (input.method === "reportContradiction") throw new Error("TEST_LOST_INCIDENT_ACK");
+    return result;
+  };
+  await assert.rejects(p.guard.report(operationId, "COORDINATOR_JOURNAL_INTEGRITY", h("confirmed-incident")), /IpcRequestRejected/u);
+  assert.equal(f.authority.status().state, "HARD_STOP_INTEGRITY");
+  assert.equal(p.client.retainedIntegrityIncidents().length, 1);
+  p.client.close(); await f.restart();
+  const ipc = new ProtectedServiceIpc(new WindowsProtectedStore(p.clientOptions)); t.after(() => ipc.close());
+  const guard = new RemoteIntegrityGuard({ ipc, port: p.port });
+  assert.equal((await guard.status(operationId)).state, "HARD_STOP_INTEGRITY");
+  await assert.rejects(guard.assertRunning(operationId, "COORDINATE_SWEEP"), /IntegrityAuthorizationStopped/u);
+  await assert.rejects(ipc.request(p.port, { method: "assertRunning", operationId, payload: { action: "COORDINATE_SWEEP" } }), /IpcIntegrityIncidentRetained/u);
+  assert.equal(f.authority.status().incidentCount, 1); assert.equal(ipc.retainedIntegrityIncidents().length, 1);
+});
+
+test("protected incident persistence failure does not send or acknowledge a global report", async t => {
+  const f = await integrityFixture(t), p = await f.peer("COORDINATOR"), original = p.clientStore.write.bind(p.clientStore);
+  p.clientStore.write = () => { throw new Error("TEST_PROTECTED_WRITE_UNAVAILABLE"); };
+  await assert.rejects(p.guard.report(h("incident"), "COORDINATOR_JOURNAL_INTEGRITY", h("evidence")), /TEST_PROTECTED_WRITE_UNAVAILABLE/u);
+  assert.equal(f.authority.status().incidentCount, 0, "NoDurableAcknowledgementWasInvented");
+  await assert.rejects(p.guard.assertRunning(h("incident"), "COORDINATE_SWEEP"), /IntegrityAuthorizationStopped/u);
+  p.clientStore.write = original;
+  await p.guard.report(h("incident"), "COORDINATOR_JOURNAL_INTEGRITY", h("evidence"));
+  assert.equal(f.authority.status().state, "HARD_STOP_INTEGRITY");
+});
+
+test("protected transport retains the exact incident payload before caller mutation", async t => {
+  const f = await integrityFixture(t), p = await f.peer("COORDINATOR"), operationId = h("immutable-incident");
+  const payload = { code: "COORDINATOR_JOURNAL_INTEGRITY", evidenceDigest: h("original-evidence") };
+  const pending = p.client.request(p.port, { method: "reportContradiction", operationId, payload });
+  // The request has reached its first real asynchronous TLS boundary. A local
+  // caller must not substitute the bytes already validated/persisted before it.
+  payload.code = "SIGNING_TRANSCRIPT_CONFLICT"; payload.evidenceDigest = h("substituted-evidence");
+  assert.equal((await pending).state, "HARD_STOP_INTEGRITY");
+  const store = new WindowsProtectedStore(f.options), read = store.read();
+  try {
+    const state = JSON.parse(read.payload.toString("utf8"));
+    assert.deepEqual(state.incidents, p.client.retainedIntegrityIncidents(), "DeliveredIncidentMustEqualDurableIntent");
+    assert.equal(state.incidents[0].code, "COORDINATOR_JOURNAL_INTEGRITY");
+    assert.equal(state.incidents[0].evidenceDigest, h("original-evidence"));
+  } finally { read.payload.fill(0); store.close(); }
+});
+
+for (const [name, change] of [
+  ["legacy enrollment", state => { state.protocol = protocol; delete state.integrityIncidents; }],
+  ["unauthorized report role", state => { state.integrityIncidents = [{ role: "SOLANA_OBSERVER", code: "SOLANA_DEPLOYMENT_CHANGED", operationId: h("incident"), evidenceDigest: h("evidence") }]; }],
+  ["malformed retained incident", state => { state.integrityIncidents = [{ role: "COORDINATOR" }]; }],
+  ["missing retained incident field", state => { delete state.integrityIncidents; }],
+]) test("protected authentication state refuses " + name + " without re-enrollment", async t => {
+  const f = await integrityFixture(t), p = await f.peer("COORDINATOR"), before = p.clientStore.read();
+  let bytes;
+  try {
+    const state = JSON.parse(before.payload.toString("utf8")); change(state);
+    bytes = Buffer.from(JSON.stringify(state)); p.clientStore.write(bytes, before.revision);
+  } finally { before.payload.fill(0); bytes?.fill(0); }
+  await assert.rejects(p.guard.status(h("status")));
+  assert.throws(() => new ProtectedServiceIpc(new WindowsProtectedStore(p.clientOptions)));
+  assert.equal(f.authority.status().incidentCount, 0, "CorruptionIsNotFabricatedDelivery");
 });
 
 test("wrong credential and signer-role substitution cannot cross endpoints", async t => {
@@ -295,10 +367,10 @@ test("IPC diagnostics expose fixed codes only and preserve request rejection", a
   assert(!JSON.stringify([f.server.lastRejection, f.client.lastRejection]).includes(privateDiagnostic), "IpcDiagnosticLeakedPrivateContext");
 });
 
-test("actual protected A+B FROST signing through authenticated endpoints", async t => {
+async function protectedCoordinatorFixture(t) {
   const global = await isolatedIntegrityFixture(t);
   const guards = await Promise.all(REQUIRED_FROST_SIGNERS.map(role => global.peer(role)));
-  const coordinatorGuard = (await global.peer("COORDINATOR")).guard;
+  const coordinatorPeer = await global.peer("COORDINATOR"), coordinatorGuard = coordinatorPeer.guard;
   const f = [fixture(t, "KINGPEPE_FROST_A"), fixture(t, "KINGPEPE_FROST_B")];
   const intent = { protocol: FROST_SIGNING_INTENT_PROTOCOL, mode: FROST_SIGNING_MODE, purpose: "RESERVE_SWEEP", nativeNetwork: "regtest",
     nativeGenesisHash: REGTEST_GENESIS, solanaDeployment: deployment, bridgeProgramId: h("bridge"), transceiverProgramId: h("transceiver"), mint: h("mint"), keyEpoch: 1,
@@ -334,23 +406,226 @@ test("actual protected A+B FROST signing through authenticated endpoints", async
     }));
   }
   const peers = f.map((v, i) => new ProtectedRemoteFrostPeer({ ipc: v.client, port: ports[i], signerId: v.role }));
-  const coordinator = new NativeFrostCoordinator({ signers: peers, publicPackage: dkg.publicPackage, aggregateTweakedXOnlyPublicKey: dkg.aggregateTweakedXOnlyPublicKey, integrity: coordinatorGuard });
+  const journalOptions = options(f[0].root, "coordinator-journal", "COORDINATOR", "coordinator-signing");
+  const journalStore = WindowsProtectedStore.create(journalOptions, initialCoordinatorSigningState(dkg));
+  cleanups.get(f[0].root).push(() => journalStore.close());
+  return { global, guards, coordinatorPeer, coordinatorGuard, f, root: f[0].root, intent, signers, ports, peers, dkg,
+    verificationCounts, handlerFaults, journalOptions, journalStore };
+}
+
+test("actual protected A+B FROST signing through authenticated endpoints", async t => {
+  const { global, guards, coordinatorGuard, f, intent, ports, peers, dkg, verificationCounts, handlerFaults, journalOptions, journalStore } = await protectedCoordinatorFixture(t);
+  let signingJournal = await ProtectedCoordinatorSigningJournal.open({ store: journalStore, integrity: coordinatorGuard, ...dkg });
+  cleanups.get(f[0].root).push(() => signingJournal.close());
+  const createCoordinator = () => new NativeFrostCoordinator({ signers: peers, publicPackage: dkg.publicPackage,
+    aggregateTweakedXOnlyPublicKey: dkg.aggregateTweakedXOnlyPublicKey, integrity: coordinatorGuard, signingJournal });
+  const coordinator = createCoordinator();
   await global.enableTestSources();
   let signed;
   try { signed = await coordinator.signAutomaticallyOverIpc(intent); }
   catch { throw new Error("ProtectedFrostIpcFailure:" + f.map(v => v.server.lastRejection ?? "UNREPORTED").join(",") + ":" + handlerFaults.join(",")); }
   assert(schnorr.verify(Buffer.from(signed.signatureHex, "hex"), Buffer.from(intent.taprootSighashHex, "hex"), Buffer.from(dkg.aggregateTweakedXOnlyPublicKey, "hex")), "IpcFrostSignatureRejected");
   assert(verificationCounts.every(count => count >= 3), "FreshEvidenceRequiredAtEverySigningBoundary");
+  const countsBefore = [...verificationCounts];
+  await signingJournal.close();
+  signingJournal = await ProtectedCoordinatorSigningJournal.open({ store: new WindowsProtectedStore(journalOptions), integrity: coordinatorGuard, ...dkg });
+  const recoveredCoordinator = createCoordinator();
+  assert.deepEqual(await recoveredCoordinator.signAutomaticallyOverIpc(intent), signed, "ExactAggregateMustSurviveCoordinatorReopen");
+  assert.deepEqual(verificationCounts, countsBefore, "RetainedResultMustNotCreateNewSigningContexts");
+  await assert.rejects(recoveredCoordinator.signAutomaticallyOverIpc(intent, { attempt: 1 }), /ProtectedFrostAttemptManagedDurably/u);
   await assert.rejects(f[0].client.request(ports[0], { method: "verifyNativeEvidence", operationId: h("wrong-operation"), payload: intent }));
-  await assert.rejects(coordinator.signAutomaticallyOverIpc({ ...intent, amountAtomic: "999" }));
+  await assert.rejects(recoveredCoordinator.signAutomaticallyOverIpc({ ...intent, amountAtomic: "999" }), /CoordinatorJournalRequestChanged/u);
+  await assert.rejects(recoveredCoordinator.signAutomaticallyOverIpc({ ...intent, signingRequestId: h("new-request") }), /CoordinatorJournalInputAlreadyBound/u);
   assert.equal((await global.authority.status()).policyState, "RUNNING", "UncertaintyIsNotConfirmedContradiction");
   await guards[0].guard.report(intent.operationId, "SIGNER_ROLLBACK", h("confirmed-test-rollback"));
   await global.restart();
   await assert.rejects(f[0].client.request(ports[0], { method: "signingCommitment", operationId: intent.operationId, payload: { request: createNativeFrostSigningRequest(intent) } }));
-  const restartedCoordinator = new NativeFrostCoordinator({ signers: peers, publicPackage: dkg.publicPackage,
-    aggregateTweakedXOnlyPublicKey: dkg.aggregateTweakedXOnlyPublicKey, integrity: coordinatorGuard });
+  const restartedCoordinator = createCoordinator();
   await assert.rejects(restartedCoordinator.signAutomaticallyOverIpc(intent));
   assert.equal((await guards[1].guard.status(intent.operationId)).state, "HARD_STOP_INTEGRITY");
+});
+
+async function coordinatorActor(f, selectedBoundary = "NONE") {
+  const child = spawn(process.execPath, [path.join(import.meta.dirname, "coordinator-recovery-actor.mjs")], { windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
+  const pending = new Map(), buffered = new Map(); let text = "", closed = false, failure;
+  const ended = new Promise(resolve => child.once("close", () => { closed = true; resolve(); }));
+  const fail = code => {
+    failure = code;
+    for (const p of pending.values()) { clearTimeout(p.timer); p.reject(new Error(code)); } pending.clear();
+  };
+  child.on("error", () => fail("TestCoordinatorActorUnavailable")); child.stdin.on("error", () => fail("TestCoordinatorActorUnavailable"));
+  child.on("close", () => fail("TestCoordinatorActorClosed")); child.stderr.on("data", () => fail("TestCoordinatorActorDiagnosticRejected"));
+  child.stdout.on("data", bytes => {
+    text += bytes.toString("utf8"); if (text.length > 32768) { fail("TestCoordinatorActorOversize"); child.kill(); return; }
+    for (;;) {
+      const at = text.indexOf("\n"); if (at < 0) break;
+      const line = text.slice(0, at); text = text.slice(at + 1);
+      try {
+        const v = JSON.parse(line); assert(Array.isArray(v) && v.length === 2 && ["READY", "BOUNDARY", "RESULT", "STATS", "CLOSED", "ERROR"].includes(v[0]));
+        if (v[0] === "ERROR") {
+          const safe = ["CoordinatorJournalUnavailable", "CoordinatorJournalRequestChanged", "FrostCoordinatorAbortIncomplete", "IpcRequestRejected", "IntegrityAuthorizationStopped", "TestCoordinatorActorRejected"];
+          const calls = ["INIT", "SUPERVISOR", ...["verifyNativeEvidence", "signingCommitment", "signatureShare", "abortSigningSession"].flatMap(m => [m + "_A", m + "_B"])];
+          const transport = ["NONE", "IpcTimeout", "IpcExpiredResult", "IpcTransportClosed", "IpcTransportRejected", "IpcAuthenticationFailed", "IpcStaleRequest", "IpcContextRejected", "IpcReplayRejected", "IpcSizeRejected", "IpcBusy", "IpcStaleEndpoint", "IpcRejected"];
+          const d = v[1];
+          fail(safe.includes(d?.code) && calls.includes(d.call) && transport.includes(d.transport)
+            ? d.code + ":" + d.call + ":" + d.transport + ":SERVERS:" + f.f.map(v => v.server.lastRejection ?? "NONE").join(",") + ":HANDLERS:" + f.handlerFaults.join(",")
+            : "TestCoordinatorActorRejected"); continue;
+        }
+        const p = pending.get(v[0]);
+        if (p) { clearTimeout(p.timer); pending.delete(v[0]); p.resolve(v[1]); }
+        else { assert(!buffered.has(v[0])); buffered.set(v[0], v[1]); }
+      } catch { fail("TestCoordinatorActorMalformed"); child.kill(); }
+    }
+  });
+  const receive = name => {
+    if (buffered.has(name)) { const v = buffered.get(name); buffered.delete(name); return Promise.resolve(v); }
+    return new Promise((resolve, reject) => {
+      if (closed || failure || pending.has(name)) { reject(new Error(failure ?? "TestCoordinatorActorUnavailable")); return; }
+      // Test orchestration only. Each actual mTLS request still has its unchanged
+      // production-code deadline; a complete multi-request signing can take longer.
+      const timer = setTimeout(() => { pending.delete(name); reject(new Error("TestCoordinatorActorTimeout")); }, 240000);
+      pending.set(name, { resolve, reject, timer });
+    });
+  };
+  const stop = async () => { if (!closed) child.kill(); await ended; };
+  cleanups.get(f.root).unshift(stop); // Kill before closing signer/supervisor dependencies.
+  const ready = receive("READY");
+  child.stdin.write(JSON.stringify(["INIT", { boundary: selectedBoundary, journalOptions: f.journalOptions,
+    key: { publicPackage: f.dkg.publicPackage, aggregateTweakedXOnlyPublicKey: f.dkg.aggregateTweakedXOnlyPublicKey }, intent: f.intent,
+    supervisorOptions: f.coordinatorPeer.clientOptions, supervisorPort: f.coordinatorPeer.port,
+    signers: f.f.map((v, i) => ({ options: v.clientOptions, port: f.ports[i], signerId: v.role })) }]) + "\n");
+  await ready;
+  return { receive, stop, startSign() { child.stdin.write('["SIGN",null]\n'); },
+    async sign() { const result = receive("RESULT"); this.startSign(); return result; },
+    async stats() { const result = receive("STATS"); child.stdin.write('["STATS",null]\n'); return result; } };
+}
+
+for (const boundary of ["PREPARED", "COMMITMENT_A", "COMMITMENT_B", "SHARE_A", "SHARE_B", "AGGREGATE_READY", "SIGNED_PERSISTED", "RESULT_READY"]) {
+  test("protected coordinator process-kill recovery at " + boundary, async t => {
+    const f = await protectedCoordinatorFixture(t);
+    f.coordinatorPeer.client.close(); f.f.forEach(v => v.client.close());
+    const actor = await coordinatorActor(f, boundary); await f.global.enableTestSources();
+    const reached = actor.receive("BOUNDARY"); actor.startSign(); assert.equal(await reached, boundary); await actor.stop();
+    const retained = f.journalStore.read(); let before;
+    try { before = JSON.parse(retained.payload.toString("utf8")); } finally { retained.payload.fill(0); }
+    assert.equal(before.records.length, 1); assert.equal(before.records[0].request.attempt, 1);
+    const completed = ["SIGNED_PERSISTED", "RESULT_READY"].includes(boundary);
+    assert.equal(before.records[0].state, completed ? "SIGNED" : "PREPARED");
+    const restarted = await coordinatorActor(f), result = await restarted.sign();
+    assert(schnorr.verify(Buffer.from(result.signatureHex, "hex"), Buffer.from(f.intent.taprootSighashHex, "hex"), Buffer.from(f.dkg.aggregateTweakedXOnlyPublicKey, "hex")));
+    assert.deepEqual(await restarted.stats(), completed ? { commitments: 0, shares: 0, aborts: 0 } : { commitments: 2, shares: 2, aborts: 2 });
+    const after = f.journalStore.read();
+    try {
+      const state = JSON.parse(after.payload.toString("utf8")); assert.equal(state.records.length, 1);
+      assert.equal(state.records[0].request.attempt, completed ? 1 : 2); assert.deepEqual(state.records[0].result, result);
+      if (completed) assert.deepEqual(result, before.records[0].result);
+      else assert.notEqual(result.sessionId, before.records[0].request.sessionId, "UncertainNonceSessionMustNeverResurrect");
+    } finally { after.payload.fill(0); }
+    assert.deepEqual(await restarted.sign(), result, "ExactResultRetryMustNotSignAgain");
+    assert.deepEqual(await restarted.stats(), completed ? { commitments: 0, shares: 0, aborts: 0 } : { commitments: 2, shares: 2, aborts: 2 });
+  });
+}
+
+test("protected coordinator keeps uncertain abort pending and requires A+B receipts on restart", async t => {
+  const f = await protectedCoordinatorFixture(t);
+  let journal = await ProtectedCoordinatorSigningJournal.open({ store: f.journalStore, integrity: f.coordinatorGuard, ...f.dkg });
+  cleanups.get(f.root).push(() => journal.close());
+  const create = () => new NativeFrostCoordinator({ signers: f.peers, publicPackage: f.dkg.publicPackage,
+    aggregateTweakedXOnlyPublicKey: f.dkg.aggregateTweakedXOnlyPublicKey, integrity: f.coordinatorGuard, signingJournal: journal });
+  const coordinator = create(), callA = f.f[0].client.request.bind(f.f[0].client), callB = f.f[1].client.request.bind(f.f[1].client);
+  f.f[0].client.request = async (...args) => { const result = await callA(...args); if (args[1].method === "signingCommitment") throw new Error("TEST_COMMITMENT_RESPONSE_LOST"); return result; };
+  f.f[1].client.request = async (...args) => { if (args[1].method === "abortSigningSession") throw new Error("TEST_ABORT_UNAVAILABLE"); return callB(...args); };
+  await f.global.enableTestSources();
+  await assert.rejects(coordinator.signAutomaticallyOverIpc(f.intent), /TEST_COMMITMENT_RESPONSE_LOST/u);
+  assert.equal(journal.lookup(f.intent).state, "PREPARED");
+  await assert.rejects(coordinator.signAutomaticallyOverIpc(f.intent), /FrostCoordinatorHardStop/u);
+  assert.equal((await f.global.authority.status()).policyState, "RUNNING", "MissingResponseIsNotConfirmedContradiction");
+  f.f[0].client.request = callA; f.f[1].client.request = callB;
+  await journal.close();
+  journal = await ProtectedCoordinatorSigningJournal.open({ store: new WindowsProtectedStore(f.journalOptions), integrity: f.coordinatorGuard, ...f.dkg });
+  const result = await create().signAutomaticallyOverIpc(f.intent);
+  assert.equal(journal.lookup(f.intent).request.attempt, 2); assert.equal(result.state, "SIGNED");
+  assert(schnorr.verify(Buffer.from(result.signatureHex, "hex"), Buffer.from(f.intent.taprootSighashHex, "hex"), Buffer.from(f.dkg.aggregateTweakedXOnlyPublicKey, "hex")));
+});
+
+test("protected coordinator recovers an exact committed aggregate after lost persistence response", async t => {
+  const f = await protectedCoordinatorFixture(t);
+  let journal = await ProtectedCoordinatorSigningJournal.open({ store: f.journalStore, integrity: f.coordinatorGuard, ...f.dkg });
+  cleanups.get(f.root).push(() => journal.close());
+  const create = () => new NativeFrostCoordinator({ signers: f.peers, publicPackage: f.dkg.publicPackage,
+    aggregateTweakedXOnlyPublicKey: f.dkg.aggregateTweakedXOnlyPublicKey, integrity: f.coordinatorGuard, signingJournal: journal });
+  const persist = f.journalStore.write.bind(f.journalStore);
+  f.journalStore.write = (bytes, revision) => {
+    const result = persist(bytes, revision);
+    if (JSON.parse(Buffer.from(bytes).toString()).records.at(-1).state === "SIGNED") throw new Error("TEST_WRITE_RESPONSE_LOST");
+    return result;
+  };
+  await f.global.enableTestSources(); await assert.rejects(create().signAutomaticallyOverIpc(f.intent), /TEST_WRITE_RESPONSE_LOST/u);
+  const before = journal.lookup(f.intent); assert.equal(before.state, "SIGNED");
+  const counts = [...f.verificationCounts];
+  await journal.close();
+  journal = await ProtectedCoordinatorSigningJournal.open({ store: new WindowsProtectedStore(f.journalOptions), integrity: f.coordinatorGuard, ...f.dkg });
+  assert.deepEqual(await create().signAutomaticallyOverIpc(f.intent), before.result); assert.deepEqual(f.verificationCounts, counts);
+  assert.equal(journal.lookup(f.intent).request.attempt, 1);
+});
+
+test("protected coordinator rejects duplicate process and retained-witness rollback with global stop", async t => {
+  const f = await protectedCoordinatorFixture(t), files = [path.join(f.journalOptions.root, "state.protected"), path.join(f.journalOptions.anchorRoot, "state.protected")];
+  const old = files.map(file => readFileSync(file));
+  const journal = await ProtectedCoordinatorSigningJournal.open({ store: f.journalStore, integrity: f.coordinatorGuard, ...f.dkg });
+  cleanups.get(f.root).push(() => journal.close());
+  // A separate real process cannot activate the same protected journal.
+  await assert.rejects(coordinatorActor(f), /CoordinatorJournalUnavailable/u);
+  await journal.runExclusive(() => journal.prepare(f.intent)); await journal.close();
+  files.forEach((file, index) => { writeFileSync(file, old[index]); old[index].fill(0); });
+  await assert.rejects(ProtectedCoordinatorSigningJournal.open({ store: new WindowsProtectedStore(f.journalOptions), integrity: f.coordinatorGuard, ...f.dkg }));
+  assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+  await f.global.restart(); assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+});
+
+test("protected coordinator rejects authenticated malformed journal and concurrent mutation", async t => {
+  const f = await protectedCoordinatorFixture(t);
+  const journal = await ProtectedCoordinatorSigningJournal.open({ store: f.journalStore, integrity: f.coordinatorGuard, ...f.dkg });
+  cleanups.get(f.root).push(() => journal.close());
+  const before = f.journalStore.read();
+  try { f.journalStore.write(before.payload, before.revision); } finally { before.payload.fill(0); }
+  await assert.rejects(journal.runExclusive(() => journal.lookup(f.intent)), /CoordinatorJournalAuthenticatedStateInvalid/u);
+  assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+  await journal.close();
+  const store = new WindowsProtectedStore(f.journalOptions), current = store.read();
+  try { store.write(Buffer.from("{"), current.revision); } finally { current.payload.fill(0); }
+  await assert.rejects(ProtectedCoordinatorSigningJournal.open({ store, integrity: f.coordinatorGuard, ...f.dkg }));
+  await f.global.restart(); assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+});
+
+test("protected coordinator retains an integrity incident when supervisor reporting is unavailable", async t => {
+  const f = await protectedCoordinatorFixture(t);
+  const journal = await ProtectedCoordinatorSigningJournal.open({ store: f.journalStore, integrity: f.coordinatorGuard, ...f.dkg });
+  cleanups.get(f.root).push(() => journal.close());
+  // Real unreachable transport, not a stub of the guard/persistence path.
+  f.coordinatorPeer.server.close();
+  const before = f.journalStore.read();
+  try { f.journalStore.write(before.payload, before.revision); } finally { before.payload.fill(0); }
+  await assert.rejects(journal.runExclusive(() => journal.lookup(f.intent)), /IpcRequestRejected/u);
+  await journal.close(); f.coordinatorPeer.client.close();
+  assert.equal((await f.global.authority.status()).policyState, "RUNNING", "IncidentDeliveryWasActuallyUnavailable");
+  const ipc = new ProtectedServiceIpc(new WindowsProtectedStore(f.coordinatorPeer.clientOptions));
+  cleanups.get(f.root).push(() => ipc.close());
+  assert.equal(ipc.retainedIntegrityIncidents().length, 1);
+  const unavailable = new RemoteIntegrityGuard({ ipc, port: f.coordinatorPeer.port });
+  await assert.rejects(unavailable.assertRunning(f.intent.operationId, "COORDINATE_SWEEP"));
+  assert.equal((await f.global.authority.status()).policyState, "RUNNING", "NoFabricatedGlobalAcknowledgement");
+  const guard = new RemoteIntegrityGuard({ ipc, port: await f.global.reopenPeerTransport(f.coordinatorPeer) });
+  const reopened = await ProtectedCoordinatorSigningJournal.open({ store: new WindowsProtectedStore(f.journalOptions), integrity: guard, ...f.dkg });
+  cleanups.get(f.root).push(() => reopened.close());
+  const coordinator = new NativeFrostCoordinator({ signers: f.peers, ...f.dkg, integrity: guard, signingJournal: reopened });
+  await assert.rejects(coordinator.signAutomaticallyOverIpc(f.intent), /IntegrityAuthorizationStopped/u);
+  assert.deepEqual(f.verificationCounts, [0, 0], "NoSigningAfterUndeliveredIntegrityIncident");
+  assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+  await f.global.restart();
+  assert.equal((await guard.status(f.intent.operationId)).state, "HARD_STOP_INTEGRITY");
+  assert.equal((await f.global.authority.status()).incidentCount, 1, "IncidentRedeliveryIsIdempotent");
+  assert.equal(ipc.retainedIntegrityIncidents().length, 1, "AcknowledgementDoesNotEraseIncident");
 });
 
 test("durable global stop propagates to every service role and survives authority/client restart", async t => {

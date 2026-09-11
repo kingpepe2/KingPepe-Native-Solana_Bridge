@@ -12,8 +12,9 @@ import {
 import { createNativeFrostSigningRequest, validateNativeFrostAbortReceipt } from "../policy/signing-request.mjs";
 import { createTwoPartyDkgRequest, normalizeNativeFrostKeyContext } from "../policy/dkg-request.mjs";
 import { deserializeFrostPublic } from "../signer/native-frost-signer.mjs";
-import { ProtectedRemoteFrostPeer } from "../signer/protected-service.mjs";
+import { isProtectedRemoteFrostPeer } from "../signer/protected-service.mjs";
 import { requireIntegrityGuard } from "../../../services/supervisor/protected-integrity.mjs";
+import { requireCoordinatorSigningJournal } from "./protected-signing-journal.mjs";
 
 export { createTwoPartyDkgRequest } from "../policy/dkg-request.mjs";
 
@@ -61,11 +62,13 @@ export class NativeFrostCoordinator {
   #hardStop = false;
   #coordinating = false;
   #integrity;
+  #signingJournal;
 
   constructor(options) {
     this.#integrity = options.integrity;
+    this.#signingJournal = options.signingJournal;
     this.#signers = signerMap(options.signers);
-    this.#publicPackage = options.publicPackage;
+    this.#publicPackage = structuredClone(options.publicPackage);
     this.#aggregateTweakedXOnlyPublicKey = assertHashHex(options.aggregateTweakedXOnlyPublicKey, "FROST aggregate x-only public key");
   }
 
@@ -87,38 +90,72 @@ export class NativeFrostCoordinator {
   async signAutomaticallyOverIpc(intent, options = {}) {
     this.#requireReady();
     requireIntegrityGuard(this.#integrity, "COORDINATOR");
-    const request = createNativeFrostSigningRequest(intent, options);
-    this.#integrity.assertDeployment({ environment: "localnet", nativeGenesis: request.intent.nativeGenesisHash,
-      solanaDeployment: request.intent.solanaDeployment, keyEpoch: request.intent.keyEpoch });
+    // Attempts are derived ONLY from the retained journal, never a caller reset.
+    if (Object.keys(dataRecord(options, "FROST protected options")).length !== 0) throw new Error("ProtectedFrostAttemptManagedDurably");
+    const snapshot = validateNativeSigningIntent(intent);
+    this.#integrity.assertDeployment({ environment: "localnet", nativeGenesis: snapshot.nativeGenesisHash,
+      solanaDeployment: snapshot.solanaDeployment, keyEpoch: snapshot.keyEpoch });
+    const journal = this.#signingJournal;
+    requireCoordinatorSigningJournal(journal, { publicPackage: this.#publicPackage,
+      aggregateTweakedXOnlyPublicKey: this.#aggregateTweakedXOnlyPublicKey }, this.#integrity);
     const signers = REQUIRED_FROST_SIGNERS.map(id => this.#signers.get(id));
-    if (!signers.every(signer => signer instanceof ProtectedRemoteFrostPeer)) throw new Error("ProtectedRemoteSignersRequired");
+    if (!signers.every(isProtectedRemoteFrostPeer)) throw new Error("ProtectedRemoteSignersRequired");
     this.#coordinating = true;
     try {
-      await this.#integrity.assertRunning(request.intent.operationId, "COORDINATE_SWEEP");
-      for (const signer of signers) await signer.verifyNativeEvidence(structuredClone(request.intent));
-      const commitments = [];
-      for (const signer of signers) commitments.push(await signer.signingCommitment(request));
-      validateCommitmentEnvelopes(request, commitments);
-      const shares = [];
-      for (const signer of signers) shares.push(await signer.signatureShare(request, commitments));
-      const result = this.#aggregate(request, commitments, shares);
-      await this.#integrity.assertRunning(request.intent.operationId, "COORDINATE_SWEEP"); return result;
-    } catch (error) {
-      let confirmed = true;
-      for (const signer of signers) {
-        try { validateNativeFrostAbortReceipt(await signer.abortSigningSession(request), request, signer.signerId); }
-        catch { confirmed = false; }
-      }
-      if (!confirmed) {
-        this.#hardStop = true;
-        // An unavailable abort response is uncertainty, not proof of an
-        // economic contradiction. Do not convert an outage into a confirmed
-        // global incident. Durable per-operation recovery is a separate gate.
-      }
-      if (["FROST share failed verification", "FROST aggregate failed ciphersuite verification", "FROST aggregate failed independent BIP340 verification"].includes(error?.message)) {
-        await this.#integrity.report(request.intent.operationId, "SIGNING_TRANSCRIPT_CONFLICT", request.intentDigest);
-      }
-      throw error;
+      return await journal.runExclusive(async () => {
+        let request;
+        const abort = async pending => {
+          const receipts = [];
+          // Contact BOTH even when the first transport fails. Unconfirmed
+          // receipts retain PREPARED; no new attempt is permitted.
+          for (const signer of signers) {
+            try { receipts.push(validateNativeFrostAbortReceipt(await signer.abortSigningSession(pending), pending, signer.signerId)); }
+            catch { receipts.push(null); }
+          }
+          if (receipts.some(r => r === null)) throw new Error("FrostCoordinatorAbortIncomplete");
+          journal.markAborted(pending, receipts);
+        };
+        try {
+          await this.#integrity.assertRunning(snapshot.operationId, "COORDINATE_SWEEP");
+          const retained = journal.lookup(snapshot);
+          if (retained?.state === "SIGNED") {
+            // This is retrieval of an already-produced exact transaction
+            // signature, NOT fresh signing. The relayer must still determine
+            // the previous broadcast outcome before any external action.
+            await this.#integrity.assertRunning(snapshot.operationId, "COORDINATE_SWEEP");
+            return journal.retainedResult(snapshot); // Re-read and cryptographically verify after the await.
+          }
+          if (retained?.state === "PREPARED") { request = retained.request; await abort(request); request = undefined; }
+          for (const signer of signers) await signer.verifyNativeEvidence(structuredClone(snapshot));
+          await this.#integrity.assertRunning(snapshot.operationId, "COORDINATE_SWEEP");
+          request = journal.prepare(snapshot);
+          const commitments = [];
+          for (const signer of signers) commitments.push(await signer.signingCommitment(request));
+          validateCommitmentEnvelopes(request, commitments);
+          const shares = [];
+          for (const signer of signers) shares.push(await signer.signatureShare(request, commitments));
+          const result = this.#aggregate(request, commitments, shares);
+          journal.markSigned(request, result); // Persist BEFORE any result release.
+          await this.#integrity.assertRunning(snapshot.operationId, "COORDINATE_SWEEP");
+          return journal.retainedResult(snapshot);
+        } catch (error) {
+          // A lost protected-write response may have committed SIGNED. Never
+          // replace that outcome with ABORTED or create a new signing attempt.
+          if (request) {
+            try { if (journal.lookup(snapshot)?.state === "PREPARED") await abort(request); }
+            catch (recoveryError) {
+              this.#hardStop = true;
+              // Integrity errors reach the journal's durable global detector;
+              // an unavailable abort is retained uncertainty, not contradiction.
+              if (["ProtectedStateRollbackDetected", "CoordinatorJournalAuthenticatedStateInvalid"].includes(recoveryError?.message)) throw recoveryError;
+            }
+          }
+          if (["FROST share failed verification", "FROST aggregate failed ciphersuite verification", "FROST aggregate failed independent BIP340 verification"].includes(error?.message)) {
+            await this.#integrity.report(snapshot.operationId, "SIGNING_TRANSCRIPT_CONFLICT", request.intentDigest);
+          }
+          throw error;
+        }
+      });
     } finally { this.#coordinating = false; }
   }
 

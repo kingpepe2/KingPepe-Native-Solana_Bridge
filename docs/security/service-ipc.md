@@ -13,12 +13,29 @@ The channel binds Native genesis, Solana deployment, key epoch, environment,
 both roles, endpoint generation, a fresh challenge and TLS exporter. Each
 request also binds an operation ID, method, request ID, admission expiry and
 bounded completion deadline (V2; see global-integrity.md).
+The client snapshots the bounded JSON wire payload before its first asynchronous
+boundary. Later caller mutation cannot change the request recorded before TLS
+connection. Protected transport and FROST-peer capabilities are privately
+registered only after construction validates real protected credentials; a
+matching JavaScript prototype is not authentication. This API hardening is not
+protection from arbitrary hostile code already controlling a signing process.
 Canonical bounded framing rejects alternate encodings, malformed/oversized
 input and unauthorized methods. The server persists a consumed request ID
 before invoking the service. Replay records are never silently pruned; capacity
 exhaustion stops service pending controlled maintenance. Clock rollback fails
 closed. A lost response does not authorize replay of a transport request ID;
 application operation/session idempotency is a separate required control.
+
+Service-auth storage V3 additionally retains a bounded integrity-incident outbox
+for the exact service-to-supervisor role. A confirmed report is DPAPI/CAS-persisted
+before opening its TLS connection. Failed delivery and lost acknowledgements
+never remove it. Reopened guards redeliver retained incidents before admitting
+work; even a direct transport assertRunning request cannot bypass a retained
+incident. Status/source observation may continue after the supervisor confirms
+its durable hard stop. The wire protocol and deadlines remain V2, unchanged.
+V1/V2 storage or a missing outbox field is rejected, not migrated, reset or
+silently re-enrolled. Existing state must not be discarded to make startup pass.
+There is no runtime incident clear/prune or production enrollment path.
 
 The FROST handler validates the operation against the real signing request and
 invokes the participant's configured Native verifier. The remote coordinator

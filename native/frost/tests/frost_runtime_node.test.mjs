@@ -28,6 +28,10 @@ import {
 import { REGTEST_GENESIS } from "../../node/native-raw-evidence.mjs";
 import { validateNativeFrostDkgRequest } from "../policy/dkg-request.mjs";
 import { initialSignerState } from "../state/file-state-store.mjs";
+import { initialCoordinatorSigningState, decodeCoordinatorSigningState, MAX_COORDINATOR_REQUESTS,
+  requireCoordinatorSigningJournal } from "../coordinator/protected-signing-journal.mjs";
+import { createNativeFrostAbortReceipt } from "../policy/signing-request.mjs";
+import { normalizeProtectedContext } from "../../../shared/windows/protected-store.mjs";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
 
@@ -925,6 +929,78 @@ function dkgFixture(t) {
   };
   return { ...runtime, signers, stores, request, round1, round2 };
 }
+
+// Portable codec tests use real ephemeral FROST results, not chain evidence or
+// Windows protected-storage certification. Private shares stay in external fixtures.
+function coordinatorJournalFixture(t) {
+  const f = createRuntime(); t.after(f.cleanup);
+  const request = createNativeFrostSigningRequest(f.auth), key = f.epoch;
+  const state = JSON.parse(initialCoordinatorSigningState(key));
+  state.records.push({ request: structuredClone(request), state: "PREPARED", abortReceipts: null, result: null });
+  return { f, key, request, state, decode: v => decodeCoordinatorSigningState(Buffer.from(JSON.stringify(v)), key) };
+}
+test("coordinator journal codec verifies genuine A+B aggregate and retained exact binding", t => {
+  const x = coordinatorJournalFixture(t); assert.deepEqual(x.decode(x.state), x.state);
+  x.state.records[0].state = "SIGNED"; x.state.records[0].result = x.f.coordinator.signAutomatically(x.f.auth);
+  assert.deepEqual(x.decode(x.state), x.state);
+});
+test("coordinator journal codec requires both exact terminal abort receipts", t => {
+  const x = coordinatorJournalFixture(t), r = x.state.records[0]; r.state = "ABORTED";
+  r.abortReceipts = REQUIRED_FROST_SIGNERS.map(id => createNativeFrostAbortReceipt(x.request, id, "ABORTED"));
+  assert.deepEqual(x.decode(x.state), x.state);
+  for (const receipts of [[r.abortReceipts[0]], [r.abortReceipts[0], r.abortReceipts[0]],
+    [r.abortReceipts[1], r.abortReceipts[0]], [r.abortReceipts[0], { ...r.abortReceipts[1], sessionId: h("wrong") }]]) {
+    assert.throws(() => x.decode({ ...x.state, records: [{ ...r, abortReceipts: receipts }] }));
+  }
+});
+for (const [label, mutate] of [
+  ["wrong protocol", v => { v.protocol += "x"; }],
+  ["wrong key package", v => { v.identityDigest = h("wrong-key"); }],
+  ["duplicate request", v => { v.records.push(structuredClone(v.records[0])); }],
+  ["same input with new request identity", v => { v.records.push({ ...v.records[0], request: createNativeFrostSigningRequest({ ...v.records[0].request.intent, signingRequestId: h("new-id") }) }); }],
+  ["wrong attempt", v => { v.records[0].request.attempt++; }],
+  ["wrong deployment", v => { v.records[0].request.intent.solanaDeployment = h("wrong-deployment"); }],
+  ["wrong amount", v => { v.records[0].request.intent.amountAtomic = "1"; }],
+  ["wrong fee", v => { v.records[0].request.intent.feeAtomic = "1"; }],
+  ["wrong sighash", v => { v.records[0].request.messageHex = h("wrong-sighash"); }],
+  ["one participant", v => { v.records[0].request.participantIds.pop(); }],
+  ["pretend completion", v => { v.records[0].state = "SIGNED"; }],
+  ["unknown state", v => { v.records[0].state = "RETRY_ANYWAY"; }],
+  ["unbounded records", v => { v.records = Array(MAX_COORDINATOR_REQUESTS + 1).fill(v.records[0]); }],
+  ["secret field", v => { v.records[0].privateShare = "forbidden"; }],
+]) test("coordinator journal codec rejects " + label, t => {
+  const x = coordinatorJournalFixture(t); mutate(x.state); assert.throws(() => x.decode(x.state));
+});
+test("coordinator journal codec rejects malformed, duplicate-key and oversized state", t => {
+  const x = coordinatorJournalFixture(t);
+  for (const bytes of [Buffer.from("{"), Buffer.alloc(900001), Buffer.from(JSON.stringify(x.state).replace('"records":', '"records":[],"records":'))]) {
+    assert.throws(() => decodeCoordinatorSigningState(bytes, x.key));
+  }
+});
+test("coordinator journal rejects signature, public key and context substitution", t => {
+  const x = coordinatorJournalFixture(t), result = x.f.coordinator.signAutomatically(x.f.auth);
+  for (const patch of [{ signatureHex: "00".repeat(64) }, { epoch: 2 }, { sessionId: h("wrong-session") },
+    { aggregateTweakedXOnlyPublicKey: h("wrong-key") }, { signerIds: [REQUIRED_FROST_SIGNERS[0]] }, { participantIdentifiers: [1, 1] }]) {
+    x.state.records[0] = { request: x.request, state: "SIGNED", abortReceipts: null, result: { ...result, ...patch } };
+    assert.throws(() => x.decode(x.state));
+  }
+});
+test("coordinator journal cannot be replaced with an in-memory duck type", () => {
+  assert.throws(() => requireCoordinatorSigningJournal({ assertBinding() {} }, {}, {}), /ProtectedCoordinatorJournalRequired/u);
+});
+test("coordinator journal enrollment rejects alternate threshold and private-share-shaped packages", t => {
+  const x = coordinatorJournalFixture(t);
+  for (const patch of [{ signers: { min: 1, max: 2 } }, { signers: { min: 2, max: 3 } },
+    { commitmentsHex: [] }, { verifyingSharesHex: {} }, { privateShare: "forbidden" }]) {
+    assert.throws(() => initialCoordinatorSigningState({ ...x.key, publicPackage: { ...x.key.publicPackage, ...patch } }));
+  }
+});
+test("coordinator signing purpose is restricted to the exact service role", () => {
+  const c = { role: "COORDINATOR", purpose: "coordinator-signing", serviceSid: "S-1-5-21-1-2-3-1001", environment: "localnet",
+    nativeGenesis: h("genesis"), solanaDeployment: h("deployment"), instanceId: h("instance"), keyEpoch: 1 };
+  assert.equal(normalizeProtectedContext(c).role, "COORDINATOR");
+  for (const role of ["KINGPEPE_FROST_A", "KINGPEPE_FROST_B", "ATTESTER_A", "SUPERVISOR", "BRIDGE_VALIDATOR"]) assert.throws(() => normalizeProtectedContext({ ...c, role }));
+});
 
 test("DKG rejects substituted self-generated round-one material before accepting a transcript", t => {
   const f = dkgFixture(t);

@@ -2,6 +2,13 @@
   "schemaVersion": "1.0",
   "generatedAt": "2026-09-11T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
+  "phase085CoordinatorRecoveryReview": {
+    "baseline": "1e0a04152b7be2e87305afcc7bb6d8d093b5981d",
+    "filesBefore": 224,
+    "filesAfter": 227,
+    "sourceImports": "None. Original protected coordinator intent/attempt/aggregate journal, protected integrity-report outbox and same-principal Windows process-kill regressions. Existing pinned FROST and Windows protection APIs are reused.",
+    "scope": "Coordinator signing boundary only; full deposit-operation and broadcast-credit recovery remain incomplete."
+  },
   "phase085AttesterRecoveryReview": {
     "baseline": "f99c08c6bb50803b7db9ddbd0c3c7862f5d23d15",
     "filesBefore": 220,
@@ -345,6 +352,21 @@
     ]
   },
   "trackedFiles": [
+    {
+      "path": "native/frost/coordinator/protected-signing-journal.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original bounded public-transcript/aggregate journal with protected CAS, retained witness, exact A+B abort recovery and global integrity reporting; no imported crypto implementation."
+    },
+    {
+      "path": "tests/windows/coordinator-recovery-actor.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original same-principal Windows process-kill actor exercising actual protected journal, authenticated FROST endpoints and synthetic Native evidence; not chain validation."
+    },
+    {
+      "path": "docs/security/coordinator-signing-recovery.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original coordinator persistence ordering, uncertainty handling and residual-risk documentation without live deployment identities."
+    },
     {
       "path": "services/attesters/authorization-journal.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",

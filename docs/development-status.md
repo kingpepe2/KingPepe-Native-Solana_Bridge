@@ -1,5 +1,89 @@
 # KingPepe Native - Solana Bridge Development Status
 
+## Coordinator recovery increment: local regression complete
+
+The attester/async increment below is now published PRIVATE at
+1e0a04152b7be2e87305afcc7bb6d8d093b5981d, tree
+1c8c9ec189f26d658223297ad7d9b369dc3d9ae4, commit
+`security(phase-08.5): persist protected attester authorizations`.
+All 224 staged/exported source files and its full outgoing commit passed Gitleaks;
+the previous 176 commits were separately scanned. No runtime state was published.
+Exact-SHA [Actions run 34622973490](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34622973490)
+had four failed-to-start jobs, zero steps and zero artifacts. GitHub's annotation:
+"The job was not started because recent account payments have failed or your
+spending limit needs to be increased. Please check the 'Billing & plans' section
+in your settings". Classification: NOT_RUN_ACCOUNT_BLOCKED, not CI PASS.
+
+Uncommitted coordinator work binds exact intents, input identities and attempts
+to protected state, retains a verified aggregate before release, and requires A+B
+abort receipts before retrying an uncertain session. It reuses the same FROST,
+DPAPI, lifetime lease, witness and global-stop mechanisms. No private share enters
+the coordinator and no new Phase 09 or production path exists.
+
+Current targeted results: 21 new codec/binding tests pass; the updated real
+Windows DPAPI/mTLS A+B FROST test passes including exact aggregate reopen/retry.
+Six initial codec negatives failed during fixture mutation of frozen snapshots;
+mutable serialized test images corrected those fixtures before the 20-pass rerun.
+The first process-kill case failed before its target boundary because its test
+actor tried to modify an intentionally frozen signer peer. Instrumentation now
+observes authenticated transport calls, preserving the frozen runtime peer.
+The corrected PREPARED process-kill case passes. An intervening IPC rejection
+remains recorded; its cause was not established and an isolated pass does not
+replace a full gate. A newly added regression FAILED because a detected valid
+journal mutation could lose its integrity report when the supervisor was
+unavailable. Protected authentication storage V3 now retains incidents before
+network connection. Its actual unavailable-TLS/reopen test passes (one); twelve
+portable metadata cases pass. The full Windows run was interrupted after 56
+completed passing cases to apply this confirmed fix; it is NOT a full-suite pass.
+At that intermediate point the expanded restart/fault/outbox matrix was pending.
+Its subsequent complete result is recorded below. These component tests
+use synthetic Native evidence and do not certify protected real-chain integration.
+
+Before the final outbox edit, Windows/WSL Node 596 each, vectors two each, Rust
+97/check/fmt/Clippy, npm zero vulnerabilities, five Cargo audits (retaining the
+bincode unmaintained warning), 227-file provenance, source-export and all 177
+existing commits passed their checks. Renewed real chains pass 55 deposit,
+26 record, 18 deployment, eight reorg and 13 acceptance checks, with COMPLETED
+deposit prerequisites. These are dirty-worktree/incremental-build results, not
+certification of the parent SHA or a final clean clone. Final outbox/coordinator
+reruns are recorded below separately from those earlier results.
+
+Full deposit-operation/broadcast-credit persistence, reconciliation service
+admission, protected chain integration and final clean-clone/re-audit remain
+required. Phase 04/07/08 and the Phase 09 entry gate remain blocked.
+
+The first expanded Windows attempt then failed source admission (also reproduced
+alone). The outbox guard had introduced an extra synchronous DPAPI read before
+each healthy request. Retention/delivery now uses the transport's already
+mandatory preflight read; no deadline is extended and no state check is cached
+away. Nine targeted real Windows cases subsequently pass, including fresh source
+admission, retained incidents and protected A+B signing. A further actual TLS
+regression reproduced post-validation caller payload mutation (one FAIL); bounded
+wire snapshotting fixes it (one PASS). Two portable prototype-forgery regressions
+also failed before private instance registration replaced instanceof-only checks;
+all three associated rejection/brand tests now pass. The prior full attempts
+were interrupted for these confirmed fixes and are not whole-suite evidence.
+The final consistent full Windows suite has completed: 113 PASS, zero FAIL,
+zero SKIP/cancellation. Its 148-file LF-normalized runtime snapshot stayed
+unchanged throughout the run. All eight coordinator process-kill boundaries,
+uncertain abort/lost-write cases, retained incidents, attester recovery and signer
+fencing passed. Earlier failed/interrupted runs above remain separate evidence.
+
+Latest real deposit rerun reaches COMPLETED/RECONCILED with all 55 checks,
+100000000 reserve and supply, zero pending credits/surplus and no per-transfer
+Team prompt. Renewed Cargo/license audits pass with the existing bincode warning.
+The final snapshot/brand revision passes Node 612 per platform and two canonical
+vectors per platform. The full Windows security matrix passes 113. Windows remains
+non-elevated, so real distinct-service account/ACL certification is environment-
+blocked rather than passed by the same-principal component tests.
+
+The next, separately unpublished operation-journal candidate passes its portable
+checks and actual-chain observation/codec checks, but is not part of this
+coordinator increment. Its integration exposed the pinned Native RPC default
+replacement signaling. Explicit non-replacement construction/rejection and
+protected journal integration require their own publication and validation.
+No complete service/broadcast-credit or final clean-clone claim is made here.
+
 ## Phase 08.5 attester recovery and async integration: local regression complete
 
 Published baseline remains f99c08c6bb50803b7db9ddbd0c3c7862f5d23d15. The original

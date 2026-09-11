@@ -1,5 +1,30 @@
 # Phase 08.5 retrospective audit
 
+## Current coordinator continuation (not a completed re-audit)
+
+Attester increment 1e0a04152b7be2e87305afcc7bb6d8d093b5981d is published PRIVATE;
+exact Actions 34622973490 is NOT_RUN_ACCOUNT_BLOCKED with zero executed steps.
+Its local regression is recorded separately from the current uncommitted
+coordinator journal. Twenty-one new portable tests and a real protected A+B/reopen
+target passed before the complete process-kill matrix and full regression
+recorded below. A reproduced lost integrity-report/restart defect now
+has protected persist-before-connect outbox retention. The actual unavailable-TLS
+reopen regression and six additional Windows outbox/storage cases pass; twelve
+portable metadata cases pass. One full run was interrupted for the confirmed
+fix. The next run failed source admission; removing a redundant DPAPI read by
+using the transport's existing mandatory preflight restored the targeted
+source-admission pass without extending any deadline. The final unchanged
+runtime passes the complete 113-test Windows security rerun, with zero failures,
+skips or cancellations. Node passes 612 per platform and vectors two each.
+This is current-principal component evidence, not full protected-chain service
+recovery or distinct-account certification.
+No old result certifies these new files.
+
+Full operation/broadcast-credit recovery, reconciliation source admission and
+protected real-chain integration remain MUST_FIX_BEFORE_PHASE09. Phase 04/07/08
+remain FAIL overall; final Phases 01-08 re-audit and clean-clone validation have
+not completed. No production-readiness or Phase 09 entry approval is implied.
+
 ## Current continuation resumed after host storage recovery
 
 Resumption baseline is f99c08c6bb50803b7db9ddbd0c3c7862f5d23d15, PRIVATE. Protected

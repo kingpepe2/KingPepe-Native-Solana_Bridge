@@ -2,9 +2,12 @@
 import { NativeFrostSigner } from "./native-frost-signer.mjs";
 import { validateNativeSigningIntent } from "../policy/native-signing-policy.mjs";
 import { validateNativeFrostSigningRequest } from "../policy/signing-request.mjs";
-import { ProtectedServiceIpc } from "../../../shared/windows/service-ipc.mjs";
+import { isProtectedServiceIpc } from "../../../shared/windows/service-ipc.mjs";
 import { requireIntegrityGuard } from "../../../services/supervisor/protected-integrity.mjs";
 import { createHash } from "node:crypto";
+
+const PEERS = new WeakSet();
+export function isProtectedRemoteFrostPeer(value) { return PEERS.has(value); }
 
 // No DKG secret, private-share export, arbitrary method dispatch or shell API.
 export function nativeFrostIpcHandler(signer, integrity) {
@@ -52,10 +55,10 @@ export function nativeFrostIpcHandler(signer, integrity) {
 export class ProtectedRemoteFrostPeer {
   #ipc; #port;
   constructor({ ipc, port, signerId }) {
-    if (!(ipc instanceof ProtectedServiceIpc) || ipc.role !== "COORDINATOR" || ipc.peerRole !== signerId ||
+    if (!isProtectedServiceIpc(ipc) || ipc.role !== "COORDINATOR" || ipc.peerRole !== signerId ||
         !["KINGPEPE_FROST_A", "KINGPEPE_FROST_B"].includes(signerId)) throw new Error("IpcSignerBindingRejected");
     this.#ipc = ipc; this.#port = port;
-    Object.defineProperty(this, "signerId", { value: signerId, enumerable: true }); Object.freeze(this);
+    Object.defineProperty(this, "signerId", { value: signerId, enumerable: true }); PEERS.add(this); Object.freeze(this);
   }
   isAvailable() { return true; } // Reachability is determined by authenticated calls, never this hint.
   async verifyNativeEvidence(intent) {

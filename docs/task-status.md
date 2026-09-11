@@ -1,5 +1,32 @@
 # KingPepe Native - Solana Bridge Task Status
 
+## Latest publication and active coordinator continuation
+
+PRIVATE HEAD 1e0a04152b7be2e87305afcc7bb6d8d093b5981d publishes the retained
+attester/async increment. Its 224-file staged export and full outgoing commit
+passed Gitleaks; the prior 176 commits also passed a separate scan. Exact Actions
+34622973490: four failed-to-start jobs, zero steps/artifacts,
+NOT_RUN_ACCOUNT_BLOCKED. No production or CI-policy changes.
+
+The next working increment implements protected coordinator attempt/aggregate
+recovery. Twenty-one new portable tests and updated protected A+B exact-result reopen
+pass. New process-kill/fault validation is in progress following a corrected
+test-only frozen-peer instrumentation error; not yet certified. The PREPARED
+kill case passes after a separate unexplained IPC rejection. A newly reproduced
+undelivered-integrity-incident/restart defect now has protected persist-before-
+connect retention; its real unavailable-TLS/reopen regression and twelve portable
+outbox cases pass. The full Windows gate was interrupted for this fix, not passed.
+Subsequent review reproduced and fixed mutable transport payloads and
+prototype-forged transport capabilities. A redundant DPAPI read was removed by
+reusing the existing per-request protected preflight, preserving all deadlines.
+The final Node reruns pass 612 per platform plus two canonical vectors each. The
+Windows full gate passes 113 / 0 FAIL / 0 SKIP for an unchanged runtime snapshot;
+earlier interrupted or failing attempts remain recorded separately.
+Next: complete staged/outgoing scans and review, then publish
+the coherent coordinator increment. Then complete durable operation/broadcast-
+credit recovery, live reconciliation, protected Windows chain integration and
+clean-clone audit. Phase 09 remains NOT_STARTED.
+
 ## Current continuation: attester/async increment locally validated
 
 Published PRIVATE baseline: f99c08c6bb50803b7db9ddbd0c3c7862f5d23d15. Storage and

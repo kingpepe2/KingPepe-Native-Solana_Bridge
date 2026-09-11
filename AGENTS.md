@@ -23,6 +23,46 @@
 
 ## Current task: Phase 08.5 security remediation
 
+Latest published PRIVATE increment: 1e0a04152b7be2e87305afcc7bb6d8d093b5981d,
+security(phase-08.5): persist protected attester authorizations. Current/staged
+227-file coverage is being prepared for the next coordinator increment; do not
+attribute its uncommitted changes to that published SHA. The published tree had
+224 files, staged/export and all outgoing commits passed Gitleaks. Exact Actions
+34622973490 ran zero steps in four failed-to-start jobs, zero artifacts:
+NOT_RUN_ACCOUNT_BLOCKED. CI was not weakened.
+
+Current work adds a mandatory protected coordinator signing journal: durable
+attempt/session preparation, two terminal abort receipts before a new attempt,
+verified aggregate retention before release, and witness/CAS integrity reporting.
+Twenty-one new portable codec tests and the updated protected A+B/reopen target pass.
+The initial new kill-test fixture failed because it tried to mutate a frozen peer;
+the fixture now observes real IPC calls without weakening peer immutability.
+The corrected PREPARED process-kill rerun passes, following one IPC rejection
+whose cause is not certified. A new real regression exposed loss of an integrity
+incident when supervisor delivery failed. The protected transport now persists
+that report before connecting; the actual unreachable-TLS/reopen regression and
+twelve portable outbox cases pass. Full Windows validation was interrupted for
+this fix and was restarted against the final consistent revision, as recorded
+below. Full operation/broadcast-credit and
+protected real-chain service recovery remain incomplete. See
+docs/security/coordinator-signing-recovery.md. Phase 09 must not start.
+
+Further review fixed exact IPC payload capture before asynchronous TLS connection
+and prototype-forged transport/peer capabilities. The former had an actual TLS
+failing regression and the latter two portable failures; their corrections pass
+targeted checks. The redundant outbox pre-read was folded into the transport's
+mandatory protected preflight, retaining unchanged freshness/response deadlines.
+Final Node reruns pass 612 per platform plus two canonical vectors each. The
+complete Windows security rerun now passes 113 / 0 FAIL / 0 SKIP for the
+unchanged 148-file runtime snapshot. This includes eight coordinator kill
+boundaries, lost writes, outbox restart, attester restart and signer fencing.
+It uses actual current-principal DPAPI/mTLS/FROST with synthetic chain fixtures,
+not cross-service account certification or full protected-chain recovery.
+Current exact source publication follows staged/outgoing scans and review.
+Separate unpublished operation-journal integration is being tested; it also
+exposed the pinned Native RPC's default replacement signaling. Its explicit
+non-replacement correction belongs to that next increment, not this source SHA.
+
 Phase 09 is NOT_STARTED. The validation-resumption baseline is
 f99c08c6bb50803b7db9ddbd0c3c7862f5d23d15, verified PRIVATE. Its exact Actions
 34576782766 started zero steps in four jobs and produced zero artifacts:
