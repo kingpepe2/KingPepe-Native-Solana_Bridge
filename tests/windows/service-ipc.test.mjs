@@ -28,20 +28,26 @@ import { LocalDeploymentRpc, ProtectedSolanaDeploymentMonitor } from "../../serv
 import { LocalNativeEvidenceVerifier } from "../../native/node/native-raw-evidence.mjs";
 import { ProtectedNativeIntegrityMonitor, compareNativeProgress } from "../../native/node/native-integrity.mjs";
 import { nativeProgressFixture } from "../integration/native-progress-fixture.mjs";
+import { witnessTestAction } from "./protected-witness-test-helper.mjs";
 
 if (process.platform !== "win32") throw new Error("WINDOWS_IPC_TESTS_REQUIRE_WINDOWS");
 const repoRoot = path.resolve(import.meta.dirname, "../.."), serviceSid = windowsCurrentServiceSid();
 const h = v => createHash("sha256").update(v).digest("hex");
 const deployment = h("protected-ipc-local-deployment"), protocol = "KINGPEPE_SERVICE_IPC_V2";
-const cleanups = new Map();
+const cleanups = new Map(), witnessOptions = new Map();
 function temporary(t) {
   const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-ipc-test-"));
   cleanups.set(root, []);
+  witnessOptions.set(root, new Map());
   t.after(async () => {
-    for (const fn of cleanups.get(root)) await fn();
+    let failed = false;
+    for (const fn of cleanups.get(root)) { try { await fn(); } catch { failed = true; } }
+    for (const opts of witnessOptions.get(root).values()) { try { witnessTestAction(opts, "DELETE"); } catch { failed = true; } }
+    witnessOptions.delete(root);
     cleanups.delete(root);
     assert(path.dirname(root) === path.resolve(os.tmpdir()) && path.basename(root).startsWith("kingpepe-ipc-test-"), "UnsafeTestCleanup");
-    try { rmSync(root, { recursive: true }); } catch { throw new Error("IpcTestCleanupFailed"); }
+    try { rmSync(root, { recursive: true }); } catch { failed = true; }
+    if (failed) throw new Error("IpcTestCleanupFailed");
   }); return root;
 }
 function certificate(root, name) {
@@ -54,10 +60,13 @@ function certificate(root, name) {
   unlinkSync(keyFile); // Disposable generation output removed BEFORE protected enrollment.
   return { privateKeyPem, certificatePem };
 }
-function options(root, name, role, purpose = "service-auth") {
-  return { root: path.join(root, name), anchorRoot: path.join(root, name + "-anchor"), repoRoot,
+function options(root, name, role, purpose = "service-auth", instanceId = h(name)) {
+  const opts = { root: path.join(root, name), anchorRoot: path.join(root, name + "-anchor"), repoRoot,
     context: { role, purpose, serviceSid, environment: "localnet", nativeGenesis: REGTEST_GENESIS,
-      solanaDeployment: deployment, instanceId: h(name), keyEpoch: 1 } };
+      solanaDeployment: deployment, instanceId, keyEpoch: 1 } };
+  // Negative tests mutate enrollment inputs. Cleanup retains the independently
+  // registered LOCALNET snapshot, not those subsequently corrupted references.
+  witnessOptions.get(root).set(name, structuredClone(opts)); return opts;
 }
 function enroll(opts, own, peer, peerRole) {
   const bytes = encodeIpcEnrollment({ ...own, peerCertificatePem: peer.certificatePem, peerRole });
@@ -68,7 +77,7 @@ function fixture(t, role = "KINGPEPE_FROST_A", clientRole = "COORDINATOR") {
   const serverOptions = options(root, "server-state", role), clientOptions = options(root, "client-state", clientRole);
   const serverStore = enroll(serverOptions, serverCert, clientCert, clientRole), clientStore = enroll(clientOptions, clientCert, serverCert, role);
   const server = new ProtectedServiceIpc(serverStore), client = new ProtectedServiceIpc(clientStore);
-  t.after(() => { server.close(); client.close(); serverStore.close(); clientStore.close(); });
+  cleanups.get(root).push(() => { server.close(); client.close(); serverStore.close(); clientStore.close(); });
   return { root, role, server, client, serverStore, clientStore, serverOptions, clientOptions, serverCert, clientCert };
 }
 function request(overrides = {}) { return { method: "verifyNativeEvidence", operationId: h("operation"), payload: { bounded: true }, ...overrides }; }
@@ -197,7 +206,7 @@ test("actual protected A+B FROST signing through authenticated endpoints", async
   const signers = [], verificationCounts = [0, 0];
   for (const [i, v] of f.entries()) {
     const base = WindowsProtectedFrostStateStore.createLocal(options(v.root, "native-state", v.role, "frost-state"), policy);
-    const fenceOptions = options(v.root, "native-fence", v.role, "signer-fence"); fenceOptions.context.instanceId = base.context.instanceId;
+    const fenceOptions = options(v.root, "native-fence", v.role, "signer-fence", base.context.instanceId);
     const stateStore = await WindowsFencedFrostStateStore.createLocal({ base, fenceOptions, policy });
     cleanups.get(v.root).push(() => stateStore.close());
     signers.push(new NativeFrostSigner({ signerId: v.role, index: i, policy, stateStore,
@@ -403,4 +412,19 @@ test("protected Native incident persists and re-reports after actual authority a
   await monitor.close(); await f.restart();
   monitor = await ProtectedNativeIntegrityMonitor.open({ expectedPolicy: fixture.expectedPolicy, verifier, integrity: peer.guard, store: new WindowsProtectedStore(opts) });
   assert.equal((await monitor.poll()).state, "HARD_STOP_INTEGRITY"); assert.equal(f.authority.status().incidentCount, 1);
+});
+
+test("retained progress witness turns co-restored observation files into a durable global stop", async t => {
+  // Actual protected files, profile witness and mutually authenticated guard;
+  // progress bytes are synthetic and never treated as Native chain proof.
+  const f = await integrityFixture(t), peer = await f.peer("NATIVE_OBSERVER"), signer = await f.peer("KINGPEPE_FROST_B");
+  const { expectedPolicy, stored } = nativeProgressFixture(), opts = options(peer.root, "witness-progress", "NATIVE_OBSERVER", "chain-progress");
+  const bytes = Buffer.from(JSON.stringify(stored)), store = WindowsProtectedStore.create(opts, bytes); bytes.fill(0);
+  const files = [path.join(opts.root, "state.protected"), path.join(opts.anchorRoot, "state.protected")], old = files.map(p => readFileSync(p));
+  const current = store.read(); store.write(current.payload, current.revision); current.payload.fill(0); store.close();
+  files.forEach((p, i) => writeFileSync(p, old[i]));
+  const verifier = new LocalNativeEvidenceVerifier({ rpc: {}, executable: path.join(peer.root, "unused-native-verifier") });
+  await assert.rejects(ProtectedNativeIntegrityMonitor.open({ expectedPolicy, verifier, integrity: peer.guard, store: new WindowsProtectedStore(opts) }));
+  assert.equal(f.authority.status().state, "HARD_STOP_INTEGRITY");
+  await f.restart(); await assert.rejects(signer.guard.assertRunning(h("rolled-back-progress"), "FROST_SIGN"));
 });

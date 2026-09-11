@@ -15,6 +15,7 @@ import { canonicalJson } from "../../native/frost/policy/native-signing-policy.m
 import { NativeFrostSigner, NativeFrostCoordinator, runTwoPartyDkg, createNativeSigningPolicy, createNativeFrostSigningRequest,
   FROST_SIGNING_INTENT_PROTOCOL, FROST_SIGNING_MODE } from "../../native/frost/index.mjs";
 import { schnorr } from "@noble/curves/secp256k1.js";
+import { witnessTestAction } from "./protected-witness-test-helper.mjs";
 
 if (process.platform !== "win32") throw new Error("WINDOWS_FENCING_TESTS_REQUIRE_WINDOWS");
 const repoRoot = path.resolve(import.meta.dirname, "../.."), serviceSid = windowsCurrentServiceSid();
@@ -29,6 +30,7 @@ async function fixture(t, role = "KINGPEPE_FROST_A") {
   const context = { role, serviceSid, environment: "localnet", nativeGenesis: REGTEST_GENESIS, solanaDeployment: h("local-fenced-deployment"), instanceId: h("instance-" + role), keyEpoch: 1 };
   const stateOptions = { root: path.join(root, "state"), anchorRoot: path.join(root, "state-anchor"), repoRoot, context: { ...context, purpose: "frost-state" } };
   const fenceOptions = { root: path.join(root, "fence"), anchorRoot: path.join(root, "fence-anchor"), repoRoot, context: { ...context, purpose: "signer-fence" } };
+  t.after(() => { witnessTestAction(stateOptions, "DELETE"); witnessTestAction(fenceOptions, "DELETE"); });
   const policy = createLocalNativeDkgPolicy({ environment: "localnet", nativeNetwork: "regtest", nativeGenesisHash: REGTEST_GENESIS,
     solanaDeployment: context.solanaDeployment, bridgeProgramId: h("bridge"), transceiverProgramId: h("transceiver"), mint: h("mint"), keyEpoch: 1 });
   const base = WindowsProtectedFrostStateStore.createLocal(stateOptions, policy);
@@ -51,6 +53,12 @@ for (const role of ["KINGPEPE_FROST_A", "KINGPEPE_FROST_B"]) test("lifetime kern
 
 test("restoring signer state and its anchor cannot roll back the retained fence", async t => {
   const f = await fixture(t), files = [path.join(f.stateOptions.root, "state.protected"), path.join(f.stateOptions.anchorRoot, "state.protected")];
+  const old = files.map(p => readFileSync(p)); f.store.save(f.store.load()); await f.store.close();
+  files.forEach((p, i) => writeFileSync(p, old[i])); await assert.rejects(f.reopen());
+});
+
+test("restoring both complete signer and fence file packages cannot roll back retained profile witnesses", async t => {
+  const f = await fixture(t), files = [f.stateOptions, f.fenceOptions].flatMap(o => [path.join(o.root, "state.protected"), path.join(o.anchorRoot, "state.protected")]);
   const old = files.map(p => readFileSync(p)); f.store.save(f.store.load()); await f.store.close();
   files.forEach((p, i) => writeFileSync(p, old[i])); await assert.rejects(f.reopen());
 });

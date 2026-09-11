@@ -2,12 +2,19 @@
   "schemaVersion": "1.0",
   "generatedAt": "2026-09-11T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
+  "phase085RetainedWitnessReview": {
+    "baseline": "00a6cf10024bec5b4ba3a644f7560c1ac64df5e4",
+    "filesBefore": 215,
+    "filesAfter": 216,
+    "sourceImports": "None. Original Windows registry/DPAPI witness glue and exact isolated test cleanup. Microsoft APIs are reference-only; no sample source or OS binaries redistributed.",
+    "limits": "Separately retained service-profile evidence detects file-package restore, not co-restored whole-host/profile state or privileged compromise. Cross-service identity testing remains environment-blocked."
+  },
   "phase085NativeReorgReview": {
     "baseline": "920347acd70dc0dd48344780fe9d6c7928de6e37",
     "filesBefore": 210,
     "filesAfter": 215,
     "sourceImports": "None. Original bounded current-branch observation, accepted-basis comparison, protected wrapper and isolated reorg tests. Existing independent Rust proof verifier and authoritative Native node are reused unchanged.",
-    "scope": "Component under validation; not complete service-wide recovery, independent rollback witness or protected Windows chain certification."
+    "scope": "Components under validation, including a separately retained profile witness. Not complete service-wide recovery, hardware rollback assurance or protected Windows chain certification."
   },
   "phase085DeploymentMonitorReview": {
     "baseline": "fd6aca9ebbe508e26818b0f33c67fad37bfb193f",
@@ -317,6 +324,11 @@
     ]
   },
   "trackedFiles": [
+    {
+      "path": "tests/windows/protected-witness-test-helper.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original exact-key LOCALNET registry fault and cleanup helper for registered temporary test roots; no production recovery/reset API or operational values."
+    },
     {
       "path": "tests/integration/native-progress-fixture.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",

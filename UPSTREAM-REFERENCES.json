@@ -20,9 +20,12 @@
       "https://learn.microsoft.com/en-us/dotnet/api/system.io.fileshare",
       "https://learn.microsoft.com/en-us/windows/win32/services/service-security-and-access-rights",
       "https://learn.microsoft.com/en-us/dotnet/api/system.io.driveinfo.drivetype",
-      "https://learn.microsoft.com/en-us/dotnet/api/system.io.filestream.-ctor"
+      "https://learn.microsoft.com/en-us/dotnet/api/system.io.filestream.-ctor",
+      "https://learn.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-regcreatekeyexw",
+      "https://learn.microsoft.com/en-us/dotnet/api/microsoft.win32.registrykey.flush"
     ],
-    "limits": "Current-identity tests do not prove cross-service isolation. Per-operation OS locks and protected checkpoints do not prove lifetime fencing or co-restored rollback detection. No production or external audit approval."
+    "retainedWitness": "Original registry witness: exclusive initial nonvolatile key creation with explicit DACL, exact encrypted-state hash/revision, synchronous flush before acknowledgement. .NET Framework registry handle APIs also inspected in the installed runtime. No Microsoft implementation copied.",
+    "limits": "Current-identity tests do not prove cross-service isolation. Separate lifetime leases and retained profile witnesses improve cooperating-process/file-restore safety, not whole-host/profile co-restore assurance. No production or external audit approval."
   },
   "phase08LocalAccountingRuntime": {
     "nodeVersion": "24.21.0",

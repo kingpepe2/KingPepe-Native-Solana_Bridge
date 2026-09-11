@@ -58,6 +58,7 @@ function invoke(request) {
   try {
     result = spawnSync(executable, ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", path.join(import.meta.dirname, "protected-store-driver.ps1")],
       { input, encoding: "buffer", maxBuffer: 1_500_000, timeout: 30_000, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
+    if (!result.error && result.status === 1 && result.stdout.length === 0 && result.stderr.toString("utf8") === "WINDOWS_PROTECTED_WITNESS_ROLLBACK") throw new Error("ProtectedStateRollbackDetected");
     if (result.error || result.status !== 0 || result.stderr.length !== 0) throw new Error("WindowsProtectedStoreRejected");
     try { return JSON.parse(result.stdout.toString("utf8")); } catch { throw new Error("WindowsProtectedStoreResponseInvalid"); }
   } finally {

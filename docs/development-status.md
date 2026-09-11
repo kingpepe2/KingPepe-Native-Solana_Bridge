@@ -1,5 +1,49 @@
 # KingPepe Native - Solana Bridge Development Status
 
+## Phase 08.5 retained Windows profile witness validated for publication
+
+Native reorg component published PRIVATE at
+00a6cf10024bec5b4ba3a644f7560c1ac64df5e4. Exact Actions
+[34567674373](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34567674373)
+started zero steps in all four jobs and produced zero artifacts. GitHub again
+reported the unchanged recent-payment/spending-limit restriction:
+NOT_RUN_ACCOUNT_BLOCKED. Working/staged source and 172 prior commits passed
+Gitleaks, as did the single outgoing commit. No artifacts were uploaded.
+
+New witness work binds each protected store to separately retained, encrypted
+registry revision/image evidence under the intended service profile, with exact
+DACL and explicit enrollment. It never stores a private share in the registry.
+The full storage subset passed 31 checks; a restored complete signer/fence file
+test passed, and a restored observation triggered global stop across restart.
+These tests use the current Windows principal. The first full security run
+reported 64 passes and one teardown failure before interruption; 15 checks were
+not certified. A negative test mutated an enrollment context after cleanup had
+retained its reference. Cleanup now retains its own localnet snapshot and closes
+all test endpoints even if another cleanup fails. The targeted rerun passes;
+the complete security rerun passed all 80 checks (zero failures/skips). A final
+cleanup registration adjustment for the actual fence instance also passed its
+targeted protected A+B FROST rerun. Runtime environment checks are unchanged.
+Cross-service identity and protected real-chain integration
+are not certified. Full profile/registry plus state co-restore remains a measured
+limitation, not a claimed hardware guarantee. Complete service/broadcast-credit
+recovery and fresh source-health admission remain open. Phase 09 NOT_STARTED.
+
+Windows and WSL full Node reruns pass 537 tests with two vectors each. A fresh
+normal SBF build and the 55-check real deposit suite pass through COMPLETED.
+Fresh project targets also pass all 97 Rust tests, locked check, formatting and
+all-target/all-feature Clippy. Exact provenance covers 216 files; declared
+dependency-license metadata and guardrails pass. npm reports zero vulnerabilities.
+All 173 published commits pass Gitleaks; outgoing/staged scans still follow.
+No protected Windows full-flow certification is inferred from that Linux run.
+An additional real flow used the unchanged Rust raw-proof verifier compiled
+to a Windows GNU executable, executed through WSL interop; it also completed.
+That proves execution of the Windows verifier, not Windows JavaScript service
+isolation. The missing official Rust target for the pinned Native nightly and
+signed Ubuntu MinGW development packages were installed in the isolated tool
+environment; no repository dependency, Rust default or production service changed.
+The verifier binary hash was
+96362c8bff79973e74d9e8f53d1189f9b87e78cde51399bc58644df359d6c81d.
+
 ## Phase 08.5 Native reorganization increment validated for publication
 
 Deployment monitor published PRIVATE at 920347acd70dc0dd48344780fe9d6c7928de6e37.

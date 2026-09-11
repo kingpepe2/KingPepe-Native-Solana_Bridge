@@ -24,12 +24,12 @@
 ## Current task: Phase 08.5 security remediation
 
 Phase 09 is NOT_STARTED. The current published source is
-920347acd70dc0dd48344780fe9d6c7928de6e37, PRIVATE. Exact Actions
-34564887534 started zero steps in four jobs and produced zero artifacts:
+00a6cf10024bec5b4ba3a644f7560c1ac64df5e4, PRIVATE. Exact Actions
+34567674373 started zero steps in four jobs and produced zero artifacts:
 NOT_RUN_ACCOUNT_BLOCKED. No account, billing, privacy or protection bypass.
 
-The new Native accepted-basis/reorg increment is under validation, not yet
-published. Windows/WSL Node 537, Windows security 74 and eight real regtest reorg
+The Native accepted-basis/reorg increment is published. Windows/WSL Node 537,
+Windows security 74 and eight real regtest reorg
 checks pass. Two of the security tests use synthetic persisted incident
 evidence with actual DPAPI/mTLS; they are not protected real-chain integration.
 Fresh Rust 97, check/fmt/Clippy, normal SBF builds, 55 deposit checks,
@@ -37,6 +37,15 @@ Fresh Rust 97, check/fmt/Clippy, normal SBF builds, 55 deposit checks,
 not a final clean-clone certification. Current evidence is in
 docs/development-status.md and docs/task-status.md; older passing evidence must
 not certify a later SHA.
+
+The retained Windows registry witness increment is validated for publication.
+Windows security 80, Windows/WSL Node 537, vectors two each, fresh Rust 97 and
+quality checks, fresh normal SBF and the 55-check real deposit suite pass. The
+full security suite passed after a test-teardown correction; a final exact fence
+cleanup adjustment also passed the protected A+B FROST targeted rerun. The
+witness survives file-package restore while
+the service profile remains current, not full profile/host co-restore. No
+runtime reset, automatic legacy enrollment or production provisioning was added.
 
 Implemented local components: protected CurrentUser DPAPI/file boundaries;
 mutual TLS role-bound IPC; separate retained signer fence and lifetime handle;
@@ -46,8 +55,8 @@ comparison with post-mint reorg incident retention. See docs/security/ for the
 precise evidence and limitations, not a claim of complete service integration.
 
 Remaining MUST_FIX_BEFORE_PHASE09 work: full service/broadcast-credit recovery,
-fresh source-health admission for every economic service, stronger separately
-retained rollback evidence and protected Windows chain integration. Final
+fresh source-health admission for every economic service and protected Windows
+chain integration. Final
 clean-clone validation and retrospective audit remain incomplete. Do not stop
 source work merely because elevated cross-service testing or Actions is blocked.
 Cross-service DPAPI/ACL certification requires an isolated elevated Windows

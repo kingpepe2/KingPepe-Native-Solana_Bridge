@@ -23,6 +23,12 @@ try {
     exit 0
 } catch {
     # Never forward exception messages, stack traces, request fields or paths.
+    $kpCause = $_.Exception
+    while ($null -ne $kpCause.InnerException) { $kpCause = $kpCause.InnerException }
+    if ($kpCause.GetType().FullName -eq 'KingPepe.LocalProtection.ProtectedWitnessRollbackException') {
+        [Console]::Error.Write('WINDOWS_PROTECTED_WITNESS_ROLLBACK')
+        exit 1
+    }
     [Console]::Error.Write('WINDOWS_PROTECTED_STORE_REJECTED')
     exit 1
 }

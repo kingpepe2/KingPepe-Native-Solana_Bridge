@@ -1,5 +1,18 @@
 # KingPepe Native - Solana Bridge Task Status
 
+## Current continuation: retained protected-store witness
+
+Published PRIVATE: 00a6cf10024bec5b4ba3a644f7560c1ac64df5e4. Exact Actions
+34567674373 is NOT_RUN_ACCOUNT_BLOCKED (four jobs, zero steps/artifacts).
+The registry witness is validated for publication: full Windows security 80,
+Windows/WSL Node 537, two vectors each, fresh Rust 97 and quality checks, normal
+SBF builds and the 55-check real deposit flow pass. The interrupted security run
+and subsequent cleanup corrections are recorded in development-status; the final
+targeted protected FROST cleanup rerun also passes. Publish this increment, then finish
+full operation/broadcast-credit recovery, source-health admission and protected
+chain integration. Final fresh-clone/retrospective audit is still required.
+Do not start Phase 09 or reclassify co-restored host/profile rollback as detected.
+
 ## Current continuation: Native accepted-basis incident response
 
 Published PRIVATE: 920347acd70dc0dd48344780fe9d6c7928de6e37. Exact CI 34564887534

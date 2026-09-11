@@ -17,6 +17,7 @@ import { schnorr } from "@noble/curves/secp256k1.js";
 import { ProjectAttester, verifyProjectAttestation } from "../../services/attesters/attestation-service.mjs";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { decodeCanonicalBridgeMessage } from "../../shared/protocol/canonical-message.mjs";
+import { witnessTestAction } from "./protected-witness-test-helper.mjs";
 
 if (process.platform !== "win32") throw new Error("WINDOWS_PROTECTED_STORAGE_TESTS_REQUIRE_WINDOWS");
 const repoRoot = path.resolve(import.meta.dirname, "../..");
@@ -28,9 +29,11 @@ function fixture(t, role = "KINGPEPE_FROST_A", purpose = "frost-state", override
     assert(path.dirname(parent) === path.resolve(os.tmpdir()) && path.basename(parent).startsWith("kingpepe-protected-test-"), "UnsafeTemporaryCleanupTarget");
     try { rmSync(parent, { recursive: true }); } catch { throw new Error("WindowsTestCleanupFailed"); }
   });
-  return { parent, options: { root: path.join(parent, "state"), anchorRoot: path.join(parent, "anchor"), repoRoot,
+  const options = { root: path.join(parent, "state"), anchorRoot: path.join(parent, "anchor"), repoRoot,
     context: { role, purpose, serviceSid, environment: "localnet", nativeGenesis: REGTEST_GENESIS,
-      solanaDeployment: h("protected-local-deployment"), instanceId: randomBytes(32).toString("hex"), keyEpoch: 1, ...overrides } } };
+      solanaDeployment: h("protected-local-deployment"), instanceId: randomBytes(32).toString("hex"), keyEpoch: 1, ...overrides } };
+  t.after(() => witnessTestAction(options, "DELETE"));
+  return { parent, options };
 }
 const stateFile = options => path.join(options.root, "state.protected");
 const anchorFile = options => path.join(options.anchorRoot, "state.protected");
@@ -96,6 +99,7 @@ test("encrypted context rejects wrong role epoch deployment network and instance
 test("copied encrypted state and anchor cannot authorize a different root", t => {
   const { parent, options } = fixture(t); WindowsProtectedStore.create(options, randomBytes(32));
   const clone = { ...options, root: path.join(parent, "copy-state"), anchorRoot: path.join(parent, "copy-anchor") };
+  t.after(() => witnessTestAction(clone, "DELETE"));
   // Create exact valid ACLs at both destinations, so this tests cryptographic
   // location binding rather than failure due to inherited copy permissions.
   WindowsProtectedStore.create(clone, randomBytes(32));
@@ -115,14 +119,29 @@ test("compare-and-swap refuses a stale writer without changing current state", t
   assert.throws(() => b.write(randomBytes(32), old.revision));
   sameProtectedBytes(a.read().payload, updated);
 });
-test("current instance notices co-restored snapshots but new instance cannot prove full rollback", t => {
+test("retained registry witness rejects co-restored file state and anchor on reopen", t => {
   const { options } = fixture(t); const store = WindowsProtectedStore.create(options, randomBytes(32));
   const oldState = readFileSync(stateFile(options)), oldAnchor = readFileSync(anchorFile(options));
   store.write(randomBytes(32), "1"); writeFileSync(stateFile(options), oldState); writeFileSync(anchorFile(options), oldAnchor);
   assert.throws(() => store.read(), /ProtectedStateRollbackDetected/u);
   assert.throws(() => store.write(randomBytes(32), "1"), /ProtectedStateRollbackDetected/u);
-  // Explicit measured limitation: retained external monotonic authority is still required.
+  assert.throws(() => new WindowsProtectedStore(options).read(), /ProtectedStateRollbackDetected/u);
+});
+
+test("full registry/profile and file co-restore remains an explicitly measured limitation", t => {
+  const { options } = fixture(t), store = WindowsProtectedStore.create(options, randomBytes(32));
+  const state = readFileSync(stateFile(options)), anchor = readFileSync(anchorFile(options)), witness = witnessTestAction(options, "READ");
+  store.write(randomBytes(32), "1");
+  writeFileSync(stateFile(options), state); writeFileSync(anchorFile(options), anchor); witnessTestAction(options, "RESTORE", witness);
+  assert.throws(() => store.read(), /ProtectedStateRollbackDetected/u);
   assert.equal(new WindowsProtectedStore(options).read().revision, "1");
+  witness.fill(0);
+});
+
+for (const action of ["DELETE", "CORRUPT", "WIDEN"]) test("retained witness fails closed without fallback: " + action, t => {
+  const { options } = fixture(t); WindowsProtectedStore.create(options, randomBytes(32));
+  witnessTestAction(options, "CHECK_ACL"); witnessTestAction(options, action);
+  assert.throws(() => new WindowsProtectedStore(options).read(), /WindowsProtectedStoreRejected/u);
 });
 test("Windows directories reject widened ACLs before releasing plaintext", t => {
   const { options } = fixture(t); const store = WindowsProtectedStore.create(options, randomBytes(32));
