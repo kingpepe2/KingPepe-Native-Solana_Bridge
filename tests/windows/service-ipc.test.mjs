@@ -1,7 +1,7 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { createHash, randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import tls from "node:tls";
@@ -12,15 +12,21 @@ import { ProtectedServiceIpc, encodeIpcEnrollment } from "../../shared/windows/s
 import { nativeFrostIpcHandler, ProtectedRemoteFrostPeer } from "../../native/frost/signer/protected-service.mjs";
 import { WindowsProtectedFrostStateStore } from "../../native/frost/state/windows-protected-state-store.mjs";
 import { WindowsFencedFrostStateStore } from "../../native/frost/state/windows-fenced-state-store.mjs";
-import { NativeFrostSigner, NativeFrostCoordinator, createNativeSigningPolicy, runTwoPartyDkg,
+import { NativeFrostSigner, NativeFrostCoordinator, createNativeSigningPolicy, createNativeFrostSigningRequest, runTwoPartyDkg,
   FROST_SIGNING_INTENT_PROTOCOL, FROST_SIGNING_MODE, REQUIRED_FROST_SIGNERS } from "../../native/frost/index.mjs";
 import { REGTEST_GENESIS } from "../../native/node/native-raw-evidence.mjs";
 import { schnorr } from "@noble/curves/secp256k1.js";
+import { ProtectedIntegrityAuthority, RemoteIntegrityGuard } from "../../services/supervisor/protected-integrity.mjs";
+import { INTEGRITY_ROLES } from "../../shared/service-integrity-policy.mjs";
+import { ed25519 } from "@noble/curves/ed25519.js";
+import { ProjectAttester, verifyProjectAttestation } from "../../services/attesters/attestation-service.mjs";
+import { attesterIpcHandler } from "../../services/attesters/protected-service.mjs";
+import { decodeCanonicalBridgeMessage, encodeCanonicalBridgeMessage } from "../../shared/protocol/canonical-message.mjs";
 
 if (process.platform !== "win32") throw new Error("WINDOWS_IPC_TESTS_REQUIRE_WINDOWS");
 const repoRoot = path.resolve(import.meta.dirname, "../.."), serviceSid = windowsCurrentServiceSid();
 const h = v => createHash("sha256").update(v).digest("hex");
-const deployment = h("protected-ipc-local-deployment"), protocol = "KINGPEPE_SERVICE_IPC_V1";
+const deployment = h("protected-ipc-local-deployment"), protocol = "KINGPEPE_SERVICE_IPC_V2";
 const cleanups = new Map();
 function temporary(t) {
   const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-ipc-test-"));
@@ -51,15 +57,27 @@ function enroll(opts, own, peer, peerRole) {
   const bytes = encodeIpcEnrollment({ ...own, peerCertificatePem: peer.certificatePem, peerRole });
   try { return WindowsProtectedStore.create(opts, bytes); } finally { bytes.fill(0); }
 }
-function fixture(t, role = "KINGPEPE_FROST_A") {
+function fixture(t, role = "KINGPEPE_FROST_A", clientRole = "COORDINATOR") {
   const root = temporary(t), serverCert = certificate(root, "server"), clientCert = certificate(root, "client");
-  const serverOptions = options(root, "server-state", role), clientOptions = options(root, "client-state", "COORDINATOR");
-  const serverStore = enroll(serverOptions, serverCert, clientCert, "COORDINATOR"), clientStore = enroll(clientOptions, clientCert, serverCert, role);
+  const serverOptions = options(root, "server-state", role), clientOptions = options(root, "client-state", clientRole);
+  const serverStore = enroll(serverOptions, serverCert, clientCert, clientRole), clientStore = enroll(clientOptions, clientCert, serverCert, role);
   const server = new ProtectedServiceIpc(serverStore), client = new ProtectedServiceIpc(clientStore);
   t.after(() => { server.close(); client.close(); serverStore.close(); clientStore.close(); });
   return { root, role, server, client, serverStore, clientStore, serverOptions, clientOptions, serverCert, clientCert };
 }
 function request(overrides = {}) { return { method: "verifyNativeEvidence", operationId: h("operation"), payload: { bounded: true }, ...overrides }; }
+
+async function integrityFixture(t, initialState = "RUNNING") {
+  const root = temporary(t), opts = options(root, "authority", "SUPERVISOR", "global-integrity");
+  let authority = await ProtectedIntegrityAuthority.createLocal(opts, initialState);
+  cleanups.get(root).push(() => authority.close());
+  return { options: opts, get authority() { return authority; },
+    async restart() { await authority.close(); authority = await ProtectedIntegrityAuthority.openLocal(new WindowsProtectedStore(opts)); },
+    async peer(role) {
+      const f = fixture(t, "SUPERVISOR", role), port = await f.server.listen(input => authority.handle(input));
+      return { ...f, port, guard: new RemoteIntegrityGuard({ ipc: f.client, port }) };
+    } };
+}
 
 for (const role of REQUIRED_FROST_SIGNERS) test("real mutual TLS and protected replay persistence: " + role, async t => {
   const f = fixture(t, role); let calls = 0;
@@ -125,7 +143,7 @@ function rawRequest(f, port, change) {
       if (sent) { gotResponse = true; s.destroy(); return; }
       input = Buffer.concat([input, chunk]); if (input.length < 4 || input.length < input.readUInt32BE() + 4) return;
       const hello = JSON.parse(input.subarray(4).toString("utf8"));
-      const value = [protocol, "REQUEST", hello[2], "localnet", "COORDINATOR", f.role, hello[6], hello[7], hello[8], h("raw-request"), h("operation"), "verifyNativeEvidence", Date.now() + 9000, {}];
+      const value = [protocol, "REQUEST", hello[2], "localnet", "COORDINATOR", f.role, hello[6], hello[7], hello[8], h("raw-request"), h("operation"), "verifyNativeEvidence", Date.now() + 9000, Date.now() + 29000, {}];
       const changed = change(value), payload = Buffer.isBuffer(changed) ? changed : Buffer.from(JSON.stringify(changed));
       const header = Buffer.alloc(4); header.writeUInt32BE(payload.length); sent = true; s.write(Buffer.concat([header, payload]));
     });
@@ -133,6 +151,9 @@ function rawRequest(f, port, change) {
 }
 for (const [label, change] of [
   ["stale request", v => { v[12] = Date.now() - 1; return v; }],
+  ["excess admission lifetime", v => { v[12] = Date.now() + 20000; return v; }],
+  ["excess execution lifetime", v => { v[13] = Date.now() + 60000; return v; }],
+  ["expired execution lifetime", v => { v[13] = Date.now() - 1; return v; }],
   ["wrong deployment", v => { v[2] = h("wrong"); return v; }],
   ["wrong environment", v => { v[3] = "mainnet"; return v; }],
   ["wrong role", v => { v[4] = "KINGPEPE_FROST_B"; return v; }],
@@ -146,7 +167,17 @@ for (const [label, change] of [
   assert.equal(await rawRequest(f, port, change), false); assert.equal(calls, 0);
 });
 
+test("an admitted request cannot return a late result", async t => {
+  const f = fixture(t); let calls = 0;
+  const port = await f.server.listen(async () => { calls++; await new Promise(resolve => setTimeout(resolve, 750)); return true; });
+  const accepted = await rawRequest(f, port, v => { v[12] = Date.now() + 200; v[13] = Date.now() + 500; return v; });
+  assert.equal(accepted, false); assert.equal(calls, 1); assert.equal(f.server.lastRejection, "IpcExpiredResult");
+});
+
 test("actual protected A+B FROST signing through authenticated endpoints", async t => {
+  const global = await integrityFixture(t);
+  const guards = await Promise.all(REQUIRED_FROST_SIGNERS.map(role => global.peer(role)));
+  const coordinatorGuard = (await global.peer("COORDINATOR")).guard;
   const f = [fixture(t, "KINGPEPE_FROST_A"), fixture(t, "KINGPEPE_FROST_B")];
   const intent = { protocol: FROST_SIGNING_INTENT_PROTOCOL, mode: FROST_SIGNING_MODE, purpose: "RESERVE_SWEEP", nativeNetwork: "regtest",
     nativeGenesisHash: REGTEST_GENESIS, solanaDeployment: deployment, bridgeProgramId: h("bridge"), transceiverProgramId: h("transceiver"), mint: h("mint"), keyEpoch: 1,
@@ -157,23 +188,139 @@ test("actual protected A+B FROST signing through authenticated endpoints", async
   const policy = createNativeSigningPolicy({ environment: "localnet", nativeNetwork: "regtest", nativeGenesisHash: REGTEST_GENESIS,
     solanaDeployment: deployment, bridgeProgramId: intent.bridgeProgramId, transceiverProgramId: intent.transceiverProgramId, mint: intent.mint, keyEpoch: 1,
     maxAmountAtomic: "10000", maxFeeAtomic: "100", reserveScriptPubKeyHex: intent.changeScriptPubKeyHex, authorizedOperations: [intent] });
-  const signers = [];
+  const signers = [], verificationCounts = [0, 0];
   for (const [i, v] of f.entries()) {
     const base = WindowsProtectedFrostStateStore.createLocal(options(v.root, "native-state", v.role, "frost-state"), policy);
     const fenceOptions = options(v.root, "native-fence", v.role, "signer-fence"); fenceOptions.context.instanceId = base.context.instanceId;
     const stateStore = await WindowsFencedFrostStateStore.createLocal({ base, fenceOptions, policy });
     cleanups.get(v.root).push(() => stateStore.close());
     signers.push(new NativeFrostSigner({ signerId: v.role, index: i, policy, stateStore,
-      nativeEvidenceValidator: async value => ({ digestHex: value.proofFingerprint }) }));
+      nativeEvidenceValidator: async value => { verificationCounts[i]++; return { digestHex: value.proofFingerprint }; } }));
   }
   t.after(() => signers.forEach(s => s.close()));
   const dkg = runTwoPartyDkg(signers, { epoch: 1 });
-  const ports = [];
-  for (let i = 0; i < 2; i++) ports.push(await f[i].server.listen(nativeFrostIpcHandler(signers[i])));
+  const ports = [], handlerFaults = [];
+  for (let i = 0; i < 2; i++) {
+    const handler = nativeFrostIpcHandler(signers[i], guards[i].guard);
+    ports.push(await f[i].server.listen(async input => {
+      try { return await handler(input); } catch (error) {
+        const allowed = ["ProtectedSignerStateIntegrityRejected", "ProtectedSignerFenceRejected", "ProtectedLifetimeLeaseLost",
+          "IntegrityStateRejected", "IntegrityResponseRollback", "IntegrityStopRollback", "IntegrityAuthorizationStopped", "IpcRequestRejected",
+          "FROST fresh independent Native evidence required"];
+        handlerFaults.push(input.method + ":" + (allowed.includes(error?.message) ? error.message : "UNCLASSIFIED"));
+        throw error;
+      }
+    }));
+  }
   const peers = f.map((v, i) => new ProtectedRemoteFrostPeer({ ipc: v.client, port: ports[i], signerId: v.role }));
-  const coordinator = new NativeFrostCoordinator({ signers: peers, publicPackage: dkg.publicPackage, aggregateTweakedXOnlyPublicKey: dkg.aggregateTweakedXOnlyPublicKey });
-  const signed = await coordinator.signAutomaticallyOverIpc(intent);
+  const coordinator = new NativeFrostCoordinator({ signers: peers, publicPackage: dkg.publicPackage, aggregateTweakedXOnlyPublicKey: dkg.aggregateTweakedXOnlyPublicKey, integrity: coordinatorGuard });
+  let signed;
+  try { signed = await coordinator.signAutomaticallyOverIpc(intent); }
+  catch { throw new Error("ProtectedFrostIpcFailure:" + f.map(v => v.server.lastRejection ?? "UNREPORTED").join(",") + ":" + handlerFaults.join(",")); }
   assert(schnorr.verify(Buffer.from(signed.signatureHex, "hex"), Buffer.from(intent.taprootSighashHex, "hex"), Buffer.from(dkg.aggregateTweakedXOnlyPublicKey, "hex")), "IpcFrostSignatureRejected");
+  assert(verificationCounts.every(count => count >= 3), "FreshEvidenceRequiredAtEverySigningBoundary");
   await assert.rejects(f[0].client.request(ports[0], { method: "verifyNativeEvidence", operationId: h("wrong-operation"), payload: intent }));
   await assert.rejects(coordinator.signAutomaticallyOverIpc({ ...intent, amountAtomic: "999" }));
+  assert.equal(global.authority.status().state, "RUNNING", "UncertaintyIsNotConfirmedContradiction");
+  await guards[0].guard.report(intent.operationId, "SIGNER_ROLLBACK", h("confirmed-test-rollback"));
+  await global.restart();
+  await assert.rejects(f[0].client.request(ports[0], { method: "signingCommitment", operationId: intent.operationId, payload: { request: createNativeFrostSigningRequest(intent) } }));
+  const restartedCoordinator = new NativeFrostCoordinator({ signers: peers, publicPackage: dkg.publicPackage,
+    aggregateTweakedXOnlyPublicKey: dkg.aggregateTweakedXOnlyPublicKey, integrity: coordinatorGuard });
+  await assert.rejects(restartedCoordinator.signAutomaticallyOverIpc(intent));
+  assert.equal((await guards[1].guard.status(intent.operationId)).state, "HARD_STOP_INTEGRITY");
+});
+
+test("durable global stop propagates to every service role and survives authority/client restart", async t => {
+  const f = await integrityFixture(t), peers = [];
+  for (const role of INTEGRITY_ROLES) peers.push(await f.peer(role));
+  for (const p of peers) assert.equal((await p.guard.status(h("status"))).state, "RUNNING");
+  const native = peers.find(p => p.client.role === "NATIVE_OBSERVER");
+  await native.guard.report(h("affected-operation"), "NATIVE_DEEP_REORG", h("raw-reorg-evidence"));
+  assert.equal(f.authority.status().incidentCount, 1);
+  await f.restart();
+  for (const p of peers) {
+    p.client.close(); const ipc = new ProtectedServiceIpc(new WindowsProtectedStore(p.clientOptions)); t.after(() => ipc.close());
+    const guard = new RemoteIntegrityGuard({ ipc, port: p.port });
+    assert.equal((await guard.status(h("restart-status"))).state, "HARD_STOP_INTEGRITY");
+    const actions = { KINGPEPE_FROST_A: "FROST_SIGN", KINGPEPE_FROST_B: "FROST_SIGN", COORDINATOR: "COORDINATE_SWEEP",
+      ATTESTER_A: "ATTEST_MINT_CREDIT", ATTESTER_B: "ATTEST_MINT_CREDIT", BRIDGE_VALIDATOR: "AUTHORIZE_CLAIM", RELAYER: "SUBMIT_CLAIM" };
+    if (actions[guard.role]) await assert.rejects(guard.assertRunning(h("new-operation"), actions[guard.role]));
+    await assert.rejects(ipc.request(p.port, { method: "clearHardStop", operationId: h("unauthorized-clear"), payload: {} }));
+  }
+  // Idempotent report preserves the original incident and never clears the stop.
+  const reopened = await f.peer("NATIVE_OBSERVER");
+  await reopened.guard.report(h("affected-operation"), "NATIVE_DEEP_REORG", h("raw-reorg-evidence"));
+  assert.equal(f.authority.status().incidentCount, 1);
+});
+
+for (const [role, code] of [["SOLANA_OBSERVER", "SOLANA_DEPLOYMENT_CHANGED"], ["RECONCILIATION", "CONFIRMED_RESERVE_DEFICIT"], ["KINGPEPE_FROST_A", "SIGNER_ROLLBACK"]]) {
+  test("protected global integrity report and durable reopen: " + role, async t => {
+    const f = await integrityFixture(t), peer = await f.peer(role);
+    await assert.rejects(peer.guard.report(h("test"), "SOURCE_UNAVAILABLE", h("not-a-contradiction")));
+    assert.equal(f.authority.status().state, "RUNNING");
+    await peer.guard.report(h("test"), code, h("confirmed-evidence"));
+    await f.restart(); assert.equal((await peer.guard.status(h("test"))).state, "HARD_STOP_INTEGRITY");
+  });
+}
+
+test("integrity role, authority lease, pause, missing and corrupt storage fail closed", async t => {
+  const f = await integrityFixture(t, "PAUSED_POLICY"), peer = await f.peer("RELAYER");
+  const invalid = options(peer.root, "not-enrolled", "SUPERVISOR", "global-integrity"); invalid.context.environment = "mainnet";
+  await assert.rejects(ProtectedIntegrityAuthority.createLocal(invalid, "RUNNING")); assert.equal(existsSync(invalid.root), false);
+  await assert.rejects(ProtectedIntegrityAuthority.openLocal(new WindowsProtectedStore(f.options)));
+  await assert.rejects(peer.guard.assertRunning(h("operation"), "SUBMIT_CLAIM"));
+  await assert.rejects(peer.guard.assertRunning(h("operation"), "FROST_SIGN"));
+  await assert.rejects(peer.guard.report(h("operation"), "SOLANA_DEPLOYMENT_CHANGED", h("wrong-role")));
+  assert.equal((await peer.guard.status(h("operation"))).state, "PAUSED_POLICY");
+  await f.authority.close();
+  await assert.rejects(peer.guard.assertRunning(h("operation"), "SUBMIT_CLAIM"));
+  const file = path.join(f.options.root, "state.protected"), bytes = readFileSync(file); bytes[bytes.length - 1] ^= 1; writeFileSync(file, bytes);
+  await assert.rejects(ProtectedIntegrityAuthority.openLocal(new WindowsProtectedStore(f.options)));
+  assert.throws(() => new RemoteIntegrityGuard({ ipc: {}, port: peer.port }));
+});
+
+for (const role of ["ATTESTER_A", "ATTESTER_B"]) test("real protected attester TLS is gated by durable integrity state: " + role, async t => {
+  const global = await integrityFixture(t), guard = (await global.peer(role)).guard;
+  const f = fixture(t, role, "BRIDGE_VALIDATOR"), seed = randomBytes(32);
+  const vector = JSON.parse(readFileSync(path.join(repoRoot, "solana/modules/bridge-messages/vectors/canonical-v1.json"))).vectors.find(v => v.name === "deposit-claim-v1");
+  const identity = { ...vector.deployment, nativeGenesis: REGTEST_GENESIS, solanaDeployment: deployment };
+  const now = BigInt(Math.floor(Date.now() / 1000)), encoded = Buffer.from(encodeCanonicalBridgeMessage({ ...decodeCanonicalBridgeMessage(vector.encodedHex), operationId: undefined,
+    deployment: identity, keyEpoch: 1, validFrom: now - 5n, validUntil: now + 600n })).toString("hex"), decoded = decodeCanonicalBridgeMessage(encoded);
+  const policy = { role, attesterPublicKeyHex: Buffer.from(ed25519.getPublicKey(seed)).toString("hex"), protocolId: identity.protocolId,
+    nativeNetwork: identity.nativeNetwork, nativeGenesisHex: identity.nativeGenesis, solanaDeploymentHex: identity.solanaDeployment,
+    managerProgramIdHex: identity.managerProgramId, transceiverProgramIdHex: identity.transceiverProgramId, mintHex: identity.mint,
+    keyEpoch: 1, policyEpoch: vector.policyEpoch, acceptedNativeTrust: ["LOCALLY_VALIDATED_CHAIN_STATE"], depositsPaused: false, hardStop: false };
+  const opts = options(f.root, "attester-seed", role, "attester-seed");
+  const store = WindowsProtectedStore.create(opts, seed); seed.fill(0);
+  const attester = ProjectAttester.fromWindowsProtectedStore({ store, role, policy }); t.after(() => { attester.close(); store.close(); });
+  let verifications = 0;
+  const evidence = { trust: "LOCALLY_VALIDATED_CHAIN_STATE", nativeNetwork: identity.nativeNetwork, nativeGenesisHash: identity.nativeGenesis,
+    operationIdHex: decoded.operationIdHex, depositOutpoint: decoded.depositOutpointText, amountAtomic: decoded.amountAtomic.toString(),
+    solanaRecipientHex: decoded.destinationHex, evidenceDigestHex: decoded.evidenceDigestHex, reserveAllocationIdHex: h("attester-test-allocation"),
+    reserveTransitionState: "CANONICAL_RESERVE", mintCreditState: "AUTHORIZED_UNCONSUMED", finalitySatisfied: true, sweepFinalized: true,
+    utxoUnspentAtDeposit: true, noPriorConsumption: true };
+  // Policy/evidence fixture, not a chain-validation claim. TLS/DPAPI/signature/stop are real.
+  const handler = attesterIpcHandler({ attester, integrity: guard, verifyNativeDeposit: async () => {
+    verifications++; return { operationIdHex: decoded.operationIdHex, messageDigestHex: decoded.messageDigestHex, evidence };
+  } });
+  const port = await f.server.listen(handler), input = { method: "attestDeposit", operationId: decoded.operationIdHex,
+    payload: { encodedMessageHex: encoded, rawEvidence: {} } };
+  const signed = await f.client.request(port, input); assert(verifyProjectAttestation(signed, encoded)); assert.equal(verifications, 1);
+  await guard.report(decoded.operationIdHex, "CONFLICTING_RESERVE_EVIDENCE", h("contradiction"));
+  await global.restart(); await assert.rejects(f.client.request(port, input)); assert.equal(verifications, 1);
+});
+
+test("failed incident persistence cannot reopen authorization in the active authority", async t => {
+  const f = await integrityFixture(t); await f.authority.close();
+  const store = new WindowsProtectedStore(f.options), authority = await ProtectedIntegrityAuthority.openLocal(store);
+  cleanups.get(path.dirname(f.options.root)).push(() => authority.close());
+  const persist = store.write.bind(store);
+  // Fault injection at a real protected store's write boundary, not a claim
+  // that the workstation disk was filled or a power-loss test was performed.
+  store.write = () => { throw new Error("TEST_PERSISTENCE_UNAVAILABLE"); };
+  assert.throws(() => authority.handle({ peerRole: "NATIVE_OBSERVER", method: "reportContradiction", operationId: h("incident"),
+    payload: { code: "NATIVE_DEEP_REORG", evidenceDigest: h("verified-incident") } }), /TEST_PERSISTENCE_UNAVAILABLE/u);
+  store.write = persist;
+  assert.throws(() => authority.handle({ peerRole: "RELAYER", method: "assertRunning", operationId: h("claim"), payload: { action: "SUBMIT_CLAIM" } }), /IntegrityStopRollback/u);
 });

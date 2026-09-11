@@ -2,6 +2,13 @@
   "schemaVersion": "1.0",
   "generatedAt": "2026-09-11T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
+  "phase085GlobalIntegrityReview": {
+    "baseline": "e60902646bde39855a1686a9295ab20ff59ef09b",
+    "filesBefore": 202,
+    "filesAfter": 205,
+    "sourceImports": "None. Original protected supervisor integrity state, role/action/report protocol, authenticated runtime guards and regressions. Existing Windows/Node/Noble APIs are dependencies or references, not imported source.",
+    "scope": "Partial integration: protected Windows signer/coordinator/attester boundary and persistent global stop. Full service crash recovery, live detectors, broadcast-credit persistence and complete protected E2E remain separate work."
+  },
   "phase085FencingReview": {
     "baseline": "9ad57981aac1aec209737cc4a420b4ee7e19ce4c",
     "filesBefore": 198,
@@ -296,6 +303,21 @@
     ]
   },
   "trackedFiles": [
+    {
+      "path": "shared/service-integrity-policy.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original bounded role/action/report authorization map for global integrity service; no third-party code."
+    },
+    {
+      "path": "services/supervisor/protected-integrity.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original leased DPAPI integrity authority and pinned authenticated remote guard, with absorbing stop and no automatic clear."
+    },
+    {
+      "path": "docs/security/global-integrity.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original non-operational control description, timing rationale, integration scope and explicit limitations."
+    },
     {
       "path": "shared/windows/protected-lease-driver.ps1",
       "classification": "ORIGINAL_KINGPEPE_CODE",

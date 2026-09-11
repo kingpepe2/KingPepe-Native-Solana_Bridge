@@ -13,6 +13,7 @@ import { createNativeFrostSigningRequest, validateNativeFrostAbortReceipt } from
 import { createTwoPartyDkgRequest, normalizeNativeFrostKeyContext } from "../policy/dkg-request.mjs";
 import { deserializeFrostPublic } from "../signer/native-frost-signer.mjs";
 import { ProtectedRemoteFrostPeer } from "../signer/protected-service.mjs";
+import { requireIntegrityGuard } from "../../../services/supervisor/protected-integrity.mjs";
 
 export { createTwoPartyDkgRequest } from "../policy/dkg-request.mjs";
 
@@ -59,8 +60,10 @@ export class NativeFrostCoordinator {
   #completed = new Map();
   #hardStop = false;
   #coordinating = false;
+  #integrity;
 
   constructor(options) {
+    this.#integrity = options.integrity;
     this.#signers = signerMap(options.signers);
     this.#publicPackage = options.publicPackage;
     this.#aggregateTweakedXOnlyPublicKey = assertHashHex(options.aggregateTweakedXOnlyPublicKey, "FROST aggregate x-only public key");
@@ -83,25 +86,38 @@ export class NativeFrostCoordinator {
 
   async signAutomaticallyOverIpc(intent, options = {}) {
     this.#requireReady();
+    requireIntegrityGuard(this.#integrity, "COORDINATOR");
     const request = createNativeFrostSigningRequest(intent, options);
+    this.#integrity.assertDeployment({ environment: "localnet", nativeGenesis: request.intent.nativeGenesisHash,
+      solanaDeployment: request.intent.solanaDeployment, keyEpoch: request.intent.keyEpoch });
     const signers = REQUIRED_FROST_SIGNERS.map(id => this.#signers.get(id));
     if (!signers.every(signer => signer instanceof ProtectedRemoteFrostPeer)) throw new Error("ProtectedRemoteSignersRequired");
     this.#coordinating = true;
     try {
+      await this.#integrity.assertRunning(request.intent.operationId, "COORDINATE_SWEEP");
       for (const signer of signers) await signer.verifyNativeEvidence(structuredClone(request.intent));
       const commitments = [];
       for (const signer of signers) commitments.push(await signer.signingCommitment(request));
       validateCommitmentEnvelopes(request, commitments);
       const shares = [];
       for (const signer of signers) shares.push(await signer.signatureShare(request, commitments));
-      return this.#aggregate(request, commitments, shares);
+      const result = this.#aggregate(request, commitments, shares);
+      await this.#integrity.assertRunning(request.intent.operationId, "COORDINATE_SWEEP"); return result;
     } catch (error) {
       let confirmed = true;
       for (const signer of signers) {
         try { validateNativeFrostAbortReceipt(await signer.abortSigningSession(request), request, signer.signerId); }
         catch { confirmed = false; }
       }
-      if (!confirmed) this.#hardStop = true;
+      if (!confirmed) {
+        this.#hardStop = true;
+        // An unavailable abort response is uncertainty, not proof of an
+        // economic contradiction. Do not convert an outage into a confirmed
+        // global incident. Durable per-operation recovery is a separate gate.
+      }
+      if (["FROST share failed verification", "FROST aggregate failed ciphersuite verification", "FROST aggregate failed independent BIP340 verification"].includes(error?.message)) {
+        await this.#integrity.report(request.intent.operationId, "SIGNING_TRANSCRIPT_CONFLICT", request.intentDigest);
+      }
       throw error;
     } finally { this.#coordinating = false; }
   }

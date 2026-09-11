@@ -11,7 +11,8 @@ unchanged, upstream-unaudited Noble 2.3.0 schnorr_FROST implementation.
 
 The channel binds Native genesis, Solana deployment, key epoch, environment,
 both roles, endpoint generation, a fresh challenge and TLS exporter. Each
-request also binds an operation ID, method, request ID and short expiry.
+request also binds an operation ID, method, request ID, admission expiry and
+bounded completion deadline (V2; see global-integrity.md).
 Canonical bounded framing rejects alternate encodings, malformed/oversized
 input and unauthorized methods. The server persists a consumed request ID
 before invoking the service. Replay records are never silently pruned; capacity
@@ -24,8 +25,9 @@ invokes the participant's configured Native verifier. The remote coordinator
 reuses the existing signature-share, aggregate and independent BIP340 checks.
 The attester handler requires its own configured evidence verifier; caller
 proof flags cannot supply the verifier result. DKG provisioning is not exposed
-through the coordinator signing endpoint. Supervisor command transport and
-bridge-wide stop/recovery integration remain separate pending work.
+through the coordinator signing endpoint. Supervisor integrity transport now
+supports role-restricted status, action checks and contradiction reports; there
+is no runtime clear/reset endpoint. Complete bridge recovery remains unfinished.
 
 Current enrollment factories are explicitly localnet-only. This is not a
 production certificate ceremony, rotation service or activation mechanism.
@@ -42,8 +44,8 @@ material remains outside the source tree; temporary plaintext key-generation
 output is removed before DPAPI enrollment. No certificates or keys are tracked.
 This utility is a test prerequisite, not the bridge's TLS implementation.
 
-Per-operation protected-store locking and endpoint generations do not yet
-provide lifetime signer fencing. Co-restoring every protected checkpoint is
+The separate protected signer adapter now requires a lifetime OS handle and
+persistent fence (signer-fencing.md). Co-restoring every protected checkpoint is
 still outside the rollback guarantee. The tests do not yet prove separate
 Windows service-process crash recovery or the secured whole-bridge E2E.
 

@@ -23,7 +23,14 @@
 
 ## Current task: Phase 08.5 security remediation
 
-Current published IPC increment: 9ad57981aac1aec209737cc4a420b4ee7e19ce4c,
+Current published fencing increment: e60902646bde39855a1686a9295ab20ff59ef09b.
+Its CI run 34557854092 started zero steps (account blocked). Current uncommitted
+global integrity authority/remote guards passed Windows Node 508/security 70 and
+two vectors with zero failures/skips. Nested TLS timing and fresh-evidence
+corrections are included. WSL Node 508/new SBF/deposit 55 also pass.
+See docs/security/global-integrity.md and the current development-status.
+
+Previously published IPC increment: 9ad57981aac1aec209737cc4a420b4ee7e19ce4c,
 from audited baseline 84ef95fba316944dd9c205e0f965d3b9ff725e64. Exact CI
 34555746195 started zero steps: NOT_RUN_ACCOUNT_BLOCKED. Fencing worktree adds
 a separate retained DPAPI fence, lifetime OS handle, persistent instance epoch,
@@ -31,8 +38,8 @@ revision CAS and nonce high-water checks. Windows Node 508, Windows security 58,
 two vectors and Rust quality/tests pass. See docs/security/signer-fencing.md
 and current development-status for evidence and remaining limits.
 
-All remaining control groups still need implementation/integration and fresh
-validation: durable global stop, complete service and broadcast-credit recovery,
+Remaining control groups still need implementation/integration and fresh
+validation: complete service and broadcast-credit recovery, global stop coverage,
 live Solana deployment monitoring, post-mint deep reorg and persistent chain
 freshness. Do not stop merely because elevated Windows cross-service testing or
 Actions is unavailable. Do not equate current-user DPAPI or local component tests

@@ -3,14 +3,20 @@
 import tls from "node:tls";
 import { createHash, createPrivateKey, createPublicKey, randomBytes, X509Certificate } from "node:crypto";
 import { assertWindowsProtectedStore } from "./protected-store.mjs";
+import { INTEGRITY_ROLES, INTEGRITY_METHODS } from "../service-integrity-policy.mjs";
 
-const VERSION = "KINGPEPE_SERVICE_IPC_V1";
+const VERSION = "KINGPEPE_SERVICE_IPC_V2";
 const HOSTNAME = "kingpepe-service.invalid";
 const MAX = 262144;
 const REQUEST_LIMIT = 2048; // Exhaustion fails closed; no automatic pruning/rotation.
 const TIMEOUT = 10000;
+// Admission freshness stays ten seconds. Execution may include several real
+// DPAPI commits and separately authenticated supervisor checks. V2 binds a
+// distinct thirty-second response deadline; it never accepts a late result.
+const EXECUTION_TIMEOUT = 30000;
 const HASH = /^[0-9a-f]{64}$/u;
 const edges = Object.freeze({
+  SUPERVISOR: Object.fromEntries(INTEGRITY_ROLES.map(role => [role, INTEGRITY_METHODS])),
   KINGPEPE_FROST_A: { COORDINATOR: ["verifyNativeEvidence", "signingCommitment", "signatureShare", "abortSigningSession"] },
   KINGPEPE_FROST_B: { COORDINATOR: ["verifyNativeEvidence", "signingCommitment", "signatureShare", "abortSigningSession"] },
   ATTESTER_A: { BRIDGE_VALIDATOR: ["attestDeposit"] },
@@ -27,10 +33,10 @@ function encode(value) {
   const data = Buffer.from(JSON.stringify(value)); requireValue(data.length > 0 && data.length <= MAX, "IpcSizeRejected");
   const prefix = Buffer.alloc(4); prefix.writeUInt32BE(data.length); return Buffer.concat([prefix, data]);
 }
-function frame(socket) {
+function frame(socket, timeout = TIMEOUT) {
   return new Promise((resolve, reject) => {
     let data = Buffer.alloc(0), length;
-    const timer = setTimeout(() => end(new Error("IpcTimeout")), TIMEOUT);
+    const timer = setTimeout(() => end(new Error("IpcTimeout")), timeout);
     function end(error, value) {
       clearTimeout(timer); socket.off("data", onData); socket.off("error", onError); socket.off("close", onClose);
       if (error) { socket.destroy(); reject(error); } else resolve(value);
@@ -80,11 +86,15 @@ export class ProtectedServiceIpc {
   #store; #credential; #generation; #server; #connections = new Set(); #busy = false; #closed = false;
   #role; #peerRole; #domain; #environment; #peerFingerprint;
   #credentialBinding;
+  #deployment;
+  #lastRejection;
   constructor(store) {
     assertWindowsProtectedStore(store, store?.context?.role, "service-auth");
     // Production enrollment/activation is outside this remediation's authority.
     requireValue(store.context.environment === "localnet", "IpcLocalEnrollmentRequired");
     this.#store = store; this.#role = store.context.role; this.#environment = store.context.environment;
+    this.#deployment = Object.freeze({ environment: store.context.environment, nativeGenesis: store.context.nativeGenesis,
+      solanaDeployment: store.context.solanaDeployment, keyEpoch: store.context.keyEpoch });
     this.#domain = digest(Buffer.from(JSON.stringify([VERSION, store.context.nativeGenesis, store.context.solanaDeployment, store.context.keyEpoch])));
     const { state } = read(store), c = state.credential;
     requireValue(c && Object.keys(c).sort().join() === "certificatePem,peerCertificatePem,peerRole,privateKeyPem");
@@ -103,6 +113,8 @@ export class ProtectedServiceIpc {
   }
   get role() { return this.#role; }
   get peerRole() { return this.#peerRole; }
+  get deployment() { return this.#deployment; }
+  get lastRejection() { return this.#lastRejection; }
   #checkPeer(socket) {
     requireValue(!this.#closed && socket.authorized && socket.getProtocol() === "TLSv1.3" && !socket.isSessionReused(), "IpcPeerRejected");
     requireValue(digest(socket.getPeerX509Certificate().raw) === this.#peerFingerprint, "IpcPeerRejected");
@@ -117,10 +129,17 @@ export class ProtectedServiceIpc {
     persist(this.#store, state, revision); this.#generation = state.generation;
     let server;
     try { server = tls.createServer({ ...this.#credential, requestCert: true, handshakeTimeout: TIMEOUT, sessionTimeout: 1 }, socket => {
-      this.#serve(socket, handler).catch(() => socket.destroy());
+      this.#serve(socket, handler).catch(error => {
+        const codes = ["IpcTimeout", "IpcExpiredResult", "IpcTransportClosed", "IpcStaleRequest", "IpcContextRejected", "IpcReplayRejected", "IpcSizeRejected"];
+        this.#lastRejection = codes.includes(error?.message) ? error.message : "IpcRejected";
+        socket.destroy();
+      });
     }); } catch { throw new Error("IpcTlsContextRejected"); }
     this.#server = server; server.maxConnections = 8;
-    server.on("connection", socket => { this.#connections.add(socket); socket.setTimeout(TIMEOUT, () => socket.destroy()); socket.once("close", () => this.#connections.delete(socket)); });
+    // This is the underlying TCP socket, not the authenticated TLSSocket. Its
+    // idle timer must not cut off a still-valid nested protected operation.
+    // TLS handshake and pre-admission framing retain their ten-second limits.
+    server.on("connection", socket => { this.#connections.add(socket); socket.setTimeout(EXECUTION_TIMEOUT, () => socket.destroy()); socket.once("close", () => this.#connections.delete(socket)); });
     server.on("tlsClientError", () => {}); // No exception may print key/config/peer data.
     server.on("error", () => this.close());
     await new Promise((resolve, reject) => { server.once("error", () => reject(new Error("IpcListenFailed"))); server.listen({ host: "127.0.0.1", port: 0, exclusive: true }, resolve); });
@@ -132,12 +151,14 @@ export class ProtectedServiceIpc {
     const nonce = randomBytes(32).toString("hex"), binding = this.#binding(socket);
     const pending = frame(socket);
     socket.write(encode([VERSION, "CHALLENGE", this.#domain, this.#environment, this.#role, this.#peerRole, this.#generation, nonce, binding]));
-    const v = exactArray(await pending, 14);
+    const v = exactArray(await pending, 15);
     requireValue(v[0] === VERSION && v[1] === "REQUEST" && v[2] === this.#domain && v[3] === this.#environment && v[4] === this.#peerRole && v[5] === this.#role && v[6] === this.#generation && v[7] === nonce && v[8] === binding, "IpcContextRejected");
-    const [id, operation, method, expires, payload] = v.slice(9);
+    const [id, operation, method, expires, completeBy, payload] = v.slice(9);
     requireValue(typeof id === "string" && HASH.test(id) && typeof operation === "string" && HASH.test(operation));
     requireValue(edges[this.#role][this.#peerRole].includes(method), "IpcMethodRejected");
     requireValue(Number.isSafeInteger(expires) && expires > Date.now() && expires <= Date.now() + TIMEOUT, "IpcStaleRequest");
+    requireValue(Number.isSafeInteger(completeBy) && completeBy >= expires && completeBy > Date.now() && completeBy <= Date.now() + EXECUTION_TIMEOUT, "IpcStaleRequest");
+    socket.setTimeout(EXECUTION_TIMEOUT, () => socket.destroy());
     requireValue(!this.#busy, "IpcBusy"); this.#busy = true;
     try {
       const { state, revision } = this.#state();
@@ -147,7 +168,7 @@ export class ProtectedServiceIpc {
       // Persist-before-dispatch. A lost result is not permission to replay this ID.
       // Economic/session idempotency remains enforced by the signer/attester.
       const result = await handler(Object.freeze({ method, operationId: operation, payload, peerRole: this.#peerRole }));
-      this.#state(); requireValue(!socket.destroyed && Date.now() < expires, "IpcExpiredResult");
+      this.#state(); requireValue(!socket.destroyed, "IpcTransportClosed"); requireValue(Date.now() < completeBy, "IpcExpiredResult");
       socket.end(encode([VERSION, "RESPONSE", id, operation, binding, result ?? null]));
     } finally { this.#busy = false; }
   }
@@ -167,10 +188,13 @@ export class ProtectedServiceIpc {
       this.#checkPeer(socket);
       const hello = exactArray(await challenge, 9), binding = this.#binding(socket);
       requireValue(hello[0] === VERSION && hello[1] === "CHALLENGE" && hello[2] === this.#domain && hello[3] === this.#environment && hello[4] === this.#peerRole && hello[5] === this.#role && HASH.test(hello[7]) && hello[8] === binding, "IpcContextRejected");
-      const response = frame(socket);
+      socket.setTimeout(EXECUTION_TIMEOUT, () => socket.destroy());
+      const completeBy = Date.now() + EXECUTION_TIMEOUT - 100;
+      const response = frame(socket, EXECUTION_TIMEOUT);
       socket.write(encode([VERSION, "REQUEST", this.#domain, this.#environment, this.#role, this.#peerRole, hello[6], hello[7], binding,
-        requestId, operationId, method, Date.now() + TIMEOUT - 100, payload]));
+        requestId, operationId, method, Date.now() + TIMEOUT - 100, completeBy, payload]));
       const result = exactArray(await response, 6); this.#state();
+      requireValue(Date.now() < completeBy, "IpcExpiredResult");
       requireValue(result[0] === VERSION && result[1] === "RESPONSE" && result[2] === requestId && result[3] === operationId && result[4] === binding);
       return result[5];
     } catch { throw new Error("IpcRequestRejected"); }

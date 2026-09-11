@@ -1,5 +1,40 @@
 # KingPepe Native - Solana Bridge Development Status
 
+## Phase 08.5 protected global integrity increment (2026-09-11)
+
+Fencing was published PRIVATE at e60902646bde39855a1686a9295ab20ff59ef09b.
+Exact Actions [34557854092](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34557854092)
+started zero steps in all four jobs with the same billing/spending restriction:
+NOT_RUN_ACCOUNT_BLOCKED. Its local worktree validation is recorded below.
+
+The current uncommitted increment adds a protected global integrity authority,
+mutually authenticated role-limited clients, and mandatory checks in protected
+signer/coordinator/attester service handlers. See security/global-integrity.md.
+Initial real Windows tests passed stop propagation across all service roles and
+authority/client restarts. Nested protected calls exposed a timeout and stale
+Native-evidence cache; targeted reruns now pass protected A+B signing and both
+attesters. IPC V2 separates unchanged ten-second admission freshness from a
+bounded thirty-second completion deadline and corrects the underlying TCP idle
+timer. Each commitment/share revalidates Native evidence; the original thirty-
+second Native freshness check is unchanged. A failed incident write latches the
+active authority closed. The final full Windows run passed 508 Node tests,
+70 security tests and two vectors, with zero failures/skips. This supersedes the
+earlier failed 68/69 run only for the corrected worktree actually rerun.
+
+Fresh WSL Node 508 and 55 real regtest/local-validator checks passed. Native to
+Solana reached COMPLETED and RECONCILED, minting 100000000 atomic units. Both new
+SBF builds reproduce the prior program hashes exactly. Windows Node 508 and two
+vectors pass. npm audit reports zero vulnerabilities.
+The separate finalized local-validator withdrawal-record prerequisite passed
+26 checks and performed no Native withdrawal payout. All five Rust locks and
+declared-license metadata pass, with RUSTSEC-2025-0141 bincode unmaintained warning
+retained after refreshing the advisory database. Full service/clean-clone audit
+for this increment still awaits completion; no CI or production pass is inferred.
+
+This is not complete service-wide crash/broadcast-credit recovery, continuous
+deployment/reorg monitoring, protected Windows chain E2E or full-host rollback
+assurance. Those requirements remain open; Phase 09 must not start.
+
 ## Phase 08.5 lifetime fencing increment (2026-09-11)
 
 Authenticated IPC was published PRIVATE at

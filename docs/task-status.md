@@ -1,5 +1,17 @@
 # KingPepe Native - Solana Bridge Task Status
 
+## Current continuation: protected global integrity integration
+
+Published fencing: e60902646bde39855a1686a9295ab20ff59ef09b, PRIVATE. CI run
+34557854092 started zero steps, NOT_RUN_ACCOUNT_BLOCKED. Uncommitted integrity
+authority and protected service guards passed full Windows Node 508/security 70,
+with zero failures/skips and two vectors; see development-status and
+security/global-integrity.md. WSL Node 508, new SBF builds and 55 real deposit checks pass;
+Native to Solana COMPLETED and RECONCILED. Then continue full operation recovery, broadcast-credit
+persistence, actual deployment monitoring and post-mint reorg/freshness work.
+Do not stop remaining source work solely for CI/elevation limitations.
+Do not start Phase 09 or claim the complete audit passed.
+
 ## Current continuation: lifetime signer fencing
 
 IPC is published PRIVATE at 9ad57981aac1aec209737cc4a420b4ee7e19ce4c; exact CI

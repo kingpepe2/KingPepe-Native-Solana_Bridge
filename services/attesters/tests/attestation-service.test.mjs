@@ -10,7 +10,7 @@ import {
   verifyProjectAttestation,
 } from "../attestation-service.mjs";
 import { decodeCanonicalBridgeMessage, encodeCanonicalBridgeMessage, bytesToHex } from "../../../shared/protocol/canonical-message.mjs";
-import { attesterIpcHandler } from "../protected-service.mjs";
+import { attesterEvidenceVerifier } from "../protected-service.mjs";
 
 const vectorPath = path.resolve(import.meta.dirname, "../../../solana/modules/bridge-messages/vectors/canonical-v1.json");
 const vectorFile = JSON.parse(readFileSync(vectorPath, "utf8"));
@@ -83,11 +83,11 @@ function runtime() {
   return { keyA, keyB, attesterA, attesterB };
 }
 
-test("attester IPC requires its own verifier and exact peer operation binding", async () => {
+test("attester service evidence policy requires its own verifier and exact peer operation binding", async () => {
   const { attesterA, attesterB } = runtime(); let calls = 0;
   try {
-    assert.throws(() => attesterIpcHandler({ attester: attesterA }));
-    const handler = attesterIpcHandler({ attester: attesterA, verifyNativeDeposit: async () => { calls++; throw new Error("TEST_SOURCE_UNAVAILABLE"); } });
+    assert.throws(() => attesterEvidenceVerifier({ attester: attesterA }));
+    const handler = attesterEvidenceVerifier({ attester: attesterA, verifyNativeDeposit: async () => { calls++; throw new Error("TEST_SOURCE_UNAVAILABLE"); } });
     const input = { method: "attestDeposit", peerRole: "BRIDGE_VALIDATOR", operationId: decodedDeposit.operationIdHex,
       payload: { encodedMessageHex: depositVector.encodedHex, rawEvidence: {} } };
     await assert.rejects(handler({ ...input, peerRole: "COORDINATOR" }));
@@ -97,27 +97,28 @@ test("attester IPC requires its own verifier and exact peer operation binding", 
   } finally { attesterA.close(); attesterB.close(); }
 });
 
-test("attester IPC ignores caller proof booleans and requires message-bound verifier output", async () => {
+test("attester service evidence policy ignores caller proof booleans and requires message-bound verifier output", async () => {
   const { attesterA, attesterB } = runtime();
   try {
-    const handler = attesterIpcHandler({ attester: attesterA, verifyNativeDeposit: async () => ({ proofVerified: true }) });
+    const handler = attesterEvidenceVerifier({ attester: attesterA, verifyNativeDeposit: async () => ({ proofVerified: true }) });
     await assert.rejects(handler({ method: "attestDeposit", peerRole: "BRIDGE_VALIDATOR", operationId: decodedDeposit.operationIdHex,
       payload: { encodedMessageHex: depositVector.encodedHex, rawEvidence: { proofVerified: true } } }), /AttesterIpcEvidenceMismatch/u);
   } finally { attesterA.close(); attesterB.close(); }
 });
 
-test("attester IPC signs only service-verified evidence and snapshots the message across await", async () => {
+test("attester service evidence policy snapshots the message across await before signing", async () => {
   const { attesterA, attesterB } = runtime();
   try {
     const now = BigInt(Math.floor(Date.now() / 1000));
     const encoded = bytesToHex(encodeCanonicalBridgeMessage({ ...decodedDeposit, operationId: undefined, validFrom: now - 1n, validUntil: now + 60n }));
     const decoded = decodeCanonicalBridgeMessage(encoded), payload = { encodedMessageHex: encoded, rawEvidence: {} };
-    const handler = attesterIpcHandler({ attester: attesterA, verifyNativeDeposit: async input => {
+    const handler = attesterEvidenceVerifier({ attester: attesterA, verifyNativeDeposit: async input => {
       assert.equal(input.encodedMessageHex, encoded); payload.encodedMessageHex = "ff";
       return { operationIdHex: decoded.operationIdHex, messageDigestHex: decoded.messageDigestHex,
         evidence: evidence({ operationIdHex: decoded.operationIdHex, evidenceDigestHex: decoded.evidenceDigestHex }) };
     } });
-    const signed = await handler({ method: "attestDeposit", peerRole: "BRIDGE_VALIDATOR", operationId: decoded.operationIdHex, payload });
+    const verified = await handler({ method: "attestDeposit", peerRole: "BRIDGE_VALIDATOR", operationId: decoded.operationIdHex, payload });
+    const signed = attesterA.signDepositCredit(verified);
     assert.equal(verifyProjectAttestation(signed, encoded), true);
   } finally { attesterA.close(); attesterB.close(); }
 });
