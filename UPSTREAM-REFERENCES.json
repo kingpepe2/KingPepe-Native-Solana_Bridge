@@ -1,5 +1,16 @@
 {
-  "generatedAt": "2026-09-10T00:00:00Z",
+  "generatedAt": "2026-09-11T00:00:00Z",
+  "phase085WindowsProtection": {
+    "checkedAt": "2026-09-11",
+    "use": "Original glue using installed Windows PowerShell 5.1 and .NET Framework DPAPI CurrentUser, protected DACLs and exclusive file handles. No upstream source or sample code copied, no OS binaries vendored, no dependency version change.",
+    "urls": [
+      "https://learn.microsoft.com/en-us/windows/win32/api/dpapi/nf-dpapi-cryptprotectdata",
+      "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.protecteddata",
+      "https://learn.microsoft.com/en-us/dotnet/api/system.io.fileshare",
+      "https://learn.microsoft.com/en-us/windows/win32/services/service-security-and-access-rights"
+    ],
+    "limits": "Current-identity tests do not prove cross-service isolation. Per-operation OS locks and protected checkpoints do not prove lifetime fencing or co-restored rollback detection. No production or external audit approval."
+  },
   "phase08LocalAccountingRuntime": {
     "nodeVersion": "24.21.0",
     "npmVersion": "11.19.0",

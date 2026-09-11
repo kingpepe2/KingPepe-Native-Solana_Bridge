@@ -1,6 +1,31 @@
 # KingPepe Native - Solana Bridge Task Status
 
-## Current Phase 08.5 audit (2026-09-10)
+## Phase 08.5 security remediation, partial increment (2026-09-11)
+
+Baseline 2b5c82971834d6299969c05a9889c950dae2ef91 was clean, PRIVATE and equal
+to origin/main. Added real Windows DPAPI protected storage and encrypted FROST/
+attester integration, strict identity/context/ACL checks, encrypted interrupted
+commit recovery and publication guard coverage. See development-status.md and
+security/windows-protected-storage.md for exact scope and measured limitations.
+
+Worktree tests: 505 Windows Node, 505 WSL Node, two vectors per platform,
+25 Windows DPAPI/security tests, 97 WSL Rust tests and quality gates, two SBF
+programs and 55 real local deposit/recovery/retry/accounting checks. Native to
+Solana COMPLETED; this is not secured multi-service Windows E2E certification.
+Dependency audits report no vulnerabilities, with the existing bincode
+unmaintained warning retained. No dependency changes or production material.
+
+Must finish publication scans/review, then normal PRIVATE commit/push and
+exact-SHA CI/clean-clone verification. Baseline CI rerun attempt 2 again started
+zero steps: GITHUB_ACTIONS_ACCOUNT_EXECUTION_BLOCKED, tests NOT_RUN.
+Remaining blockers: cross-identity Windows service tests need an elevated
+isolated environment; IPC/lifetime fencing/global stop/full service and
+broadcast-credit recovery/deployment watcher/post-mint reorg remain incomplete.
+The tests expressly do not prove full co-restored rollback detection.
+Full Phase 04/07/08 audit gates remain FAIL. Phase 09 NOT_STARTED;
+SAFE_TO_BEGIN_PHASE_09=false. Stop after the evidence report for Team direction.
+
+## Previous Phase 08.5 audit (2026-09-10)
 
 Audit fixes published PRIVATE at 845f2b22c87a94f79a3b499209260247a5d01acf:
 `fix(phase-08.5): initialize withdrawal records and harden audit boundaries`.

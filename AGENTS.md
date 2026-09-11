@@ -21,7 +21,20 @@
   files, every outgoing commit and publication artifacts. Verify privacy before
   normal push; respect branch protections and check CI for the exact SHA.
 
-## Current task: Phase 08.5 retrospective audit
+## Current task: Phase 08.5 security remediation
+
+The latest Team request starts from 2b5c82971834d6299969c05a9889c950dae2ef91
+and authorizes remediation of the remaining Phase 01-08 security findings, not
+Phase 09. See docs/security/windows-protected-storage.md for the new DPAPI
+component, its tests and limits. Distinct Windows service-identity execution is
+BLOCKED on the present non-elevated token. No production accounts, keys or
+services have been provisioned. Do not equate current-user DPAPI tests with
+cross-service isolation, full rollback assurance or secured service-wide E2E.
+No plaintext fallback is permitted. Keep the remaining IPC, persistent fencing,
+global-stop, service recovery, deployment watcher and post-mint reorg gaps open.
+Historical audit results below do not certify this remediation's source SHA.
+
+## Previous retrospective audit context
 
 Phase 09 is NOT_STARTED and MUST NOT start automatically. The Team requested
 audit/fixes of Phases 01-08, including the fresh withdrawal-record PDA prerequisite,
@@ -59,7 +72,9 @@ Rust FROST crate is a supporting policy/state model, not this cryptographic sign
 V2 nonces are volatile private buffers; public reservations/tombstones persist
 before exposure and uncertain sessions are burned on reopen. Local process crash
 tests are not full rollback, cloned-signer or power-loss assurance. Long-term DKG
-shares still use external plaintext test JSON. Protected storage, authenticated
+shares in the Linux test harness still use external plaintext test JSON; the
+new Windows protected adapter is separately tested and never a fallback.
+Cross-identity protected-service validation, authenticated
 confidential IPC, ongoing signer leases, durable global stops and service-wide
 fencing/recovery remain incomplete. A co-restored database and checkpoint cannot
 prove freshness. The approved same-host topology is not the cause of these gaps.
@@ -85,6 +100,8 @@ Use verified process-local tools; do not modify global defaults just for tests.
   Direct solana-program builds, not Anchor CLI or Anchor-generated IDLs.
 - Native test node/CLI 31.1.0 from the checksum/commit-pinned source, REGTEST only.
 - npm ci --ignore-scripts; npm test; npm audit --audit-level=low.
+- Windows only: npm run test:windows-security. These are real DPAPI tests under
+  the current test identity, not completed cross-service account/ACL validation.
 - python .github/scripts/guardrails.py; node scripts/source-audit.mjs.
 - node .github/scripts/dependency-license-audit.mjs (requires Cargo metadata).
 - In solana/: cargo check --locked --workspace --all-targets;

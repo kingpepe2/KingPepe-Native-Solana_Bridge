@@ -1,5 +1,27 @@
 # Phase 08.5 retrospective audit
 
+## Remediation checkpoint (2026-09-11)
+
+The protected-store increment starts at `2b5c82971834d6299969c05a9889c950dae2ef91`.
+See [new measured scope and limits](security/windows-protected-storage.md) and
+[current status](development-status.md). It adds real DPAPI-backed FROST/attester
+tests, not a complete protected service deployment. Current worktree counts and
+subsequent exact-SHA publication evidence must not be attributed to older SHAs.
+
+A85-08 through A85-11 remain MUST_FIX_BEFORE_PHASE09. In particular: actual
+cross-service Windows identity/ACL tests are BLOCKED on the current non-elevated
+token; lifetime fencing, confidential authenticated IPC, durable global stop,
+broadcast-credit/full service recovery, real deployment monitoring and post-mint
+reorg handling are still INCOMPLETE. A retained protected checkpoint is an
+improvement, not proof against restoration of the entire protected snapshot.
+The regression explicitly demonstrates that remaining limitation.
+
+SAFE_TO_BEGIN_PHASE_09=false. The requested full remediation and final all-pass
+01-08 audit have NOT been completed. Nothing below should be read as changing
+Phase 04, 07 or 08 to PASS. No production services, keys or funds were touched.
+
+## Earlier audit evidence (historical)
+
 Date: 2026-09-10. Scope: Phases 01-08 only. This is an internal engineering audit,
 not an independent external audit. Phase 09 NOT_STARTED.
 productionReady=false; mainnetActivation=DISABLED.

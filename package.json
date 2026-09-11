@@ -22,7 +22,8 @@
     "test:local-e2e-readiness": "node --test scripts/tests/*.test.mjs",
     "test:native-node": "node --test native/node/tests/*.test.mjs",
     "test:protocol": "node solana/ts/scripts/verify-vectors.mjs",
-    "test:solana-observer": "node --test services/solana-observer/tests/*.test.mjs"
+    "test:solana-observer": "node --test services/solana-observer/tests/*.test.mjs",
+    "test:windows-security": "node --test tests/windows/*.test.mjs"
   },
   "dependencies": {
     "@noble/curves": "2.3.0"

@@ -26,7 +26,7 @@ export function checkProvenance(paths, provenance) {
 
 export function publicationRisks(name, content) {
   const findings = [];
-  if (/(^|\/)(\.env(?:\..*)?|wallet\.dat|\.cookie|frost-signer-state\.json)$|(-keypair\.json|\.(?:db|sqlite3?|log|pem|p12|pfx|key|dump))$/iu.test(name)) findings.push("OPERATIONAL_FILE");
+  if (/(^|\/)(\.env(?:\..*)?|wallet\.dat|\.cookie|frost-signer-state\.json)$|(-keypair\.json|\.(?:db|sqlite3?|log|pem|p12|pfx|key|dump|protected))$/iu.test(name)) findings.push("OPERATIONAL_FILE");
   if (/-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----/u.test(content)) findings.push("PRIVATE_KEY_MATERIAL");
   if (/(?:[a-z]+:\/\/)[^\s/"']+:[^\s/@"']+@/iu.test(content)) findings.push("URL_CREDENTIALS");
   if (/[A-Z]:[\\/]+Users[\\/]+(?!\$\{|<)[a-z0-9_.-]+/iu.test(content)) findings.push("PRIVATE_USER_PATH");

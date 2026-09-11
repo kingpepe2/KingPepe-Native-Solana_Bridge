@@ -1,8 +1,18 @@
 {
   "schemaVersion": "1.0",
-  "generatedAt": "2026-09-10T00:00:00Z",
+  "generatedAt": "2026-09-11T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
   "purpose": "file-by-file provenance classification for local tracked content",
+  "phase085ProtectedStoreReview": {
+    "baseline": "2b5c82971834d6299969c05a9889c950dae2ef91",
+    "filesBefore": 186,
+    "filesAfter": 193,
+    "filesDeleted": 0,
+    "filesMoved": 0,
+    "sourceImports": "None. Original C#/PowerShell/Node glue calls existing Windows DPAPI and filesystem APIs; no Microsoft implementation or sample code imported. Noble signing algorithm and all dependency/toolchain pins unchanged.",
+    "scope": "User-scoped encrypted local state, protected directory checks, exact context/revision binding, encrypted FROST and separate attester adapters, Windows regressions, publication guard extension and maintenance documentation. No production material or legacy mutation.",
+    "terminology": "GetOwner/SetOwner and Windows ACL ownership are official filesystem API concepts, not KingPepe project governance roles. Synthetic SID constants are non-operational negative-test vectors; actual identities are never committed."
+  },
   "phase085AuditReview": {
     "baseline": "9ea5e198b57f48086a0c7861123a6d79d14e8560",
     "filesBefore": 180,
@@ -1175,6 +1185,41 @@
       "path": "tests/recovery/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
       "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+    },
+    {
+      "path": "shared/windows/ProtectedStore.cs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original DPAPI CurrentUser, exact ACL, protected revision/checkpoint and encrypted commit recovery implementation using OS APIs, not copied Microsoft code."
+    },
+    {
+      "path": "shared/windows/protected-store-driver.ps1",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original bounded redirected-pipe helper; no operational secret, identity or runtime state."
+    },
+    {
+      "path": "shared/windows/protected-store.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original strict immutable protected-context parser and Windows child-process storage adapter; no plaintext or non-Windows fallback."
+    },
+    {
+      "path": "native/frost/state/windows-protected-state-store.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original real FROST state-interface adapter with encrypted persistence and policy/revision binding. Noble cryptographic implementation remains external and unchanged."
+    },
+    {
+      "path": "scripts/tests/protected-store-contract.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original portable context/capability rejection tests with explicitly synthetic non-operational identity values."
+    },
+    {
+      "path": "tests/windows/protected-storage.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original real Windows DPAPI/ACL, encrypted FROST and attester tests with ephemeral material outside source; no cross-service validation or production claim."
+    },
+    {
+      "path": "docs/security/windows-protected-storage.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original non-operational description of the protected-store implementation, measured limits, API references and outstanding security requirements."
     }
   ]
 }

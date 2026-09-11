@@ -1,6 +1,63 @@
 # KingPepe Native - Solana Bridge Development Status
 
-## Current Phase 08.5 retrospective audit (2026-09-10)
+## Phase 08.5 protected-store remediation increment (2026-09-11)
+
+Starting source: `2b5c82971834d6299969c05a9889c950dae2ef91`, clean and equal to
+PRIVATE origin/main at inspection. This increment is partial remediation of the
+remaining Phases 01-08 findings, not completion of Phase 04 or permission for 09.
+See [the protected-storage boundary](security/windows-protected-storage.md).
+
+Implemented original user-scoped Windows DPAPI storage, exclusive private DACL
+creation, exact service/context/location binding, encrypted revision/checkpoint
+updates and prepared-commit recovery. Real FROST DKG/share persistence and separate
+attester loading use this adapter in Windows tests. No plaintext fallback, secrets
+in arguments, production provisioning or dependency/toolchain changes. Added a
+Windows CI test step without removing any existing gate. Publication checks now
+reject protected operational blob files as well as plaintext secret files.
+
+Pre-publication worktree validation: Windows Node 505 PASS; WSL Node 505 PASS;
+two canonical vectors per platform; Windows protected-store suite 25 PASS;
+97 Rust tests PASS with check/fmt/all-targets/all-features Clippy on WSL. Both SBF
+builds passed in a fresh isolated REGTEST/local-validator run. Native deposit
+reached COMPLETED, 55 real chain/recovery/retry/accounting checks passed. Native
+reserve and Solana supply were each 100000000 atomic; pending credit and surplus
+zero, project fee zero, no per-transfer Team approval. This Linux harness still
+uses external disposable test-file shares, not isolated Windows service accounts.
+The new Windows encrypted FROST test is real cryptography but not chain execution.
+
+Windows/WSL npm audit: zero vulnerabilities. Five Cargo lockfile audits and
+declared dependency-license checks passed; bincode RUSTSEC-2025-0141 remains an
+unsuppressed unmaintained warning. Provenance now covers 193 intended files:
+105 original code, 58 original documentation, one derived public-vector file,
+eight generated files and 21 build/config metadata. No files moved or deleted.
+No Microsoft code, binaries or sample implementation imported; OS API references
+and required existing third-party terms remain separate from proprietary source.
+
+The rerun of exact baseline Actions run 34522983188 (attempt 2) failed all four
+jobs before any steps. Tests NOT_RUN; GITHUB_ACTIONS_ACCOUNT_EXECUTION_BLOCKED.
+Exact message: "The job was not started because recent account payments have
+failed or your spending limit needs to be increased. Please check the 'Billing &
+plans' section in your settings". No account or CI protection bypass.
+
+Open technical/authorization blocker: the available Windows token is not elevated;
+distinct disposable service identities and cross-user DPAPI/ACL access have not
+been executed. Configured-SID substitution is not a second-user test. Completing
+this validation requires an appropriately privileged isolated Windows test
+environment, not production credentials. Co-restoring state and checkpoint is
+explicitly shown to evade a fresh instance; lifetime fencing, authenticated
+confidential service IPC and protected service enrollment remain incomplete.
+Durable global HARD_STOP, complete broadcast/credit and service restart recovery,
+live Solana deployment monitoring and post-mint deep-reorg response remain open.
+
+Phase 09 stays NOT_STARTED; SAFE_TO_BEGIN_PHASE_09=false. Current-user component
+passes cannot satisfy the full requested remediation/audit gate. After this real
+source fix passes publication scans, commit/push PRIVATE and verify its exact CI
+and separate clean clone. Bind that subsequent evidence to the actual published
+SHA, never to this worktree's baseline or a circular self-SHA. Stop for explicit
+Team direction and the required isolated Windows validation capability.
+productionReady=false; mainnetActivation=DISABLED.
+
+## Previous Phase 08.5 retrospective audit (2026-09-10)
 
 Published audit implementation: `845f2b22c87a94f79a3b499209260247a5d01acf`,
 `fix(phase-08.5): initialize withdrawal records and harden audit boundaries`.

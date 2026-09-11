@@ -291,6 +291,8 @@ jobs:
           node-version: "24.21.0"
       - name: Install locked Node dependencies
         run: npm ci --ignore-scripts
+      - name: Windows DPAPI and protected-state failure regressions (current test identity)
+        run: npm run test:windows-security
       - name: Check exact provenance coverage and publication boundary
         run: node scripts/source-audit.mjs
       - name: Audit Node dependencies
