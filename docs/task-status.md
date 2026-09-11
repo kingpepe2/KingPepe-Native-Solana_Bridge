@@ -2,6 +2,15 @@
 
 ## Phase 08.5 security remediation, partial increment (2026-09-11)
 
+The test-output correction is PRIVATE at f212983a67a43d7f988eb3ec878a322c2c16190d.
+Its clean clone passed Windows/WSL Node 505 each, Windows security 26, Rust 97/quality gates,
+both new SBF builds, 55 deposit checks and 26 withdrawal-record checks.
+Native to Solana COMPLETED. CI 34546962076 started no steps; 167-commit scan clean.
+A further file-policy correction requires fixed local drives and explicit private
+file descriptors, with 27 Windows security tests passing on its worktree.
+Publish and verify that correction before handoff. Service identity, IPC,
+fencing, global stop, complete recovery, monitor and reorg findings remain open.
+
 Implementation published PRIVATE at cba77159f5afbbea5aa1f95030e1b90c5fc990df.
 Its separate clean clone reproduced all results below, including 26 finalized
 withdrawal-record checks, with new project host/SBF builds and matching program

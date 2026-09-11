@@ -1,5 +1,10 @@
 # FROST state
 
+`windows-protected-state-store.mjs` is a separate, real DPAPI-backed adapter for
+Windows tests. It is never selected as a fallback to or from plaintext storage.
+See [its boundary and remaining service/rollback gaps](../../../docs/security/windows-protected-storage.md).
+The following paragraphs describe the isolated JSON test adapter specifically.
+
 `file-state-store.mjs` provides the V2 localnet JSON signer-state adapter. It rejects
 source-tree roots, linked paths and nonregular files. The constructor may prepare
 an empty external directory, but does not create state or generate a key.

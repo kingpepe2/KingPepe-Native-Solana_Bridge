@@ -7,7 +7,9 @@
       "https://learn.microsoft.com/en-us/windows/win32/api/dpapi/nf-dpapi-cryptprotectdata",
       "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.protecteddata",
       "https://learn.microsoft.com/en-us/dotnet/api/system.io.fileshare",
-      "https://learn.microsoft.com/en-us/windows/win32/services/service-security-and-access-rights"
+      "https://learn.microsoft.com/en-us/windows/win32/services/service-security-and-access-rights",
+      "https://learn.microsoft.com/en-us/dotnet/api/system.io.driveinfo.drivetype",
+      "https://learn.microsoft.com/en-us/dotnet/api/system.io.filestream.-ctor"
     ],
     "limits": "Current-identity tests do not prove cross-service isolation. Per-operation OS locks and protected checkpoints do not prove lifetime fencing or co-restored rollback detection. No production or external audit approval."
   },

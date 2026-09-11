@@ -2,6 +2,24 @@
 
 ## Phase 08.5 protected-store remediation increment (2026-09-11)
 
+The assertion-output correction was published PRIVATE at
+`f212983a67a43d7f988eb3ec878a322c2c16190d`,
+`test(phase-08.5): redact protected-state assertion failures`.
+Its separate clean clone passed Windows and WSL Node 505 each, Windows security 26, all
+97 Rust tests/quality gates, fresh SBF builds, 55 real deposit checks and 26
+finalized withdrawal-record checks. Native to Solana completed and reconciled.
+Exact CI run 34546962076 again started zero steps and produced zero artifacts.
+All 167 published commits and current source passed Gitleaks.
+
+A final protected-file policy correction requires Windows to report Fixed local
+volumes and supplies the identity-bound security descriptor when creating each
+file. Drive letters alone are not a locality check, and default token file
+security need not match the explicitly configured identity. New Windows tests
+verify explicit protected file DACLs and the actual local volume classification:
+27 PASS on the correction worktree. Remote-drive and distinct service-token
+integration remain unexecuted; no network shares, services or production roots
+were created. This correction requires its own post-publication verification.
+
 Published implementation: `cba77159f5afbbea5aa1f95030e1b90c5fc990df`,
 `feat(phase-08.5): add user-bound Windows protected state`. Normal PRIVATE push
 succeeded. A completely separate clean clone of that SHA passed locked Windows

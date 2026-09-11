@@ -51,6 +51,8 @@ namespace KingPepe.LocalProtection {
       Require(!path.StartsWith("\\") && path.IndexOf(':',2)<0 && path.IndexOfAny(new[]{'\r','\n','\0'})<0);
       string full=Path.GetFullPath(path).TrimEnd('\\');
       Require(full.Equals(path.TrimEnd('\\'),StringComparison.OrdinalIgnoreCase));
+      // A drive letter alone does not prove local storage (for example SMB mappings).
+      Require(new DriveInfo(Path.GetPathRoot(full)).DriveType==DriveType.Fixed);
       Require(!ContainsPath(source,full) && !ContainsPath(full,source));
       for(string p=full;p!=null;p=Path.GetDirectoryName(p)) {
         if(Directory.Exists(p)||File.Exists(p)) Require((File.GetAttributes(p)&FileAttributes.ReparsePoint)==0);
@@ -85,7 +87,12 @@ namespace KingPepe.LocalProtection {
     }
     static FileStream Open(string path, FileMode mode, SecurityIdentifier sid) {
       if(mode==FileMode.Open) CheckAcl(path,false,sid);
-      var stream=new FileStream(path,mode,FileAccess.ReadWrite,FileShare.None,4096,FileOptions.WriteThrough);
+      FileStream stream;
+      if(mode==FileMode.CreateNew) {
+        var acl=new FileSecurity();acl.SetOwner(sid);acl.SetAccessRuleProtection(true,false);
+        acl.AddAccessRule(new FileSystemAccessRule(sid,FileSystemRights.FullControl,AccessControlType.Allow));
+        stream=new FileStream(path,mode,FileSystemRights.FullControl,FileShare.None,4096,FileOptions.WriteThrough,acl);
+      } else stream=new FileStream(path,mode,FileAccess.ReadWrite,FileShare.None,4096,FileOptions.WriteThrough);
       try {
         FileInformation info; Require(GetFileInformationByHandle(stream.SafeFileHandle,out info));
         Require(info.Links==1 && (info.Attributes&(uint)FileAttributes.ReparsePoint)==0);

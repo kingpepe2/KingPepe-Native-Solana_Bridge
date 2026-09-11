@@ -45,6 +45,14 @@ logic. Verify its own SHA after publication; never infer CI success. The full
 remediation gate remains blocked; next requires isolated Windows service-test
 capability and further IPC/fencing/recovery/monitor/reorg implementation.
 
+Test-output correction published at f212983a67a43d7f988eb3ec878a322c2c16190d;
+its clean clone passed Windows/WSL Node 505 each, Windows security 26, Rust 97/quality, SBF, deposit 55
+and withdrawal-record 26. CI 34546962076 started no steps. The next file-policy
+correction adds OS fixed-volume checks and explicit per-file security descriptors;
+27 Windows security tests passed on that worktree. Validate the new SHA rather
+than attributing f212983 evidence to it. Cross-service testing still needs a
+privileged isolated Windows test environment, not production credentials.
+
 ## Previous retrospective audit context
 
 Phase 09 is NOT_STARTED and MUST NOT start automatically. The Team requested

@@ -62,6 +62,13 @@ test("protected storage never initializes missing state on read or write", t => 
   assert.throws(() => store.write(randomBytes(32), "1"), /WindowsProtectedStoreRejected/u);
   assert.equal(existsSync(options.root), false);
 });
+test("created protected files have explicit private DACLs on a fixed local volume", t => {
+  const { options } = fixture(t); WindowsProtectedStore.create(options, randomBytes(32));
+  const ps = path.join(process.env.SystemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+  const script = '$ErrorActionPreference="Stop";try{$r=[Console]::In.ReadToEnd()|ConvertFrom-Json;$sid=[Security.Principal.WindowsIdentity]::GetCurrent().User;foreach($p in $r.files){$a=[IO.File]::GetAccessControl($p);if(-not $a.AreAccessRulesProtected -or -not $a.GetOwner([Security.Principal.SecurityIdentifier]).Equals($sid)){throw "ACL"};if(([IO.DriveInfo]([IO.Path]::GetPathRoot($p))).DriveType -ne [IO.DriveType]::Fixed){throw "VOLUME"}};[Console]::Out.Write("VERIFIED");exit 0}catch{[Console]::Error.Write("TEST_FILE_POLICY_REJECTED");exit 1}';
+  const result = spawnSync(ps, ["-NoProfile", "-NonInteractive", "-Command", script], { input: JSON.stringify({ files: [stateFile(options), anchorFile(options), path.join(options.anchorRoot, "lock.protected")] }), windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
+  assert(result.status === 0 && result.stdout.toString("utf8") === "VERIFIED", "ProtectedFilePolicyNotVerified");
+});
 test("protected storage refuses reinitialization without overwriting", t => {
   const { options } = fixture(t); WindowsProtectedStore.create(options, randomBytes(32));
   const before = readFileSync(stateFile(options));

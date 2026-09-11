@@ -15,7 +15,8 @@
     "report": "docs/security/windows-protected-storage.md",
     "sourceBinding": "Clean-clone implementation results are bound to cba77159f5afbbea5aa1f95030e1b90c5fc990df in development-status. The follow-up test-log correction has separate worktree validation and requires its own publication evidence. Older localValidation/audit objects are historical.",
     "protectedStorage": "REAL_WINDOWS_CURRENT_USER_DPAPI_FROST_AND_ATTESTER_TESTED",
-    "currentIdentityWindowsTests": { "pass": 26, "fail": 0, "skip": 0, "scope": "FOLLOW_UP_WORKTREE_WITH_FIXED_ERROR_ASSERTIONS" },
+    "currentIdentityWindowsTests": { "pass": 27, "fail": 0, "skip": 0, "scope": "FILE_POLICY_CORRECTION_WORKTREE" },
+    "protectedFilePolicy": "EXPLICIT_IDENTITY_BOUND_DACL_AT_CREATE_FIXED_VOLUME_REQUIRED",
     "implementationFreshClone": {
       "sourceSha": "cba77159f5afbbea5aa1f95030e1b90c5fc990df",
       "windowsNodePass": 505,
@@ -116,7 +117,7 @@
     "frost": "NOBLE_CURVES_2_3_0_SCHNORR_FROST_NATIVE_ACCEPTED_2_OF_2",
     "frostUpstreamReview": "EXPLICITLY_UNAUDITED",
     "frostNonceSafety": "VOLATILE_NONCES_PUBLIC_TOMBSTONES_SIGKILL_REOPEN_TESTED_NOT_FULL_ROLLBACK_OR_LEASES",
-    "frostProtectedStorage": "INCOMPLETE_EXTERNAL_TEST_DKG_JSON",
+    "frostProtectedStorage": "WINDOWS_DPAPI_ADAPTER_TESTED_CROSS_SERVICE_VALIDATION_INCOMPLETE_LINUX_TEST_JSON_UNCHANGED",
     "attesters": "ED25519_DISTINCT_KEYS_FIXED_POLICY_NOT_PROTECTED_SERVICE",
     "solanaObservation": "LOCAL_RPC_PLUS_POLICY_MODELS_NO_COMPLETE_BYTECODE_WATCHER",
     "withdrawalRecord": "FRESH_PDA_CREATION_ATOMIC_BURN_RECORD_REAL_CHAIN_PASS",
