@@ -14,6 +14,17 @@ export const MAX_RAW_EVIDENCE_BYTES = 8_000_000;
 const MAX_HEADERS = 4096;
 const MAX_TRANSACTIONS = 16;
 const MAX_BLOCK_TXIDS = 65_536;
+const VERIFIED_CHAINS = new WeakSet(), VERIFIED_RESERVES = new WeakMap();
+const headerId = raw => createHash("sha256").update(createHash("sha256").update(hex(raw, 80)).digest()).digest().reverse().toString("hex");
+export function requireVerifiedRegtestChain(value) { if (!VERIFIED_CHAINS.has(value)) throw new Error("RAW_NATIVE_VERIFIED_CHAIN_REQUIRED"); }
+export function requireVerifiedRegtestReserve(value) { if (!VERIFIED_RESERVES.has(value)) throw new Error("RAW_NATIVE_VERIFIED_RESERVE_REQUIRED"); }
+export function verifiedReserveChain(value) { requireVerifiedRegtestReserve(value); return VERIFIED_RESERVES.get(value); }
+function verifiedChain(bundle, verified, observedAt) {
+  const result = Object.freeze({ ...verified, genesis: REGTEST_GENESIS, chainworkHex: bundle.chainworkHex, observedAt,
+    headerHashes: Object.freeze([REGTEST_GENESIS, ...bundle.headers.map(headerId)]),
+    canonicalChoiceTrust: "CONFIGURED_LOCAL_VALIDATING_NODE_RPC_OBSERVATION" });
+  VERIFIED_CHAINS.add(result); return result;
+}
 
 export function encodeRegtestEvidence(bundle) {
   if (bundle?.genesisHash !== REGTEST_GENESIS) throw new Error("RAW_NATIVE_WRONG_GENESIS");
@@ -127,6 +138,22 @@ export class LocalNativeEvidenceVerifier {
   #executable;
   constructor({ rpc, executable }) { this.#rpc = rpc; this.#executable = executable; }
 
+  // Verify the CURRENT branch even when a previously accepted transaction has
+  // disappeared from it. A current coinbase anchors a real Merkle proof; it is
+  // never a deposit or a reserve credit. The independent Rust verifier checks
+  // the complete bounded regtest header sequence and declared chainwork.
+  async observeChain() {
+    const observedAt = Date.now(), info = await this.#rpc.getBlockchainInfo();
+    if (info?.chain !== "regtest" || info.initialblockdownload !== false || info.headers !== info.blocks) throw new Error("RAW_NATIVE_SOURCE_NOT_READY");
+    const block = await this.#rpc.getBlock(hex(info.bestblockhash, 32).toString("hex"), 1);
+    const ids = boundedArray(block?.tx, MAX_BLOCK_TXIDS);
+    if (ids.length === 0) throw new Error("RAW_NATIVE_SOURCE_NOT_READY");
+    const bundle = await collectRegtestEvidence({ rpc: this.#rpc, transactionIds: [ids[0]], minimumConfirmations: 1 });
+    const verified = await verifyRegtestEvidencePacket({ executable: this.#executable, packet: encodeRegtestEvidence(bundle) });
+    if ((await this.#rpc.call("getbestblockhash", [])).result !== verified.tipHash) throw new Error("RAW_NATIVE_SOURCE_CHANGED");
+    return verifiedChain(bundle, verified, observedAt);
+  }
+
   async verifySweepSigning({ inputs, minimumConfirmations, unsignedTransactionHex, reserveAmountAtomic, feeAtomic, reserveScriptHex, intent, tapscriptSpends }) {
     const expected = structuredClone({ inputs, minimumConfirmations, unsignedTransactionHex, reserveAmountAtomic, feeAtomic, reserveScriptHex, intent, tapscriptSpends });
     const verified = await this.verifyInputs(expected);
@@ -184,6 +211,7 @@ export class LocalNativeEvidenceVerifier {
   }
 
   async verifyReserve({ deposit, feeInputs, sweepTxid, reserveVout, reserveScriptHex, feeAtomic, minimumConfirmations, tapscriptSpends }) {
+    const observedAt = Date.now();
     const expected = structuredClone({ deposit, feeInputs, sweepTxid, reserveVout, reserveScriptHex, feeAtomic, minimumConfirmations, tapscriptSpends });
     if (!Array.isArray(expected.feeInputs) || expected.feeInputs.length > MAX_TRANSACTIONS - 2) throw new Error("RAW_NATIVE_COUNT_INVALID");
     const inputs = [expected.deposit, ...expected.feeInputs];
@@ -214,7 +242,14 @@ export class LocalNativeEvidenceVerifier {
     if (!utxo.unspent || utxo.coinbase || utxo.bestBlockHash !== verified.tipHash
       || utxo.valueAtomic !== output.amountAtomic || utxo.scriptPubKeyHex !== output.scriptPubKeyHex
       || utxo.confirmations < expected.minimumConfirmations) throw new Error("RAW_NATIVE_RESERVE_NOT_AVAILABLE");
-    return Object.freeze({ ...verified, witnessSignatures, utxoTrust: "CONFIGURED_LOCAL_VALIDATING_NODE_RPC_OBSERVATION" });
+    const basis = txid => { const proof = bundle.proofs.find(p => parseNativeTransactionHex(p.rawTransactionHex).txidHex === txid);
+      return Object.freeze({ txid, height: proof.blockHeight, blockHash: headerId(bundle.headers[proof.blockHeight - 1]) }); };
+    const result = Object.freeze({ ...verified, witnessSignatures, utxoTrust: "CONFIGURED_LOCAL_VALIDATING_NODE_RPC_OBSERVATION",
+      reserveBasis: Object.freeze({ genesis: REGTEST_GENESIS, chainworkHex: bundle.chainworkHex,
+        deposit: Object.freeze({ ...basis(expected.deposit.txid), vout: expected.deposit.vout }),
+        sweep: Object.freeze({ ...basis(sweep.txidHex), vout: expected.reserveVout }),
+        amountAtomic: output.amountAtomic, reserveScriptHex: output.scriptPubKeyHex }) });
+    VERIFIED_RESERVES.set(result, verifiedChain(bundle, verified, observedAt)); return result;
   }
 }
 

@@ -1,5 +1,18 @@
 # KingPepe Native - Solana Bridge Task Status
 
+## Current continuation: Native accepted-basis incident response
+
+Published PRIVATE: 920347acd70dc0dd48344780fe9d6c7928de6e37. Exact CI 34564887534
+is NOT_RUN_ACCOUNT_BLOCKED with zero steps/artifacts. Native reorg source and
+protected-wrapper work is uncommitted. Windows Node 537, eight real regtest reorg
+checks after a completed Solana mint and two protected incident tests pass.
+Final worktree validation passed Windows/WSL Node 537, Windows security 74,
+vectors 2 each, Rust 97/quality, fresh normal SBF builds, deposit 55, record 26,
+deployment 18 and reorg 8. See development-status and security/native-reorg-monitor.md
+for limits. Publish the reviewed component, then finish stronger independently
+retained rollback evidence, source-health admission and durable complete operation
+recovery. Do not start Phase 09 or claim final audit completion.
+
 ## Current continuation: live deployment identity
 
 Global integrity component is PRIVATE at fd6aca9ebbe508e26818b0f33c67fad37bfb193f;

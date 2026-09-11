@@ -2,6 +2,13 @@
   "schemaVersion": "1.0",
   "generatedAt": "2026-09-11T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
+  "phase085NativeReorgReview": {
+    "baseline": "920347acd70dc0dd48344780fe9d6c7928de6e37",
+    "filesBefore": 210,
+    "filesAfter": 215,
+    "sourceImports": "None. Original bounded current-branch observation, accepted-basis comparison, protected wrapper and isolated reorg tests. Existing independent Rust proof verifier and authoritative Native node are reused unchanged.",
+    "scope": "Component under validation; not complete service-wide recovery, independent rollback witness or protected Windows chain certification."
+  },
   "phase085DeploymentMonitorReview": {
     "baseline": "fd6aca9ebbe508e26818b0f33c67fad37bfb193f",
     "filesBefore": 205,
@@ -310,6 +317,31 @@
     ]
   },
   "trackedFiles": [
+    {
+      "path": "tests/integration/native-progress-fixture.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original shared synthetic Native progress/incident fixture for parser and protected persistence tests; not genuine blockchain evidence."
+    },
+    {
+      "path": "native/node/native-integrity.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original exact accepted-basis comparison and protected observer wrapper. No upstream consensus code or cryptographic implementation copied."
+    },
+    {
+      "path": "native/node/tests/native-integrity.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original explicitly synthetic policy comparisons and capability rejection tests; not blockchain or protected-service evidence."
+    },
+    {
+      "path": "solana/tests/local-native-reorg.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated real regtest competing-branch test after real Solana mint, with separate-process incident policy replay and no automatic economic repair."
+    },
+    {
+      "path": "docs/security/native-reorg-monitor.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original non-operational description and explicit evidence/integration limits, with no private deployment values."
+    },
     {
       "path": "services/solana-observer/deployment-integrity.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",

@@ -78,7 +78,7 @@
     "phase08HeaderTimeSources": ["src/chain.h: MAX_FUTURE_BLOCK_TIME and GetMedianTimePast", "src/validation.cpp: ContextualCheckBlockHeader"],
     "phase08RecoverySources": ["src/kernel/chainparams.cpp: REGTEST CSVHeight=1 and Taproot ALWAYS_ACTIVE", "src/script/interpreter.cpp: CHECKSEQUENCEVERIFY", "src/bitcoin-cli.cpp: ParseResult suppresses null output", "src/wallet/rpc/addresses.cpp: getaddressinfo single-key public-key and ismine fields"],
     "phase08PsbtSources": ["src/wallet/scriptpubkeyman.cpp: FillPSBT locates keys using public taproot origins", "src/script/sign.cpp: SignTaprootScript parses Miniscript and uses SHA256 preimages", "src/script/miniscript.h: OLDER, SHA256 and VERIFY fragment compilation"],
-    "phase08ForcedForkSources": ["src/rpc/mining.cpp: generateblock selects explicit transactions, uses an empty mempool template and calls TestBlockValidity", "src/rpc/blockchain.cpp: invalidateblock test/debug chain invalidation; invoked only against fresh isolated REGTEST state"],
+    "phase08ForcedForkSources": ["src/rpc/mining.cpp: generateblock selects explicit transactions, uses an empty mempool template and calls TestBlockValidity", "src/rpc/blockchain.cpp: invalidateblock and reconsiderblock test/debug invalidation/activation; invoked only against fresh isolated REGTEST state. ReconsiderBlock clears failure flags and invokes ActivateBestChain; no production RPC allowance added."],
     "phase08RpcErrorSource": "src/httprpc.cpp: JSONErrorReply returns HTTP 400/404/500 with the request ID and numeric JSON-RPC error; provider message text is not needed or exposed by the bridge",
     "status": "reference-facts-only-no-git-history-import"
   },

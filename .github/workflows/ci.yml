@@ -182,6 +182,25 @@ jobs:
             }
           '
 
+      - name: Real post-mint Native reorganization and incident replay (regtest only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="${KINGPEPE_CI_TOOL_ROOT}/solana-release/bin:${KINGPEPE_CI_TOOL_ROOT}/native-build/bin:${PATH}"
+          export KINGPEPE_LOCAL_E2E_ROOT="${KINGPEPE_CI_TOOL_ROOT}/native-reorg-run"
+          export KINGPEPE_LOCAL_BUILD_ROOT="${KINGPEPE_CI_TOOL_ROOT}/build"
+          node solana/tests/local-native-reorg.mjs > "${KINGPEPE_CI_TOOL_ROOT}/native-reorg-result.json"
+          node --input-type=module -e '
+            import {readFileSync} from "node:fs";
+            const r = JSON.parse(readFileSync(process.env.KINGPEPE_CI_TOOL_ROOT + "/native-reorg-result.json", "utf8"));
+            console.log(JSON.stringify({sourceSha: process.env.GITHUB_SHA, ...r}));
+            if (r.nativeReorg?.pass !== 8 || r.nativeReorg?.fail !== 0 || r.phase09 !== "NOT_STARTED" || r.fullNativeToSolanaE2e !== "COMPLETED") process.exit(1);
+            for (const check of ["REAL_POST_MINT_HIGHER_WORK_FORK_IDENTIFIES_EXACT_BACKING_INCIDENT",
+              "NO_REMINT_CONFISCATION_OR_AUTOMATIC_SUPPLY_REPAIR", "REAL_CHAIN_RECOVERY_CANNOT_AUTOMATICALLY_CLEAR_INCIDENT"]) {
+              if (!r.nativeReorg.passed.includes(check)) process.exit(1);
+            }
+          '
+
   foundation-guardrails:
     name: Foundation Guardrails
     runs-on: ubuntu-latest

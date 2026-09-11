@@ -23,95 +23,54 @@
 
 ## Current task: Phase 08.5 security remediation
 
-Current published global-stop component: fd6aca9ebbe508e26818b0f33c67fad37bfb193f.
-PRIVATE push succeeded; exact Actions 34561370027 again ran zero steps due to
-the account restriction. Windows Node 508/security 70 passed for that increment.
-The current live-deployment-monitor work has Windows/WSL Node 529, Windows
-security 72, two vectors per platform and 18 real deployment checks passing.
-The upgrade probe uses pinned SBPF v3 builds and requires a later finalized bank
-after extending ProgramData. Actual authority/bytecode changes were detected and
-its fresh Native-to-Solana deposit reached COMPLETED. Normal build architecture
-is unchanged; no validator feature was disabled. Full protected bridge recovery,
-progress witness, reorg and clean-clone audit remain open. The notes below
-describe previous increments only.
+Phase 09 is NOT_STARTED. The current published source is
+920347acd70dc0dd48344780fe9d6c7928de6e37, PRIVATE. Exact Actions
+34564887534 started zero steps in four jobs and produced zero artifacts:
+NOT_RUN_ACCOUNT_BLOCKED. No account, billing, privacy or protection bypass.
 
-Current published fencing increment: e60902646bde39855a1686a9295ab20ff59ef09b.
-Its CI run 34557854092 started zero steps (account blocked). Current uncommitted
-global integrity authority/remote guards passed Windows Node 508/security 70 and
-two vectors with zero failures/skips. Nested TLS timing and fresh-evidence
-corrections are included. WSL Node 508/new SBF/deposit 55 also pass.
-See docs/security/global-integrity.md and the current development-status.
+The new Native accepted-basis/reorg increment is under validation, not yet
+published. Windows/WSL Node 537, Windows security 74 and eight real regtest reorg
+checks pass. Two of the security tests use synthetic persisted incident
+evidence with actual DPAPI/mTLS; they are not protected real-chain integration.
+Fresh Rust 97, check/fmt/Clippy, normal SBF builds, 55 deposit checks,
+26 record checks and 18 deployment checks pass. This is worktree evidence,
+not a final clean-clone certification. Current evidence is in
+docs/development-status.md and docs/task-status.md; older passing evidence must
+not certify a later SHA.
 
-Previously published IPC increment: 9ad57981aac1aec209737cc4a420b4ee7e19ce4c,
-from audited baseline 84ef95fba316944dd9c205e0f965d3b9ff725e64. Exact CI
-34555746195 started zero steps: NOT_RUN_ACCOUNT_BLOCKED. Fencing worktree adds
-a separate retained DPAPI fence, lifetime OS handle, persistent instance epoch,
-revision CAS and nonce high-water checks. Windows Node 508, Windows security 58,
-two vectors and Rust quality/tests pass. See docs/security/signer-fencing.md
-and current development-status for evidence and remaining limits.
+Implemented local components: protected CurrentUser DPAPI/file boundaries;
+mutual TLS role-bound IPC; separate retained signer fence and lifetime handle;
+global integrity authority and protected signer/coordinator/attester guards;
+actual Solana deployment identity verification; and current Native accepted-basis
+comparison with post-mint reorg incident retention. See docs/security/ for the
+precise evidence and limitations, not a claim of complete service integration.
 
-Remaining control groups still need implementation/integration and fresh
-validation: complete service and broadcast-credit recovery, global stop coverage,
-live Solana deployment monitoring, post-mint deep reorg and persistent chain
-freshness. Do not stop merely because elevated Windows cross-service testing or
-Actions is unavailable. Do not equate current-user DPAPI or local component tests
-with distinct-service certification. Full-host co-restore remains a limitation.
-No production provisioning or plaintext fallback is authorized. Phase 09 is
-NOT_STARTED and must not begin automatically. Historical notes below do not
-certify newer commits.
+Remaining MUST_FIX_BEFORE_PHASE09 work: full service/broadcast-credit recovery,
+fresh source-health admission for every economic service, stronger separately
+retained rollback evidence and protected Windows chain integration. Final
+clean-clone validation and retrospective audit remain incomplete. Do not stop
+source work merely because elevated cross-service testing or Actions is blocked.
+Cross-service DPAPI/ACL certification requires an isolated elevated Windows
+environment with distinct temporary identities; same-principal tests are not
+that evidence. Full privileged host/profile/state co-restore remains a risk.
 
-## Previous retrospective audit context
+Preserve @noble/curves 2.3.0 schnorr_FROST secp256k1/BIP340 and applicable
+BIP342 sighashes, exact A+B. Upstream FROST is explicitly UNAUDITED. Ed25519 is
+separate attestation/Solana transaction signing, not Native payment signing.
+Volatile private nonces are burned on uncertain restart; retained public
+tombstones and exact prepared-state recovery do not prove full-host rollback
+detection. Linux test-only external JSON is not production protected storage
+and must never become a fallback.
 
-Phase 09 is NOT_STARTED and MUST NOT start automatically. The Team requested
-audit/fixes of Phases 01-08, including the fresh withdrawal-record PDA prerequisite,
-but not a Native withdrawal payout or the full Phase 09 E2E.
+Native raw verification still relies on the configured validating node for
+canonical choice and UTXO state. Solana local observation is RPC_OBSERVATION,
+not independent consensus. Off-chain stops cannot revoke already released
+attestations or already sent blockchain transactions. No automatic economic
+repair, confiscation, remint, stop clearing, production setup or activation.
 
-Audit baseline: 9ea5e198b57f48086a0c7861123a6d79d14e8560.
-Prior implementation: 0133a6cc7f22bf880249a72a62502aa4bf3a638b.
-Published audit fixes: 845f2b22c87a94f79a3b499209260247a5d01acf; separate-clone
-Windows/WSL Node, Rust, SBF and real-chain reruns passed for that SHA. Its exact
-Actions run 34519943346 was rejected before steps. Follow-up changes need new
-SHA-bound validation; the remaining security findings still prevent Phase 09.
-Current evidence and outstanding findings: docs/phase-08-5-audit.md,
-docs/development-status.md, docs/task-status.md and BRIDGE-READINESS.json.
-Historical passing runs do not certify a later SHA.
-
-The latest instructions authorize local audit fixes and private pushes while
-Actions is account-blocked. This supersedes old status entries that paused all
-fixes pending CI. It does not authorize Phase 09 or weaker security gates.
-Current external blocker: GITHUB_ACTIONS_ACCOUNT_EXECUTION_BLOCKED. No account,
-billing, privacy or protection changes are authorized. A rejected job with no
-steps is NOT_RUN, never a test PASS.
-
-The audit repairs fresh withdrawal-record allocation, Native-domain/P2TR checks,
-gross withdrawal/fee liabilities, canonical observer PDA derivation, bounded RPC,
-immutable attester policy/key references and provenance coverage checks. The
-new real-validator regression is a Phase 08.5 prerequisite, not Phase 09:
-it deliberately leaves unpaid disposable withdrawals and never builds a payout.
-
-Native signing uses @noble/curves 2.3.0 schnorr_FROST, secp256k1/BIP340 with
-BIP342 script-path sighashes where applicable. Its FROST implementation is
-explicitly UNAUDITED upstream. Ed25519 is used for separate attestations and
-Solana wallet transactions, never the final Native sweep signature. The Native
-Rust FROST crate is a supporting policy/state model, not this cryptographic signer.
-
-V2 nonces are volatile private buffers; public reservations/tombstones persist
-before exposure and uncertain sessions are burned on reopen. Local process crash
-tests are not full rollback, cloned-signer or power-loss assurance. Long-term DKG
-shares in the Linux test harness still use external plaintext test JSON; the
-new Windows protected adapter is separately tested and never a fallback.
-Cross-identity protected-service validation, authenticated
-confidential IPC, ongoing signer leases, durable global stops and service-wide
-fencing/recovery remain incomplete. A co-restored database and checkpoint cannot
-prove freshness. The approved same-host topology is not the cause of these gaps.
-
-Raw local Native headers/PoW/difficulty/Merkle data are verified; canonical choice
-and UTXO state still come from the configured validating node. Solana deposit
-observation is RPC_OBSERVATION. Identity-policy fixtures are not a running
-ProgramData/upgrade watcher, full Solana validation or production approval.
-Post-mint deep-reorg response and complete service crash recovery remain open.
-Finish the audit report with an honest gate verdict, then wait for explicit
-KingPepe Team direction. Do not reinterpret a local E2E pass as all audits passing.
+Finish the audit with an honest entry-gate verdict and then wait for explicit
+KingPepe Team direction. Historical details remain in the status files and
+docs/phase-08-5-audit.md; no old CI/local pass is relabeled as new evidence.
 
 ## Actual build and test commands
 

@@ -1,5 +1,42 @@
 # KingPepe Native - Solana Bridge Development Status
 
+## Phase 08.5 Native reorganization increment validated for publication
+
+Deployment monitor published PRIVATE at 920347acd70dc0dd48344780fe9d6c7928de6e37.
+Exact Actions [34564887534](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34564887534)
+ran zero steps in four jobs with the unchanged account billing/spending message;
+zero artifacts, NOT_RUN_ACCOUNT_BLOCKED. Outgoing commit scan passed.
+
+New work retains verified deposit/sweep block identities and detects conflicts
+on a freshly Rust-verified higher-work regtest branch. Eight comparison/capability
+tests pass (Native Node subset 43 total; Windows full Node 537). The real reorg
+suite passed all eight checks after extending only the isolated REGTEST CLI test
+helper to permit reconsiderblock. The ordinary RPC adapter still rejects forced
+fork controls. Native-to-Solana completed, a real higher-work fork invalidated
+the accepted sweep after mint, exact affected backing was identified, supply
+was unchanged, and incident replay remained stopped after actual process and
+chain recovery. Two Windows DPAPI/mTLS Native incident tests pass using synthetic
+persisted evidence; they are not cross-account or protected real-chain proof.
+The final worktree reruns passed Windows/WSL Node 537, Windows security 74,
+two vectors per platform, all 97 Rust tests and locked check/fmt/all-features
+Clippy from fresh project targets. New normal SBF builds reproduce the prior
+hashes. Real chains passed 55 deposit/recovery/retry checks, 26 withdrawal-record
+prerequisite checks and 18 deployment identity/mutation checks. Each fresh deposit
+reached COMPLETED; no Native withdrawal payout was implemented. A stale timestamp
+review fix now waits without moving retained observation time backwards.
+
+Declared dependency-license metadata and exact provenance coverage (215 files)
+pass. npm reports zero vulnerabilities; all five Rust lockfile audits retain the
+visible bincode RUSTSEC-2025-0141 unmaintained warning. Current source and all
+172 prior commits passed Gitleaks. Staged/outgoing publication checks follow
+without uploading runtime data or test artifacts. No CI pass is inferred.
+
+Full service/broadcast-credit recovery, independent retained progress witness,
+source-health admission, protected Windows real-chain integration and final
+fresh-clone audit remain open. These worktree results do not certify a completed
+01-08 retrospective audit. Phase 09 NOT_STARTED; productionReady=false; Mainnet
+disabled. Existing dated entries below describe their own older increments.
+
 ## Phase 08.5 deployment monitor work in progress (2026-09-11)
 
 Global-stop component published PRIVATE at

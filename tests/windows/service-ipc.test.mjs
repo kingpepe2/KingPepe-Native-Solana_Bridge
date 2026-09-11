@@ -25,6 +25,9 @@ import { attesterIpcHandler } from "../../services/attesters/protected-service.m
 import { decodeCanonicalBridgeMessage, encodeCanonicalBridgeMessage } from "../../shared/protocol/canonical-message.mjs";
 import { deploymentFixture } from "../integration/deployment-fixture.mjs";
 import { LocalDeploymentRpc, ProtectedSolanaDeploymentMonitor } from "../../services/solana-observer/deployment-integrity.mjs";
+import { LocalNativeEvidenceVerifier } from "../../native/node/native-raw-evidence.mjs";
+import { ProtectedNativeIntegrityMonitor, compareNativeProgress } from "../../native/node/native-integrity.mjs";
+import { nativeProgressFixture } from "../integration/native-progress-fixture.mjs";
 
 if (process.platform !== "win32") throw new Error("WINDOWS_IPC_TESTS_REQUIRE_WINDOWS");
 const repoRoot = path.resolve(import.meta.dirname, "../.."), serviceSid = windowsCurrentServiceSid();
@@ -369,4 +372,35 @@ test("protected deployment progress rejects a restored manifest identity and rep
   await assert.rejects(ProtectedSolanaDeploymentMonitor.open({ manifest: obsolete, rpc: new LocalDeploymentRpc({ endpoint: "http://127.0.0.1:54321" }), integrity: peer.guard, store }));
   assert.equal(f.authority.status().state, "HARD_STOP_INTEGRITY");
   await f.restart(); assert.equal((await peer.guard.status(h("after-restore"))).state, "HARD_STOP_INTEGRITY");
+});
+
+test("protected Native observer rejects unavailable validation and reports corrupt progress", async t => {
+  // Current-user DPAPI/mTLS test, NOT cross-account or real Native execution.
+  const f = await integrityFixture(t), peer = await f.peer("NATIVE_OBSERVER"), signer = await f.peer("KINGPEPE_FROST_A");
+  const { expectedPolicy, stored } = nativeProgressFixture(), opts = options(peer.root, "native-progress", "NATIVE_OBSERVER", "chain-progress");
+  const bytes = Buffer.from(JSON.stringify(stored)), store = WindowsProtectedStore.create(opts, bytes); bytes.fill(0);
+  const verifier = new LocalNativeEvidenceVerifier({ rpc: { async getBlockchainInfo() { throw new Error("TEST_SOURCE_UNAVAILABLE"); } }, executable: path.join(peer.root, "unavailable-native-verifier") });
+  const monitor = await ProtectedNativeIntegrityMonitor.open({ expectedPolicy, verifier, integrity: peer.guard, store });
+  cleanups.get(peer.root).push(() => monitor.close());
+  assert.equal((await monitor.poll()).state, "WAITING_FOR_DEPENDENCY"); assert.equal(f.authority.status().state, "RUNNING");
+  const value = store.read(); value.payload.fill(0); store.write(Buffer.from("invalid-test-progress"), value.revision);
+  assert.equal((await monitor.poll()).state, "HARD_STOP_INTEGRITY");
+  await f.restart(); await assert.rejects(signer.guard.assertRunning(h("after-native-corruption"), "FROST_SIGN"));
+});
+
+test("protected Native incident persists and re-reports after actual authority and observer reopen", async t => {
+  // The incident was constructed from policy fixtures. The protected replay is
+  // real, but real regtest-fork evidence is tested separately on Linux/WSL.
+  const f = await integrityFixture(t), peer = await f.peer("NATIVE_OBSERVER"), fixture = nativeProgressFixture();
+  fixture.chain.headerHashes[3] = h("reorg-fixture"); fixture.chain.chainworkHex = "00".repeat(31) + "20";
+  const incident = compareNativeProgress(fixture.stored, fixture.chain, fixture.expectedPolicy, fixture.now).progress;
+  const opts = options(peer.root, "native-progress", "NATIVE_OBSERVER", "chain-progress"), bytes = Buffer.from(JSON.stringify(incident));
+  const store = WindowsProtectedStore.create(opts, bytes); bytes.fill(0);
+  const verifier = new LocalNativeEvidenceVerifier({ rpc: {}, executable: path.join(peer.root, "unavailable-native-verifier") });
+  let monitor = await ProtectedNativeIntegrityMonitor.open({ expectedPolicy: fixture.expectedPolicy, verifier, integrity: peer.guard, store });
+  cleanups.get(peer.root).push(() => monitor.close());
+  const result = await monitor.poll(); assert.equal(result.state, "HARD_STOP_INTEGRITY"); assert.equal(result.affectedReserveAtomic, "9007199254740993");
+  await monitor.close(); await f.restart();
+  monitor = await ProtectedNativeIntegrityMonitor.open({ expectedPolicy: fixture.expectedPolicy, verifier, integrity: peer.guard, store: new WindowsProtectedStore(opts) });
+  assert.equal((await monitor.poll()).state, "HARD_STOP_INTEGRITY"); assert.equal(f.authority.status().incidentCount, 1);
 });
