@@ -68,6 +68,7 @@ export class ProjectAttester {
     try {
       if (result.payload.length !== this.#secretKey.length || !timingSafeEqual(result.payload, this.#secretKey)) throw new Error("ProtectedAttesterStateChanged");
     } finally { result.payload.fill(0); }
+    return this.#protectedStore.context;
   }
 
   evaluateDepositCredit(request, nowUnix = undefined) {

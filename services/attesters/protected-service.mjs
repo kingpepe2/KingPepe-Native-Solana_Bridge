@@ -2,6 +2,7 @@
 import { ProjectAttester } from "./attestation-service.mjs";
 import { decodeCanonicalBridgeMessage } from "../../shared/protocol/canonical-message.mjs";
 import { requireIntegrityGuard } from "../supervisor/protected-integrity.mjs";
+import { requireAttesterAuthorizationJournal } from "./authorization-journal.mjs";
 
 // The verifier is configured INSIDE the attester service. Evidence/booleans
 // asserted by the bridge validator are never used as the verifier's result.
@@ -20,19 +21,20 @@ export function attesterEvidenceVerifier({ attester, verifyNativeDeposit }) {
   };
 }
 
-export function attesterIpcHandler({ attester, verifyNativeDeposit, integrity }) {
+export function attesterIpcHandler({ attester, verifyNativeDeposit, integrity, journal }) {
   requireIntegrityGuard(integrity, attester?.role);
   if (!(attester instanceof ProjectAttester)) throw new Error("AttesterServiceVerifierRequired");
   attester.assertProtectedStorage();
+  requireAttesterAuthorizationJournal(journal, attester, integrity);
   integrity.assertDeployment({ environment: "localnet", nativeGenesis: attester.policy.nativeGenesisHex,
     solanaDeployment: attester.policy.solanaDeploymentHex, keyEpoch: attester.policy.keyEpoch });
   const verify = attesterEvidenceVerifier({ attester, verifyNativeDeposit });
   return async input => {
+    input = structuredClone(input);
     await integrity.assertRunning(input.operationId, "ATTEST_MINT_CREDIT");
     const request = await verify(input);
-    await integrity.assertRunning(input.operationId, "ATTEST_MINT_CREDIT");
-    attester.assertProtectedStorage();
-    const signature = attester.signDepositCredit(request);
-    await integrity.assertRunning(input.operationId, "ATTEST_MINT_CREDIT"); return signature;
+    // The journal checks the authority again before preparation, signing and
+    // release. It persists the result before that final check/acknowledgement.
+    return journal.authorize(request);
   };
 }

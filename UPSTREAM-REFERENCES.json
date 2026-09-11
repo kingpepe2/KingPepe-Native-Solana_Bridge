@@ -1,5 +1,10 @@
 {
   "generatedAt": "2026-09-11T00:00:00Z",
+  "phase085AttesterRecovery": {
+    "use": "Reference-only Ed25519 deterministic signing semantics and existing Windows CurrentUser DPAPI boundary. No RFC sample implementation or Microsoft source imported; pinned Noble signing remains unchanged.",
+    "urls": ["https://www.rfc-editor.org/rfc/rfc8032#section-5.1.6", "https://learn.microsoft.com/en-us/windows/win32/api/dpapi/nf-dpapi-cryptprotectdata"],
+    "limits": "Retaining a project attestation is not Native FROST signing, independent consensus proof or an external audit."
+  },
   "phase085DeploymentMonitor": {
     "use": "Reference-only RPC bank-context/genesis definitions and loader metadata layout; no upstream code imported. Existing original Rust account codecs define bridge configuration. Actual pinned Agave 4.2.2 validator tests check upgradeable Program/ProgramData relationships.",
     "urls": ["https://solana.com/docs/rpc/http/getgenesishash", "https://solana.com/docs/rpc/http/getmultipleaccounts", "https://raw.githubusercontent.com/anza-xyz/agave/v4.2.2/programs/bpf_loader/src/lib.rs"],
