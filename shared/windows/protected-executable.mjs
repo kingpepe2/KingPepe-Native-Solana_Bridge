@@ -10,6 +10,7 @@ import { validateRuntimeStateRoot, validateRuntimeFile } from "../runtime-path-b
 const sourceRoot = path.resolve(import.meta.dirname, "../..");
 const sources = ["ProtectedStore.cs", "ProtectedStoreExecutable.cs", "protected-helper-build.ps1"];
 let retained, failed = false;
+const BUILD_STAGES = new Set(["INPUT", "SOURCE_COMPILE", "PRIVATE_DIRECTORY", "FRAMEWORK_COMPILER", "EXECUTABLE_COMPILE", "EXECUTABLE_POLICY", "RESULT"]);
 const check = value => { if (!value) throw new Error("WindowsProtectedExecutableRejected"); };
 const hash = bytes => createHash("sha256").update(bytes).digest("hex");
 const sourceDigest = () => hash(JSON.stringify(sources.map(name => [name, hash(readFileSync(path.join(import.meta.dirname, name)))])));
@@ -22,6 +23,7 @@ function verify(value) {
 }
 export function windowsProtectedExecutable() {
   check(process.platform === "win32" && !failed);
+  let rejectedBuildStage;
   try {
     if (!retained) {
       const windowsRoot = process.env.SystemRoot;
@@ -35,6 +37,8 @@ export function windowsProtectedExecutable() {
         result = spawnSync(path.join(windowsRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
           ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", path.join(import.meta.dirname, "protected-helper-build.ps1")],
           { input, encoding: "buffer", timeout: 30000, maxBuffer: 4096, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
+        const stage = result.stderr?.toString("utf8").replace(/^WINDOWS_PROTECTED_HELPER_BUILD_REJECTED:/u, "");
+        if (BUILD_STAGES.has(stage)) rejectedBuildStage = stage;
         check(!result.error && result.status === 0 && result.stderr.length === 0);
         const built = JSON.parse(result.stdout.toString("utf8"));
         check(Object.keys(built).sort().join() === "compilerVersion,protocol,sha256" && built.protocol === "KINGPEPE_PROTECTED_EXECUTABLE_BUILD_V1" &&
@@ -55,5 +59,10 @@ export function windowsProtectedExecutable() {
       } finally { input.fill(0); result?.stdout?.fill(0); result?.stderr?.fill(0); }
     }
     verify(retained); return retained;
-  } catch { failed = true; throw new Error("WindowsProtectedExecutableRejected"); }
+  } catch {
+    failed = true;
+    const error = new Error("WindowsProtectedExecutableRejected");
+    if (rejectedBuildStage) error.code = "PROTECTED_HELPER_BUILD_" + rejectedBuildStage;
+    throw error;
+  }
 }
