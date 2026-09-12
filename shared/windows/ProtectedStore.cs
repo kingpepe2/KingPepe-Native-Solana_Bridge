@@ -32,7 +32,10 @@ namespace KingPepe.LocalProtection {
     [DllImport("kernel32.dll", SetLastError=true)]
     static extern bool GetFileInformationByHandle(SafeFileHandle handle, out FileInformation info);
 
-    static void Require(bool value) { if (!value) throw new InvalidOperationException("PROTECTED_STORE_REJECTED"); }
+    static void Require(bool value, string reason="POLICY") {
+      if (!value) { var error=new InvalidOperationException("PROTECTED_STORE_REJECTED");
+        error.Data["ProtectedBuildReason"]=reason; throw error; }
+    }
     static string Text(IDictionary<string, object> r, string key) {
       object value; Require(r.TryGetValue(key, out value) && value is string); return (string)value;
     }
@@ -50,12 +53,12 @@ namespace KingPepe.LocalProtection {
       Require(path.Length > 3 && path.Length < 240 && path[1]==':' && path[2]=='\\');
       Require(!path.StartsWith("\\") && path.IndexOf(':',2)<0 && path.IndexOfAny(new[]{'\r','\n','\0'})<0);
       string full=Path.GetFullPath(path).TrimEnd('\\');
-      Require(full.Equals(path.TrimEnd('\\'),StringComparison.OrdinalIgnoreCase));
+      Require(full.Equals(path.TrimEnd('\\'),StringComparison.OrdinalIgnoreCase),"ROOT_CANONICAL");
       // A drive letter alone does not prove local storage (for example SMB mappings).
-      Require(new DriveInfo(Path.GetPathRoot(full)).DriveType==DriveType.Fixed);
-      Require(!ContainsPath(source,full) && !ContainsPath(full,source));
+      Require(new DriveInfo(Path.GetPathRoot(full)).DriveType==DriveType.Fixed,"ROOT_FIXED_DRIVE");
+      Require(!ContainsPath(source,full) && !ContainsPath(full,source),"ROOT_SOURCE_BOUNDARY");
       for(string p=full;p!=null;p=Path.GetDirectoryName(p)) {
-        if(Directory.Exists(p)||File.Exists(p)) Require((File.GetAttributes(p)&FileAttributes.ReparsePoint)==0);
+        if(Directory.Exists(p)||File.Exists(p)) Require((File.GetAttributes(p)&FileAttributes.ReparsePoint)==0,"ROOT_REPARSE");
       }
       return full;
     }
@@ -67,23 +70,23 @@ namespace KingPepe.LocalProtection {
     }
     static void CreatePrivateDirectory(string root, SecurityIdentifier sid) {
       // Atomic CREATE_NEW directory semantics with its final DACL, never chmod an existing directory.
-      Require(Directory.Exists(Path.GetDirectoryName(root)));
+      Require(Directory.Exists(Path.GetDirectoryName(root)),"DIRECTORY_PARENT");
       var bytes=DirectoryAcl(sid).GetSecurityDescriptorBinaryForm(); IntPtr descriptor=Marshal.AllocHGlobal(bytes.Length);
       try {
         Marshal.Copy(bytes,0,descriptor,bytes.Length);
         var attributes=new SecurityAttributes {Length=Marshal.SizeOf(typeof(SecurityAttributes)),Descriptor=descriptor,Inherit=0};
-        Require(CreateDirectory(root,ref attributes));
+        if(!CreateDirectory(root,ref attributes)) Require(false,"DIRECTORY_CREATE_"+Marshal.GetLastWin32Error());
       } finally { Marshal.FreeHGlobal(descriptor); }
       CheckAcl(root,true,sid);
     }
     static void CheckAcl(string path, bool directory, SecurityIdentifier sid) {
       Require((File.GetAttributes(path)&FileAttributes.ReparsePoint)==0);
       FileSystemSecurity acl=directory?(FileSystemSecurity)Directory.GetAccessControl(path):File.GetAccessControl(path);
-      Require(acl.GetOwner(typeof(SecurityIdentifier)).Equals(sid));
-      if(directory) Require(acl.AreAccessRulesProtected);
-      var rules=acl.GetAccessRules(true,true,typeof(SecurityIdentifier)); Require(rules.Count==1);
+      Require(acl.GetOwner(typeof(SecurityIdentifier)).Equals(sid),"ACL_PRINCIPAL");
+      if(directory) Require(acl.AreAccessRulesProtected,"ACL_INHERITANCE");
+      var rules=acl.GetAccessRules(true,true,typeof(SecurityIdentifier)); Require(rules.Count==1,"ACL_RULE_COUNT");
       foreach(FileSystemAccessRule rule in rules) Require(rule.IdentityReference.Equals(sid) &&
-        rule.AccessControlType==AccessControlType.Allow && rule.FileSystemRights==FileSystemRights.FullControl);
+        rule.AccessControlType==AccessControlType.Allow && rule.FileSystemRights==FileSystemRights.FullControl,"ACL_ACCESS");
     }
     // Source-built executable cache only: never a share, key or state enrollment.
     // CREATE_NEW and the final single-principal DACL are applied atomically.
