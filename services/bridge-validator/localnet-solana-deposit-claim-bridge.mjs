@@ -29,6 +29,7 @@ export class LocalnetSolanaDepositClaimBridge {
   #rpcClient;
   #journal;
   #receiptJournal;
+  #expiredPacketCheck;
 
   constructor(options) {
     const value = requireObject(options, "options");
@@ -38,6 +39,8 @@ export class LocalnetSolanaDepositClaimBridge {
     this.#rpcClient = value.rpcClient;
     this.#journal = value.journal ?? new InMemorySolanaDepositClaimJournal();
     this.#receiptJournal = value.receiptJournal ?? new InMemorySolanaDepositClaimJournal();
+    this.#expiredPacketCheck = value.expiredPacketCheck;
+    if (this.#expiredPacketCheck !== undefined && typeof this.#expiredPacketCheck !== "function") throw new Error("SolanaExpiryVerifierRequired");
     if (this.#receiptJournal === this.#journal) throw new Error("LocalnetSolanaSeparateStageJournalsRequired");
     this.#submitter =
       value.submitter ??
@@ -78,11 +81,14 @@ export class LocalnetSolanaDepositClaimBridge {
 
   async #prepare(request, journal, receiptOnly) {
     const existing = journal.get(request.operationIdHex);
+    let expiry;
     if (existing !== undefined) {
       for (const field of ["operationIdHex", "messageDigestHex", "encodedMessageHex", "amountAtomic", "solanaRecipientHex"]) {
         if (existing.prepared[field] !== request[field]) throw new Error("LocalnetSolanaPreparedOperationConflict");
       }
-      return Object.freeze({ ...request, ...existing.prepared });
+      if (![DEPOSIT_STATES.COMPLETED, DEPOSIT_STATES.REJECTED, DEPOSIT_STATES.HARD_STOP].includes(existing.state) && this.#expiredPacketCheck)
+        expiry = await this.#expiredPacketCheck(receiptOnly ? "RECEIPT" : "CLAIM", existing.prepared);
+      if (!expiry) return Object.freeze({ ...request, ...existing.prepared });
     }
     let latestBlockhash;
     try {
@@ -113,7 +119,8 @@ export class LocalnetSolanaDepositClaimBridge {
       mintAccountBase58: plan.mintBase58,
     };
     // Each stage has a distinct journal; both retain the economic operation ID.
-    journal.persistPrepared(prepared);
+    if (expiry) journal.replaceExpired(prepared, expiry);
+    else journal.persistPrepared(prepared);
     return Object.freeze(prepared);
   }
 

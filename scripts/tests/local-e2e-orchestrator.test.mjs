@@ -126,6 +126,9 @@ test("fake complete toolchain produces a ready local-only execution plan", () =>
     const plan = createLocalE2ePlan({
       repoRoot: REPO_ROOT,
       runRoot,
+      // This fixture asserts its own target location, independently of the
+      // developer's legitimate external build-cache environment override.
+      buildRoot: path.join(runRoot, "cargo-target"),
       envPath: bin,
       platform: "linux",
     });

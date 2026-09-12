@@ -148,6 +148,19 @@ test("bootstrap rejects SDK and validator version substitutions before building"
   }
 });
 
+test("bootstrap waits for slow fresh Native initialization without skipping health verification", async () => {
+  const executor = new FakeExecutor(), run = executor.runOneShot.bind(executor);
+  let attempts = 0;
+  executor.runOneShot = async command => {
+    if (command.step === "CHECK_KINGPEPE_REGTEST_HEALTH" && ++attempts <= 13) throw new Error("NODE_INITIALIZING");
+    return run(command);
+  };
+  const result = await runLocalE2eBootstrap({ plan: readyPlan(), executor, programArtifactExists: () => true, healthDelayMs: 0 });
+  assert.equal(result.state, LOCAL_E2E_BOOTSTRAP_READY);
+  assert.equal(result.checks.find(c => c.step === "CHECK_KINGPEPE_REGTEST_HEALTH").attempts, 14);
+  assert.deepEqual(executor.stopped, ["START_KINGPEPE_REGTEST", "START_SOLANA_LOCAL_VALIDATOR"]);
+});
+
 test("bootstrap stops started services if a health check fails", async () => {
   const executor = new FakeExecutor({
     failures: new Set(["CHECK_SOLANA_LOCAL_VALIDATOR_HEALTH"]),
