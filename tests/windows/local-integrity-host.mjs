@@ -23,9 +23,10 @@ async function close() {
 }
 async function execute(method, payload) {
   assert(!closed);
-  if (method === "INIT") {
+  if (method === "INIT" || method === "OPEN") {
     assert.equal(process.platform, "win32"); assert(!authority); options = approved(payload, "global-integrity");
-    authority = await ProtectedIntegrityAuthority.createLocal(options, "RUNNING"); return authority.status();
+    authority = method === "INIT" ? await ProtectedIntegrityAuthority.createLocal(options, "RUNNING") :
+      await ProtectedIntegrityAuthority.openLocal(new WindowsProtectedStore(options)); return authority.status();
   }
   assert(authority);
   if (method === "STATUS") return authority.status();

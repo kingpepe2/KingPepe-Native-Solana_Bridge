@@ -10,18 +10,33 @@ export function solanaDepositIpcHandler({ outbox, integrity, policy }) {
     check(peerRole === "BRIDGE_VALIDATOR" && ["enqueueSolanaDeposit", "solanaDepositStatus"].includes(method));
     const v = validateSolanaDepositDelivery(payload, pinned); check(v.delivery.operationId === operationId);
     requireSolanaDepositOutbox(outbox, pinned, integrity);
-    return method === "enqueueSolanaDeposit" ? outbox.enqueue(v.delivery) : outbox.status(solanaDeliveryId(v.delivery, pinned));
+    if (method === "enqueueSolanaDeposit") return outbox.enqueue(v.delivery);
+    const deliveryId = solanaDeliveryId(v.delivery, pinned);
+    try { return await outbox.status(deliveryId); }
+    catch (error) {
+      if (error?.message !== "SolanaDeliveryMissing") throw error;
+      // This negative lookup comes only from the authenticated exact-role
+      // protected journal. It is not a chain observation or permission to sign,
+      // broadcast, abandon an old transaction, or discharge a mint liability.
+      return { state: "NOT_ENQUEUED", deliveryId, operationId, kind: v.delivery.kind, signature: v.signature };
+    }
   };
 }
 export function validateSolanaDeliveryResponse(input, delivery, policy, method) {
   const expected = validateSolanaDepositDelivery(delivery, policy), v = structuredClone(input);
   const fields = method === "enqueueSolanaDeposit" ? ["state", "deliveryId", "operationId", "kind"] :
-    ["state", "deliveryId", "operationId", "kind", "signature", "observedSlot"];
+    v?.state === "NOT_ENQUEUED" ? ["state", "deliveryId", "operationId", "kind", "signature"] :
+      ["state", "deliveryId", "operationId", "kind", "signature", "observedSlot"];
   check(["enqueueSolanaDeposit", "solanaDepositStatus"].includes(method) && v && !Array.isArray(v) && Object.keys(v).sort().join() === fields.sort().join());
   check(v.deliveryId === solanaDeliveryId(delivery, policy) && v.operationId === delivery.operationId && v.kind === delivery.kind);
   if (method === "enqueueSolanaDeposit") check(v.state === "ACCEPTED");
-  else { check(["WAITING_FOR_DEPENDENCY", "QUEUED_BY_LIMIT", "FINALIZED_ACCOUNT", "EXPIRED_UNSEEN", "FINALIZED_FAILED"].includes(v.state));
-    check(v.signature === expected.signature); deliveryUint(v.observedSlot); }
+  else {
+    check(v.signature === expected.signature);
+    if (v.state !== "NOT_ENQUEUED") {
+      check(["WAITING_FOR_DEPENDENCY", "QUEUED_BY_LIMIT", "FINALIZED_ACCOUNT", "EXPIRED_UNSEEN", "FINALIZED_FAILED"].includes(v.state));
+      deliveryUint(v.observedSlot);
+    }
+  }
   return Object.freeze(v); // A transport/account observation, never mint settlement.
 }
 export class ProtectedSolanaDepositClient {

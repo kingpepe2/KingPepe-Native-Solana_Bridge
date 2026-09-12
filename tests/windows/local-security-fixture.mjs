@@ -19,11 +19,12 @@ export async function createLocalSecurityFixture({ repoRoot, policy }) {
   const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-ipc-test-"));
   validateRuntimeStateRoot(root, repoRoot);
   const sid = windowsCurrentServiceSid(), registrations = [], closers = [], ids = new Set();
-  function options(name, role, purpose) {
+  function options(name, role, purpose, instanceId = randomBytes(32).toString("hex")) {
     assert.match(name, /^[a-z0-9-]{1,60}$/u); assert(!ids.has(name)); ids.add(name);
+    assert.match(instanceId, /^[0-9a-f]{64}$/u);
     const value = { root: path.join(root, name), anchorRoot: path.join(root, name + "-anchor"), repoRoot,
       context: { role, purpose, serviceSid: sid, environment: "localnet", nativeGenesis: policy.nativeGenesis,
-        solanaDeployment: policy.solanaDeployment, keyEpoch: policy.keyEpoch, instanceId: randomBytes(32).toString("hex") } };
+        solanaDeployment: policy.solanaDeployment, keyEpoch: policy.keyEpoch, instanceId } };
     registrations.push(structuredClone(value)); return value;
   }
   function store(opts, payload) {
@@ -39,8 +40,8 @@ export async function createLocalSecurityFixture({ repoRoot, policy }) {
     const privateKeyPem = readFileSync(key, "utf8"), certificatePem = readFileSync(cert, "utf8");
     unlinkSync(key); return { privateKeyPem, certificatePem };
   }
-  let connection = 0; const transports = [];
-  async function pair(serverRole, clientRole, handler) {
+  let connection = 0; const transports = [], supervisorEndpoints = [];
+  async function pair(serverRole, clientRole, handler, deferred = false) {
     const n = ++connection, serverCert = certificate("server-" + n), clientCert = certificate("client-" + n);
     const serverOptions = options("server-" + n, serverRole, "service-auth");
     const clientOptions = options("client-" + n, clientRole, "service-auth");
@@ -48,10 +49,15 @@ export async function createLocalSecurityFixture({ repoRoot, policy }) {
       encodeIpcEnrollment({ ...serverCert, peerCertificatePem: clientCert.certificatePem, peerRole: clientRole }));
     const clientStore = store(clientOptions,
       encodeIpcEnrollment({ ...clientCert, peerCertificatePem: serverCert.certificatePem, peerRole: serverRole }));
+    if (deferred) {
+      assert.notEqual(serverRole, "SUPERVISOR"); serverStore.close(); clientStore.close();
+      return { serverOptions, clientOptions };
+    }
     const client = new ProtectedServiceIpc(clientStore);
     if (serverRole === "SUPERVISOR") {
       serverStore.close();
       const port = await authority.listen(serverOptions);
+      supervisorEndpoints.push({ serverOptions, port });
       transports.push({ serverRole, clientRole, client }); closers.push(() => client.close());
       return { client, port, clientOptions };
     }
@@ -75,10 +81,21 @@ export async function createLocalSecurityFixture({ repoRoot, policy }) {
     if (failed) throw new Error("LocalSecurityFixtureCleanupFailed");
   }
   return {
-    root, options, store, pair, close, onClose(fn) { closers.push(fn); }, get authority() { return authority; },
+    root, options, store, pair, deferredPair: (serverRole, clientRole) => pair(serverRole, clientRole, undefined, true),
+    close, onClose(fn) { closers.push(fn); }, get authority() { return authority; },
     async diagnostics() { return [...await authority.diagnostics(), ...transports.map(v => ({ serverRole: v.serverRole, clientRole: v.clientRole,
       server: v.server?.lastRejection ?? "NONE", client: v.client.lastRejection ?? "NONE" }))]; },
     async restartAuthority() { await authority.reopen(); },
+    async restartAuthorityProcess() {
+      // TEST lifecycle only: reopen the EXISTING protected authority, never
+      // re-enroll policy or recreate RUNNING state after an integrity incident.
+      await authority.close(); authority = await actualTestAuthority(authorityOptions, true);
+      const ports = new Map();
+      for (const endpoint of supervisorEndpoints) {
+        const old = endpoint.port; endpoint.port = await authority.listen(endpoint.serverOptions); ports.set(old, endpoint.port);
+      }
+      return ports;
+    },
     async guard(role) { const p = await pair("SUPERVISOR", role); return new RemoteIntegrityGuard({ ipc: p.client, port: p.port }); },
   };
 }
@@ -86,7 +103,7 @@ export async function createLocalSecurityFixture({ repoRoot, policy }) {
 // Real independent process for the authority, so synchronous Windows protection
 // in an observer cannot starve its network/health clock or TLS listeners. This
 // actor has no synthetic health command. Reports must come from actual peers.
-async function actualTestAuthority(options) {
+async function actualTestAuthority(options, reopen = false) {
   const child = spawn(process.execPath, [path.join(import.meta.dirname, "local-integrity-host.mjs")],
     { windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
   let sequence = 0, buffer = "", failed = false, closed = false;
@@ -109,7 +126,7 @@ async function actualTestAuthority(options) {
     }
   });
   const call = (method, payload = {}) => new Promise((resolve, reject) => {
-    assert(["INIT", "LISTEN", "DIAGNOSTICS", "STATUS", "REOPEN", "CLOSE"].includes(method));
+    assert(["INIT", "OPEN", "LISTEN", "DIAGNOSTICS", "STATUS", "REOPEN", "CLOSE"].includes(method));
     if (failed || closed || pending.size >= 8) { reject(new Error("LocalAuthorityUnavailable")); return; }
     const id = ++sequence, timer = setTimeout(() => { pending.delete(id); reject(new Error("LocalAuthorityTimeout")); }, 15000);
     pending.set(id, { resolve, reject, timer }); child.stdin.write(JSON.stringify([id, method, payload]) + "\n");
@@ -120,7 +137,7 @@ async function actualTestAuthority(options) {
     finally { closed = true; child.stdin.end(); const timer = setTimeout(() => child.kill(), 10000);
       try { await ended; } finally { clearTimeout(timer); } }
   };
-  try { await call("INIT", options); }
+  try { await call(reopen ? "OPEN" : "INIT", options); }
   catch { await close(); throw new Error("LocalAuthorityUnavailable"); }
   return { status: () => call("STATUS"), listen: value => call("LISTEN", value),
     diagnostics: () => call("DIAGNOSTICS"), reopen: () => call("REOPEN"), close };

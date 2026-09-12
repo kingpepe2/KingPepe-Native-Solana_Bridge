@@ -32,11 +32,15 @@ const MAX_SOLANA_RPC_RESPONSE_BYTES = 2_097_152;
 const SOLANA_RPC_TIMEOUT_MS = 10_000;
 const INSTRUCTION_FAILURE_REASONS = new Set(["InvalidAccountData", "InvalidArgument", "InvalidInstructionData", "InsufficientFunds", "ProgramFailedToComplete", "ComputationalBudgetExceeded", "AccountNotRentExempt", "AccountAlreadyInitialized", "IncorrectProgramId"]);
 const EXECUTION_FAULTS = new Set(["SBF_STACK_ACCESS_VIOLATION", "SBF_ACCESS_VIOLATION", "SBF_HEAP_EXHAUSTED", "SBF_COMPUTE_BUDGET_EXCEEDED"]);
+const TRANSACTION_FAILURES = new Set(["BlockhashNotFound", "AccountNotFound", "InvalidAccountForFee", "InsufficientFundsForFee",
+  "AlreadyProcessed", "SignatureFailure", "SanitizeFailure", "AccountInUse", "TooManyAccountLocks", "MaxLoadedAccountsDataSizeExceeded"]);
 
-function sanitizedRpcDiagnostic(error) {
+// Narrow shared projection, never provider messages, logs, paths or packets.
+export function sanitizedRpcDiagnostic(error) {
   const result = {};
   if (Number.isSafeInteger(error?.code)) result.rpcCode = error.code;
   if (EXECUTION_FAULTS.has(error?.executionFault)) result.executionFault = error.executionFault;
+  if (TRANSACTION_FAILURES.has(error?.transactionFailure)) result.transactionFailure = error.transactionFailure;
   const failure = error?.instructionFailure;
   if (Number.isInteger(failure?.index) && failure.index >= 0 && failure.index <= 255) {
     if (Number.isInteger(failure.customCode) && failure.customCode >= 0 && failure.customCode <= 0xffff_ffff) {
@@ -340,6 +344,8 @@ export class SolanaLocalRpcClient {
       if (typeof envelope.error !== "object" || Array.isArray(envelope.error) || !Number.isInteger(code) ||
           code < -0x8000_0000 || code > 0x7fff_ffff) throw rpcError("SolanaRpcInvalidEnvelope", method);
       const error = rpcError("SolanaRpcRejected", method, code);
+      const transactionFailure = envelope.error?.data?.err;
+      if (TRANSACTION_FAILURES.has(transactionFailure)) error.transactionFailure = transactionFailure;
       const failure = envelope.error?.data?.err?.InstructionError;
       const logs = envelope.error?.data?.logs;
       if (Array.isArray(logs)) {
