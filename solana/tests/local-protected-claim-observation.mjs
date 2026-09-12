@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { withLocalE2eInfrastructure } from "../../scripts/local-e2e-bootstrap.mjs";
-import { createLocalSolanaSetupContext, createNativeToSolanaFlowConfig, executeNativeDepositObservationFlow, submitLocalnetSolanaDepositClaim } from "../../scripts/local-e2e-native-to-solana.mjs";
+import { createLocalSolanaSetupContext, createNativeToSolanaFlowConfig, executeNativeDepositObservationFlow, submitLocalnetSolanaDepositClaim, createLocalFrostTaprootCustodyContext } from "../../scripts/local-e2e-native-to-solana.mjs";
 import { createLocalNativeEvidenceVerifier } from "../../scripts/local-native-evidence-verifier.mjs";
 import { requireVerifiedRegtestReserve } from "../../native/node/native-raw-evidence.mjs";
 import { initialDepositOperationState, validateDepositOperationPlan, decodeDepositOperationState, depositOperationAccounting } from "../../services/bridge-validator/deposit-operation-state.mjs";
@@ -14,26 +14,31 @@ import { SolanaDepositClaimObserver, requireProtectedClaimObservation } from "..
 import { LocalDeploymentRpc } from "../../services/solana-observer/deployment-integrity.mjs";
 import { findProgramAddress, base58Encode, DEPOSIT_CLAIM_PDA_SEED_PREFIX } from "../../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs";
 
-export async function runLocalProtectedClaimObservation(repoRoot) {
+export async function runLocalProtectedClaimObservation(repoRoot, afterObservation = undefined) {
   const passed = []; let stage = "BOOTSTRAP", failure;
   const result = await withLocalE2eInfrastructure({ repoRoot }, async context => {
     try {
       const setup = createLocalSolanaSetupContext(), flowConfig = createNativeToSolanaFlowConfig({ plan: context.plan, repoRoot,
         mintHex: setup.mintHex, keyEpoch: setup.keyEpoch, policyEpoch: setup.policyEpoch });
       stage = "FRESH_NATIVE_TO_SOLANA";
-      let inputs, encodedMessageHex;
+      let inputs, encodedMessageHex, nativeVerifier, testCustody, captureSigning = true;
       const verifiedSigningIntents = new Map();
       const flow = await executeNativeDepositObservationFlow({ ...context, flowConfig, localSolanaSetupContext: setup,
+        custodyFactory: async options => { testCustody = await createLocalFrostTaprootCustodyContext(options); return testCustody; },
         nativeEvidenceVerifierFactory: async options => {
           const verifier = await createLocalNativeEvidenceVerifier(options), verify = verifier.verifyInputs.bind(verifier),
             verifySigning = verifier.verifySweepSigning.bind(verifier);
+          nativeVerifier = verifier;
           verifier.verifyInputs = async request => {
             const checked = await verify(request); inputs ??= structuredClone(request.inputs); return checked;
           };
           verifier.verifySweepSigning = async request => {
             const checked = await verifySigning(request), index = request.intent.signingInputIndex;
-            if (verifiedSigningIntents.has(index)) assert.deepEqual(verifiedSigningIntents.get(index), request.intent);
-            verifiedSigningIntents.set(index, structuredClone(request.intent)); return checked;
+            if (captureSigning) {
+              if (verifiedSigningIntents.has(index)) assert.deepEqual(verifiedSigningIntents.get(index), request.intent);
+              verifiedSigningIntents.set(index, structuredClone(request.intent));
+            }
+            return checked;
           };
           return verifier;
         },
@@ -42,6 +47,9 @@ export async function runLocalProtectedClaimObservation(repoRoot) {
           return submitLocalnetSolanaDepositClaim(request);
         },
       });
+      // Later adversarial checks may sign a DIFFERENT isolated test operation.
+      // Keep validating it, but do not confuse it with this flow's captured intent.
+      captureSigning = false;
       assert.equal(flow.state, "COMPLETED"); assert.equal(flow.reconciliation.state, "RECONCILED");
       passed.push("FRESH_NATIVE_ACCEPTED_FROST_MINT_AND_RECONCILIATION");
       const endpoint = "http://127.0.0.1:" + context.plan.ports.solanaRpcPort;
@@ -114,6 +122,10 @@ export async function runLocalProtectedClaimObservation(repoRoot) {
       passed.push("NEW_OBSERVER_REVALIDATES_ALREADY_MINTED_CLAIM_WITHOUT_REMINT");
       await assert.rejects(new SolanaDepositClaimObserver({ config, rpcClient: {} }).observeProtectedFinalizedDepositClaim(request, genesis), /ProtectedClaimLiveRpcRequired/u);
       passed.push("CALLBACK_ADAPTER_NOT_ACCEPTED_AS_LIVE_QUERY");
+      if (afterObservation !== undefined) {
+        stage = "ADDITIONAL_REAL_CHAIN_ASSERTIONS";
+        await afterObservation({ context, flow, flowConfig, setup, policy, state: reopened, nativeVerifier, observation, testCustody });
+      }
       return { nativeToSolanaE2e: { state: flow.state }, localProtectedClaimObservation: { pass: passed.length, fail: 0, passed } };
     } catch (error) {
       const codes = new Map([["DepositOperationRejected", "INVALID_OPERATION"],

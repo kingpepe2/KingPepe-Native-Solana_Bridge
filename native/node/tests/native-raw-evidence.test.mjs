@@ -7,7 +7,7 @@ import os from "node:os";
 import { test } from "node:test";
 import { createHash } from "node:crypto";
 import { collectRegtestEvidence, encodeRegtestEvidence, encodeRegtestEvidenceAtCheckpoint, MAX_RAW_EVIDENCE_BYTES,
-  REGTEST_GENESIS, verifyRegtestEvidencePacket } from "../native-raw-evidence.mjs";
+  REGTEST_GENESIS, verifyRegtestEvidencePacket, observedSpentRegtestReserve } from "../native-raw-evidence.mjs";
 import { parseNativeTransactionHex } from "../native-taproot-transaction.mjs";
 
 const h = (byte) => byte.repeat(32);
@@ -16,6 +16,13 @@ const txid = parseNativeTransactionHex(raw).txidHex;
 const bundle = () => ({ genesisHash: REGTEST_GENESIS, tipHash: h("08"), tipHeight: 1,
   chainworkHex: h("00"), minimumConfirmations: 1, headers: ["09".repeat(80)],
   proofs: [{ rawTransactionHex: raw, blockHeight: 1, transactionIndex: 0, transactionIds: [txid] }] });
+
+test("caller-created errors and copied fields cannot claim a verified spent reserve", () => {
+  for (const value of [undefined, null, "RAW_NATIVE_RESERVE_SPENT", new Error("RAW_NATIVE_RESERVE_SPENT"),
+    { reserveBasis: {}, chain: {}, utxoTrust: "CONFIGURED_LOCAL_VALIDATING_NODE_RPC_OBSERVATION" }]) {
+    assert.equal(observedSpentRegtestReserve(value), undefined);
+  }
+});
 
 function rpcModel(overrides = {}) {
   return { getBlockchainInfo: async () => ({ chain: "regtest", initialblockdownload: false, blocks: 1, headers: 1,

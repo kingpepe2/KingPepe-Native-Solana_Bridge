@@ -79,8 +79,12 @@ export class ProtectedDepositOperationJournal {
   }
   async reservePlan(input) {
     const plan = validateDepositOperationPlan(input, this.#policy);
-    return this.#exclusive(async () => {
-      await this.#guard.assertRunning(plan.operationId, "AUTHORIZE_SWEEP");
+    // Reconciliation must read this journal to establish source health. Never
+    // hold its mutation lock while awaiting that dependent authorization.
+    // The validated plan is immutable; the current image and all reservations
+    // are checked synchronously inside the protected CAS after fresh admission.
+    await this.#guard.assertRunning(plan.operationId, "AUTHORIZE_SWEEP");
+    return this.#exclusive(() => {
       const { state, revision } = this.#read(), existing = state.operations.find(op => op.plan.operationId === plan.operationId);
       if (existing) { check(same(existing.plan, plan), "DepositOperationPlanChanged"); return structuredClone(existing); }
       check(state.operations.length < MAX_DEPOSIT_OPERATIONS, "DepositOperationCapacity");
@@ -99,8 +103,8 @@ export class ProtectedDepositOperationJournal {
     });
   }
   async prepareBroadcast(operationId) {
-    return this.#exclusive(async () => {
-      await this.#guard.assertRunning(operationId, "AUTHORIZE_SWEEP");
+    await this.#guard.assertRunning(operationId, "AUTHORIZE_SWEEP");
+    return this.#exclusive(() => {
       const { state, revision } = this.#read(), record = this.#record(state, operationId);
       check(record.signedTransactionHex !== null, "DepositSignatureNotRetained");
       check(record.finalizedCredit === null, "DepositSweepAlreadyFinalized");

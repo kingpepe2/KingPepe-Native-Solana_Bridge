@@ -73,10 +73,20 @@ mixing changing journal snapshots. The client validates and freezes the complete
 image; a page failure or concurrent update requires a fresh read. This grants no
 write/signing capability and does not itself constitute chain reconciliation.
 
+Reservation and broadcast preparation request fresh global authorization before
+entering the short journal critical section. Reconciliation needs that same
+journal to establish health, so holding its lock across the asynchronous guard
+would block the evidence on which admission depends. The current complete image,
+lease, revision, exact plan and input reservations are checked inside the CAS.
+There is no cached permission or relaxed deadline. Actual DPAPI/mTLS regressions
+keep snapshot reads available while authorization waits and require an intervening
+durable stop to reject the action without a journal mutation.
+
 Portable tests use actual ephemeral FROST and packet signatures with explicitly
 synthetic chain/execution fixtures. Actual local-validator claim tests are a
 separate gate. Windows journal tests use real current-principal DPAPI and mTLS,
 not distinct service identities. Neither category certifies complete protected
 service recovery. The full controller, broadcast-to-credit rediscovery, protected
-claim outbox, live reconciliation and all-boundary real-chain process-kill matrix
-remain required. No per-transfer Team approval or verification bypass is added.
+claim outbox and all-boundary real-chain process-kill matrix remain required.
+Live reconciliation is now a separate component with its own documented tests.
+No per-transfer Team approval or verification bypass is added.

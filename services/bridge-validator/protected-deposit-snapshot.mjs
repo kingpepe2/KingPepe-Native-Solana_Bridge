@@ -6,7 +6,7 @@ import { requireDepositOperationJournal } from "./protected-deposit-journal.mjs"
 import { validateDepositOperationPolicy, depositOperationPolicyDigest, decodeDepositOperationState,
   depositOperationAccounting, DEPOSIT_OPERATION_PROTOCOL, MAX_DEPOSIT_OPERATIONS } from "./deposit-operation-state.mjs";
 
-const PROTOCOL = "KINGPEPE_DEPOSIT_SNAPSHOT_V1", CLIENTS = new WeakSet();
+const PROTOCOL = "KINGPEPE_DEPOSIT_SNAPSHOT_V1", CLIENTS = new WeakSet(), SNAPSHOTS = new WeakMap();
 const check = v => { if (!v) throw new Error("DepositSnapshotRejected"); };
 const fields = (v, names) => check(v && !Array.isArray(v) && Object.keys(v).sort().join() === [...names].sort().join());
 const revision = v => { check(typeof v === "string" && /^[1-9][0-9]{0,19}$/u.test(v) && BigInt(v) <= 0xffff_ffff_ffff_ffffn); return BigInt(v); };
@@ -50,7 +50,8 @@ export class ProtectedDepositSnapshotClient {
         fields(response, ["protocol", "policyDigest", "revision", "count", "index", "record"]);
         check(response.protocol === PROTOCOL && response.policyDigest === policyDigest && response.index === index &&
           Number.isInteger(response.count) && response.count >= 0 && response.count <= MAX_DEPOSIT_OPERATIONS);
-        check(revision(response.revision) >= this.#revision && (expectedRevision === null || response.revision === expectedRevision));
+        if (revision(response.revision) < this.#revision) throw new Error("DepositSnapshotRollbackDetected");
+        check(expectedRevision === null || response.revision === expectedRevision);
         check(response.count === 0 ? index === 0 && response.record === null : index < response.count && response.record !== null);
         return response;
       };
@@ -61,8 +62,21 @@ export class ProtectedDepositSnapshotClient {
       const final = await page(0, first.revision); check(final.count === first.count && JSON.stringify(final.record) === JSON.stringify(first.record));
       const state = decodeDepositOperationState(Buffer.from(JSON.stringify({ protocol: DEPOSIT_OPERATION_PROTOCOL, policyDigest, operations: records })), this.#policy);
       this.#revision = revision(first.revision);
-      return immutable({ protocol: PROTOCOL, trust: "AUTHENTICATED_LOCAL_JOURNAL_OBSERVATION", revision: first.revision,
+      const result = immutable({ protocol: PROTOCOL, trust: "AUTHENTICATED_LOCAL_JOURNAL_OBSERVATION", revision: first.revision,
         policyDigest, operations: state.operations, accounting: depositOperationAccounting(state, this.#policy) });
+      SNAPSHOTS.set(result, this); return result;
+    } finally { this.#busy = false; }
+  }
+  async assertCurrent(snapshot) {
+    check(!this.#busy && SNAPSHOTS.get(snapshot) === this); this.#busy = true;
+    try {
+      const response = await this.#ipc.request(this.#port, { method: "depositSnapshot", operationId: snapshot.policyDigest,
+        payload: { index: 0, revision: snapshot.revision } });
+      fields(response, ["protocol", "policyDigest", "revision", "count", "index", "record"]);
+      check(response.protocol === PROTOCOL && response.policyDigest === snapshot.policyDigest && response.revision === snapshot.revision &&
+        response.count === snapshot.operations.length && response.index === 0 &&
+        JSON.stringify(response.record) === JSON.stringify(snapshot.operations[0] ?? null));
+      if (revision(response.revision) < this.#revision) throw new Error("DepositSnapshotRollbackDetected");
     } finally { this.#busy = false; }
   }
 }
