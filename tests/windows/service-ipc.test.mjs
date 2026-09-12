@@ -36,6 +36,8 @@ import { depositOperationFixture } from "../integration/deposit-operation-fixtur
 import { ProtectedDepositOperationJournal } from "../../services/bridge-validator/protected-deposit-journal.mjs";
 import { initialDepositOperationState } from "../../services/bridge-validator/deposit-operation-state.mjs";
 import { depositSnapshotIpcHandler, ProtectedDepositSnapshotClient } from "../../services/bridge-validator/protected-deposit-snapshot.mjs";
+import { reconciliationFixture } from "../integration/reconciliation-fixture.mjs";
+import { initialReconciliationProgress, ProtectedDepositReconciliationMonitor } from "../../services/reconciliation/protected-deposit-reconciliation.mjs";
 
 if (process.platform !== "win32") throw new Error("WINDOWS_IPC_TESTS_REQUIRE_WINDOWS");
 const repoRoot = path.resolve(import.meta.dirname, "../.."), serviceSid = windowsCurrentServiceSid();
@@ -172,6 +174,44 @@ async function protectedDepositFixture(t) {
   return { ...data, global, peer, opts, store, journal, open };
 }
 
+for (const method of ["reservePlan", "prepareBroadcast"]) for (const stopped of [false, true]) {
+  test(`protected deposit admission leaves reconciliation readable during ${method} and ${stopped ? "rejects intervening stop" : "retains exact action"}`, async t => {
+    const f = await protectedDepositFixture(t), id = f.plan.operationId;
+    if (method === "prepareBroadcast") {
+      await f.journal.reservePlan(f.plan); await f.journal.retainSigned(id, f.signedTransactionHex);
+    }
+    const transport = fixture(t, "BRIDGE_VALIDATOR", "RECONCILIATION");
+    const port = await transport.server.listen(depositSnapshotIpcHandler({ journal: f.journal, integrity: f.peer.guard, policy: f.policy }));
+    const client = new ProtectedDepositSnapshotClient({ ipc: transport.client, port, policy: f.policy });
+    const before = await client.read(), original = f.peer.guard.assertRunning.bind(f.peer.guard);
+    let entered, release, outcome;
+    const waiting = new Promise(resolve => { entered = resolve; }), suspended = new Promise(resolve => { release = resolve; });
+    // Suspend BEFORE the real mutually authenticated authorization. The test
+    // never fabricates permission or extends any production freshness window.
+    f.peer.guard.assertRunning = async (...args) => { entered(); await suspended; return original(...args); };
+    const pending = (method === "reservePlan" ? f.journal.reservePlan(f.plan) : f.journal.prepareBroadcast(id))
+      .then(value => ({ value }), error => ({ error }));
+    try {
+      await waiting;
+      const during = await client.read(); await client.assertCurrent(during);
+      assert.equal(during.revision, before.revision);
+      if (stopped) await f.peer.guard.report(id, "IMPOSSIBLE_OPERATION_STATE", h("intervening deposit admission incident"));
+    } finally { release(); outcome = await pending; f.peer.guard.assertRunning = original; }
+    const after = await f.journal.snapshot();
+    if (stopped) {
+      assert.match(outcome.error?.message ?? "", /IntegrityAuthorizationStopped/u);
+      assert.equal(after.revision, before.revision);
+      assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+    } else {
+      assert.ifError(outcome.error);
+      assert.equal(after.operations.length, 1);
+      assert.deepEqual(after.operations[0].plan, f.plan);
+      assert.equal(after.operations[0].broadcastAttempted, method === "prepareBroadcast");
+      if (method === "prepareBroadcast") assert.equal(outcome.value, f.signedTransactionHex);
+    }
+  });
+}
+
 test("protected deposit operations retain exact signed liability across reopen and reject reused inputs", async t => {
   const f = await protectedDepositFixture(t), id = f.plan.operationId;
   const original = structuredClone(f.plan); await f.journal.reservePlan(original);
@@ -295,6 +335,77 @@ test("protected deposit snapshot is mutually authenticated bounded read-only and
   assert.equal((await client.read()).revision, before.revision);
   assert.equal((await f.journal.inspect(f.plan.operationId)).broadcastAttempted, false);
   assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+});
+
+test("deposit snapshot fresh-revision recheck rejects copied capabilities and concurrent changes", async t => {
+  const f = await protectedDepositFixture(t), transport = fixture(t, "BRIDGE_VALIDATOR", "RECONCILIATION");
+  const port = await transport.server.listen(depositSnapshotIpcHandler({ journal: f.journal, integrity: f.peer.guard, policy: f.policy }));
+  const client = new ProtectedDepositSnapshotClient({ ipc: transport.client, port, policy: f.policy });
+  const first = await client.read(); await client.assertCurrent(first);
+  await assert.rejects(client.assertCurrent(structuredClone(first)), /DepositSnapshotRejected/u);
+  await f.journal.reservePlan(f.plan);
+  await assert.rejects(client.assertCurrent(first), /IpcRequestRejected/u);
+  await client.assertCurrent(await client.read());
+});
+
+async function protectedReconciliationFixture(t, retainedIncident = false) {
+  // Current-principal actual DPAPI/mTLS. An unavailable Native source is never
+  // replaced by a fixture proof; these tests certify persistence/fail-closed
+  // behavior only, not a successful protected chain reconciliation.
+  const global = await integrityFixture(t), bridge = await global.peer("BRIDGE_VALIDATOR"), peer = await global.peer("RECONCILIATION");
+  const { policy, manifest } = reconciliationFixture();
+  const journalOptions = options(bridge.root, "empty-operations", "BRIDGE_VALIDATOR", "deposit-operations"), initialJournal = initialDepositOperationState(policy);
+  const journalStore = WindowsProtectedStore.create(journalOptions, initialJournal); initialJournal.fill(0);
+  const journal = await ProtectedDepositOperationJournal.open({ store: journalStore, integrity: bridge.guard, policy });
+  cleanups.get(bridge.root).push(() => journal.close());
+  const transport = fixture(t, "BRIDGE_VALIDATOR", "RECONCILIATION");
+  const port = await transport.server.listen(depositSnapshotIpcHandler({ journal, integrity: bridge.guard, policy }));
+  const journalClient = new ProtectedDepositSnapshotClient({ ipc: transport.client, port, policy });
+  const opts = options(peer.root, "reconciliation-progress", "RECONCILIATION", "reconciliation-progress");
+  const value = JSON.parse(initialReconciliationProgress(policy, manifest));
+  if (retainedIncident) value.incident = { reason: "ECONOMIC_SNAPSHOT_CONTRADICTION", evidenceDigest: h("SYNTHETIC_INCIDENT_ONLY"), affectedOperations: [], affectedReserveAtomic: "0" };
+  const bytes = Buffer.from(JSON.stringify(value)), store = WindowsProtectedStore.create(opts, bytes); bytes.fill(0);
+  const nativeVerifier = new LocalNativeEvidenceVerifier({ rpc: { async getBlockchainInfo() { throw new Error("TEST_SOURCE_UNAVAILABLE"); } }, executable: path.join(peer.root, "unavailable-native-verifier") });
+  const solanaRpc = new LocalDeploymentRpc({ endpoint: "http://127.0.0.1:54321" });
+  const open = (nextStore = new WindowsProtectedStore(opts), expectedManifest = manifest) => ProtectedDepositReconciliationMonitor.open({ policy, manifest: expectedManifest,
+    journalClient, nativeVerifier, solanaRpc, integrity: peer.guard, store: nextStore });
+  const monitor = await open(store); cleanups.get(peer.root).push(() => monitor.close());
+  return { global, peer, opts, store, monitor, open, policy, manifest };
+}
+
+test("protected reconciliation outage never fabricates deficit or source-health permission", async t => {
+  const f = await protectedReconciliationFixture(t);
+  assert.equal((await f.monitor.poll()).state, "WAITING_FOR_DEPENDENCY");
+  assert.equal(f.global.authority.status().incidentCount, 0); assert.equal(f.global.authority.status().state, "PAUSED_POLICY");
+  const saved = f.store.read();
+  try { assert.equal(JSON.parse(saved.payload).observedAt, 0); } finally { saved.payload.fill(0); }
+  await f.monitor.close(); const reopened = await f.open(); cleanups.get(f.peer.root).push(() => reopened.close());
+  assert.equal((await reopened.poll()).state, "WAITING_FOR_DEPENDENCY"); assert.equal(f.global.authority.status().incidentCount, 0);
+});
+test("protected reconciliation lifetime lease rejects a duplicate process instance", async t => {
+  const f = await protectedReconciliationFixture(t);
+  await assert.rejects(f.open(), /ReconciliationMonitorUnavailable/u);
+  assert.equal(f.global.authority.status().incidentCount, 0);
+});
+test("protected reconciliation authenticated malformed progress causes a durable global stop", async t => {
+  const f = await protectedReconciliationFixture(t), old = f.store.read();
+  try { f.store.write(Buffer.from("{"), old.revision); } finally { old.payload.fill(0); }
+  assert.equal((await f.monitor.poll()).state, "HARD_STOP_INTEGRITY");
+  await f.global.restart(); assert.equal(f.global.authority.status().state, "HARD_STOP_INTEGRITY");
+  const saved = f.store.read(); try { assert.equal(saved.payload.toString(), "{"); } finally { saved.payload.fill(0); }
+});
+test("protected reconciliation retained incident replays after full authority and monitor reopen", async t => {
+  const f = await protectedReconciliationFixture(t, true);
+  assert.equal((await f.monitor.poll()).state, "HARD_STOP_INTEGRITY");
+  await f.monitor.close(); await f.global.restart();
+  const reopened = await f.open(); cleanups.get(f.peer.root).push(() => reopened.close());
+  assert.equal((await reopened.poll()).state, "HARD_STOP_INTEGRITY"); assert.equal(f.global.authority.status().incidentCount, 1);
+});
+test("protected reconciliation rejects restored obsolete deployment identity", async t => {
+  const f = await protectedReconciliationFixture(t); await f.monitor.close();
+  const changed = structuredClone(f.manifest); changed.identityVersion++;
+  await assert.rejects(f.open(new WindowsProtectedStore(f.opts), changed), /ReconciliationMonitorUnavailable/u);
+  assert.equal(f.global.authority.status().state, "HARD_STOP_INTEGRITY");
 });
 
 test("persisted RUNNING requires fresh mutually authenticated source checks after restart", async t => {

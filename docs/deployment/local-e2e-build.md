@@ -146,6 +146,16 @@ vectors, all Rust workspaces/quality checks, both local daemon suites, source
 guardrails, complete history scans and license/dependency audits. A fresh clone
 that only passes host tests is not a fresh real-chain validation.
 
+`node solana/tests/local-reconciliation.mjs` runs the real deposit prerequisite
+and coherent accounting/deployment/Native-fork checks in another fresh external
+root. The Windows integration uses the separate local-chain host and
+`tests/windows/local-reconciliation.mjs`, with only external test configuration
+references in `KINGPEPE_LOCAL_WINDOWS_CHAIN_ROOT`. The independent Windows
+Native verifier is selected by `KINGPEPE_TEST_NATIVE_VERIFIER` and its verified
+`KINGPEPE_TEST_NATIVE_VERIFIER_SHA256`. Those values and all test data stay outside
+source. Current-principal DPAPI/mTLS/live-chain execution is not certification of
+separate service accounts or the complete protected deposit workflow.
+
 Tool references: [Agave 4.2.2 release](https://github.com/anza-xyz/agave/releases/tag/v4.2.2),
 [SBF builder](https://github.com/anza-xyz/cargo-build-sbf),
 [Native source pin](https://github.com/kingpepe2/king-pepe-source-code/tree/3f2621820ffefae59cbe48b350f5f8f6ec8a6da5).

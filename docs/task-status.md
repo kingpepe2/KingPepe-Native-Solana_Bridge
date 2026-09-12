@@ -1,5 +1,48 @@
 # KingPepe Native - Solana Bridge Task Status
 
+## Current reconciliation integration
+
+PRIVATE HEAD a2861f8676e20c30c26ec93202f877441a7990f5 publishes the tested RPC
+correction. Actions 34661170916 is NOT_RUN_ACCOUNT_BLOCKED, zero steps/artifacts.
+The next uncommitted 248-file tree integrates read-only reconciliation,
+protected progress/incident retention and actual-chain/Windows test harnesses.
+Locked installation and provenance pass; primary Node is 771 per platform plus
+two vectors each. Actual reconciliation is ten PASS after fourteen claim checks
+and a COMPLETED fresh deposit prerequisite.
+Six protected reconciliation candidate targets passed alongside three separate
+dispatch targets. Actual candidate checks remain separately scoped, not primary
+or clean-clone certification. Two separate outbox delivery probes failed before
+broadcast. The second found paused reconciliation admission at plan reservation.
+Four actual Windows regressions reproduced the journal-lock dependency failure;
+all four corrective cases pass. Current authorization now precedes the short
+journal CAS, with unchanged security deadlines and stop/mutation regression checks.
+The primary protected/live-chain rerun now passes eight checks with a fresh
+fourteen-check COMPLETED prerequisite; scope is actual CurrentUser DPAPI/mTLS
+and imported chain-derived completed records, not the full protected workflow.
+Final Node remains 771 plus two vectors per platform. Full Windows security
+reports 132 PASS, zero failed/skipped/cancelled, on the unchanged 168-file
+runtime (including C#); final clean clone is not run.
+Separate outbox attempts three/four failed admission, and five passed plan/signed
+retention but not durable enqueue. Attempt six now passes eight actual
+Windows/Native checks followed by fourteen claim checks and COMPLETED; it is
+not a full protected signing controller. The separate source-built helper passes
+36 targeted checks and its full 140-test Windows suite; Node is 835 plus two
+vectors per platform. Neither candidate is integrated or cross-account certified.
+Renewed primary Rust is 97 PASS with quality gates; license metadata/npm pass,
+and five Cargo audits retain the bincode unmaintained warning. CI attempt two
+for the published RPC SHA is still account-blocked, four jobs with zero steps
+and zero artifacts. Added reconciliation CI gates are not yet executed there.
+Primary real-chain regression now passes 55 deposit/security, 26 record,
+18 deployment, eight reorg and thirteen checkpoint checks. Primary Windows
+security passes 132. The separate frozen Solana delivery candidate passes
+147 full Windows tests, 879 Node plus two vectors per platform, and nine actual
+Windows/local-validator delivery checks plus fourteen claims and COMPLETED.
+Its actual-chain credit was initialized from prior verified test-chain data;
+this is not the full protected controller or cross-account certification.
+Next: finish primary reconciliation publication review/scans
+and push; then finish full controller/outbox/crash recovery. Phase 09 must not
+start. Final Phase 01-08 re-audit is incomplete.
+
 ## Current RPC correction
 
 Operation/accounting commit 8ea5d66f58abc0e756090bc94659860dd7627a55 is published

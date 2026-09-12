@@ -2,6 +2,13 @@
   "schemaVersion": "1.0",
   "generatedAt": "2026-09-12T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
+  "phase085ReconciliationReview": {
+    "baseline": "a2861f8676e20c30c26ec93202f877441a7990f5",
+    "filesBefore": 236,
+    "filesAfter": 248,
+    "sourceImports": "None. Original read-only coherent economic snapshots, protected progress and incident reporting, actual local-chain regressions and isolated Windows test processes. Existing raw Native verifier, Solana parser and Windows protection are reused.",
+    "scope": "Reconciliation boundary under primary integration validation. Not full protected deposit workflow, distinct service-principal certification or final clean-clone audit."
+  },
   "phase085RpcTransportReview": {
     "baseline": "8ea5d66f58abc0e756090bc94659860dd7627a55",
     "filesBefore": 236,
@@ -1521,6 +1528,66 @@
       "path": "docs/security/deposit-operation-recovery.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
       "notes": "Original engineering description of operation retention, observation checks and explicit uncompleted integration, without private deployment data."
+    },
+    {
+      "path": "docs/security/deposit-reconciliation.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original accounting, trust and test-scope explanation; official Agave links are reference-only."
+    },
+    {
+      "path": "services/reconciliation/deposit-reconciliation.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original exact accounting and read-only Native/Solana coherent snapshot comparison; no new cryptography or third-party source import."
+    },
+    {
+      "path": "services/reconciliation/protected-deposit-reconciliation.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original protected monotonic progress and incident retention using existing DPAPI, authenticated journal and global-stop adapters."
+    },
+    {
+      "path": "services/reconciliation/tests/deposit-reconciliation.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original exact arithmetic and account-layout tests with explicitly synthetic fixtures."
+    },
+    {
+      "path": "services/reconciliation/tests/protected-reconciliation-progress.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original bounded canonical progress, network and monotonic journal revision regression tests."
+    },
+    {
+      "path": "solana/tests/local-reconciliation.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original actual regtest/validator reconciliation and higher-work post-mint fork regression. Pinned Agave behavior is referenced, not copied."
+    },
+    {
+      "path": "solana/tests/local-windows-reconciliation-host.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated WSL chain/control harness; generated test data stays outside checkout and test control is not production IPC."
+    },
+    {
+      "path": "tests/integration/reconciliation-fixture.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original synthetic non-operational account and accounting fixture; no chain proof or private key."
+    },
+    {
+      "path": "tests/windows/local-integrity-host.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated test authority process hosting actual mutually authenticated endpoints. Test control carries only external configuration references, not keys or signing shares."
+    },
+    {
+      "path": "tests/windows/local-monitor-actor.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated test observer process with actual chain reads, protected progress and mTLS health reports; no synthetic health or production provisioning."
+    },
+    {
+      "path": "tests/windows/local-reconciliation.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original real Windows protected reconciliation/live-chain probe; not full deposit workflow or distinct-principal certification."
+    },
+    {
+      "path": "tests/windows/local-security-fixture.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original current-principal disposable Windows test enrollment helper, not a production installer or cross-service identity claim."
     }
   ]
 }

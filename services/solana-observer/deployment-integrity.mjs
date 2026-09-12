@@ -93,35 +93,35 @@ export function verifyDeploymentSnapshot(manifest, snapshot) {
   const accounts = new Map(addresses.map((address, i) => [address, snapshot.accounts[i]]));
   for (const p of [m.manager, m.transceiver]) {
     const a = accounts.get(p.id);
-    if (a === null) different("SOLANA_DEPLOYMENT_CHANGED", { absent: p.id });
+    if (a === null) different("SOLANA_DEPLOYMENT_CHANGED", { absent: p.id }, "PROGRAM_ABSENT");
     let b = accountData(a), slot;
-    if (a.owner !== p.loader || !a.executable) different("SOLANA_DEPLOYMENT_CHANGED", a);
+    if (a.owner !== p.loader || !a.executable) different("SOLANA_DEPLOYMENT_CHANGED", a, "PROGRAM_EXECUTABLE_OR_LOADER");
     if (p.loader === UPGRADEABLE_LOADER) {
-      if (b.length !== 36 || b.readUInt32LE() !== 2 || base58Encode(b.subarray(4)) !== p.programData) different("SOLANA_DEPLOYMENT_CHANGED", a);
+      if (b.length !== 36 || b.readUInt32LE() !== 2 || base58Encode(b.subarray(4)) !== p.programData) different("SOLANA_DEPLOYMENT_CHANGED", a, "PROGRAMDATA_BINDING");
       const data = accounts.get(p.programData);
-      if (data === null) different("SOLANA_DEPLOYMENT_CHANGED", { absent: p.programData });
+      if (data === null) different("SOLANA_DEPLOYMENT_CHANGED", { absent: p.programData }, "PROGRAMDATA_ABSENT");
       b = accountData(data);
-      if (data.owner !== UPGRADEABLE_LOADER || data.executable || b.length !== p.dataLength || b.length < 45 || b.readUInt32LE() !== 3 || ![0, 1].includes(b[12])) different("SOLANA_DEPLOYMENT_CHANGED", data);
+      if (data.owner !== UPGRADEABLE_LOADER || data.executable || b.length !== p.dataLength || b.length < 45 || b.readUInt32LE() !== 3 || ![0, 1].includes(b[12])) different("SOLANA_DEPLOYMENT_CHANGED", data, "PROGRAMDATA_LAYOUT");
       slot = b.readBigUInt64LE(4).toString();
       const authority = b[12] === 0 ? null : base58Encode(b.subarray(13, 45));
-      if (slot !== p.deploymentSlot || authority !== p.upgradeAuthority) different("SOLANA_DEPLOYMENT_CHANGED", data);
+      if (slot !== p.deploymentSlot || authority !== p.upgradeAuthority) different("SOLANA_DEPLOYMENT_CHANGED", data, "UPGRADE_AUTHORITY_OR_SLOT");
       // None's serialized unused bytes are not authority data. Hash precisely
       // the approved executable length and require all allocated tail bytes zero.
       b = b.subarray(45);
-    } else if (b.length !== p.dataLength) different("SOLANA_DEPLOYMENT_CHANGED", a);
+    } else if (b.length !== p.dataLength) different("SOLANA_DEPLOYMENT_CHANGED", a, "PROGRAM_LENGTH");
     if (b.subarray(0, 4).toString("hex") !== "7f454c46" || b.length < p.binaryLength ||
-        b.subarray(p.binaryLength).some(byte => byte !== 0) || deploymentDigest(b.subarray(0, p.binaryLength)) !== p.binaryHash) different("SOLANA_DEPLOYMENT_CHANGED", { program: p.id, dataHash: deploymentDigest(b), slot: slot ?? null });
+        b.subarray(p.binaryLength).some(byte => byte !== 0) || deploymentDigest(b.subarray(0, p.binaryLength)) !== p.binaryHash) different("SOLANA_DEPLOYMENT_CHANGED", { program: p.id, dataHash: deploymentDigest(b), slot: slot ?? null }, "BYTECODE_IDENTITY");
   }
   const mint = accounts.get(m.mint.id), bridge = accounts.get(m.config.bridgePda), transceiver = accounts.get(m.config.transceiverPda);
-  if (!mint) different("SOLANA_DEPLOYMENT_CHANGED", { missingMint: true });
+  if (!mint) different("SOLANA_DEPLOYMENT_CHANGED", { missingMint: true }, "MISSING_MINT");
   const mintBytes = accountData(mint);
   if (mint.owner !== TOKEN || mint.executable || mintBytes.length !== 82 || mintBytes.readUInt32LE() !== 1 ||
       base58Encode(mintBytes.subarray(4, 36)) !== m.mint.authority || mintBytes[44] !== m.mint.decimals || mintBytes[45] !== 1) different("SOLANA_DEPLOYMENT_CHANGED", mint, "MINT_BINDING");
   if (mintBytes.readUInt32LE(46) !== 0 || mintBytes.subarray(50).some(byte => byte !== 0)) different("SOLANA_DEPLOYMENT_CHANGED", mint, "FREEZE_AUTHORITY");
-  if (!bridge || !transceiver) different("SOLANA_DEPLOYMENT_CHANGED", { missingConfiguration: true });
+  if (!bridge || !transceiver) different("SOLANA_DEPLOYMENT_CHANGED", { missingConfiguration: true }, "CONFIGURATION_ABSENT");
   const bridgeBytes = accountData(bridge), transceiverBytes = accountData(transceiver), expected = expectedConfig(m);
-  if (bridge.owner !== m.manager.id || bridge.executable || bridgeBytes.length !== 298 || !bridgeBytes.subarray(0, 266).equals(expected.bridge)) different("SOLANA_DEPLOYMENT_CHANGED", bridge);
-  if (transceiver.owner !== m.transceiver.id || transceiver.executable || !transceiverBytes.equals(expected.transceiver)) different("SOLANA_DEPLOYMENT_CHANGED", transceiver);
+  if (bridge.owner !== m.manager.id || bridge.executable || bridgeBytes.length !== 298 || !bridgeBytes.subarray(0, 266).equals(expected.bridge)) different("SOLANA_DEPLOYMENT_CHANGED", bridge, "BRIDGE_CONFIGURATION");
+  if (transceiver.owner !== m.transceiver.id || transceiver.executable || !transceiverBytes.equals(expected.transceiver)) different("SOLANA_DEPLOYMENT_CHANGED", transceiver, "TRANSCEIVER_CONFIGURATION");
   const u128 = (b, offset) => (b.readBigUInt64LE(offset) + (b.readBigUInt64LE(offset + 8) << 64n)).toString();
   return Object.freeze({ protocol: DEPLOYMENT_MONITOR_PROTOCOL, trust: "RPC_OBSERVATION", slot: String(snapshot.slot),
     genesis: snapshot.genesis, manifestDigest: deploymentManifestDigest(m), snapshotDigest: deploymentDigest(Buffer.from(JSON.stringify(canonical(snapshot)))),
@@ -149,10 +149,16 @@ export class LocalDeploymentRpc {
   }
   async genesis() { const result = await this.#call("getGenesisHash", []); key(result); return result; }
   async snapshot(manifest, minimumSlot = manifest.minimumSlot) {
+    return this.snapshotWithAdditionalAccounts(manifest, [], minimumSlot);
+  }
+  async snapshotWithAdditionalAccounts(manifest, additionalAccounts, minimumSlot = manifest.minimumSlot) {
     const m = validateDeploymentManifest(manifest); check(uint(minimumSlot) <= BigInt(Number.MAX_SAFE_INTEGER));
+    check(Array.isArray(additionalAccounts) && additionalAccounts.length <= 64);
+    const addresses = [...deploymentAddresses(m), ...additionalAccounts];
+    addresses.forEach(key); check(new Set(addresses).size === addresses.length);
     const genesis = await this.genesis();
-    // One bank/context for program, ProgramData, mint and both configuration accounts.
-    const v = await this.#call("getMultipleAccounts", [deploymentAddresses(m), { commitment: "finalized", encoding: "base64", minContextSlot: Number(minimumSlot) }]);
+    // One bank/context for deployment, Mint/counters and optional claim accounts.
+    const v = await this.#call("getMultipleAccounts", [addresses, { commitment: "finalized", encoding: "base64", minContextSlot: Number(minimumSlot) }]);
     check(genesis === await this.genesis(), "DeploymentEndpointChangedDuringRead");
     return { genesis, slot: v?.context?.slot, accounts: v?.value };
   }

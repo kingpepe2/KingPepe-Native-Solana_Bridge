@@ -15,11 +15,16 @@ const MAX_HEADERS = 4096;
 const MAX_TRANSACTIONS = 16;
 const MAX_BLOCK_TXIDS = 65_536;
 const CHECKPOINT_PROTOCOL = "KINGPEPE_REGTEST_ACCEPTANCE_CHECKPOINT_V1";
-const VERIFIED_CHAINS = new WeakSet(), VERIFIED_RESERVES = new WeakMap();
+const VERIFIED_CHAINS = new WeakSet(), VERIFIED_RESERVES = new WeakMap(), OBSERVED_SPENT_RESERVES = new WeakMap();
 const headerId = raw => createHash("sha256").update(createHash("sha256").update(hex(raw, 80)).digest()).digest().reverse().toString("hex");
 export function requireVerifiedRegtestChain(value) { if (!VERIFIED_CHAINS.has(value)) throw new Error("RAW_NATIVE_VERIFIED_CHAIN_REQUIRED"); }
 export function requireVerifiedRegtestReserve(value) { if (!VERIFIED_RESERVES.has(value)) throw new Error("RAW_NATIVE_VERIFIED_RESERVE_REQUIRED"); }
 export function verifiedReserveChain(value) { requireVerifiedRegtestReserve(value); return VERIFIED_RESERVES.get(value); }
+// A generic RPC error or a caller-created object is not evidence of a deficit.
+// Only the verified sweep path below can produce this capability. UTXO absence
+// still relies on the configured validating node; it is not a cryptographic
+// proof of the node's honesty or a proof of the spending transaction itself.
+export function observedSpentRegtestReserve(error) { return OBSERVED_SPENT_RESERVES.get(error); }
 function verifiedChain(bundle, verified, observedAt) {
   const result = Object.freeze({ ...verified, genesis: REGTEST_GENESIS, chainworkHex: bundle.chainworkHex, observedAt,
     headerHashes: Object.freeze([REGTEST_GENESIS, ...bundle.headers.map(headerId)]),
@@ -278,19 +283,33 @@ export class LocalNativeEvidenceVerifier {
       || total - atomic(output.amountAtomic) !== atomic(expected.feeAtomic)) throw new Error("RAW_NATIVE_SWEEP_VALUE_MISMATCH");
     const witnessSignatures = verifyRegtestSweepSignatures({ sweep, inputs, tapscriptSpends: expected.tapscriptSpends,
       reserveScriptHex: expected.reserveScriptHex });
+    const basis = txid => { const proof = bundle.proofs.find(p => parseNativeTransactionHex(p.rawTransactionHex).txidHex === txid);
+      return Object.freeze({ txid, height: proof.blockHeight, blockHash: headerId(bundle.headers[proof.blockHeight - 1]) }); };
+    const reserveBasis = Object.freeze({ genesis: REGTEST_GENESIS, chainworkHex: bundle.chainworkHex,
+      deposit: Object.freeze({ ...basis(expected.deposit.txid), vout: expected.deposit.vout }),
+      sweep: Object.freeze({ ...basis(sweep.txidHex), vout: expected.reserveVout }),
+      amountAtomic: output.amountAtomic, reserveScriptHex: output.scriptPubKeyHex });
     const utxo = await this.#rpc.getUtxoObservation({ txid: sweep.txidHex, vout: 0, decimals: 8, includeMempool: true });
+    if (utxo.unspent === false) {
+      // Exclude mempool spends before classifying canonical reserve loss. The
+      // creating sweep's inclusion, exact inputs/output/fees and all signatures
+      // have already passed independent raw verification at this same tip.
+      const canonical = await this.#rpc.getUtxoObservation({ txid: sweep.txidHex, vout: 0, decimals: 8, includeMempool: false });
+      if ((await this.#rpc.call("getbestblockhash", [])).result !== current.tipHash) throw new Error("RAW_NATIVE_SOURCE_CHANGED");
+      if (canonical.unspent === false) {
+        const error = new Error("RAW_NATIVE_RESERVE_SPENT");
+        OBSERVED_SPENT_RESERVES.set(error, Object.freeze({ reserveBasis, chain: verifiedChain(bundle, current, observedAt),
+          utxoTrust: "CONFIGURED_LOCAL_VALIDATING_NODE_RPC_OBSERVATION" }));
+        throw error;
+      }
+    }
     if (!utxo.unspent || utxo.coinbase || utxo.bestBlockHash !== current.tipHash
       || utxo.valueAtomic !== output.amountAtomic || utxo.scriptPubKeyHex !== output.scriptPubKeyHex
       || utxo.confirmations < expected.minimumConfirmations) throw new Error("RAW_NATIVE_RESERVE_NOT_AVAILABLE");
     if ((await this.#rpc.call("getbestblockhash", [])).result !== current.tipHash) throw new Error("RAW_NATIVE_SOURCE_CHANGED");
-    const basis = txid => { const proof = bundle.proofs.find(p => parseNativeTransactionHex(p.rawTransactionHex).txidHex === txid);
-      return Object.freeze({ txid, height: proof.blockHeight, blockHash: headerId(bundle.headers[proof.blockHeight - 1]) }); };
     const result = Object.freeze({ ...verified, acceptedCheckpoint: acceptance,
       currentTipHash: current.tipHash, currentTipHeight: current.tipHeight, witnessSignatures, utxoTrust: "CONFIGURED_LOCAL_VALIDATING_NODE_RPC_OBSERVATION",
-      reserveBasis: Object.freeze({ genesis: REGTEST_GENESIS, chainworkHex: bundle.chainworkHex,
-        deposit: Object.freeze({ ...basis(expected.deposit.txid), vout: expected.deposit.vout }),
-        sweep: Object.freeze({ ...basis(sweep.txidHex), vout: expected.reserveVout }),
-        amountAtomic: output.amountAtomic, reserveScriptHex: output.scriptPubKeyHex }) });
+      reserveBasis });
     VERIFIED_RESERVES.set(result, verifiedChain(bundle, current, observedAt)); return result;
   }
 }

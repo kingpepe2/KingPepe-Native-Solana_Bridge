@@ -82,6 +82,8 @@
     "phase09": "NOT_STARTED"
   },
   "phase085RpcContinuation": {
+    "publishedRpcSha": "a2861f8676e20c30c26ec93202f877441a7990f5",
+    "publishedRpcCi": "NOT_RUN_ACCOUNT_BLOCKED_RUN_34661170916_ZERO_STEPS_ZERO_ARTIFACTS",
     "publishedOperationSha": "8ea5d66f58abc0e756090bc94659860dd7627a55",
     "publishedOperationCi": "NOT_RUN_ACCOUNT_BLOCKED_RUN_34660593342_ZERO_STEPS_ZERO_ARTIFACTS",
     "rpcTransport": "IMPLEMENTED_AND_PRIMARY_LOCALLY_VALIDATED_TRANSPORT_BOUNDARY",
@@ -93,6 +95,28 @@
     "actualOperationClaimChecks": 14,
     "reorgRerun": { "pass": 8, "fail": 0, "scope": "ACTUAL_REGTEST_AFTER_REAL_MINT_NOT_FULL_PROTECTED_SERVICE" },
     "windowsFullSecurity": "PRIOR_122_PASS_BELONGS_TO_OPERATION_REVISION_FINAL_CURRENT_CLONE_RERUN_REQUIRED",
+    "freshClone": "NOT_RUN",
+    "phase09": "NOT_STARTED"
+  },
+  "phase085ReconciliationContinuation": {
+    "source": "INTEGRATED_PRIMARY_LOCAL_COMPONENT_VALIDATION_COMPLETE_PUBLICATION_PENDING",
+    "candidateProtectedTargetsPass": 6,
+    "candidateActualChainChecksPass": 10,
+    "candidateWindowsLiveChainChecksPass": 8,
+    "candidateScope": "SEPARATE_CURRENT_PRINCIPAL_COMPONENT_AND_POST_MINT_JOURNAL_TEST_INITIALIZATION_NOT_FULL_PROTECTED_FLOW",
+    "primaryNode": { "passPerPlatform": 771, "fail": 0, "skip": 0, "cancelled": 0, "vectorsPerPlatform": 2 },
+    "primaryActualChain": { "reconciliationPass": 10, "claimPass": 14, "nativeToSolana": "COMPLETED", "scope": "NOT_PROTECTED_WINDOWS_STOP_PROPAGATION" },
+    "admissionLockRegression": { "red": { "pass": 0, "fail": 4, "durationMs": 153386.5502 }, "correction": "FRESH_AUTHORIZATION_BEFORE_SHORT_JOURNAL_CAS", "green": { "pass": 4, "fail": 0, "skip": 0, "cancelled": 0, "durationMs": 233452.6367 }, "deadlines": "UNCHANGED" },
+    "primaryProtectedAndLiveChain": { "pass": 8, "fail": 0, "claimPrerequisite": 14, "nativeToSolana": "COMPLETED", "runtimeFiles": 167, "runtimeDigest": "fa4d29efbc5095acedc2207bc2bf07417d898a5f4309e29d665d0005ff3d83fe", "scope": "CURRENT_PRINCIPAL_ACTUAL_CHAINS_IMPORTED_COMPLETED_RECORDS_NOT_FULL_PROTECTED_FLOW_OR_CROSS_ACCOUNT" },
+    "primaryFullWindowsSecurity": { "state": "COMPLETED_LOG_REPORTS_PASS_ORIGINAL_TERMINAL_SESSION_EXPIRED", "pass": 132, "fail": 0, "skip": 0, "cancelled": 0, "durationMs": 6926073.896, "runtimeFilesIncludingCSharp": 168, "runtimeDigest": "0101add2d4782652d75b08ca00d05a7f2dd4732998dbad6691d33e691f4502d9", "beforeAfterRuntimeUnchanged": true, "scope": "CURRENT_PRINCIPAL_COMPONENTS_NOT_CROSS_ACCOUNT_OR_FULL_PROTECTED_CHAIN" },
+    "separateOutboxCandidate": { "priorAttempts": "FIVE_FAILED_BEFORE_BROADCAST_RETAINED", "attemptSixWindowsNativePass": 8, "claimContinuationPass": 14, "nativeToSolana": "COMPLETED", "scope": "ACTUAL_PROTECTED_DELIVERY_LINUX_TEST_FROST_NOT_FULL_PROTECTED_CONTROLLER", "integration": "NOT_INTEGRATED" },
+    "separateCompiledProtectionCandidate": { "targetedPass": 36, "fullWindowsSecurityPass": 140, "fail": 0, "skip": 0, "cancelled": 0, "durationMs": 2284658.0676, "nodePassPerPlatform": 835, "vectorsPerPlatform": 2, "runtimeFiles": 186, "runtimeDigest": "37c0361a40d411c40194d37969dc6921eec1b08f7c9559435b67940961890e08", "scope": "CURRENT_PRINCIPAL_COMPONENTS_NOT_CROSS_ACCOUNT_OR_FULL_PROTECTED_CHAIN", "integration": "NOT_INTEGRATED" },
+    "primaryRustRerun": { "pass": 97, "fail": 0, "ignored": 0, "quality": "PASS" },
+    "primaryRealChainRerun": { "depositSecurity": 55, "withdrawalRecord": 26, "deploymentIntegrity": 18, "nativeReorg": 8, "acceptanceCheckpoint": 13, "scope": "FRESH_CHAIN_STATE_EXISTING_BUILD_CACHE" },
+    "primaryDependencyRerun": "NPM_ZERO_AND_DECLARED_LICENSE_PASS_CARGO_FIVE_PASS_BINCODE_UNMAINTAINED_WARNING_RETAINED",
+    "publishedRpcCiAttemptTwo": "NOT_RUN_ACCOUNT_BLOCKED_FOUR_JOBS_ZERO_STEPS_ZERO_ARTIFACTS",
+    "addedReconciliationCiGates": "LOCAL_VALIDATION_PASS_GITHUB_EXECUTION_NOT_RUN_ACCOUNT_BLOCKED",
+    "fullControllerAndOutboxes": "INCOMPLETE",
     "freshClone": "NOT_RUN",
     "phase09": "NOT_STARTED"
   },

@@ -159,6 +159,28 @@ jobs:
             }
           '
 
+      - name: Real finalized claim and consistent-snapshot reconciliation (regtest only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="${KINGPEPE_CI_TOOL_ROOT}/solana-release/bin:${KINGPEPE_CI_TOOL_ROOT}/native-build/bin:${PATH}"
+          export KINGPEPE_LOCAL_E2E_ROOT="${KINGPEPE_CI_TOOL_ROOT}/reconciliation-run"
+          export KINGPEPE_LOCAL_BUILD_ROOT="${KINGPEPE_CI_TOOL_ROOT}/build"
+          export KINGPEPE_TEST_SOURCE_SHA="${GITHUB_SHA}"
+          node solana/tests/local-reconciliation.mjs > "${KINGPEPE_CI_TOOL_ROOT}/reconciliation-result.json"
+          node --input-type=module -e '
+            import {readFileSync} from "node:fs";
+            const r = JSON.parse(readFileSync(process.env.KINGPEPE_CI_TOOL_ROOT + "/reconciliation-result.json", "utf8"));
+            console.log(JSON.stringify({sourceSha: process.env.GITHUB_SHA, ...r}));
+            if (r.pass !== 10 || r.fail !== 0 || r.claimChecks !== 14 || r.state !== "COMPLETED" || r.phase09 !== "NOT_STARTED") process.exit(1);
+            for (const check of ["MEMPOOL_RESERVE_SPEND_SUSPENDS_NOT_CONFIRMED_CHAIN_DEFICIT",
+              "CONFIRMED_UNREGISTERED_RESERVE_MOVE_IS_EXACT_INTEGRITY_INCIDENT",
+              "HIGHER_WORK_POST_MINT_REORG_IDENTIFIES_EXACT_AFFECTED_BACKING",
+              "REORG_DETECTION_DOES_NOT_REMINT_BURN_OR_CONFISCATE"]) {
+              if (!r.passed.includes(check)) process.exit(1);
+            }
+          '
+
       - name: Real atomic withdrawal-record prerequisite (no Native payout)
         shell: bash
         run: |
@@ -311,6 +333,8 @@ jobs:
         run: npm run test:solana-observer
       - name: Run bridge validator tests
         run: npm run test:bridge-validator
+      - name: Run consistent-snapshot reconciliation tests
+        run: npm run test:reconciliation
       - name: Run local E2E readiness gate tests
         run: npm run test:local-e2e-readiness
       - name: Validate native FROST runtime
@@ -386,6 +410,8 @@ jobs:
         run: npm run test:solana-observer
       - name: Run bridge validator tests
         run: npm run test:bridge-validator
+      - name: Run consistent-snapshot reconciliation tests
+        run: npm run test:reconciliation
       - name: Run local E2E readiness gate tests
         run: npm run test:local-e2e-readiness
       - name: Validate native FROST runtime

@@ -23,6 +23,59 @@
 
 ## Current task: Phase 08.5 security remediation
 
+Current PRIVATE published HEAD is a2861f8676e20c30c26ec93202f877441a7990f5,
+the RPC boundary correction. Node 712 per platform, vectors two each, actual
+deposit/claim checks fourteen and post-mint reorg checks eight pass. Exact
+Actions 34661170916 is NOT_RUN_ACCOUNT_BLOCKED: four jobs with zero steps and
+zero artifacts. Source/staged exports and the outgoing commit passed scans.
+
+The next reconciliation increment is integrated but uncommitted. It reads a
+revision-bound protected operation journal and coherent Native/Solana snapshots,
+retains network progress and reports durable contradictions without financial
+repair. Twelve new source/test/doc files bring provenance to 248. The separate
+candidate passed six protected component checks, ten actual-chain checks and
+eight Windows protected/live-chain checks in their documented scopes. Primary
+Windows and WSL Node each passed 771 tests plus two vectors; actual primary
+reconciliation passed ten checks after fourteen claim checks and COMPLETED.
+Primary protected/live-chain validation now passes eight checks after its own
+fourteen-check COMPLETED prerequisite. The full Windows security run now reports
+132 PASS, zero failed/skipped/cancelled, in 6926073.896 ms. Its 168-file runtime
+digest including the C# helper is
+0101add2d4782652d75b08ca00d05a7f2dd4732998dbad6691d33e691f4502d9.
+All runtime hashes match the pre-run snapshot. This is CurrentUser component
+evidence, not cross-account certification or complete protected-chain recovery.
+Full protected deposit controller/outboxes and final clean clone remain required.
+An additional, separate Native outbox candidate failed before broadcast on
+source admission. Its diagnostic rerun found reconciliation missing, no integrity
+incident. Four actual DPAPI/mTLS regressions reproduced the operation-journal
+lock held across dependent authorization (zero pass, four fail). Admission now
+precedes the short current-image CAS; all four corrective cases pass, including
+intervening-stop rejection without mutation. Separate outbox attempts three/four
+still failed admission; five passed plan/signed retention but not durable enqueue.
+The sixth run passes eight actual Windows/Native delivery checks and its
+fourteen-check COMPLETED claim prerequisite. It verifies that the lost-response
+fault actually follows persistence, kills a worker after real broadcast and
+reopens without sending again. It is not the full protected signing controller.
+A separate source-built protection-helper candidate now passes 36 targeted
+tests, full Windows security 140, and Node 835 plus two vectors per platform.
+Its frozen 186-file runtime digest is
+37c0361a40d411c40194d37969dc6921eec1b08f7c9559435b67940961890e08.
+Neither candidate is integrated here. Preserve earlier failed evidence.
+Freshness and IPC deadlines are unchanged. The separate Solana delivery
+candidate has seven protected component passes with synthetic RPC responses;
+actual validator delivery remains a separate gate. Primary Rust rerun passes
+97 with quality checks. Cargo audits retain the unmaintained bincode warning.
+CI attempt two of the published RPC SHA remains account-blocked, zero steps
+in four jobs and zero artifacts. Reconciliation checks are added to CI without
+removing existing gates. Full primary Windows security now passes 132.
+Primary real-chain regressions now pass 55/26/18/8/13 in their documented scopes.
+The separate Solana delivery candidate passes 147 full Windows tests, Node 879
+plus two vectors per platform and nine actual Windows/local-validator delivery
+checks with fourteen claims and COMPLETED. Its 194-file runtime digest is
+1a896a1cc8510011d09d3cade9bdf38d8d5a01d8bc644efcb22fe729f253f3a4.
+That candidate remains separate; no complete protected-controller certification.
+Phase 09 NOT_STARTED.
+
 Latest published operation/accounting increment is
 8ea5d66f58abc0e756090bc94659860dd7627a55 (PRIVATE). Its complete Windows security
 rerun passed 122; Node 699 per platform, two vectors each, Rust 97/quality and

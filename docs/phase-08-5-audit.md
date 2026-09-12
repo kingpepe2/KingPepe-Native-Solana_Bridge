@@ -1,5 +1,30 @@
 # Phase 08.5 retrospective audit
 
+## Current reconciliation integration (not final re-audit)
+
+PRIVATE RPC HEAD a2861f8676e20c30c26ec93202f877441a7990f5 has exact Actions
+34661170916 account-blocked with zero steps/artifacts. Its primary Node 712 per
+platform and actual deposit/reorg results are not proof of the new reconciliation
+tree. The 248-file integration has complete provenance; primary Node 771 plus
+two vectors per platform, Rust 97 and quality gates, ten actual reconciliation
+checks after fourteen claim checks, and eight primary Windows/live-chain checks
+pass in their documented scopes. Primary full Windows security reports 132 PASS,
+zero failed/skipped/cancelled, with the unchanged pre/post runtime digest.
+The separate helper/dispatch candidate passes full Windows security 140 and
+Node 835 per platform; Native outbox delivery passes eight actual checks with
+a COMPLETED fourteen-check claim continuation. These candidate totals do not
+certify primary integration or the complete protected deposit controller.
+Attempt two of the published RPC CI remains account-blocked, zero executed
+steps in all four jobs, zero artifacts. Added reconciliation CI gates are
+not bypasses or successful GitHub execution.
+Primary real-chain regressions now pass 55/26/18/8/13; full primary Windows
+security passes 132. Separate Solana delivery evidence is 147 full Windows
+tests, Node 879 plus two vectors per platform and nine actual protected/local-
+validator delivery checks with fourteen claims and COMPLETED. It uses verified
+test-chain credit initialization and is not the complete protected workflow.
+Full protected controller/outboxes and final clean-clone/re-audit remain open.
+Phase 04/07/08 remain FAIL overall; SAFE_TO_BEGIN_PHASE_09=false.
+
 ## Current RPC correction (not final re-audit)
 
 Operation increment 8ea5d66f58abc0e756090bc94659860dd7627a55 is published PRIVATE.

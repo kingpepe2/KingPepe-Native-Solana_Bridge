@@ -1,5 +1,115 @@
 # KingPepe Native - Solana Bridge Development Status
 
+## Reconciliation primary integration in progress
+
+RPC correction a2861f8676e20c30c26ec93202f877441a7990f5 is published PRIVATE,
+tree 5fab65e04ffb371084b9de02a41a18f0644f5a2a. Its current/staged source exports,
+all 179 earlier commits and its one outgoing commit passed Gitleaks. Node 712
+per platform, two vectors each, actual deposit/claim fourteen and reorg eight
+checks pass. [Exact Actions 34661170916](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34661170916)
+is NOT_RUN_ACCOUNT_BLOCKED, including the renewed attempt two: the same account payments/spending-limit message,
+four jobs, zero executed steps, zero artifacts. CI policy is unchanged.
+
+The next integrated component performs exact coherent reconciliation of the
+operation journal, registered Native reserve, pending credits, Mint supply,
+Manager counters and observed claims. It persists network/manifest/revision
+progress and confirmed incidents using the existing protected storage and
+global-stop path. Missing data waits; confirmed contradictions do not auto-clear.
+No balance editing, signing, payout or Phase 09 API is introduced.
+
+The separate candidate has ten actual-chain checks and eight Windows/live-chain
+checks recorded in its security document. A new combined targeted run passed
+six reconciliation and three separate signing-dispatch checks (nine total,
+zero failures/skips/cancellations, 775196.1845 ms). Only the reconciliation
+component is integrated here; the dispatch candidate is not published. That
+targeted run's 180-file candidate digest was
+c4f8f5e6c1db2389fcbc0c72b4bd634ec9e4fbf57f11c59a256bdf3812d0dc02.
+These are actual current-principal DPAPI/mTLS tests with synthetic/unavailable
+chain fixtures, not the complete protected deposit workflow.
+
+Primary locked installation and 248-file provenance pass. Full primary Windows
+and WSL Node each passed 771 tests plus two vectors, zero failures/skips/cancelled.
+Fresh primary actual-chain reconciliation passes ten checks after fourteen
+claim checks and a COMPLETED Native-to-Solana prerequisite. It validates real
+reserve/one-bank accounting, lost mint-journal acknowledgement, deployed bytes,
+genesis, mempool versus confirmed reserve loss and exact higher-work reorg impact.
+Primary protected/live-chain propagation now passes eight checks following its
+own fresh fourteen-check COMPLETED deposit prerequisite. It uses actual
+CurrentUser DPAPI/mTLS, separate source processes and real higher-work Native
+reorganization, with exact backing impact and durable stop propagation. The
+completed records are chain-derived test initialization, not a full protected
+deposit controller or cross-service SID certification. The 167-file runtime
+digest is fa4d29efbc5095acedc2207bc2bf07417d898a5f4309e29d665d0005ff3d83fe.
+The final primary Node rerun again passes 771 plus two vectors per platform.
+The complete Windows security log reports 132 PASS, zero failed/skipped/cancelled,
+in 6926073.896 ms. The process has ended; its original terminal session was no
+longer available at the final log check. Including the unchanged C# protection
+implementation, its 168-file digest before and after the run is
+0101add2d4782652d75b08ca00d05a7f2dd4732998dbad6691d33e691f4502d9.
+Final clean-clone and complete protected-controller gates remain pending.
+
+A separate Native outbox probe failed before broadcast. Its diagnostic second
+attempt reached PLAN_RESERVATION with PAUSED_POLICY, RECONCILIATION missing and
+zero integrity incidents. Four actual DPAPI/mTLS regressions then reproduced a
+journal mutex held across the authorization that depends on reconciliation
+reading that journal: zero pass, four fail (153386.5502 ms). The correction moves
+fresh authorization before the short synchronous current-image CAS; neither
+deadlines nor state checks are relaxed. Four corrective cases also require an
+intervening durable stop to reject without mutation; all four pass in
+233452.6367 ms, zero failures/skips/cancellations. Separate actual outbox attempts
+three and four still failed admission before broadcast. Separating reconciliation
+into its own process did not alone resolve protected-call scheduling cost.
+Candidate attempt five passed plan reservation and signed retention but failed
+enqueue admission before the intended lost-response fault was injected.
+The fixture had advanced the Native tip before every status check; the corrected
+fixture retries the same idempotent request only after actual policy health
+returns, and asserts that the durable enqueue fault really occurred. Attempt six
+passes eight actual Windows/Native delivery checks, followed by fourteen real
+claim checks and COMPLETED. It kills the child after actual Native acceptance,
+reopens without rebroadcast and retains the outcome after a lost protected-write
+acknowledgement. The FROST signature was created by the isolated Linux fixture;
+this is not the complete protected FROST-to-mint controller.
+
+A separate source-built Windows protection-helper candidate removes compilation
+on every protected read/write without changing DPAPI, ACL, CAS, witness, lease,
+nonce or authorization checks. Five executable-integrity tests and the existing
+31 CurrentUser protection/FROST/attester tests pass (36 total). The candidate's
+full Windows security rerun passes 140, zero failed/skipped/cancelled, in
+2284658.0676 ms; Node passes 835 plus two vectors per platform. Its unchanged
+186-file digest is 37c0361a40d411c40194d37969dc6921eec1b08f7c9559435b67940961890e08.
+The actual eight-check outbox result belongs to that same runtime, not primary
+integration or cross-service-account certification. A separate Solana outbox
+candidate passes seven actual protected/IPC component tests with synthetic chain
+responses; its actual validator test is separate. All failed outbox
+attempts remain failed evidence; none changes the published RPC/operation results.
+
+Renewed primary Rust is 97 PASS, zero failed/ignored, with check/fmt/Clippy.
+All five Cargo advisory checks complete under the unchanged deny policy;
+RUSTSEC-2025-0141 (unmaintained bincode 1.3.3) remains a reported warning.
+Declared-license metadata passes and npm reports zero vulnerabilities.
+CI now explicitly includes the portable reconciliation suite on both platforms
+and the actual ten-check reconciliation/fourteen-check claim prerequisite.
+These additional gates have not executed on GitHub because account execution
+remains blocked; local execution is not relabeled CI success.
+
+The primary real-chain regression rerun is now complete: deposit/security 55,
+withdrawal record 26, deployment integrity 18, Native reorg eight and acceptance
+checkpoint thirteen pass with their fresh COMPLETED deposit prerequisites.
+This uses isolated fresh chain state and the existing build cache, not a cold
+reproducibility claim. Primary Windows security is complete as recorded above.
+
+The separate Solana delivery candidate passes Node 879 plus two vectors on
+each platform and its full Windows security suite 147, zero failed/skipped/
+cancelled, in 2529100.8571 ms. The unchanged 194-file runtime digest is
+1a896a1cc8510011d09d3cade9bdf38d8d5a01d8bc644efcb22fe729f253f3a4.
+Its actual Windows/local-validator delivery run passes nine checks followed by
+fourteen claim checks and COMPLETED. Both receipt and claim workers are killed
+after actual validator acknowledgement, before protected outcome persistence;
+reopen queries finalized accounts without resending. Lost enqueue/CAS responses
+are also covered. Its pending credit is chain-derived TEST initialization, not
+the complete protected FROST/attester/controller workflow or cross-SID evidence.
+These candidate files and results are not yet primary publication.
+
 ## RPC boundary correction after operation-journal publication
 
 Operation/accounting increment 8ea5d66f58abc0e756090bc94659860dd7627a55 is now
