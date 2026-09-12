@@ -1,7 +1,14 @@
 {
   "schemaVersion": "1.0",
-  "generatedAt": "2026-09-11T00:00:00Z",
+  "generatedAt": "2026-09-12T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
+  "phase085DepositOperationReview": {
+    "baseline": "9de05a715c8a2c124a2c456b7cb8a50cdb6014ca",
+    "filesBefore": 227,
+    "filesAfter": 236,
+    "sourceImports": "None. Original protected deposit state/accounting adapter, read-only authenticated snapshots, existing canonical packet verifier integration, explicit non-replacement sweep construction and local-chain execution checks. Native RPC default checked in the existing pinned source; no upstream implementation copied or cryptographic dependency changed.",
+    "scope": "Operation/observation boundary locally component-tested, not a complete unattended controller, broadcast-credit rediscovery service or final clean-clone certification."
+  },
   "phase085CoordinatorRecoveryReview": {
     "baseline": "1e0a04152b7be2e87305afcc7bb6d8d093b5981d",
     "filesBefore": 224,
@@ -1462,6 +1469,51 @@
       "path": "docs/security/service-ipc.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
       "notes": "Original engineering description, test prerequisites and explicit remaining integration limitations."
+    },
+    {
+      "path": "services/bridge-validator/deposit-operation-state.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original strict localnet operation image codec and input/credit accounting using existing transaction, FROST witness and economic primitives."
+    },
+    {
+      "path": "services/bridge-validator/protected-deposit-journal.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original mandatory protected operation journal, CAS/lease recovery and verified-fact entry points; no runtime data."
+    },
+    {
+      "path": "services/bridge-validator/protected-deposit-snapshot.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original mutually authenticated, role-restricted and revision-bound read-only journal pagination. Not an economic authority or chain proof."
+    },
+    {
+      "path": "services/bridge-validator/tests/deposit-operation-state.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original parser/accounting and capability tests with explicitly synthetic chain evidence and externally created ephemeral test state."
+    },
+    {
+      "path": "tests/integration/deposit-operation-fixture.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original reusable real FROST/transaction fixture; chain data synthetic, private test material external and never returned."
+    },
+    {
+      "path": "services/solana-observer/deposit-mint-execution.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original exact signed-packet, reported MintToChecked CPI and atomic balance-delta verification. Reuses existing original packet builder and external pinned Noble Ed25519."
+    },
+    {
+      "path": "services/solana-observer/tests/deposit-mint-execution.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original real ephemeral packet-signature tests; reported execution is explicitly a synthetic parser fixture."
+    },
+    {
+      "path": "solana/tests/local-protected-claim-observation.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original actual regtest/local-validator deposit and finalized claim/genesis/execution regression; no production or protected Windows full-flow claim."
+    },
+    {
+      "path": "docs/security/deposit-operation-recovery.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original engineering description of operation retention, observation checks and explicit uncompleted integration, without private deployment data."
     }
   ]
 }

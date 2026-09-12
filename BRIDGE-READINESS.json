@@ -5,7 +5,7 @@
   "mainnetActivation": "DISABLED",
   "productionSigningAuthorized": false,
   "productionBroadcastAuthorized": false,
-  "lastUpdated": "2026-09-11",
+  "lastUpdated": "2026-09-12",
   "currentPhase": "PHASE_08_5",
   "phase09": "NOT_STARTED",
   "phase085FinalContinuation": {
@@ -52,6 +52,13 @@
     "publishedAttesterSha": "1e0a04152b7be2e87305afcc7bb6d8d093b5981d",
     "publishedAttesterCi": "NOT_RUN_ACCOUNT_BLOCKED_RUN_34622973490_ZERO_STEPS_ZERO_ARTIFACTS",
     "protectedCoordinatorJournal": "IMPLEMENTED_AND_COMPONENT_TESTED_NOT_FULL_BROADCAST_CREDIT_RECOVERY",
+    "publishedCoordinatorSha": "9de05a715c8a2c124a2c456b7cb8a50cdb6014ca",
+    "publishedCoordinatorCi": "NOT_RUN_ACCOUNT_BLOCKED_RUN_34640680967_ZERO_STEPS_ZERO_ARTIFACTS",
+    "protectedDepositOperationJournal": "IMPLEMENTED_AND_LOCALLY_COMPONENT_TESTED_FULL_PROTECTED_CONTROLLER_INCOMPLETE",
+    "operationPriorWindowsFailure": { "state": "HISTORICAL_FAILED_RUN_CORRECTED_BY_SEPARATE_RERUN", "pass": 116, "fail": 4, "skip": 0, "cancelled": 0, "durationMs": 6288325.8365, "boundaries": ["FRESH_SOURCE_ADMISSION", "COORDINATOR_SHARE_A_PROCESS_KILL_RECOVERY", "COORDINATOR_UNCERTAIN_ABORT_RECOVERY", "ATTESTER_SIGNATURE_CREATED_PROCESS_KILL_RECOVERY"], "diagnostic": "EXPIRED_SOURCE_WINDOW_AND_SIGNATURE_RESPONSE_DEADLINES", "publicationAtThatRevision": "BLOCKED" },
+    "operationCandidateEvidence": { "nodePassPerPlatform": 699, "vectorsPerPlatform": 2, "windowsProtectedTargetsPass": 7, "liveClaimAndOperationCodecPass": 14, "fullCurrentWindowsSecurity": "NOT_CERTIFIED", "freshClone": "NOT_RUN" },
+    "operationPrimaryEvidence": { "nodePassPerPlatform": 699, "vectorsPerPlatform": 2, "rustPass": 97, "rustQuality": "PASS", "realChainChecks": [55, 26, 18, 8, 13, 14], "windowsProtectedTargetsPass": 7, "fullCurrentWindowsSecurity": "FAIL_116_PASS_4_FAIL", "runtimeFileCount": 156, "runtimeDigest": "d95c00f2675c26332e5e29aad667b2144472b4a33fbc25802919b7aa7f506908", "npmVulnerabilities": 0, "cargoAndDeclaredLicenseChecks": "PASS_UNMAINTAINED_BINCODE_WARNING_RETAINED", "freshClone": "NOT_RUN" },
+    "operationResponseCorrection": { "runtimeFileCount": 156, "runtimeDigest": "475f6f9083d3e122f303a33ec72a3dc701bdc85bb8c53db1e0fb779447be3dd5", "nodePassPerPlatform": 699, "vectorsPerPlatform": 2, "originalFourFailures": "TARGETED_PASS", "stopBeforeSecretTargets": "TWO_PASS", "targetedInitial": { "pass": 7, "fail": 2, "failure": "NEW_ASSERTIONS_READ_CLOSED_FIXTURE_STORE" }, "correctedAttesterHandleTargets": { "pass": 2, "fail": 0 }, "freshNativeToSolana": "COMPLETED", "actualOperationClaimChecks": 14, "fullWindowsSecurity": { "pass": 122, "fail": 0, "skip": 0, "cancelled": 0, "durationMs": 5838633.1515, "scope": "CURRENT_PRINCIPAL_COMPONENTS_SYNTHETIC_CHAIN_FIXTURES" }, "deadlines": "UNCHANGED", "freshClone": "NOT_RUN" },
     "coordinatorTargeted": { "portableCodecPass": 21, "protectedFrostReopenPass": 1, "processKillMatrix": "EIGHT_COORDINATOR_BOUNDARIES_PASS", "windowsSecurityPass": 113, "windowsSecurityFail": 0, "windowsSecuritySkip": 0, "nodePassPerPlatform": 612, "vectorsPerPlatform": 2, "incidentOutboxPortablePass": 12, "unavailableSupervisorRestartPass": 1, "crossServiceIdentity": "BLOCKED_ENVIRONMENT", "freshClone": "NOT_RUN" },
     "hostValidation": "STORAGE_RECOVERED_WSL_STARTUP_PASS_VALIDATION_RESUMED",
     "attesterRecoveryWorktree": {

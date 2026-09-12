@@ -1,6 +1,33 @@
 # Phase 08.5 retrospective audit
 
-## Current coordinator continuation (not a completed re-audit)
+## Current operation/accounting remediation (not final re-audit)
+
+Published coordinator 9de05a715c8a2c124a2c456b7cb8a50cdb6014ca passes its
+113-test Windows security and 612-test Node suites per platform. Exact Actions
+34640680967 is NOT_RUN_ACCOUNT_BLOCKED, with zero steps and artifacts.
+New operation-journal/live claim-observation code has separate candidate
+evidence: 699 Node per platform, seven Windows protected targets, fourteen real
+chain checks. It is not a complete protected deposit controller or reconciliation
+service. Primary Node 699 per platform, two vectors each, 55 existing deposit
+checks and fourteen new chain checks pass. Primary Rust 97/quality, real
+26/18/8/13 checks and seven new Windows protected targets also pass. Full
+120-test Windows security finished 116 PASS / 4 FAIL / 0 SKIP / 0 CANCELLED.
+Fresh-source admission expired the Native observation; SHARE_A and uncertain-
+abort recovery rejected signature-share IPC; attester SIGNATURE_CREATED recovery
+exceeded its response deadline. A pre-read round-trip correction and explicit
+stop-before-secret tests pass targeted reruns. Two new assertion failures were
+closed fixture handles, corrected and rerun successfully for both attesters.
+Renewed Node is 699 per platform plus two vectors; fresh actual E2E and fourteen
+operation checks pass. Complete Windows rerun passes 122 / 0 FAIL / 0 SKIP /
+0 CANCELLED with an unchanged runtime digest. No freshness or transport deadline
+is relaxed. This clears the increment's local component gate, not the full
+protected-chain or final re-audit gate. Publication still requires scans/review.
+The default Native transaction replacement signaling found in integration is
+corrected explicitly; no replacement-spend policy or Phase 09 payout is enabled.
+Phases 04/07/08 remain FAIL overall. Full Phase 01-08 re-audit and final clean-
+clone certification have not completed; SAFE_TO_BEGIN_PHASE_09=false.
+
+## Coordinator continuation checkpoint (historical)
 
 Attester increment 1e0a04152b7be2e87305afcc7bb6d8d093b5981d is published PRIVATE;
 exact Actions 34622973490 is NOT_RUN_ACCOUNT_BLOCKED with zero executed steps.

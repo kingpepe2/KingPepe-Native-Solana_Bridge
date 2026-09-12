@@ -21,7 +21,10 @@ export function nativeFrostIpcHandler(signer, integrity) {
     try {
     if (!signer.hasProtectedLifetimeFence()) throw new Error("IpcFencedSignerRequired");
     if (peerRole !== "COORDINATOR") throw new Error("IpcCoordinatorRequired");
-    if (method !== "abortSigningSession") await integrity.assertRunning(operationId, "FROST_SIGN");
+    // Independent evidence verification is read-only. Authorize immediately
+    // after it, before any nonce/share mutation, and again before release.
+    // A redundant pre-read round trip must not consume the bounded signing
+    // response window; no signing guard or transport deadline is removed.
     if (method === "verifyNativeEvidence") {
       const intent = validateNativeSigningIntent(payload);
       if (operationId !== intent.operationId) throw new Error("IpcOperationBindingRejected");

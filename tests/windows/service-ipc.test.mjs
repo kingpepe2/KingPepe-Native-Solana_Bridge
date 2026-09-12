@@ -32,6 +32,10 @@ import { ProtectedNativeIntegrityMonitor, compareNativeProgress } from "../../na
 import { nativeProgressFixture } from "../integration/native-progress-fixture.mjs";
 import { witnessTestAction } from "./protected-witness-test-helper.mjs";
 import { SOURCE_HEALTH_ROLES } from "../../shared/source-health-window.mjs";
+import { depositOperationFixture } from "../integration/deposit-operation-fixture.mjs";
+import { ProtectedDepositOperationJournal } from "../../services/bridge-validator/protected-deposit-journal.mjs";
+import { initialDepositOperationState } from "../../services/bridge-validator/deposit-operation-state.mjs";
+import { depositSnapshotIpcHandler, ProtectedDepositSnapshotClient } from "../../services/bridge-validator/protected-deposit-snapshot.mjs";
 
 if (process.platform !== "win32") throw new Error("WINDOWS_IPC_TESTS_REQUIRE_WINDOWS");
 const repoRoot = path.resolve(import.meta.dirname, "../.."), serviceSid = windowsCurrentServiceSid();
@@ -154,6 +158,145 @@ function testOnlyHealthySources(t, global) {
   t.after(() => clearInterval(timer));
 }
 
+async function protectedDepositFixture(t) {
+  const global = await isolatedIntegrityFixture(t), peer = await global.peer("BRIDGE_VALIDATOR");
+  const data = await depositOperationFixture({ root: peer.root, repoRoot, solanaDeployment: deployment });
+  const opts = options(peer.root, "deposit-operations", "BRIDGE_VALIDATOR", "deposit-operations");
+  const bytes = initialDepositOperationState(data.policy);
+  let store;
+  try { store = WindowsProtectedStore.create(opts, bytes); } finally { bytes.fill(0); }
+  cleanups.get(peer.root).push(() => store.close());
+  const open = nextStore => ProtectedDepositOperationJournal.open({ store: nextStore ?? new WindowsProtectedStore(opts), integrity: peer.guard, policy: data.policy });
+  const journal = await open(store); cleanups.get(peer.root).push(() => journal.close());
+  await global.enableTestSources();
+  return { ...data, global, peer, opts, store, journal, open };
+}
+
+test("protected deposit operations retain exact signed liability across reopen and reject reused inputs", async t => {
+  const f = await protectedDepositFixture(t), id = f.plan.operationId;
+  const original = structuredClone(f.plan); await f.journal.reservePlan(original);
+  original.depositIntent.amountAtomic = "1";
+  assert.deepEqual((await f.journal.inspect(id)).plan, f.plan);
+  const before = await f.journal.snapshot();
+  await f.journal.reservePlan(f.plan);
+  assert.equal((await f.journal.snapshot()).revision, before.revision);
+  await assert.rejects(f.journal.prepareBroadcast(id), /DepositSignatureNotRetained/u);
+  await assert.rejects(f.journal.retainSigned(id, f.plan.unsignedTransactionHex));
+  assert.equal((await f.journal.inspect(id)).signedTransactionHex, null);
+  await f.journal.retainSigned(id, f.signedTransactionHex);
+  const signed = await f.journal.snapshot();
+  assert.equal(signed.accounting.unresolvedSignedSweepAmount, f.plan.depositIntent.amountAtomic);
+  assert.equal(signed.accounting.canonicalReserve, "0");
+  assert.equal(signed.accounting.reservedInputCount, 2);
+  const changed = structuredClone(f.plan); changed.operationId = h("different deposit operation");
+  changed.signingIntents.forEach(i => { i.operationId = changed.operationId; i.signingRequestId = h(i.signingRequestId); });
+  await assert.rejects(f.journal.reservePlan(changed), /DepositInputAlreadyReserved/u);
+  assert.equal((await f.journal.snapshot()).revision, signed.revision);
+  const raw = await f.journal.prepareBroadcast(id); assert.equal(raw, f.signedTransactionHex);
+  await assert.rejects(f.journal.recordBroadcastAccepted(id, h("wrong transaction")), /DepositBroadcastIdentityChanged/u);
+  await f.journal.recordBroadcastAccepted(id, f.plan.signingIntents[0].unsignedNativeTransactionId);
+  await assert.rejects(f.journal.retainFinalizedCredit(id, { receipt: f.finalizedCredit }), /RAW_NATIVE_VERIFIED_RESERVE_REQUIRED/u);
+  await assert.rejects(f.journal.retainFinalizedMint(id, f.mintReceipt), /ProtectedClaimObservationRequired/u);
+  await f.journal.close(); const reopened = await f.open(); cleanups.get(f.peer.root).push(() => reopened.close());
+  const restored = await reopened.inspect(id);
+  assert.equal(restored.broadcastAccepted, true); assert.equal(restored.signedTransactionHex, raw);
+  assert.equal((await reopened.snapshot()).accounting.unresolvedSignedSweepAmount, f.plan.depositIntent.amountAtomic);
+  assert.equal(restored.finalizedCredit, null); assert.equal(restored.mintReceipt, null);
+});
+
+test("protected deposit operations recover committed signed bytes and broadcast intent after lost CAS acknowledgement", async t => {
+  const f = await protectedDepositFixture(t), id = f.plan.operationId;
+  await f.journal.reservePlan(f.plan);
+  const persist = f.store.write.bind(f.store); let fault = true;
+  f.store.write = (bytes, revision) => { const result = persist(bytes, revision);
+    if (fault) throw new Error("TEST_DEPOSIT_WRITE_RESPONSE_LOST"); return result; };
+  await assert.rejects(f.journal.retainSigned(id, f.signedTransactionHex), /TEST_DEPOSIT_WRITE_RESPONSE_LOST/u);
+  assert.equal((await f.journal.inspect(id)).signedTransactionHex, f.signedTransactionHex);
+  await assert.rejects(f.journal.prepareBroadcast(id), /TEST_DEPOSIT_WRITE_RESPONSE_LOST/u);
+  assert.equal((await f.journal.inspect(id)).broadcastAttempted, true);
+  fault = false;
+  await f.journal.close(); const reopened = await f.open(); cleanups.get(f.peer.root).push(() => reopened.close());
+  assert.equal(await reopened.prepareBroadcast(id), f.signedTransactionHex);
+  assert.equal((await reopened.snapshot()).accounting.unresolvedSignedSweepAmount, f.plan.depositIntent.amountAtomic);
+});
+
+test("protected deposit operations preserve existing risk read-only during durable global stop", async t => {
+  const f = await protectedDepositFixture(t), id = f.plan.operationId; await f.journal.reservePlan(f.plan);
+  await f.peer.guard.report(id, "IMPOSSIBLE_OPERATION_STATE", h("confirmed component incident"));
+  await f.journal.retainSigned(id, f.signedTransactionHex); // Retain already-created risk, never new signing.
+  await assert.rejects(f.journal.reservePlan(f.plan), /IntegrityAuthorizationStopped/u);
+  await assert.rejects(f.journal.prepareBroadcast(id), /IntegrityAuthorizationStopped/u);
+  await f.global.restart();
+  assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+  await f.journal.close(); const reopened = await f.open(); cleanups.get(f.peer.root).push(() => reopened.close());
+  assert.equal((await reopened.snapshot()).accounting.unresolvedSignedSweepAmount, f.plan.depositIntent.amountAtomic);
+  await assert.rejects(reopened.prepareBroadcast(id), /IntegrityAuthorizationStopped/u);
+});
+
+test("protected deposit operations reject duplicate lifetime lease and co-restored data plus anchor", async t => {
+  const f = await protectedDepositFixture(t);
+  await assert.rejects(f.open(), /DepositJournalUnavailable/u);
+  const files = [path.join(f.opts.root, "state.protected"), path.join(f.opts.anchorRoot, "state.protected")], old = files.map(file => readFileSync(file));
+  await f.journal.reservePlan(f.plan); await f.journal.retainSigned(f.plan.operationId, f.signedTransactionHex); await f.journal.close();
+  try { files.forEach((file, index) => writeFileSync(file, old[index])); } finally { old.forEach(bytes => bytes.fill(0)); }
+  await assert.rejects(f.open(), /DepositJournalUnavailable/u);
+  assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+});
+
+test("protected deposit operations reject malformed authenticated journal without resetting it", async t => {
+  const f = await protectedDepositFixture(t);
+  await f.journal.close(); const store = new WindowsProtectedStore(f.opts), before = store.read();
+  try { store.write(Buffer.from("{"), before.revision); } finally { before.payload.fill(0); }
+  await assert.rejects(f.open(store), /DepositJournalUnavailable/u);
+  await f.global.restart(); assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+  const verify = new WindowsProtectedStore(f.opts), saved = verify.read();
+  try { assert.equal(saved.payload.toString(), "{", "MalformedStateNotSilentlyReplaced"); } finally { saved.payload.fill(0); verify.close(); }
+});
+
+test("protected deposit operations retain concurrent-state incident through unavailable supervisor and transport restart", async t => {
+  const f = await protectedDepositFixture(t);
+  f.peer.server.close();
+  const old = f.store.read(); try { f.store.write(old.payload, old.revision); } finally { old.payload.fill(0); }
+  await assert.rejects(f.journal.snapshot(), /IpcRequestRejected/u);
+  await f.journal.close(); f.peer.client.close();
+  assert.equal((await f.global.authority.status()).policyState, "RUNNING");
+  const ipc = new ProtectedServiceIpc(new WindowsProtectedStore(f.peer.clientOptions)); cleanups.get(f.peer.root).push(() => ipc.close());
+  assert.equal(ipc.retainedIntegrityIncidents().length, 1);
+  const guard = new RemoteIntegrityGuard({ ipc, port: await f.global.reopenPeerTransport(f.peer) });
+  const reopened = await ProtectedDepositOperationJournal.open({ store: new WindowsProtectedStore(f.opts), integrity: guard, policy: f.policy });
+  cleanups.get(f.peer.root).push(() => reopened.close());
+  await assert.rejects(reopened.reservePlan(f.plan), /IntegrityAuthorizationStopped/u);
+  assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+  assert.equal((await reopened.snapshot()).operations.length, 0);
+});
+
+test("protected deposit snapshot is mutually authenticated bounded read-only and remains observable after stop", async t => {
+  const f = await protectedDepositFixture(t), transport = fixture(t, "BRIDGE_VALIDATOR", "RECONCILIATION");
+  let changeDuringRead = false;
+  const handler = depositSnapshotIpcHandler({ journal: f.journal, integrity: f.peer.guard, policy: f.policy });
+  const port = await transport.server.listen(async input => {
+    const result = await handler(input);
+    if (changeDuringRead) { changeDuringRead = false; await f.journal.retainSigned(f.plan.operationId, f.signedTransactionHex); }
+    return result;
+  });
+  const client = new ProtectedDepositSnapshotClient({ ipc: transport.client, port, policy: f.policy });
+  assert.equal((await client.read()).operations.length, 0);
+  await f.journal.reservePlan(f.plan); changeDuringRead = true;
+  await assert.rejects(client.read(), /IpcRequestRejected/u, "ConcurrentRevisionCannotBeCombined");
+  const before = await client.read(); assert.equal(before.operations.length, 1);
+  assert(Object.isFrozen(before.operations[0].plan.depositIntent));
+  assert.equal(before.accounting.unresolvedSignedSweepAmount, f.plan.depositIntent.amountAtomic);
+  for (const payload of [{ index: 64, revision: null }, { index: 1, revision: null }, { index: 0, revision: "999" }, { index: 0, revision: before.revision, clear: true }]) {
+    await assert.rejects(transport.client.request(port, { method: "depositSnapshot", operationId: before.policyDigest, payload }));
+  }
+  await assert.rejects(transport.client.request(port, { method: "reservePlan", operationId: before.policyDigest, payload: f.plan }));
+  await assert.rejects(transport.client.request(port, { method: "depositSnapshot", operationId: h("other policy"), payload: { index: 0, revision: null } }));
+  await f.peer.guard.report(f.plan.operationId, "IMPOSSIBLE_OPERATION_STATE", h("confirmed read-only test stop"));
+  assert.equal((await client.read()).revision, before.revision);
+  assert.equal((await f.journal.inspect(f.plan.operationId)).broadcastAttempted, false);
+  assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+});
+
 test("persisted RUNNING requires fresh mutually authenticated source checks after restart", async t => {
   const f = await integrityFixture(t), peers = [];
   for (const role of SOURCE_HEALTH_ROLES) peers.push(await f.peer(role));
@@ -166,7 +309,10 @@ test("persisted RUNNING requires fresh mutually authenticated source checks afte
     const ticket = await p.guard.beginSourceCheck(h("test-observation"));
     await p.guard.finishSourceCheck(ticket, { state: "OBSERVED_MATCH", evidenceDigest: h("SYNTHETIC_ADMISSION_TEST_ONLY") }); return ticket;
   };
-  for (const peer of peers) await finish(peer);
+  // Distinct source services observe concurrently. Exercise the real TLS paths
+  // together so one one-shot fixture result need not outlive all later polls.
+  // No synthetic watchdog, renewed old ticket or enlarged freshness window.
+  await Promise.all(peers.map(finish));
   try { await signer.guard.assertRunning(h("admission-only-not-a-signature"), "FROST_SIGN"); }
   catch { throw new Error("SourceAdmissionRejected:" + f.authority.status().missingSources.join(",")); }
   const unavailable = await peers[0].guard.beginSourceCheck(h("source-unavailable"));
@@ -381,14 +527,15 @@ async function protectedCoordinatorFixture(t) {
   const policy = createNativeSigningPolicy({ environment: "localnet", nativeNetwork: "regtest", nativeGenesisHash: REGTEST_GENESIS,
     solanaDeployment: deployment, bridgeProgramId: intent.bridgeProgramId, transceiverProgramId: intent.transceiverProgramId, mint: intent.mint, keyEpoch: 1,
     maxAmountAtomic: "10000", maxFeeAtomic: "100", reserveScriptPubKeyHex: intent.changeScriptPubKeyHex, authorizedOperations: [intent] });
-  const signers = [], verificationCounts = [0, 0];
+  const signers = [], stateStores = [], verificationCounts = [0, 0]; let duringEvidence;
   for (const [i, v] of f.entries()) {
     const base = WindowsProtectedFrostStateStore.createLocal(options(v.root, "native-state", v.role, "frost-state"), policy);
     const fenceOptions = options(v.root, "native-fence", v.role, "signer-fence", base.context.instanceId);
     const stateStore = await WindowsFencedFrostStateStore.createLocal({ base, fenceOptions, policy });
+    stateStores.push(stateStore);
     cleanups.get(v.root).push(() => stateStore.close());
     signers.push(new NativeFrostSigner({ signerId: v.role, index: i, policy, stateStore,
-      nativeEvidenceValidator: async value => { verificationCounts[i]++; return { digestHex: value.proofFingerprint }; } }));
+      nativeEvidenceValidator: async value => { verificationCounts[i]++; await duringEvidence?.(i); return { digestHex: value.proofFingerprint }; } }));
   }
   t.after(() => signers.forEach(s => s.close()));
   const dkg = runTwoPartyDkg(signers, { epoch: 1 });
@@ -410,8 +557,25 @@ async function protectedCoordinatorFixture(t) {
   const journalStore = WindowsProtectedStore.create(journalOptions, initialCoordinatorSigningState(dkg));
   cleanups.get(f[0].root).push(() => journalStore.close());
   return { global, guards, coordinatorPeer, coordinatorGuard, f, root: f[0].root, intent, signers, ports, peers, dkg,
-    verificationCounts, handlerFaults, journalOptions, journalStore };
+    verificationCounts, handlerFaults, journalOptions, journalStore, stateStores,
+    setEvidenceHook(fn) { duringEvidence = fn; } };
 }
+
+test("signer rechecks durable stop after read-only evidence before nonce reservation", async t => {
+  const f = await protectedCoordinatorFixture(t); await f.global.enableTestSources();
+  const before = f.stateStores.map(store => store.publicFence());
+  let reported = false;
+  f.setEvidenceHook(async index => {
+    if (!reported) { reported = true; await f.guards[index].guard.report(f.intent.operationId, "SIGNER_ROLLBACK", h("stop-during-evidence")); }
+  });
+  const request = createNativeFrostSigningRequest(f.intent);
+  for (const [i, peer] of f.peers.entries()) {
+    await assert.rejects(peer.signingCommitment(request), /IpcRequestRejected/u);
+    assert.deepEqual(f.stateStores[i].publicFence(), before[i], "StopMustPreventNonceOrStateMutation");
+  }
+  assert.deepEqual(f.verificationCounts, [1, 1], "OnlyReadOnlyVerificationMayContinue");
+  assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+});
 
 test("actual protected A+B FROST signing through authenticated endpoints", async t => {
   const { global, guards, coordinatorGuard, f, intent, ports, peers, dkg, verificationCounts, handlerFaults, journalOptions, journalStore } = await protectedCoordinatorFixture(t);
@@ -760,7 +924,31 @@ for (const role of ["ATTESTER_A", "ATTESTER_B"]) attesterRecoveryTest("real prot
   await assert.rejects(f.client.request(port, input)); assert.equal(verifications, 4);
   evidence.noPriorConsumption = true;
   await guard.report(decoded.operationIdHex, "CONFLICTING_RESERVE_EVIDENCE", h("contradiction"));
-  await global.restart(); await assert.rejects(f.client.request(port, input)); assert.equal(verifications, 4);
+  await global.restart();
+  // journal.close() above closed its original store handle. Inspect the same
+  // existing protected state with a fresh read-only handle, not that closed one.
+  const stoppedProbe = new WindowsProtectedStore(f.journalOptions);
+  cleanups.get(f.root).push(() => stoppedProbe.close());
+  const beforeStopRevision = stoppedProbe.read().revision;
+  await assert.rejects(f.client.request(port, input)); assert.equal(verifications, 5, "ReadOnlyEvidenceMayContinueUnderStop");
+  assert.equal(stoppedProbe.read().revision, beforeStopRevision, "StoppedRequestCannotCreateOrReplaceAuthorization");
+});
+
+attesterRecoveryTest("attester rechecks durable stop after read-only evidence before key use and preparation", async t => {
+  const f = await protectedAttesterFixture(t), journal = await ProtectedAttesterAuthorizationJournal.open({ attester: f.attester, integrity: f.guard, store: f.journalStore });
+  cleanups.get(f.root).push(() => journal.close());
+  const handler = attesterIpcHandler({ attester: f.attester, integrity: f.guard, journal, verifyNativeDeposit: async () => {
+    await f.guard.report(f.decoded.operationIdHex, "CONFLICTING_RESERVE_EVIDENCE", h("stop-during-attester-evidence"));
+    return { operationIdHex: f.decoded.operationIdHex, messageDigestHex: f.decoded.messageDigestHex, evidence: f.evidence };
+  } });
+  const port = await f.server.listen(handler), revision = f.journalStore.read().revision;
+  const originalRead = f.store.read.bind(f.store); let keyReads = 0;
+  f.store.read = () => { keyReads++; return originalRead(); };
+  await f.global.enableTestSources();
+  await assert.rejects(f.client.request(port, f.input), /IpcRequestRejected/u);
+  assert.equal(keyReads, 0, "NoProtectedKeyReadAfterEvidenceIntroducesStop");
+  assert.equal(f.journalStore.read().revision, revision, "NoAuthorizationPreparedAfterStop");
+  assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
 });
 
 async function attesterActor(f, selectedBoundary = "NONE") {

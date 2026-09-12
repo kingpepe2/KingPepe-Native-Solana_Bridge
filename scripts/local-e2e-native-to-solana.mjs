@@ -1857,11 +1857,16 @@ export async function draftLocalReserveSweep({
       parameters: [
         JSON.stringify(transactionInputs),
         JSON.stringify({ [reserveAddress]: reserveAmountNative }),
+        "0", // Explicit locktime; never inherit transaction-policy defaults.
+        "false", // Pinned Native RPC defaults replaceable=true; bridge replacements are disabled.
       ],
     }),
     "unsignedNativeTransactionHex",
   );
   const parsedUnsignedTransaction = parseNativeTransactionHex(unsignedNativeTransactionHex);
+  if (parsedUnsignedTransaction.inputs.some(input => input.sequence < 0xffff_fffe)) {
+    throw new Error("LocalNativeReserveSweepReplacementDisabled");
+  }
   const parsedInputOutpoints = parsedUnsignedTransaction.inputs.map((input) => input.outpoint);
   if (
     parsedInputOutpoints.length !== inputOutpoints.length ||

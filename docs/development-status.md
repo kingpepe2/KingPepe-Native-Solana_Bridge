@@ -1,5 +1,101 @@
 # KingPepe Native - Solana Bridge Development Status
 
+## Protected operation journal continuation
+
+Coordinator commit 9de05a715c8a2c124a2c456b7cb8a50cdb6014ca is published PRIVATE,
+tree 7546272fe07f2b55af1ec2099a65cbb64446b4a9. Its complete Windows security
+suite passed 113, Node 612 per platform and vectors two each. Working/staged
+227-file exports, all 177 prior commits and its one outgoing commit passed
+Gitleaks. [Exact Actions 34640680967](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34640680967)
+executed zero steps in four failed-to-start jobs and produced zero artifacts.
+The unchanged account payments/spending-limit annotation means
+NOT_RUN_ACCOUNT_BLOCKED, not CI PASS.
+
+The current uncommitted operation/accounting boundary retains exact input
+reservations and signed sweeps, persists broadcast intent before releasing
+bytes, and records finalized reserve plus its owed credit in one protected CAS.
+Only actual verifier results can enter its reserve/mint settlement APIs.
+Reconciliation receives bounded immutable revision-bound snapshots through
+authenticated read-only IPC; that API is not a complete reconciliation service.
+
+Candidate results before transfer to this checkout: Node 699 per platform,
+vectors two each, seven Windows current-principal DPAPI/mTLS journal checks,
+and fourteen actual regtest/validator observation and operation-codec checks.
+Primary-checkout Node 699 per platform, vectors two each, the 55 existing
+deposit/security checks and fourteen new actual-chain checks now also pass.
+Primary Rust 97/check/fmt/Clippy, actual withdrawal-record 26, deployment 18,
+Native reorg eight, acceptance 13 and seven new protected Windows targets pass.
+The full Windows suite finished 116 PASS / 4 FAIL / 0 SKIP / 0 CANCELLED
+in 6288325.8365 ms. Fresh source admission expired the Native source result;
+coordinator SHARE_A and uncertain-abort recovery rejected signature-share IPC;
+attester SIGNATURE_CREATED recovery exceeded its response deadline. This blocks
+publication. No targeted pass overrides the full failure. The next correction
+removes only the redundant authorization round trip before read-only evidence
+verification, retaining current checks before nonce/signature actions and result
+release. New stop-during-evidence tests check unchanged nonce/journal state and
+no protected attester-key access. The admission fixture now polls authenticated
+source peers concurrently. Transport and source-health deadlines are unchanged;
+the complete rerun remains required. Nine targeted regressions produced seven
+PASS and two FAIL: all four original failures and both new stop-before-secret
+tests passed; two new assertions attempted to read an already closed original
+attester store. That test-only handle defect was fixed. Both attesters then pass
+the targeted rerun (209673.7948 ms). These failed attempts remain evidence, not
+retroactively passing runs.
+The corrected worktree has since passed WSL Node 699 and two vectors, plus a
+fresh real Native-to-Solana COMPLETED flow and all fourteen operation/claim
+checks. Two alternative Windows-mounted ledger attempts failed during bootstrap
+(socket path/support diagnostics); no economic test pass is attributed to them.
+The successful rerun used a new native WSL filesystem root, unchanged startup
+and security limits, and external runtime data. Renewed Windows Node also passes
+699 plus two vectors. The complete Windows security rerun passes 122 / 0 FAIL /
+0 SKIP / 0 CANCELLED in 5838633.1515 ms. The runtime digest was verified unchanged
+after completion. This is actual current-principal DPAPI/mTLS component evidence
+with synthetic chain fixtures, not cross-account or full protected-chain proof.
+The preceding failed full/targeted runs remain recorded separately.
+The original failed full run's 156-file runtime digest is
+d95c00f2675c26332e5e29aad667b2144472b4a33fbc25802919b7aa7f506908.
+The corrected 156-file runtime (including the handle assertion fix) is
+475f6f9083d3e122f303a33ec72a3dc701bdc85bb8c53db1e0fb779447be3dd5.
+Renewed npm audit reports zero vulnerabilities; all five Cargo scans and
+declared-license checks pass with the unmaintained bincode warning retained.
+No final clean-clone certification is claimed. The previous 113-test full
+security pass belongs to the coordinator revision, not this new tree.
+
+Two real-chain plan attempts failed: one used sanitized signing-report entries
+instead of full verified intents, corrected in the test capture; the subsequent
+diagnostic confirmed actual replacement-signaling input sequences. Pinned Native
+source defaults createrawtransaction to replaceable=true. Explicit false plus
+returned-sequence rejection fixes the construction policy: two targeted RED
+tests then two GREEN, followed by all fourteen real-chain checks PASS through
+COMPLETED. The journal also reserves one evidence-packet slot for the sweep,
+limiting a plan to fifteen input transactions.
+
+Full protected controller/relayer/claim-outbox integration, broadcast-to-credit
+rediscovery, live reconciliation and the all-boundary real-chain crash matrix
+remain MUST_FIX_BEFORE_PHASE09. Cross-service identity/ACL tests remain
+BLOCKED_ENVIRONMENT; no production or Phase 09 work has begun.
+
+Further delivery review reproduced HTTP redirect following in the inherited
+Native RPC client, for both observation and transaction submission. Two isolated
+HTTP regressions fail before correction. A separate unpublished candidate rejects
+redirects and passes all thirteen RPC tests. The primary runtime remains frozen
+for its current security run; that endpoint fix must be integrated and validated
+before a new Phase 06 audit can pass. No live node/funds were used in these probes.
+
+The inherited local Solana submission client also followed HTTP redirects.
+Two actual isolated HTTP regressions reproduced this for observation and send.
+Five more negative tests reproduced absent size/response-ID/UTF-8 boundaries.
+The separate candidate rejects those cases and enforces a ten-second timeout
+for actual stalled headers and bodies; all 60 targeted checks pass. Its renewed
+portable suite passes 834 on both platforms with two vectors each. A further
+actual HTTP test reproduced arbitrary provider text in malformed RPC error
+codes; strict error-envelope validation fixes it and all 61 targeted checks
+pass. The 834-test totals precede that final redaction correction. A fresh
+actual deposit still reaches COMPLETED with fourteen operation/claim checks;
+the actual eight-check post-mint reorg suite also passes. These are separate
+candidate results, not certification of the frozen primary or full protected
+flow. Integrate and validate both endpoint fixes before the final re-audit.
+
 ## Coordinator recovery increment: local regression complete
 
 The attester/async increment below is now published PRIVATE at

@@ -1,6 +1,35 @@
 # KingPepe Native - Solana Bridge Task Status
 
-## Latest publication and active coordinator continuation
+## Current operation-journal continuation
+
+Published PRIVATE coordinator SHA: 9de05a715c8a2c124a2c456b7cb8a50cdb6014ca.
+Windows security 113, Node 612 per platform, vectors two each and all publication
+scans passed. Actions 34640680967: zero steps/artifacts, NOT_RUN_ACCOUNT_BLOCKED.
+Current uncommitted operation journal/live claim-observation work was integrated
+from its separate test checkout without replacing the newer status history.
+Candidate Node 699 per platform, vectors two each, seven new Windows protected
+targets and fourteen real-chain checks pass. Primary Node 699 per platform,
+vectors two each, 55 existing deposit checks and fourteen new chain checks also
+pass. Primary Rust 97/quality, actual 26/18/8/13 chain checks, npm zero and five
+Cargo/license scans pass; seven new protected Windows targets pass.
+Full Windows security finished 116 PASS / 4 FAIL / 0 SKIP / 0 CANCELLED.
+Fresh source admission expired the Native result; SHARE_A and uncertain-abort
+recovery rejected signature-share IPC; attester SIGNATURE_CREATED recovery hit
+the bounded response deadline. A correction removes redundant pre-read
+authorization calls but keeps pre-secret/pre-release guards. New stop-during-
+verification tests and all four originally failing targets now pass. Two new
+attester assertions first read a closed fixture handle; both corrected handle
+reruns pass. Renewed Windows/WSL Node 699 and two vectors each pass, as does a
+fresh real deposit E2E with fourteen operation checks. The complete Windows rerun
+passes 122 / 0 FAIL / 0 SKIP / 0 CANCELLED in 5838633.1515 ms with the same runtime
+digest before and after. No deadline was extended. This is current-principal
+component evidence, not cross-account or full protected-chain certification.
+Final clean-clone certification is NOT_RUN; publication scans/review follow.
+Next: finish relevant primary validation, review/scan/publish this logical
+increment, then complete the protected controller/outboxes, actual reconciliation
+and full restart matrix. Phase 09 must not start.
+
+## Coordinator checkpoint before publication (historical)
 
 PRIVATE HEAD 1e0a04152b7be2e87305afcc7bb6d8d093b5981d publishes the retained
 attester/async increment. Its 224-file staged export and full outgoing commit

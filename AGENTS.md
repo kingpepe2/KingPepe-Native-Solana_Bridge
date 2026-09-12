@@ -23,10 +23,49 @@
 
 ## Current task: Phase 08.5 security remediation
 
-Latest published PRIVATE increment: 1e0a04152b7be2e87305afcc7bb6d8d093b5981d,
-security(phase-08.5): persist protected attester authorizations. Current/staged
-227-file coverage is being prepared for the next coordinator increment; do not
-attribute its uncommitted changes to that published SHA. The published tree had
+Latest published PRIVATE increment: 9de05a715c8a2c124a2c456b7cb8a50cdb6014ca,
+security(phase-08.5): persist coordinator signing and integrity reports.
+The 227-file tree passed current/staged and outgoing scans; 177 prior commits
+were scanned separately. Exact Actions 34640680967 executed zero steps in four
+jobs with no artifacts: NOT_RUN_ACCOUNT_BLOCKED (account payments/spending limit).
+Its Windows security 113, Node 612 per platform and vectors two each pass.
+
+Current operation-journal continuation adds protected immutable input reservations,
+signed-sweep/broadcast retention, atomic reserve-plus-credit persistence, genuine
+finalized claim observations and a read-only authenticated reconciliation snapshot.
+It does not yet implement the full unattended controller, protected claim outbox,
+live reconciliation or complete protected real-chain restart matrix. The separate
+candidate passed Node 699 per platform, vectors two each, seven new Windows
+DPAPI/mTLS targets and fourteen actual-chain observation/codec checks. Primary-
+checkout Node 699 per platform, vectors two each, 55 existing deposit checks and
+fourteen new actual-chain checks also pass. Primary Rust 97/check/fmt/Clippy,
+other real-chain checks 26/18/8/13 and seven new protected Windows targets pass.
+The complete 120-test Windows security suite finished 116 PASS / 4 FAIL, with
+zero skipped/cancelled. Fresh source admission expired the Native result;
+SHARE_A and uncertain-abort recovery rejected signature-share IPC; attester
+SIGNATURE_CREATED recovery exceeded the unchanged response deadline. The next
+correction removes redundant checks before read-only evidence verification,
+retains checks before secret actions/result release, and adds explicit stop-
+during-evidence tests. Concurrent authenticated source polling replaces the
+sequential one-shot admission fixture. The four original failures and both new
+stop-before-secret targets now pass. Two additional fixture assertions initially
+read a closed store; the corrected current-store rerun passes both attesters.
+Renewed Windows/WSL Node 699 and two vectors each pass; fresh actual E2E plus
+fourteen operation checks pass. The complete Windows rerun now passes 122 with
+zero failures/skips/cancellations for the unchanged 156-file runtime digest
+recorded in development-status. This is actual current-principal DPAPI/mTLS
+component evidence, not cross-account or full protected-chain certification.
+The prior failed runs remain recorded. Final publication scans/review follow;
+do not infer final clean-clone certification from this local increment.
+The real integration test exposed Native RPC default replacement signaling.
+The builder now explicitly disables it and rejects unexpected sequences; both
+targeted tests failed before correction and pass afterward. This is not a change
+to Native consensus or a claim about the node's full-RBF mempool policy.
+See docs/security/deposit-operation-recovery.md. Phase 09 NOT_STARTED.
+
+Prior published PRIVATE increment: 1e0a04152b7be2e87305afcc7bb6d8d093b5981d,
+security(phase-08.5): persist protected attester authorizations. Do not attribute
+the later coordinator or operation-journal changes to that SHA. Its tree had
 224 files, staged/export and all outgoing commits passed Gitleaks. Exact Actions
 34622973490 ran zero steps in four failed-to-start jobs, zero artifacts:
 NOT_RUN_ACCOUNT_BLOCKED. CI was not weakened.
@@ -205,6 +244,7 @@ Use verified process-local tools; do not modify global defaults just for tests.
   KINGPEPE_TEST_SOURCE_SHA; no inferred worktree certification).
 - node solana/tests/local-native-reorg.mjs.
 - node solana/tests/local-acceptance-checkpoint.mjs.
+- node solana/tests/local-protected-claim-observation.mjs.
   Each daemon run requires a NEW external KINGPEPE_LOCAL_E2E_ROOT. Never reset an
   existing ledger. See the build guide for external outputs and locked SBF builds.
 - Fresh-clone proof requires new compiled project outputs, not copied targets.

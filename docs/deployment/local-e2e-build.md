@@ -49,6 +49,15 @@ exclusively, refuses source-directory aliases and ancestors, and never resets an
 existing ledger. Linux directory creation requests mode 0700; dedicated Windows
 service ACL validation remains separate work.
 
+Keep the validator ledger on a filesystem that supports Linux Unix-domain
+sockets, using a short external path. The remediation validation observed both
+a socket-path-length failure and an unsupported admin socket on a Windows-
+mounted filesystem. Neither attempt reached the economic flow. A fresh run on
+the native WSL filesystem succeeded with unchanged validator/startup settings.
+Do not relocate or alter an existing WSL virtual disk to work around this.
+Monitor host free space before fresh builds and daemon runs; source checkouts,
+production data and recovery material are not disposable build caches.
+
 Build output and, by default, Cargo targets are under that external root.
 `KINGPEPE_LOCAL_BUILD_ROOT` may select a separate external Cargo cache to avoid
 recompiling dependencies on each run; every run still invokes both locked builds.
