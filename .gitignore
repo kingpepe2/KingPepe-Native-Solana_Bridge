@@ -1,0 +1,69 @@
+# Environment and local secrets
+.env
+.env.*
+*.pem
+*.key
+*.secret
+*.p12
+*.jks
+id_*.json
+*-keypair.json
+keypair.json
+keypairs/
+wallet.json
+wallet-*.json
+mnemonic.txt
+seed.json
+seedphrase.txt
+recovery.json
+secret.*
+*.seed
+*.protected
+
+# FROST / attester runtime state and recovery artifacts (kept out of repository)
+frost-state/
+frost_state/
+frost-a-state/
+frost-b-state/
+frost-data/
+attester-state/
+attester-a-state/
+attester-b-state/
+attester-keys/
+backups/
+data/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.sqlite-*
+local-test-key.bin
+
+# Logs and crash artifacts
+*.log
+crash.log
+*.core
+
+# Node / TS / JS / Rust build outputs
+node_modules/
+dist/
+build/
+coverage/
+target/
+**/target/
+
+# Test and local chain/runtime material
+tmp/
+*.tmp
+*.bak
+.local/
+localnet-state/
+solana-devnet-state/
+validator-ledger/
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo

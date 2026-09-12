@@ -83,7 +83,7 @@
     {
       "path": ".gitignore",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Publication-boundary and build artifact ignore rules.",
+      "notes": "Original publication-boundary exclusions for secrets, FROST/attester state, wallets, databases, ledgers, backups and generated build/test outputs.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_TOOLING"
     },
@@ -111,15 +111,15 @@
     {
       "path": "config/examples/localnet.example.json",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type.",
-      "purpose": "CORE_BRIDGE",
+      "notes": "Original non-secret localnet configuration example with placeholder references for separate FROST participants, attesters and Solana identities; not production provisioning.",
+      "purpose": "REQUIRED_TOOLING",
       "reviewDisposition": "KEEP_TOOLING"
     },
     {
       "path": "config/schemas/bridge-local.schema.json",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type.",
-      "purpose": "CORE_BRIDGE",
+      "notes": "Original minimal schema for the non-secret localnet example; excludes Devnet/Mainnet configuration and does not change runtime validation.",
+      "purpose": "REQUIRED_TOOLING",
       "reviewDisposition": "KEEP_TOOLING"
     },
     {
@@ -615,7 +615,7 @@
     {
       "path": "PROVENANCE.json",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Per-file provenance, licensing context and final simplification review dispositions.",
+      "notes": "Per-file provenance, licensing context and retained simplification classifications, including required repository-file restoration.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "SIMPLIFY"
     },
@@ -629,7 +629,7 @@
     {
       "path": "rust-toolchain.toml",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type.",
+      "notes": "Pinned Native workspace toolchain nightly-2023-10-29 and required development components; Solana retains its separate 1.89.0 pin.",
       "purpose": "REQUIRED_BUILD",
       "reviewDisposition": "KEEP_TOOLING"
     },
@@ -762,7 +762,7 @@
     {
       "path": "SECURITY.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Security boundary and operational controls.",
+      "notes": "Concise responsible-disclosure guidance and non-secret publication posture; no internal runtime architecture or operational configuration.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "KEEP_SECURITY"
     },
@@ -1743,5 +1743,22 @@
       }
     ],
     "retainedSecurity": "Exact FROST A+B, nonce tombstones, protected secrets, operation binding, persist-before-broadcast, replay protection, pause and reconciliation remain required."
+  },
+  "repositoryRepair": {
+    "baseSha": "45fca8492ac186361195f4001f4354ebcf56778c",
+    "restoredFromSha": "95cd02126be2f056b0da94f3120556453866caae",
+    "scope": "REQUIRED_REPOSITORY_TOOLING_AND_PUBLICATION_PROTECTIONS_ONLY",
+    "restoredFiles": [
+      ".gitattributes",
+      ".gitignore",
+      ".npmrc",
+      "LICENSE",
+      "SECURITY.md",
+      "rust-toolchain.toml",
+      "package-lock.json",
+      "config/examples/localnet.example.json",
+      "config/schemas/bridge-local.schema.json"
+    ],
+    "runtimeChanged": false
   }
 }

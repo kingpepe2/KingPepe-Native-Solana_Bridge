@@ -1,0 +1,2 @@
+# Consistent source checkouts for Windows and Linux/WSL; never normalize binaries.
+* text=auto eol=lf
