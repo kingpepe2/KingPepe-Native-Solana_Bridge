@@ -12,10 +12,9 @@ import { ProtectedServiceIpc } from "../../shared/windows/service-ipc.mjs";
 import { RemoteIntegrityGuard } from "../../services/supervisor/protected-integrity.mjs";
 import { NativeRpcClient } from "../../native/node/native-rpc-client.mjs";
 import { LocalNativeEvidenceVerifier } from "../../native/node/native-raw-evidence.mjs";
-import { createNativeSigningPolicy, NativeFrostSigner } from "../../native/frost/index.mjs";
+import { createNativeSigningPolicy } from "../../native/frost/index.mjs";
 import { WindowsProtectedFrostStateStore } from "../../native/frost/state/windows-protected-state-store.mjs";
-import { WindowsFencedFrostStateStore } from "../../native/frost/state/windows-fenced-state-store.mjs";
-import { nativeFrostIpcHandler, ProtectedRemoteFrostPeer } from "../../native/frost/signer/protected-service.mjs";
+import { openProtectedNativeSigner, ProtectedRemoteFrostPeer } from "../../native/frost/signer/protected-service.mjs";
 import { ProtectedCoordinatorSigningJournal } from "../../native/frost/coordinator/protected-signing-journal.mjs";
 import { ProtectedSweepJobs } from "../../native/frost/coordinator/protected-sweep-jobs.mjs";
 import { sweepJobIpcHandler, ProtectedSweepJobClient } from "../../native/frost/coordinator/sweep-job-ipc.mjs";
@@ -73,16 +72,14 @@ async function start(c) {
       maxAmountAtomic: p.maximumAmountAtomic, maxFeeAtomic: p.maximumFeeAtomic, reserveScriptPubKeyHex: plan.depositPolicy.canonicalReserveScriptPubKeyHex,
       authorizedOperations: plan.signingIntents });
     const base = new WindowsProtectedFrostStateStore(store(c.stateOptions, role, "frost-state"), role);
-    const state = await WindowsFencedFrostStateStore.openLocal({ base, fence: store(c.fenceOptions, role, "signer-fence"), policy });
-    closers.push(() => state.close());
-    service = new NativeFrostSigner({ signerId: role, index: role.endsWith("_A") ? 0 : 1, policy, stateStore: state,
+    service = await openProtectedNativeSigner({ base, fence: store(c.fenceOptions, role, "signer-fence"), policy, integrity,
       nativeEvidenceValidator: async intent => {
         assert(plan.signingIntents.some(v => canonicalJson(v) === canonicalJson(intent)));
         return native.verifySweepSigning({ inputs: plan.inputs, minimumConfirmations: p.minimumConfirmations, acceptedCheckpoint: plan.acceptedCheckpoint,
           unsignedTransactionHex: plan.unsignedTransactionHex, reserveAmountAtomic: plan.depositIntent.amountAtomic, feeAtomic: intent.feeAtomic,
           reserveScriptHex: plan.depositPolicy.canonicalReserveScriptPubKeyHex, intent, tapscriptSpends: [plan.depositPolicy.sweep, ...plan.inputs.slice(1).map(() => undefined)] });
       } });
-    ports.service = await listen(c.serverOptions, nativeFrostIpcHandler(service, integrity));
+    ports.service = await listen(c.serverOptions, service.handler);
   } else if (role === "COORDINATOR") {
     const signers = c.signers.map(v => new ProtectedRemoteFrostPeer({ ipc: transport(v.options, role), port: v.port, signerId: v.role }));
     journal = await ProtectedCoordinatorSigningJournal.open({ store: store(c.journalOptions, role, "coordinator-signing"), integrity, ...c.publicPackage });

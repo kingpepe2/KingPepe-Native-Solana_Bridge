@@ -23,6 +23,18 @@ and signed-share retry rules remain unchanged. Remote FROST service handlers
 require the genuine fenced adapter; legacy local in-process test adapters are
 not promoted into protected services by configuration fallback.
 
+Runtime startup uses `openProtectedNativeSigner`. Its authenticated service
+role, policy and storage context are bound before opening existing state.
+Confirmed retained-witness rollback, authenticated malformed state and nonce
+contradictions are reported through the durable integrity outbox even when
+startup fails before a request handler exists. The signer never becomes ready.
+A lost/unavailable supervisor connection retains the incident for authenticated
+redelivery; it is not reported as an acknowledged global stop.
+Missing/inaccessible protection and a contended lifetime lease reject startup
+without inventing a confirmed integrity contradiction. No state, nonce, key or
+authentication package is recreated. The report identifies the public
+domain/instance digest, not a transfer ID, private state digest or filesystem path.
+
 Tests use actual Windows file handles, DPAPI and separate Node processes. They
 exercise duplicate A/B processes, SIGKILL, restored state plus its state anchor,
 stale revisions/epochs, wrong role/deployment, nonce-counter rollback and prepared
