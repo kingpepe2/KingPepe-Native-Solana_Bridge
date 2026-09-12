@@ -31,6 +31,6 @@ try {
       { input: helper.root, windowsHide: true, timeout: 30000, stdio: ["pipe", "pipe", "pipe"] });
     assert(result.status === 0 && result.stderr.length === 0, "TestHelperAclMutationFailed");
     assert.throws(windowsCurrentServiceSid, { message: "WindowsProtectedStoreRejected" });
-  } else if (mode !== "CANONICAL_PATH") throw new Error("TEST_MODE_REJECTED");
+  } else if (!["CANONICAL_PATH", "FOREIGN_MODULE_PATH"].includes(mode)) throw new Error("TEST_MODE_REJECTED");
   console.log("PROTECTED_EXECUTABLE_TEST_PASS");
 } catch { console.error("PROTECTED_EXECUTABLE_TEST_FAILED"); process.exitCode = 1; }

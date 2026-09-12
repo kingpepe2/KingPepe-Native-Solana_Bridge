@@ -8,7 +8,7 @@ import os from "node:os";
 import { validateRuntimeStateRoot } from "../../shared/runtime-path-boundary.mjs";
 if (process.platform !== "win32") throw new Error("WINDOWS_PROTECTED_EXECUTABLE_TESTS_REQUIRE_WINDOWS");
 const repoRoot = path.resolve(import.meta.dirname, "../..");
-for (const mode of ["TAMPER", "MISSING", "HARDLINK", "WRONG_ACL", "CANONICAL_PATH"]) {
+for (const mode of ["TAMPER", "MISSING", "HARDLINK", "WRONG_ACL", "CANONICAL_PATH", "FOREIGN_MODULE_PATH"]) {
   test("source-built protected executable " + mode.toLowerCase(), t => {
     const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-helper-test-"));
     validateRuntimeStateRoot(root, repoRoot);
@@ -34,7 +34,8 @@ for (const mode of ["TAMPER", "MISSING", "HARDLINK", "WRONG_ACL", "CANONICAL_PAT
       assert.equal(validateRuntimeStateRoot(runtimeRoot, repoRoot), validateRuntimeStateRoot(root, repoRoot));
     }
     const result = spawnSync(process.execPath, [path.join(import.meta.dirname, "protected-executable-actor.mjs"), mode],
-      { env: { ...process.env, TEMP: runtimeRoot, TMP: runtimeRoot }, timeout: 60000, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
+      { env: { ...process.env, TEMP: runtimeRoot, TMP: runtimeRoot,
+        ...(mode === "FOREIGN_MODULE_PATH" ? { PSModulePath: path.join(root, "foreign-host-module-path") } : {}) }, timeout: 60000, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
     assert(result.status === 0 && result.stderr.length === 0 &&
       result.stdout.toString("utf8").trim() === "PROTECTED_EXECUTABLE_TEST_PASS", "ProtectedExecutableActorRejected");
   });

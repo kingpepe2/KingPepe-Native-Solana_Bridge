@@ -34,9 +34,15 @@ export function windowsProtectedExecutable() {
       const before = sourceDigest(), input = Buffer.from(JSON.stringify({ root }));
       let result;
       try {
+        // Node can be a PowerShell 7 grandchild. Do not pass incompatible PS7
+        // module search paths into the explicitly selected Windows PowerShell.
+        // Let that child construct its own supported module path; no host
+        // environment, execution policy or installed module is changed.
+        const environment = { ...process.env };
+        for (const key of Object.keys(environment)) if (key.toUpperCase() === "PSMODULEPATH") delete environment[key];
         result = spawnSync(path.join(windowsRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
           ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", path.join(import.meta.dirname, "protected-helper-build.ps1")],
-          { input, encoding: "buffer", timeout: 30000, maxBuffer: 4096, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
+          { input, env: environment, encoding: "buffer", timeout: 30000, maxBuffer: 4096, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
         const [stage, reason] = (result.stderr?.toString("utf8").replace(/^WINDOWS_PROTECTED_HELPER_BUILD_REJECTED:/u, "") ?? "").split(":");
         if (BUILD_STAGES.has(stage) && /^(POLICY|ROOT_CANONICAL|ROOT_FIXED_DRIVE|ROOT_SOURCE_BOUNDARY|ROOT_REPARSE|DIRECTORY_PARENT|DIRECTORY_CREATE_[0-9]{1,6}|ACL_PRINCIPAL|ACL_INHERITANCE|ACL_RULE_COUNT|ACL_ACCESS)$/u.test(reason ?? "")) rejectedBuildStage = stage + "_" + reason;
         check(!result.error && result.status === 0 && result.stderr.length === 0);
