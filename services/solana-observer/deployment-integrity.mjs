@@ -148,6 +148,10 @@ export class LocalDeploymentRpc {
     } catch { fail("DeploymentSourceUnavailable"); }
   }
   async genesis() { const result = await this.#call("getGenesisHash", []); key(result); return result; }
+  async finalizedTransaction(signature) {
+    check(typeof signature === "string" && signature.length <= 88 && base58Decode(signature).length === 64, "DeploymentTransactionSignatureRejected");
+    return this.#call("getTransaction", [signature, { commitment: "finalized", encoding: "json", maxSupportedTransactionVersion: 0 }]);
+  }
   async snapshot(manifest, minimumSlot = manifest.minimumSlot) {
     return this.snapshotWithAdditionalAccounts(manifest, [], minimumSlot);
   }

@@ -6,7 +6,7 @@
   "productionSigningAuthorized": false,
   "productionBroadcastAuthorized": false,
   "lastUpdated": "2026-09-12",
-  "sourceStatus": "CLEANUP_PUBLISHED_CORE_PASS_CI_WINDOWS_HELPER_FAILURE",
+  "sourceStatus": "PHASE09_LOCAL_ROUND_TRIP_PASS_COMMIT_AND_EXACT_SHA_VALIDATION_PENDING",
   "baselineSha": "bdb996e45df33535a78d983afab22aa60a47cf15",
   "repository": {
     "visibility": "PUBLIC",
@@ -14,9 +14,9 @@
     "reviewedSha": "e7e7f6f247a18f298cb7d92b247fb2dd43cee609"
   },
   "phase08Core": "PASS_LOCALLY",
-  "phase09": "NOT_STARTED",
+  "phase09": "IMPLEMENTED_AND_TESTED_IN_WORKING_TREE",
   "coreValidation": {
-    "scope": "PRE_COMMIT_WORKING_TREE_NOT_FUTURE_SHA_CERTIFICATION",
+    "scope": "EXACT_CLEANUP_SHA_e7e7f6f247a18f298cb7d92b247fb2dd43cee609_UNLESS_MARKED_OTHERWISE",
     "windowsNode": {
       "pass": 940,
       "fail": 0,
@@ -51,20 +51,13 @@
       "fail": 0
     },
     "windowsSecurity": {
-      "priorRun": {
-        "pass": 136,
-        "fail": 1,
-        "skip": 0
-      },
-      "failure": "REMOVED_FENCE_API_IN_TEST",
-      "correctedRegression": {
-        "pass": 1,
-        "fail": 0
-      },
-      "currentCleanFullRun": "NOT_RUN"
+      "pass": 136,
+      "fail": 0,
+      "skip": 0,
+      "scope": "CURRENT_USER_NOT_DISTINCT_SERVICE_IDENTITIES"
     },
-    "solanaToNative": "NOT_RUN",
-    "freshClone": "IN_PROGRESS_EXACT_CLEANUP_SHA",
+    "solanaToNative": "SEE_PHASE09_WORKING_TREE_EVIDENCE",
+    "freshClone": "PASS_EXACT_CLEANUP_SHA",
     "provenanceBoundary": {
       "files": 239,
       "status": "PASS"
@@ -90,13 +83,16 @@
     "guardrails": "PASS"
   },
   "ci": {
-    "status": "EXECUTION_RESTORED_WINDOWS_FAILURE",
-    "sourceSha": "e7e7f6f247a18f298cb7d92b247fb2dd43cee609",
-    "runId": 34688184212,
-    "historyScan": "PASS",
-    "foundationGuardrails": "PASS",
-    "windows": "FAIL_HELPER_STARTUP",
-    "linuxE2e": "IN_PROGRESS"
+    "status": "EXECUTION_RESTORED_FIX_VERIFICATION_IN_PROGRESS",
+    "sourceSha": "5c93ddf24a613a9414c28b28c7e9353758a327da",
+    "runId": 34691122645,
+    "priorRunId": 34690072892,
+    "priorWindows": {
+      "pass": 137,
+      "fail": 1
+    },
+    "correction": "CANDIDATE_TEST_FIXTURE_USES_REAL_WRITER_ACL",
+    "correctedLocalTests": 3
   },
   "production": {
     "configuration": "NOT_CONFIGURED",
@@ -114,5 +110,26 @@
     "Upgrade authority can change program behavior",
     "Cargo reports bincode 1.3.3 unmaintained: RUSTSEC-2025-0141"
   ],
-  "next": "Diagnose Windows runner helper failure and implement Phase 09 separately"
+  "next": "Commit independently validated Phase 09, verify exact-SHA CI and finish simple operational integration",
+  "phase09Validation": {
+    "baseSha": "3428dd7d0f324c113bdf82bdad8d6a199853b8ba",
+    "worktreeDirty": true,
+    "windowsNode": 962,
+    "wslNode": 962,
+    "vectorsPerPlatform": 2,
+    "finalFullSuites": "PASS_WINDOWS_AND_WSL_ZERO_FAILURES_OR_SKIPS",
+    "targetedTests": {
+      "pass": 44,
+      "fail": 0
+    },
+    "roundTrip": {
+      "pass": 20,
+      "fail": 0,
+      "nativeToSolana": "COMPLETED",
+      "solanaToNative": "COMPLETED",
+      "separateProcessRestart": "PASS",
+      "perTransferTeamApproval": false
+    },
+    "exactShaFreshClone": "NOT_RUN"
+  }
 }

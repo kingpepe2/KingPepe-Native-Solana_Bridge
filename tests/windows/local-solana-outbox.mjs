@@ -204,5 +204,5 @@ try {
   if (!done && file) { try { writeFileSync(file("abort"), "ABORT", { flag: "wx" }); } catch { /* Preserve first failure. */ } }
   try { await fixture?.close(); } catch { console.error("WINDOWS_SOLANA_OUTBOX_FIXTURE_CLEANUP_FAILED"); process.exitCode = 1; }
 }
-if (done && process.exitCode !== 1) console.log(JSON.stringify({ pass: passed.length, fail: 0, passed, phase09: "NOT_STARTED", productionReady: false,
+if (done && process.exitCode !== 1) console.log(JSON.stringify({ pass: passed.length, fail: 0, passed, nativePayout: "NOT_RUN_BY_THIS_TEST", productionReady: false,
   scope: "Actual CurrentUser DPAPI/mTLS and validator delivery; test-initialized pending credit, not full protected controller or cross-SID certification." }));

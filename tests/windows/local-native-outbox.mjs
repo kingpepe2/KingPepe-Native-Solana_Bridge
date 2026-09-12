@@ -221,4 +221,4 @@ try {
   try { await fixture?.close(); } catch { console.error("WINDOWS_NATIVE_OUTBOX_CLEANUP_FAILED"); process.exitCode = 1; }
 }
 if (!process.exitCode) console.log(JSON.stringify({ pass: passed.length, fail: 0, passed, scope: "CURRENT_PRINCIPAL_REAL_BROADCAST_NOT_FULL_PROTECTED_FLOW",
-  productionReady: false, mainnetActivation: "DISABLED", phase09: "NOT_STARTED" }));
+  productionReady: false, mainnetActivation: "DISABLED", nativePayout: "NOT_RUN_BY_THIS_TEST" }));

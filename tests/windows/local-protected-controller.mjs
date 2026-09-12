@@ -348,5 +348,5 @@ try {
   if (cleanupFailed) { console.error("LOCAL_PROTECTED_CONTROLLER_CLEANUP_FAILED"); process.exitCode = 1; }
   if (complete && !cleanupFailed) console.log(JSON.stringify({ state: "COMPLETED", pass: passed.length, fail: 0, passed, boundaries,
     restartGroup, killedBoundaries, postMintReorg, scope: "CURRENT_PRINCIPAL_ACTUAL_CHAINS_SELECTED_CONTROLLER_KILLS_NOT_CROSS_SID_OR_COMPLETE_ALL_SERVICE_MATRIX",
-    productionReady: false, mainnetActivation: "DISABLED", phase09: "NOT_STARTED" }));
+    productionReady: false, mainnetActivation: "DISABLED", nativePayout: "NOT_RUN_BY_THIS_TEST" }));
 }

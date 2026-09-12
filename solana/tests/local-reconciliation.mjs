@@ -120,7 +120,7 @@ export async function runLocalReconciliation(repoRoot, sourceSha) {
     }
   }).catch(() => { throw new Error("LOCAL_RECONCILIATION_FAILED:" + (failure ? failure.stage + ":" + failure.code : "CLAIM_PREREQUISITE")); });
   return { protocol: "KINGPEPE_LOCAL_RECONCILIATION_V1", claimChecks: claims.pass, pass: passed.length, fail: 0, passed,
-    state: "COMPLETED", phase09: "NOT_STARTED", productionReady: false, mainnetActivation: "DISABLED",
+    state: "COMPLETED", nativePayout: "NOT_RUN_BY_THIS_TEST", productionReady: false, mainnetActivation: "DISABLED",
     scope: "Real Native/validator read-only reconciliation and deep-fork detection, not protected Windows stop propagation or service certification." };
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

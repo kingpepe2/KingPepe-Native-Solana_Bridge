@@ -105,8 +105,8 @@ export async function runLocalAcceptanceCheckpoint(repoRoot) {
       throw error;
     }
   });
-  return { sourceScope: "PHASE_08_5", infrastructure: result.state, acceptanceCheckpoint: result.acceptanceCheckpoint,
-    fullNativeToSolanaE2e: result.fullNativeToSolanaE2e, failure, phase09: "NOT_STARTED", productionReady: false, mainnetActivation: "DISABLED" };
+  return { sourceScope: "NATIVE_TO_SOLANA_CORE", infrastructure: result.state, acceptanceCheckpoint: result.acceptanceCheckpoint,
+    fullNativeToSolanaE2e: result.fullNativeToSolanaE2e, failure, nativePayout: "NOT_RUN_BY_THIS_TEST", productionReady: false, mainnetActivation: "DISABLED" };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

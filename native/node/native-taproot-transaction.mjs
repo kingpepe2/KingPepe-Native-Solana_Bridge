@@ -14,6 +14,25 @@ export const LOCAL_NATIVE_TAPROOT_SIGHASH_VALIDATED =
   "LOCALLY_VALIDATED_NATIVE_SIGHASH";
 export const SIGHASH_DEFAULT = 0x00;
 
+// Small deterministic key-path payout builder. No wallet key or RPC signing.
+export function createUnsignedNativePayout({ inputs, outputs }) {
+  if (!Array.isArray(inputs) || inputs.length < 1 || inputs.length > 8 ||
+      !Array.isArray(outputs) || outputs.length < 1 || outputs.length > 2) throw new Error("NativePayoutShapeRejected");
+  const ids = new Set();
+  const nativeInputs = inputs.map(input => {
+    if (!/^[0-9a-f]{64}$/u.test(input?.txid ?? "") || !Number.isInteger(input.vout) || input.vout < 0 || input.vout > 0xffffffff ||
+        ids.has(`${input.txid}:${input.vout}`)) throw new Error("NativePayoutInputRejected");
+    ids.add(`${input.txid}:${input.vout}`);
+    return { serializedOutpoint: Buffer.concat([Buffer.from(input.txid, "hex").reverse(), uint32LE(input.vout)]), scriptSig: Buffer.alloc(0), sequence: 0xffffffff };
+  });
+  for (const output of outputs) {
+    canonicalUintDecimal(output.amountAtomic, "payout output");
+    if (BigInt(output.amountAtomic) === 0n || !/^(?:0014[0-9a-f]{40}|0020[0-9a-f]{64}|5120[0-9a-f]{64})$/u.test(output.scriptPubKeyHex)) throw new Error("NativePayoutOutputRejected");
+  }
+  const raw = serializeNativeTransactionParts({ version: 2, inputs: nativeInputs, outputs, lockTime: 0 });
+  return parseNativeTransactionHex(raw.toString("hex")).rawHex;
+}
+
 const MAX_NATIVE_TRANSACTION_BYTES = 4_000_000;
 const MAX_NATIVE_TRANSACTION_INPUTS = 100_000;
 const MAX_NATIVE_TRANSACTION_OUTPUTS = 500_000;

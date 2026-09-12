@@ -52,5 +52,5 @@ try {
     assert(completed); failureStage = "AFTER_REAL_PROTECTED_DELIVERY";
   });
   assert.equal(result.pass, 14);
-  console.log(JSON.stringify({ state: "COMPLETED", chainChecks: result.pass, productionReady: false, phase09: "NOT_STARTED" }));
+  console.log(JSON.stringify({ state: "COMPLETED", chainChecks: result.pass, productionReady: false, nativePayout: "NOT_RUN_BY_THIS_TEST" }));
 } catch { console.error("LOCAL_WINDOWS_NATIVE_OUTBOX_HOST_FAILED:" + failureStage); process.exitCode = 1; }

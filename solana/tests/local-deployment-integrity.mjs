@@ -252,7 +252,7 @@ export async function runLocalDeploymentIntegrity(repoRoot, sourceSha) {
       await delay(500);
     }
     assert.equal(byteChange, true); passed.push("ACTUAL_FINALIZED_WRONG_PROGRAM_BYTECODE_DETECTED");
-    return { sourceScope: "PHASE_08_5", fullNativeToSolanaE2e: flow.state, deploymentIntegrity: { pass: passed.length, fail: 0, passed }, phase09: "NOT_STARTED" };
+    return { sourceScope: "NATIVE_TO_SOLANA_CORE", fullNativeToSolanaE2e: flow.state, deploymentIntegrity: { pass: passed.length, fail: 0, passed }, nativePayout: "NOT_RUN_BY_THIS_TEST" };
     } catch (error) {
       failure = { code: /^(?:Deployment[A-Za-z]+|SOLANA_[A-Z_]+)$/u.test(error?.message ?? "") ? error.message : "LOCAL_MONITOR_CHECK_FAILED",
         testLine: Number(error.stack?.match(/local-deployment-integrity\.mjs:(\d+):/u)?.[1]) || undefined, passed: passed.length,

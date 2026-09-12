@@ -19,6 +19,8 @@ const VERIFIED_CHAINS = new WeakSet(), VERIFIED_RESERVES = new WeakMap(), OBSERV
 const headerId = raw => createHash("sha256").update(createHash("sha256").update(hex(raw, 80)).digest()).digest().reverse().toString("hex");
 export function requireVerifiedRegtestChain(value) { if (!VERIFIED_CHAINS.has(value)) throw new Error("RAW_NATIVE_VERIFIED_CHAIN_REQUIRED"); }
 export function requireVerifiedRegtestReserve(value) { if (!VERIFIED_RESERVES.has(value)) throw new Error("RAW_NATIVE_VERIFIED_RESERVE_REQUIRED"); }
+const VERIFIED_PAYOUTS = new WeakSet();
+export function requireVerifiedRegtestPayout(value) { if (!VERIFIED_PAYOUTS.has(value)) throw new Error("RAW_NATIVE_VERIFIED_PAYOUT_REQUIRED"); }
 export function verifiedReserveChain(value) { requireVerifiedRegtestReserve(value); return VERIFIED_RESERVES.get(value); }
 // A generic RPC error or a caller-created object is not evidence of a deficit.
 // Only the verified sweep path below can produce this capability. UTXO absence
@@ -254,6 +256,37 @@ export class LocalNativeEvidenceVerifier {
     return Object.freeze({ ...verified, acceptedCheckpoint: acceptance,
       currentTipHash: current.tipHash, currentTipHeight: current.tipHeight,
       utxoTrust: "CONFIGURED_LOCAL_VALIDATING_NODE_RPC_OBSERVATION" });
+  }
+
+  async verifyFinalizedPayout({ inputs, unsignedTransactionHex, signedTransactionHex, minimumConfirmations, reserveScriptHex }) {
+    const expected = structuredClone({ inputs, unsignedTransactionHex, signedTransactionHex, minimumConfirmations, reserveScriptHex });
+    const signed = parseNativeTransactionHex(expected.signedTransactionHex);
+    if (signed.strippedHex !== expected.unsignedTransactionHex || signed.outputs.length < 1 || signed.outputs.length > 2 ||
+        signed.inputs.length !== expected.inputs.length || signed.inputs.some((i, n) => i.outpoint !== `${expected.inputs[n].txid}:${expected.inputs[n].vout}`)) throw new Error("RAW_NATIVE_PAYOUT_SUBSTITUTED");
+    const bundle = await collectRegtestEvidence({ rpc: this.#rpc, transactionIds: [...new Set([...expected.inputs.map(i => i.txid), signed.txidHex])],
+      minimumConfirmations: positive(expected.minimumConfirmations, MAX_HEADERS) });
+    const verified = await verifyRegtestEvidencePacket({ executable: this.#executable, packet: encodeRegtestEvidence(bundle) });
+    const transactions = bundle.proofs.map(p => parseNativeTransactionHex(p.rawTransactionHex));
+    if (transactions.find(t => t.txidHex === signed.txidHex)?.rawHex !== expected.signedTransactionHex) throw new Error("RAW_NATIVE_PAYOUT_SUBSTITUTED");
+    let total = 0n;
+    for (const i of expected.inputs) {
+      const output = transactions.find(t => t.txidHex === i.txid)?.outputs[i.vout];
+      if (output?.amountAtomic !== i.amountAtomic || output.scriptPubKeyHex !== i.scriptPubKeyHex || i.scriptPubKeyHex !== expected.reserveScriptHex) throw new Error("RAW_NATIVE_INPUT_SUBSTITUTED");
+      total += atomic(i.amountAtomic);
+    }
+    verifyRegtestSweepSignatures({ sweep: signed, inputs: expected.inputs, reserveScriptHex: expected.reserveScriptHex });
+    const change = signed.outputs[1];
+    if (change) {
+      const utxo = await this.#rpc.getUtxoObservation({ txid: signed.txidHex, vout: 1, decimals: 8, includeMempool: true });
+      if (change.scriptPubKeyHex !== expected.reserveScriptHex || !utxo.unspent || utxo.coinbase || utxo.bestBlockHash !== verified.tipHash ||
+          utxo.valueAtomic !== change.amountAtomic || utxo.scriptPubKeyHex !== expected.reserveScriptHex || utxo.confirmations < expected.minimumConfirmations) throw new Error("RAW_NATIVE_CHANGE_NOT_AVAILABLE");
+    }
+    const changeAtomic = change?.amountAtomic ?? "0", gross = total - BigInt(changeAtomic), net = BigInt(signed.outputs[0].amountAtomic);
+    if (gross < net || (await this.#rpc.call("getbestblockhash", [])).result !== verified.tipHash) throw new Error("RAW_NATIVE_PAYOUT_SOURCE_CHANGED");
+    const result = Object.freeze({ txid: signed.txidHex, digestHex: verified.digestHex, tipHash: verified.tipHash, tipHeight: verified.tipHeight,
+      grossAtomic: gross.toString(), netAtomic: net.toString(), feeAtomic: (gross - net).toString(), changeAtomic,
+      reserveScriptHex: expected.reserveScriptHex, recipientScriptHex: signed.outputs[0].scriptPubKeyHex });
+    VERIFIED_PAYOUTS.add(result); return result;
   }
 
   async verifyReserve({ deposit, feeInputs, sweepTxid, reserveVout, reserveScriptHex, feeAtomic, minimumConfirmations, tapscriptSpends, acceptedCheckpoint }) {

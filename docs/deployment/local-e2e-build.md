@@ -42,6 +42,14 @@ npm run local:e2e:plan
 npm run local:e2e:native-to-solana
 ```
 
+With another fresh external run root, `npm run local:e2e:round-trip` starts
+both isolated chains, completes a Native deposit and then a user-signed atomic
+SPL burn/withdrawal. It verifies the finalized record, exact Native payout,
+independent A+B signing checks, lost broadcast response, separate-process
+restart, payout finality and reconciliation. Direct SPL burns cannot create
+payout rights. This test uses only newly generated disposable test material;
+it is not a production service installation or Devnet validation.
+
 Set `KINGPEPE_LOCAL_E2E_ROOT` through local configuration to a new, dedicated
 directory outside all source checkouts. It must not already exist. Its parent
 must exist and have suitable permissions. The runner creates this directory

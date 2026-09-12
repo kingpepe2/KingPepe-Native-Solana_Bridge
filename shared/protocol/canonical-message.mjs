@@ -128,6 +128,7 @@ export function decodeCanonicalBridgeMessage(input) {
 
 export function encodeCanonicalBridgeMessage(input) {
   validateInputMessage(input);
+  const destination = asBytes(input.destination, "destination");
   const operationId = input.operationId ? asHash32(input.operationId, "operationId") : deriveOperationId(input);
   const derived = deriveOperationId(input);
   if (!bytesEqual(operationId, derived)) {
@@ -147,9 +148,9 @@ export function encodeCanonicalBridgeMessage(input) {
   cursor = writeBytes(out, cursor, asHash32(input.withdrawalId, "withdrawalId"));
   cursor = writeU64(out, cursor, BigInt(input.amountAtomic));
   cursor = writeU64(out, cursor, BigInt(input.feeAtomic));
-  cursor = writeU16(out, cursor, input.destination.length);
-  cursor = writeBytes(out, cursor, input.destination);
-  cursor += MAX_DESTINATION_LENGTH - input.destination.length;
+  cursor = writeU16(out, cursor, destination.length);
+  cursor = writeBytes(out, cursor, destination);
+  cursor += MAX_DESTINATION_LENGTH - destination.length;
   cursor = writeU32(out, cursor, input.policyEpoch);
   cursor = writeU32(out, cursor, input.keyEpoch);
   cursor = writeBytes(out, cursor, asHash32(input.nonce, "nonce"));

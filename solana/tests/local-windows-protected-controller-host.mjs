@@ -142,10 +142,10 @@ try {
     assert.equal(prepared.state, "LOCAL_PROTECTED_DEPOSIT_PREPARED");
     assert.equal(prepared.signed, false); assert.equal(prepared.broadcast, false); assert.equal(prepared.minted, false);
     return { state: "COMPLETED", scope: "ACTUAL_WINDOWS_PROTECTED_SERVICES_WITH_INDEPENDENT_LINUX_CHAIN_RECHECK",
-      productionReady: false, mainnetActivation: "DISABLED", phase09: "NOT_STARTED" };
+      productionReady: false, mainnetActivation: "DISABLED", nativePayout: "NOT_RUN_BY_THIS_TEST" };
   });
   assert.equal(result.state, "LOCAL_E2E_BOOTSTRAP_READY"); // Bootstrap owns lifecycle; callback result is retained below.
-  console.log(JSON.stringify({ state: "COMPLETED", productionReady: false, mainnetActivation: "DISABLED", phase09: "NOT_STARTED" }));
+  console.log(JSON.stringify({ state: "COMPLETED", productionReady: false, mainnetActivation: "DISABLED", nativePayout: "NOT_RUN_BY_THIS_TEST" }));
 } catch (error) {
   const codes = ["RAW_NATIVE_SOURCE_CHANGED", "RAW_NATIVE_RESERVE_NOT_AVAILABLE", "RAW_NATIVE_ACCEPTANCE_DIGEST_CHANGED",
     "RAW_NATIVE_ACCEPTANCE_CHECKPOINT_REJECTED", "RAW_NATIVE_SWEEP_SIGNATURE_INVALID", "ProtectedControllerHostWaitFailed"];

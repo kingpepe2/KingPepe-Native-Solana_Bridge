@@ -84,6 +84,6 @@ try {
     assert.equal(sequence, 2); return outcome;
   });
   assert.equal(result.pass, 14);
-  console.log(JSON.stringify({ state: "COMPLETED", chainChecks: result.pass, productionReady: false, phase09: "NOT_STARTED" }));
+  console.log(JSON.stringify({ state: "COMPLETED", chainChecks: result.pass, productionReady: false, nativePayout: "NOT_RUN_BY_THIS_TEST" }));
 } catch { console.error("LOCAL_WINDOWS_SOLANA_OUTBOX_HOST_FAILED:" + stage); process.exitCode = 1; }
 finally { clearInterval(timer); await mining; if (miningFailed) { console.error("LOCAL_SOLANA_OUTBOX_MINING_FAILED"); process.exitCode = 1; } }

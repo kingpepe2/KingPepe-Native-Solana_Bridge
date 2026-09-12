@@ -43,5 +43,5 @@ try {
   });
   assert.equal(result.pass, 14); assert.equal(passed.length, 10);
   console.log(JSON.stringify({ pass: passed.length, fail: 0, passed, depositPrerequisiteChecks: result.pass,
-    scope: "ACTUAL_NATIVE_CREDIT_FACT_RECONSTRUCTION_NOT_PROTECTED_CONTROLLER", productionReady: false, phase09: "NOT_STARTED" }));
+    scope: "ACTUAL_NATIVE_CREDIT_FACT_RECONSTRUCTION_NOT_PROTECTED_CONTROLLER", productionReady: false, nativePayout: "NOT_RUN_BY_THIS_TEST" }));
 } catch { console.error("LOCAL_NATIVE_RESERVE_CREDIT_FAILED"); process.exitCode = 1; }

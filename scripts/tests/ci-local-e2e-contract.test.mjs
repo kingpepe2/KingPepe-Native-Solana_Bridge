@@ -20,6 +20,41 @@ const withdrawalCode = gateFor("withdrawal-record-result.json");
 assert.ok(withdrawalCode?.includes("withdrawalRecord") && withdrawalCode.length < 16_384, "WithdrawalRecordWorkflowGateRequired");
 const acceptanceCode = gateFor("acceptance-checkpoint-result.json");
 assert(acceptanceCode.includes("acceptanceCheckpoint"), "AcceptanceCheckpointWorkflowGateRequired");
+const roundTripCode = gateFor("round-trip-result.json");
+
+// Report fixtures exercise the exact CI gate; actual chain execution is a
+// separate mandatory job step and cannot be replaced by this contract test.
+for (const [name, change, expected] of [
+  ["accepts the exact clean source and both flows", () => {}, 0],
+  ["rejects older source evidence", r => { r.sourceSha = "1".repeat(40); }, 1],
+  ["rejects uncommitted source evidence", r => { r.worktreeDirty = true; }, 1],
+  ["requires separate-process payout recovery", r => { r.checks.passed.splice(4, 1); }, 1],
+  ["rejects an E2E failure", r => { r.checks.fail = 1; }, 1],
+  ["requires Native payout completion", r => { r.solanaToNative = "NOT_RUN"; }, 1],
+]) test(`CI round-trip gate ${name}`, () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-ci-gate-test-"));
+  try {
+    const result = { sourceSha: "0".repeat(40), worktreeDirty: false, state: "COMPLETED", nativeToSolana: "COMPLETED",
+      solanaToNative: "COMPLETED", noPerTransferKingPepeTeamApproval: true, checks: { pass: 20, fail: 0, passed: [
+        "REAL_FINALIZED_BURN_CHECKED_AND_WITHDRAWAL_RECORD", "MISSING_SIGNER_NO_FALLBACK_DURABLE_LIABILITY_AND_INPUT_LOCK",
+        "REAL_FROST_A_B_NATIVE_ACCEPTED_PAYOUT", "INVALID_PAYOUT_SIGNATURE_REJECTED_BEFORE_RELAY",
+        "SEPARATE_PROCESS_RESUMES_UNFINALIZED_PAYOUT_WITHOUT_REBROADCAST", "NATIVE_FINALITY_RECONCILIATION_COMPLETED",
+        "DUPLICATE_OPERATION_NO_DOUBLE_PAYOUT", "REAL_DIRECT_SPL_BURN_NO_PAYOUT_RIGHT", "DIRECT_BURN_NOT_SPENDABLE_SURPLUS",
+        "PAUSE_SURVIVES_RESTART_NO_NEW_AUTHORIZATION",
+      ] } };
+    change(result);
+    writeFileSync(path.join(root, "round-trip-result.json"), JSON.stringify(result), { flag: "wx", mode: 0o600 });
+    const child = spawnSync(process.execPath, ["--input-type=module", "-e", roundTripCode], {
+      cwd: REPO_ROOT, env: { ...process.env, KINGPEPE_CI_TOOL_ROOT: root, GITHUB_SHA: "0".repeat(40) },
+      encoding: "utf8", timeout: 10_000, maxBuffer: 8192, windowsHide: true,
+    });
+    assert.equal(child.error, undefined, "WorkflowGateExecutionFailed"); assert.equal(child.signal, null);
+    assert.equal(child.status, expected);
+  } finally {
+    assert.equal(path.dirname(root), path.resolve(os.tmpdir())); assert(path.basename(root).startsWith("kingpepe-ci-gate-test-"));
+    assert(lstatSync(root).isDirectory() && !lstatSync(root).isSymbolicLink()); rmSync(root, { recursive: true, force: true });
+  }
+});
 
 for (const [name, change, expected] of [
   ["accepts all thirteen actual-chain checks", () => {}, 0],
@@ -27,11 +62,11 @@ for (const [name, change, expected] of [
   ["requires independent forged-work rejection", r => { r.acceptanceCheckpoint.passed.splice(1, 1); }, 1],
   ["rejects any failure", r => { r.acceptanceCheckpoint.fail = 1; }, 1],
   ["requires the completed economic flow", r => { r.fullNativeToSolanaE2e = "NOT_RUN"; }, 1],
-  ["rejects starting Phase 09", r => { r.phase09 = "STARTED"; }, 1],
+  ["rejects misreported payout scope", r => { r.nativePayout = "COMPLETED"; }, 1],
 ]) test(`CI immutable acceptance gate ${name}`, () => {
   const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-ci-gate-test-"));
   try {
-    const result = { phase09: "NOT_STARTED", fullNativeToSolanaE2e: "COMPLETED", acceptanceCheckpoint: { pass: 13, fail: 0,
+    const result = { nativePayout: "NOT_RUN_BY_THIS_TEST", fullNativeToSolanaE2e: "COMPLETED", acceptanceCheckpoint: { pass: 13, fail: 0,
       passed: ["REAL_NATIVE_ACCEPTED_FROST_AND_SOLANA_MINT_AFTER_TIP_ADVANCE", "FORGED_PREFIX_WORK_AND_DIGEST_REJECTED_BY_INDEPENDENT_RUST",
         "HISTORICALLY_INCLUDED_BUT_NOW_SPENT_INPUT_REJECTED", "REORGANIZED_ACCEPTED_SWEEP_REJECTED_WITHOUT_NEW_CREDIT"] } };
     change(result);
@@ -79,12 +114,12 @@ for (const [name, change, expected] of [
   ["requires the post-direct-burn claim replay check", r => { r.depositCounter.passed.pop(); }, 1],
   ["requires the real fresh-PDA check", r => { r.withdrawalRecord.passed.shift(); }, 1],
   ["rejects a record regression failure", r => { r.withdrawalRecord.fail = 1; }, 1],
-  ["rejects an expanded Phase 09 scope", r => { r.phase09 = "STARTED"; }, 1],
+  ["rejects misreported payout scope", r => { r.nativePayout = "COMPLETED"; }, 1],
 ]) {
   test(`CI withdrawal prerequisite gate ${name}`, () => {
     const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-ci-gate-test-"));
     try {
-      const result = { phase09: "NOT_STARTED", withdrawalRecord: { pass: 29, fail: 0, passed: [
+      const result = { nativePayout: "NOT_RUN_BY_THIS_TEST", withdrawalRecord: { pass: 29, fail: 0, passed: [
         "FRESH_USER_FRESH_PDA_FINALIZED_BURN_AND_RECORD", "DUPLICATE_WITHDRAWAL_NEW_NONCE_REJECTED",
         "MISSING_USER_SIGNATURE_REJECTED", "INSUFFICIENT_RECORD_RENT_ROLLS_BACK",
         "PREFUNDED_SYSTEM_PDA_SAFELY_INITIALIZED", "LATER_INSTRUCTION_FAILURE_ROLLS_BACK_BURN_RECORD_AND_RENT",

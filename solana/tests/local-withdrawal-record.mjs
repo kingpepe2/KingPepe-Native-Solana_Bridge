@@ -408,7 +408,7 @@ export async function runLocalWithdrawalRecordRegression(repoRoot, { onCheck = (
   if (!evidence || !counterEvidence) throw new Error("WITHDRAWAL_REGRESSION_NOT_COMPLETED", { cause: failure ?? { code: "LOCAL_INFRASTRUCTURE_OR_DEPOSIT_FAILED" } });
   return { sourceScope: "CORE_WITHDRAWAL_RECORD", infrastructure: result.state, withdrawalRecord: evidence,
     depositCounter: counterEvidence,
-    phase09: "NOT_STARTED", productionReady: false, mainnetActivation: "DISABLED" };
+    nativePayout: "NOT_RUN_BY_THIS_TEST", productionReady: false, mainnetActivation: "DISABLED" };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

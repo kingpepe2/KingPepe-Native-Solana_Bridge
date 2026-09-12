@@ -1,89 +1,102 @@
 # Development status
 
-Cleanup was committed and pushed as e7e7f6f247a18f298cb7d92b247fb2dd43cee609
-after source/staged/outgoing/history and publication review. The repository is
-PUBLIC; original code remains All Rights Reserved. Baseline before cleanup:
-bdb996e45df33535a78d983afab22aa60a47cf15.
+The repository is PUBLIC. Original KingPepe code remains All Rights Reserved.
+Mainnet activation, production signing and production broadcasting are disabled.
 
-## Cleanup
+## Completed cleanup
 
-Source inventory: 293 files before, 239 after (55 removed, one small shared
-real-validator transaction test helper added). File purposes and origin
-classifications are in PROVENANCE.json. Removed README-only placeholders,
-unused Rust deterministic test shares, advanced signer fences, registry/file
-rollback anchors and duplicated historical reports. Real Noble FROST, nonce
-tombstones, process exclusion, DPAPI, replay and durable accounting remain.
+Baseline: bdb996e45df33535a78d983afab22aa60a47cf15.
+Cleanup: e7e7f6f247a18f298cb7d92b247fb2dd43cee609.
 
-Preserved and validated the pending Manager accounting fix: direct SPL burns
-must not erase the difference between bridge-issued units and live Mint supply.
-A circular import in the withdrawal test harness caused its earlier unsettled
-top-level await/hang; the shared packet helper removes that cycle.
+293 source files became 239: 55 removed, one shared real-validator packet helper
+added. PROVENANCE.json records each retained file's origin and bridge purpose.
+Removed placeholders, unused deterministic Rust signing scaffolds, advanced
+fencing/rollback anchors and duplicated historical reports. Real Noble FROST,
+nonce tombstones, process exclusion, DPAPI and core chain/accounting tests remain.
+No npm dependency was removed or changed.
 
-## Local results on the pre-commit working tree
+Preserved the pending Manager accounting correction: direct burns do not erase
+the difference between bridge-issued units and actual SPL supply. Fixed the
+test harness circular import rather than suppressing its failing test.
 
-- Windows Node: 940 PASS; canonical vectors: 2 PASS.
-- WSL Node: 940 PASS; canonical vectors: 2 PASS.
-- Rust: 94 PASS; locked check, formatting and Clippy PASS for all four retained
-  workspaces. Removed seven unused scaffold tests; added four accounting tests.
-- Both SBF programs built and executed on the real local validator.
-- Native to Solana: COMPLETED, real A+B FROST accepted by Native, both
-  attestations, finalized mint and reconciliation; no per-transfer Team approval.
-- Deposit/security/recovery/retry/accounting real-chain checks: 55 PASS.
-- Atomic withdrawal-record checks: 29 PASS; subsequent deposit/direct-burn
-  counter checks: 5 PASS. These do not include a Native payout.
-- Other real-chain runs: acceptance checkpoint 13 PASS; reconciliation 10 PASS
-  plus 14 claim checks; deployment identities 18 PASS; Native reorg 8 PASS.
-- Windows full security run: 136 PASS, 1 FAIL, zero skipped. Its one failure
-  called the removed fence API in a test; corrected to compare actual protected
-  signer state. The corrected regression passed independently (1 PASS).
-  The removed compatibility-driver comparison is no longer a retained test.
-  Do not relabel that earlier full run PASS; a clean current run remains due.
-- npm audit: zero vulnerabilities. Cargo audit: no vulnerability failures,
-  one unsuppressed bincode 1.3.3 unmaintained warning, RUSTSEC-2025-0141.
-- Locked dependency license metadata: PASS on WSL.
-- Current-file provenance/boundary check: 239 files, no findings.
-- Full historical Gitleaks: 184 commits, no leaks. History boundary review
-  identified only dummy credentials in rejection tests, not deployment secrets.
-- Historical CI: 158 runs reviewed, 134 executed logs scanned (48.28 MB),
-  24 runs with no executed steps; no secrets. One compiler diagnostic used a
-  standard GitHub-hosted runner profile, not a Team machine. No artifacts,
-  releases or issues were present at review.
-- Guardrails: PASS. Fresh-clone validation: PENDING. Exact staged/outgoing
-  scanning is required immediately before this cleanup commit/push.
+Fresh clones of that exact cleanup SHA passed:
 
-An initial WSL Node invocation inherited the E2E build-root environment and
-failed one default-plan fixture; the full clean-environment rerun passed.
-These are working-tree results, not certification of a future commit SHA.
+- Windows Node 940; WSL Node 940; canonical vectors 2 per platform.
+- Windows CurrentUser protected-storage/security 136, zero failures/skips.
+  This does not certify separate Windows service identities.
+- Rust 94; locked check, formatting and Clippy for all four retained workspaces.
+- Two independent SBF build outputs matched:
+  Manager: 996d0f1ac65b97160bf8ea0cd4c5e77361f4d83f9c15aa0c2ca2c238ea350f46
+  Transceiver: 58bacbe7119e8793ae93dc0e025ed2ebc96c9a1407b16fdcbbdab2ec4d706eb0
+- Real Native-to-Solana COMPLETED and 55 local-chain checks.
+- Locked installation, source/provenance guardrails and dependency/license checks.
 
-Device cleanup attempted only two verified obsolete compiler-output directories;
-execution policy rejected deletion before execution. No runtime data, tools,
-wallets, backups, source-recovery copies or WSL storage were deleted.
+Other pre-cleanup-commit working-tree real-chain results: withdrawal record 29,
+subsequent deposit/direct-burn accounting 5, acceptance checkpoint 13,
+reconciliation 10 plus 14 claim checks, deployment identity 18, Native reorg 8.
+Those remain distinct from fresh-clone evidence, not certification of later code.
 
-## Next
+Publication review found no secrets in the current/staged/outgoing tree,
+184 historical commits or 134 executed historical CI logs. No published
+artifacts, releases or issues were present. Required third-party terms remain.
+The only attempted device cleanup targeted two verified obsolete compiler
+output directories; policy denied deletion before execution. No source,
+wallets, runtime state, backups, tools or WSL storage were deleted.
 
-Exact cleanup clones are validating on Windows and WSL. Begin Phase 09 in a
-separate implementation commit; core local gates passed. Fresh-clone evidence
-must identify the exact resulting source SHA.
+## Phase 09 local implementation
 
-Actions execution resumed after the approved visibility change. Run 34688184212
-for cleanup SHA e7e7f6f247a18f298cb7d92b247fb2dd43cee609: history scan and
-Foundation Guardrails PASS; Windows failed during protected-helper startup;
-Linux E2E is still running at this update. The Windows failure happens before
-protected-state tests execute. Fixed-stage-only build diagnostics were added to
-identify the runner-specific cause without printing paths, identities or input.
-Local compiled-helper tamper/missing/hardlink/ACL regressions: 4 PASS.
-The CI failure is not suppressed and is not yet resolved.
+Six focused source/test files extend the existing bridge, not a new service
+framework. The existing authenticated operation journal now persists canonical
+reserve inputs, finalized user withdrawals, signed transactions, broadcast
+attempts, final payments and reconciliation. Input locks precede signing;
+signed bytes precede broadcast. A burned unpaid amount remains a liability.
+Direct SPL burns grant no payout right and do not create spendable surplus.
 
-CI for baseline bdb996e45df33535a78d983afab22aa60a47cf15:
-NOT_RUN_ACCOUNT_BLOCKED, run 34683149831, zero steps/artifacts.
-GitHub: "The job was not started because recent account payments have failed
-or your spending limit needs to be increased. Please check the 'Billing & plans'
-section in your settings". Do not weaken CI or reuse old success.
+The reader checks the actual finalized transaction, BurnChecked CPI, exact
+withdrawal PDA, user authorization, canonical message, Mint and deployed
+configuration. Each FROST participant independently checks the Solana request
+and Native UTXOs/sighash. Native finality is checked against raw evidence by
+the pinned verifier. Configured Solana RPC observation is not trustless proof.
 
-Phase 08 core: PASS_LOCALLY (pre-commit source; final publication gates remain).
-Phase 09: NOT_STARTED.
-Devnet, production configuration/deployment and external review: NOT_RUN.
+Working-tree evidence based on 3428dd7d0f324c113bdf82bdad8d6a199853b8ba:
+
+- Full Windows and WSL Node: 962 PASS each, zero failures/skips; vectors 2 each.
+  Includes the counter-width and exact-source CI-gate regressions.
+- Fresh real Native-to-Solana-to-Native round trip: 20 PASS, both COMPLETED.
+  Includes actual A+B Native-accepted payout, missing signer, invalid signature,
+  lost broadcast response, separate-process restart before/after finality,
+  no duplicate payout, direct burn rejection and persistent pause.
+- Current source/provenance: 245 files PASS. npm audit: zero vulnerabilities.
+- Phase 09 exact committed-SHA fresh-clone/CI validation remains due.
+
+These results explicitly contain worktreeDirty=true; they are not proof that the
+base SHA contains the new withdrawal implementation. No per-transfer Team
+approval was added. Phase 10 operational integration follows a separate commit.
+
+## CI and remaining work
+
+Actions now execute; the historical billing restriction is no longer the current
+status. Cleanup run 34688184212 passed Linux SBF and all its real-chain steps;
+Windows failed before protected-state tests. Subsequent explicit fixes addressed
+Windows canonical paths, the compiled helper's principal binding and inherited
+PowerShell module discovery. No gate was removed or weakened.
+
+Run 34690072892 for 3428dd7d0f324c113bdf82bdad8d6a199853b8ba has source scan
+and Foundation Guardrails PASS. Windows executed 138 security tests: 137 PASS,
+one interrupted-write fixture failure. The fixture used a default file principal
+instead of the real writer's explicit service-SID ACL. Test-only correction
+5c93ddf24a613a9414c28b28c7e9353758a327da passed all three candidate regressions
+locally and is pushed; run 34691122645 is executing. Runtime ACL enforcement is
+unchanged. Do not certify a later implementation using either earlier run.
+
+Phase 08 core: PASS_LOCALLY.
+Phase 09: IMPLEMENTED_AND_TESTED_IN_WORKING_TREE; publication in progress.
+Simple operational integration, complete CLI/UI, final clean-clone validation,
+Devnet, production configuration/deployment and external review remain incomplete.
+
+Residual risks: common-host compromise/availability, unaudited Noble FROST,
+CurrentUser-only Windows certification, no full-host rollback guarantee,
+project attestation/configured observer trust and upgrade authority.
+Cargo reports an unsuppressed bincode 1.3.3 unmaintained warning
+(RUSTSEC-2025-0141); no dependency vulnerability failures were reported.
 productionReady=false; mainnetActivation=DISABLED.
-
-Full-host rollback resistance, advanced clone detection and cross-service
-Windows certification are not Phase 09 gates. No external audit is claimed.

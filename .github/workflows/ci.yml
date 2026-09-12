@@ -151,7 +151,7 @@ jobs:
             import {readFileSync} from "node:fs";
             const r = JSON.parse(readFileSync(process.env.KINGPEPE_CI_TOOL_ROOT + "/acceptance-checkpoint-result.json", "utf8"));
             console.log(JSON.stringify({sourceSha: process.env.GITHUB_SHA, ...r}));
-            if (r.acceptanceCheckpoint?.pass !== 13 || r.acceptanceCheckpoint?.fail !== 0 || r.phase09 !== "NOT_STARTED" || r.fullNativeToSolanaE2e !== "COMPLETED") process.exit(1);
+            if (r.acceptanceCheckpoint?.pass !== 13 || r.acceptanceCheckpoint?.fail !== 0 || r.nativePayout !== "NOT_RUN_BY_THIS_TEST" || r.fullNativeToSolanaE2e !== "COMPLETED") process.exit(1);
             for (const check of ["REAL_NATIVE_ACCEPTED_FROST_AND_SOLANA_MINT_AFTER_TIP_ADVANCE",
               "FORGED_PREFIX_WORK_AND_DIGEST_REJECTED_BY_INDEPENDENT_RUST", "HISTORICALLY_INCLUDED_BUT_NOW_SPENT_INPUT_REJECTED",
               "REORGANIZED_ACCEPTED_SWEEP_REJECTED_WITHOUT_NEW_CREDIT"]) {
@@ -172,7 +172,7 @@ jobs:
             import {readFileSync} from "node:fs";
             const r = JSON.parse(readFileSync(process.env.KINGPEPE_CI_TOOL_ROOT + "/reconciliation-result.json", "utf8"));
             console.log(JSON.stringify({sourceSha: process.env.GITHUB_SHA, ...r}));
-            if (r.pass !== 10 || r.fail !== 0 || r.claimChecks !== 14 || r.state !== "COMPLETED" || r.phase09 !== "NOT_STARTED") process.exit(1);
+            if (r.pass !== 10 || r.fail !== 0 || r.claimChecks !== 14 || r.state !== "COMPLETED" || r.nativePayout !== "NOT_RUN_BY_THIS_TEST") process.exit(1);
             for (const check of ["MEMPOOL_RESERVE_SPEND_SUSPENDS_NOT_CONFIRMED_CHAIN_DEFICIT",
               "CONFIRMED_UNREGISTERED_RESERVE_MOVE_IS_EXACT_INTEGRITY_INCIDENT",
               "HIGHER_WORK_POST_MINT_REORG_IDENTIFIES_EXACT_AFFECTED_BACKING",
@@ -194,7 +194,7 @@ jobs:
             import {readFileSync} from "node:fs";
             const r = JSON.parse(readFileSync(process.env.KINGPEPE_CI_TOOL_ROOT + "/withdrawal-record-result.json", "utf8"));
             console.log(JSON.stringify({sourceSha: process.env.GITHUB_SHA, ...r}));
-            if (r.withdrawalRecord?.pass !== 29 || r.withdrawalRecord?.fail !== 0 || r.phase09 !== "NOT_STARTED") process.exit(1);
+            if (r.withdrawalRecord?.pass !== 29 || r.withdrawalRecord?.fail !== 0 || r.nativePayout !== "NOT_RUN_BY_THIS_TEST") process.exit(1);
             for (const check of ["FRESH_USER_FRESH_PDA_FINALIZED_BURN_AND_RECORD",
               "DUPLICATE_WITHDRAWAL_NEW_NONCE_REJECTED", "MISSING_USER_SIGNATURE_REJECTED",
               "INSUFFICIENT_RECORD_RENT_ROLLS_BACK", "PREFUNDED_SYSTEM_PDA_SAFELY_INITIALIZED",
@@ -213,6 +213,32 @@ jobs:
             }
           '
 
+      - name: Real automatic withdrawal, lost broadcast response and process restart (regtest only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="${KINGPEPE_CI_TOOL_ROOT}/solana-release/bin:${KINGPEPE_CI_TOOL_ROOT}/native-build/bin:${PATH}"
+          export KINGPEPE_LOCAL_E2E_ROOT="${KINGPEPE_CI_TOOL_ROOT}/round-trip-run"
+          export KINGPEPE_LOCAL_BUILD_ROOT="${KINGPEPE_CI_TOOL_ROOT}/build"
+          node solana/tests/local-withdrawal-e2e.mjs > "${KINGPEPE_CI_TOOL_ROOT}/round-trip-result.json"
+          node --input-type=module -e '
+            import {readFileSync} from "node:fs";
+            const r = JSON.parse(readFileSync(process.env.KINGPEPE_CI_TOOL_ROOT + "/round-trip-result.json", "utf8"));
+            console.log(JSON.stringify(r));
+            if (r.sourceSha !== process.env.GITHUB_SHA || r.worktreeDirty !== false || r.state !== "COMPLETED" ||
+                r.nativeToSolana !== "COMPLETED" || r.solanaToNative !== "COMPLETED" ||
+                r.noPerTransferKingPepeTeamApproval !== true || r.checks?.pass !== 20 || r.checks?.fail !== 0) process.exit(1);
+            for (const check of ["REAL_FINALIZED_BURN_CHECKED_AND_WITHDRAWAL_RECORD",
+              "MISSING_SIGNER_NO_FALLBACK_DURABLE_LIABILITY_AND_INPUT_LOCK", "REAL_FROST_A_B_NATIVE_ACCEPTED_PAYOUT",
+              "INVALID_PAYOUT_SIGNATURE_REJECTED_BEFORE_RELAY",
+              "SEPARATE_PROCESS_RESUMES_UNFINALIZED_PAYOUT_WITHOUT_REBROADCAST",
+              "NATIVE_FINALITY_RECONCILIATION_COMPLETED", "DUPLICATE_OPERATION_NO_DOUBLE_PAYOUT",
+              "REAL_DIRECT_SPL_BURN_NO_PAYOUT_RIGHT", "DIRECT_BURN_NOT_SPENDABLE_SURPLUS",
+              "PAUSE_SURVIVES_RESTART_NO_NEW_AUTHORIZATION"]) {
+              if (!r.checks.passed.includes(check)) process.exit(1);
+            }
+          '
+
       - name: Real deployment-integrity and upgrade regression (localnet only)
         shell: bash
         run: |
@@ -226,8 +252,8 @@ jobs:
             import {readFileSync} from "node:fs";
             const r = JSON.parse(readFileSync(process.env.KINGPEPE_CI_TOOL_ROOT + "/deployment-monitor-result.json", "utf8"));
             console.log(JSON.stringify({sourceSha: process.env.GITHUB_SHA, state: r.state,
-              deploymentIntegrity: r.deploymentIntegrity, fullNativeToSolanaE2e: r.fullNativeToSolanaE2e, phase09: r.phase09}));
-            if (r.deploymentIntegrity?.pass !== 18 || r.deploymentIntegrity?.fail !== 0 || r.phase09 !== "NOT_STARTED" || r.fullNativeToSolanaE2e !== "COMPLETED") process.exit(1);
+              deploymentIntegrity: r.deploymentIntegrity, fullNativeToSolanaE2e: r.fullNativeToSolanaE2e, nativePayout: r.nativePayout}));
+            if (r.deploymentIntegrity?.pass !== 18 || r.deploymentIntegrity?.fail !== 0 || r.nativePayout !== "NOT_RUN_BY_THIS_TEST" || r.fullNativeToSolanaE2e !== "COMPLETED") process.exit(1);
             for (const check of ["ACTUAL_FINALIZED_UPGRADE_AUTHORITY_CHANGE_DETECTED",
               "ACTUAL_FINALIZED_WRONG_PROGRAM_BYTECODE_DETECTED", "FINALIZED_UNAPPROVED_MINT_WITH_FREEZE_AUTHORITY_REJECTED"]) {
               if (!r.deploymentIntegrity.passed.includes(check)) process.exit(1);
@@ -246,7 +272,7 @@ jobs:
             import {readFileSync} from "node:fs";
             const r = JSON.parse(readFileSync(process.env.KINGPEPE_CI_TOOL_ROOT + "/native-reorg-result.json", "utf8"));
             console.log(JSON.stringify({sourceSha: process.env.GITHUB_SHA, ...r}));
-            if (r.nativeReorg?.pass !== 8 || r.nativeReorg?.fail !== 0 || r.phase09 !== "NOT_STARTED" || r.fullNativeToSolanaE2e !== "COMPLETED") process.exit(1);
+            if (r.nativeReorg?.pass !== 8 || r.nativeReorg?.fail !== 0 || r.nativePayout !== "NOT_RUN_BY_THIS_TEST" || r.fullNativeToSolanaE2e !== "COMPLETED") process.exit(1);
             for (const check of ["REAL_POST_MINT_HIGHER_WORK_FORK_IDENTIFIES_EXACT_BACKING_INCIDENT",
               "NO_REMINT_CONFISCATION_OR_AUTOMATIC_SUPPLY_REPAIR", "REAL_CHAIN_RECOVERY_CANNOT_AUTOMATICALLY_CLEAR_INCIDENT"]) {
               if (!r.nativeReorg.passed.includes(check)) process.exit(1);

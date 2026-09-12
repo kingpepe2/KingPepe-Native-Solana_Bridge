@@ -25,6 +25,24 @@
   },
   "trackedFiles": [
     {
+      "path": "services/bridge-validator/tests/automatic-withdrawal.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original core deterministic payout-plan, canonical encoding and unpaid withdrawal liability regressions; synthetic public protocol values are test-only, not evidence of chain execution.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "solana/tests/local-withdrawal-e2e.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated real-chain withdrawal harness with actual user BurnChecked, Native FROST payout, lost-response/restart and reconciliation checks. Ephemeral keys are generated outside source at runtime.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "solana/ts/sdk/withdrawal.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original unsigned canonical user withdrawal instruction builder using the existing Solana account/PDA and SPL Token interfaces; no upstream source copied.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
       "path": ".gitattributes",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
       "notes": "Original text-only LF checkout policy for reproducible Windows/WSL source inspection; binary files are not normalized.",
@@ -481,6 +499,12 @@
       "purpose": "CORE_BRIDGE"
     },
     {
+      "path": "native/reserve/withdrawal-plan.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original deterministic exact-integer Native withdrawal payout plan, canonical-message bindings and existing FROST sighash integration. No upstream code copied.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
       "path": "native/reserve/Cargo.lock",
       "classification": "GENERATED_FILE",
       "notes": "Generated Rust lockfile for the Phase 06 Native reserve crate.",
@@ -695,6 +719,12 @@
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original portable retained-image codec regressions using public messages and ephemeral in-memory attestation keys; not protected-service or chain evidence.",
       "purpose": "CORE_TEST"
+    },
+    {
+      "path": "services/bridge-validator/automatic-withdrawal.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original localnet automatic withdrawal coordinator using finalized Solana observations, exact Native FROST plans, the existing authenticated ledger and integer reconciliation. No upstream code copied.",
+      "purpose": "CORE_BRIDGE"
     },
     {
       "path": "services/bridge-validator/automatic-deposit-pipeline.mjs",
@@ -959,6 +989,12 @@
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original packet/account/outcome regression tests using synthetic public evidence and ephemeral test identities.",
       "purpose": "CORE_TEST"
+    },
+    {
+      "path": "services/solana-observer/finalized-withdrawal.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original finalized Solana withdrawal transaction, BurnChecked CPI, immutable record and deployment observation. Solana account owner is a protocol term. No upstream source copied.",
+      "purpose": "CORE_BRIDGE"
     },
     {
       "path": "services/solana-observer/deployment-integrity.mjs",
