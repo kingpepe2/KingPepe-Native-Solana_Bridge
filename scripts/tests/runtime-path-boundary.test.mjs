@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import {
   existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync,
-  readdirSync, rmSync, rmdirSync, statSync, symlinkSync, writeFileSync,
+  readdirSync, realpathSync, rmSync, rmdirSync, statSync, symlinkSync, writeFileSync,
 } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -77,8 +77,11 @@ test("runtime roots reject ancestors and broad roots but permit dedicated siblin
     assert.throws(() => validateRuntimeStateRoot(broad, repo), /InsideRepositoryRejected|DedicatedDirectoryRequired/u);
   }
   const outside = path.join(root, "repo-sibling", "new", "state");
-  assert.equal(validateRuntimeStateRoot(outside, repo), outside);
-  assert.equal(resolveExistingParents(outside), outside);
+  // Windows TEMP may use an 8.3 alias. The boundary returns the physical
+  // spelling without creating the missing suffix or accepting a junction.
+  const physical = path.join(realpathSync.native(root), "repo-sibling", "new", "state");
+  assert.equal(validateRuntimeStateRoot(outside, repo), physical);
+  assert.equal(resolveExistingParents(outside), physical);
   assert(!existsSync(outside));
 });
 
