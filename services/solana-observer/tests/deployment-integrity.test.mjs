@@ -19,7 +19,7 @@ for (const [name, mutate] of [
   ["executable flag", s => { s.accounts[0].executable = false; }],
   ["ProgramData address", s => byte(s, 0, 4)], ["loader discriminator", s => byte(s, 5, 0)],
   ["ProgramData executable", s => { s.accounts[5].executable = true; }],
-  ["deployed bytecode", s => byte(s, 5, 52)], ["upgrade authority", s => byte(s, 5, 13)],
+  ["executable layout", s => byte(s, 5, 45)], ["upgrade authority", s => byte(s, 5, 13)],
   ["deployment slot", s => byte(s, 5, 4)], ["mint authority", s => byte(s, 2, 4)],
   ["freeze authority", s => byte(s, 2, 46)], ["mint precision", s => byte(s, 2, 44)],
   ["token program", s => { s.accounts[2].owner = s.accounts[3].owner; }],
