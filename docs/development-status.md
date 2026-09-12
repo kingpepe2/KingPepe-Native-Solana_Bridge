@@ -55,10 +55,11 @@ The separately reviewed coordinator correction is
 sweep and withdrawal purposes, preserves exact intent binding and reuses a retained
 aggregate after restart. Worker errors expose fixed public classes, not secrets.
 
-## Phase 11 migration milestone
+## Phase 11 canonical Borsh validation
 
-The schema, caller, vector and legacy-encoder changes form one atomic migration
-based on e60d4d70261114b075049b0bd5076495ce9f7f2e. Bridge messages now use Borsh
+The schema, caller, vector and legacy-encoder changes form atomic migration
+commit 3b083b34477c0d2c841f43561eb91d104e73a9b8, based on
+e60d4d70261114b075049b0bd5076495ce9f7f2e. Bridge messages now use Borsh
 V2 (`KPEPBRG2`); the old encoder/fixture and duplicate TypeScript implementation
 are removed. Accounting, lifecycle, authority and Native/FROST consensus
 signatures are unchanged. There is no V1 reader or automatic runtime-state
@@ -71,12 +72,35 @@ checks, formatting and Clippy. Both SBF programs build. The 55 deposit checks
 and 25 round-trip checks passed on real local chains; both directions completed
 using Borsh. These results do not certify the parent SHA.
 
-Remaining retained chain regressions and the Windows CurrentUser security suite
-are still running. Phase 11 remains IN_PROGRESS until all required validation,
-publication scans and matching exact-SHA CI pass. The schema inventory is in
-`docs/architecture/protocol-messages.md`. Bincode is still required by the
+The remaining retained local checks also passed:
+
+- Windows CurrentUser security: 139 PASS, no failures/skips, using a fresh
+  source-built Native verifier. This is not distinct-service-principal proof.
+- Withdrawal records: 29 PASS plus five subsequent-deposit/direct-burn checks.
+- Combined automatic service: 22 PASS on the clean migration commit, both
+  directions COMPLETED, including lost replies, restart and pause/resume.
+- Deployment identity/authority: 18 PASS; acceptance checkpoint: 13 PASS;
+  actual Native reorg: eight PASS; reconciliation: ten plus 14 claim checks.
+- Exact provenance: 255 files. Guardrails, dependency/license checks and npm
+  audit passed (zero npm vulnerabilities). Gitleaks working tree, staged diff
+  and all 205 commits through the migration milestone reported no leaks.
+
+One initial local mining setup timed out during host I/O contention before the
+bridge flow. A fresh isolated rerun passed unchanged; failure evidence remains
+local. Local wrappers preserve diagnostic evidence externally, stop owned test
+processes and remove only recognized temporary validator databases after every
+run. Generated key files are preserved, not swept by generic cleanup. Reusable
+tool caches, private/operational state, wallets and backups are untouched.
+
+All local Phase 11 validation is complete. Migration commit
+3b083b34477c0d2c841f43561eb91d104e73a9b8 passed all four required jobs, none
+skipped, in [Actions run 34722632015](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34722632015).
+Later publication commits, including documentation-only updates, require their
+own matching exact-SHA CI; do not inherit that older run. The schema inventory is in
+`docs/architecture/protocol-messages.md`. Bincode remains required by the
 retained Solana SDK/System-instruction path, not by a legacy bridge codec;
-its maintenance warning remains visible. Devnet has not started.
+its maintenance warning is unsuppressed. Devnet has not started. After the
+matching CI passes, continue to Phase 12 without routine approval.
 
 ## Phase 10 validation
 
@@ -165,8 +189,8 @@ Historical Phase 09 evidence remains bound to
 ## Limits
 
 This remains LOCALNET/REGTEST software, not production Windows service integration
-or deployment approval. Phase 11 validation is in progress; Devnet and Mainnet
-have not started here.
+or deployment approval. Phase 11 is locally validated and requires matching
+exact-SHA CI; Devnet and Mainnet have not started here.
 Common-host compromise/availability, unaudited Noble FROST, CurrentUser-only Windows
 coverage, no full-host rollback guarantee, configured RPC/attester trust and upgrade
 authority remain explicit limitations. Cargo reports the unsuppressed bincode

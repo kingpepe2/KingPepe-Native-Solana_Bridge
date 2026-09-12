@@ -1,8 +1,9 @@
 # Canonical Protocol Messages
 
 Phase 11 migrates bridge-owned wire formats to canonical Borsh. Accounting,
-state transitions, authority and replay rules remain unchanged. Migration is
-in progress; previous E2E evidence does not certify the new encoding.
+state transitions, authority and replay rules remain unchanged. The migration
+and new local E2E validation are recorded in `../development-status.md`;
+previous-format E2E evidence does not certify this encoding.
 
 ## Encoding
 
