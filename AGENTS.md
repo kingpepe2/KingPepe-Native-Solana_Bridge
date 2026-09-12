@@ -11,10 +11,11 @@ required third-party notices and historical licensing facts.
 ## Safety and implementation
 
 - Preserve useful work; no reset/clean/restore/stash. Legacy is read-only.
-- Software FROST A+B: exact 2-of-2, separate private state, no fallback or
-  coordinator private share. Current local tests use one host. The corrected
-  roadmap requires genuinely distinct production hosts/accounts/network paths
-  at Phase 13, verified before Phase 19; that deployment is not certified here.
+- Software FROST A+B: exact 2-of-2, separate processes/services, protected private
+  shares and nonce state; no fallback or coordinator private share. SINGLE_HOST
+  is the final KingPepe Team decision. Common-host compromise/outage may affect
+  both participants; record that accepted risk for Phase 13 and external review.
+  Do not require another physical host, HSM or hardware signer.
 - Preserve @noble/curves 2.3.0 schnorr_FROST secp256k1/BIP340/BIP342.
   Upstream FROST is UNAUDITED. Ed25519 is for attestations/Solana identities.
 - Keep nonce tombstones, exact transaction binding, simple process exclusion,
@@ -40,12 +41,17 @@ coverage. Reuse the verifiers and transaction engines in one service loop.
 Keep this change set scoped to Phase 10. Finish its validation, publication,
 exact-SHA CI verification and report before separate Phase-11 work. No Devnet,
 Mainnet or production integration belongs in this change set.
-Phase 11 is now Borsh migration (including removal of obsolete bincode paths),
-before Devnet. Keep recoveryProcedure NOT_TESTED until the actual snapshot
-restore drill passes. Never relabel process restart as host-loss recovery.
-Keep full-host rollback, current same-host risk, and upgrade-authority trust
-explicit in readiness; the corrected roadmap requires a recorded authority
-decision before external review, not an automatically chosen governance policy.
+Phase 11 is Borsh migration before Devnet. Remove obsolete encoding and bincode
+paths/dependencies only when no retained code genuinely requires them. Do not
+suppress a remaining upstream advisory or change Native/Solana consensus encoding.
+Recovery uses manual or existing OS-scheduled encrypted snapshots, not a custom
+backup service. Keep recoveryProcedure NOT_TESTED until the actual snapshot
+restore/chain-resume drill passes, before Phase 15; repeat in Phase 17 and require
+TESTED before Phase 19. Do not power off the host or recreate WSL for the drill.
+Keep full-host rollback, accepted same-host risk and upgrade-authority trust
+explicit in readiness. At Phase 18 stop for a KingPepe Team authority-model
+decision if undecided. At Phase 19 stop for KINGPEPE_TEAM_ACTIVATION_APPROVAL
+before production deployment. Do not choose either decision for the Team.
 
 Source-bound status and evidence: docs/development-status.md and
 BRIDGE-READINESS.json. Historical validation certifies only its named source.

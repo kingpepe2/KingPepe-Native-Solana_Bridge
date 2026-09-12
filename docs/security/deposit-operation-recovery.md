@@ -68,22 +68,24 @@ production operation, sudden power loss or full-host snapshot recovery.
 A released transaction cannot be revoked by an off-chain pause and must still
 be observed and accounted. All production activation remains disabled.
 
-## Minimal scheduled backup and manual restore
+## Minimal encrypted backup and manual restore
 
 Status: `recoveryProcedure = NOT_TESTED`. Process-restart tests are not a
-snapshot/host-loss drill. This procedure must be exercised on isolated test
+snapshot/chain-resume drill. This procedure must be exercised on isolated test
 state before Phase 15, repeated during the Phase-17 Devnet soak, and recorded
-as TESTED before Phase 19. No production backup job has been installed.
+as TESTED before Phase 19. No production backup job has been installed. Manual
+capture is allowed; an existing OS scheduler may be used but is not required.
 
-Keep the actual schedule, source/destination inventory, encryption credentials,
-service identities and recovery material in local private configuration. The
-KingPepe Team must select a fixed interval and offline/cold destination; neither
-is inferred from a development path. Use an existing encrypted-backup utility
-and the host scheduler, not another bridge database or replication service.
-Schedule failure leaves the previous good snapshot intact and is reported for
-manual review. A backup stored only on the active host is not host-loss recovery.
+Keep the actual capture policy, source/destination inventory, encryption
+credentials, service identities and recovery material in local private
+configuration. Use an existing encrypted-backup utility manually or with the
+OS scheduler, not another bridge database, daemon or replication service. The
+destination is private/local/offline as appropriate to the recovery objective;
+a local development copy does not establish production backup policy. Preserve
+the previous good snapshot on failure and report it for manual review. A backup
+stored only on the active host is not protection against losing that host.
 
-### Scheduled capture
+### Quiescent capture (manual or OS-scheduled)
 
 1. Stop admission and await the existing service loop, signer and attester work.
    Close every state writer and the journal cleanly. A timed-out shutdown is
@@ -96,12 +98,25 @@ manual review. A backup stored only on the active host is not host-loss recovery
    do not create a plaintext staging archive. Preserve the previous good backup.
    Record source SHA, schema/tool versions, environment/genesis/deployment,
    snapshot time, journal checkpoint and file hashes inside the encrypted set.
-4. Verify the archive can be authenticated and decrypted in a restricted test
-   location and that its inventory/hashes match. Keep decryption/recovery
-   credentials separately from the archive. Detach or otherwise make the
-   verified cold copy unavailable to the running bridge host.
+4. Verify the complete archive's integrity before extracting it to a new,
+   restricted test location; compare its inventory/hashes. Do not accept partial
+   plaintext from a failed decryption. Keep decryption/recovery credentials
+   separately from the archive. For a cold/offline copy, detach or otherwise
+   make the verified copy unavailable to the running bridge host.
 5. Restart only the unchanged live state, retaining its previous pause status.
-   This is a scheduled stop/start, not a restore or permission to clear a pause.
+   This is a controlled stop/start, not a restore or permission to clear a pause.
+
+For an isolated Linux test, existing GNU tar and GnuPG can stream the closed
+state/config directly into an encrypted archive without a plaintext staging
+archive. Give the passphrase through protected input, never a command-line
+argument, shell history or log; retain GnuPG's integrity checks. Decrypt once
+to a discard sink and require success before a second verified extraction into
+an empty directory, with every pipeline failure checked. The archive must remain
+unchanged between verification and extraction. See the upstream
+[GnuPG commands](https://www.gnupg.org/documentation/manuals/gnupg/Operational-GPG-Commands.html)
+and [passphrase/input options](https://www.gnupg.org/documentation/manuals/gnupg/GPG-Esoteric-Options.html).
+This is an available test mechanism, not a new backup framework or certification
+of Windows DPAPI recovery.
 
 CurrentUser DPAPI blobs alone are not a portable key backup. Recovering them on
 a replacement machine requires the corresponding approved OS/account recovery
@@ -143,7 +158,7 @@ Keep participants' secret recovery material separate from the coordinator.
    review and resume through the existing service API. Never remove an integrity
    stop, edit balances, reassign inputs or reset replay records to force progress.
 
-A periodic snapshot bounds recoverable data age; it does not guarantee zero
+A snapshot preserves only its capture point; it does not guarantee zero
 data loss, full-host rollback detection, or automatic recovery from every old
 snapshot. If complete operation/signing evidence cannot be recovered, safely
 resuming economic actions is BLOCKED. Preserve this limitation in readiness.
@@ -152,13 +167,16 @@ resuming economic actions is BLOCKED. Preserve this limitation in readiness.
 
 Use only disposable localnet/regtest state and the chosen encrypted-backup tool.
 Capture a quiescent snapshot with signed operations awaiting chain settlement;
-stop the test host/processes, restore to fresh roots, and follow the procedure
+stop the bridge services/runtime, restore to fresh roots, and follow the procedure
 above. Let real chains settle the retained transactions. Require both directions
 COMPLETED with no new sweep, mint or payout, exact liabilities and reconciliation.
 Also reject a corrupt archive and a snapshot with a deliberately missing operation
 or ambiguous consumed-nonce gap; those cases must stay PAUSED/signing-disabled.
+Do not power off/reset the physical development host, recreate WSL, or conduct
+a full-host disaster test without a separate KingPepe Team instruction.
 
 Record source SHA, snapshot scope/time, restore duration, manual steps, actual
 chain results and gaps in the existing readiness/status files. Do not publish
 archive contents, keys, private paths or machine identities. The later Devnet
-report must record its own host-loss drill, not reuse local restart evidence.
+report must record its own controlled runtime snapshot/restore drill, not reuse
+local restart or archive-only evidence.

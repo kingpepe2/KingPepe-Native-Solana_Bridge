@@ -57,9 +57,12 @@ aggregate after restart. Worker errors expose fixed public classes, not secrets.
 
 ## Phase 10 validation
 
-Source base: 5926bb1f56e7b7d708a60469af8e51282fe6274f. Local results describe the
-Phase-10 working tree, not certification of its parent SHA. Exact publication
-certification is the GitHub Actions run whose head SHA matches the final commit.
+Service commit: 5512963398d6c2070102cd6781e72f129e3b6cc4, based on
+5926bb1f56e7b7d708a60469af8e51282fe6274f. The local results below describe its
+reviewed implementation worktree. The exact published service commit is verified
+by [Actions run 34713517512](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34713517512):
+all four required jobs passed, none skipped, including the combined service E2E.
+Later commits must use their own matching CI run, not inherit this certification.
 
 - Windows and WSL Node: 978 PASS each, zero failures/skips; two vectors each.
 - Rust: 94 PASS; locked checks, formatting and Clippy in all four workspaces.
@@ -84,24 +87,42 @@ No production or Phase 11 implementation is included in this Phase-10 change set
 The updated next step is Phase 11 canonical Borsh migration, not SDK/UI work.
 Devnet deployment must wait for that migration and fresh-clone validation;
 the current wire format is not being represented as the future Devnet format.
-Phase 11 must also remove obsolete bincode paths and the dependency, rather
-than suppress RUSTSEC-2025-0141. No such migration is claimed in Phase 10.
+Phase 11 must remove obsolete custom/bincode paths, fixtures and dependencies
+once Borsh replaces their real coverage. Do not suppress RUSTSEC-2025-0141 or
+remove an unrelated dependency still required by retained code. The present
+Solana SDK/system-interface dependency graph uses bincode; migrating bridge
+messages alone does not prove that upstream requirement has disappeared. Native
+and Solana consensus transaction encodings are not bridge message schemas.
+No Borsh migration is claimed in Phase 10.
 
-The corrected roadmap adds the minimal scheduled-backup/manual-restore procedure
-in `docs/security/deposit-operation-recovery.md`. `recoveryProcedure` is
-NOT_TESTED; no archive, schedule installation or host-loss drill is claimed.
-The fixed interval and offline/cold destination require local KingPepe Team
-configuration. Test the runbook before Phase 15 and repeat it during the
-Phase-17 Devnet soak. A stale snapshot is not permission to reuse nonce state.
-The service implementation is locally validated; the corrected Phase-10 recovery
-requirement is still pending, not silently included in a blanket phase PASS.
+The final directive permits manual encrypted snapshots or existing OS scheduling;
+neither a fixed schedule nor a custom backup service is required. The runbook is
+`docs/security/deposit-operation-recovery.md`. A local-only archive check on the
+closed, completed service test state passed with GNU tar 1.35 and GnuPG 2.4.4:
+encrypted capture, exact restored file hashes, corrupt/wrong-passphrase rejection,
+authenticated journal reopening and pause of the restored copy. Original test
+state was unchanged. This check used no chains or production identities and did
+not install a production backup job; its disposable copies were removed.
 
-Phase 13 now requires genuinely distinct production signer hosts, accounts and
-network paths. Current tests still use one host and do not certify that future
-deployment. Phase 18 requires a recorded KingPepe Team upgrade-authority decision
+Phase 10 service and runbook requirements are complete under that scope.
+`recoveryProcedure` remains NOT_TESTED: archive verification is not the actual
+snapshot/chain-resume drill. That drill must pass before Phase 15, repeat during
+Phase 17, and be TESTED before Phase 19. A stale snapshot is not permission to
+reuse nonce state. Unknown post-snapshot history still requires pause/manual
+review. Do not power off the physical host or recreate WSL for the runtime drill.
+
+`signerTopology = SINGLE_HOST` is the final KingPepe Team decision: separate
+software participants, processes/services, protected shares and nonce state;
+exact A+B 2-of-2, no fallback and no coordinator share. Common-host compromise
+or outage may affect both, and that risk is explicitly accepted by the Team.
+Record this decision at Phase 13 and present it honestly to external review;
+do not require a second physical host or hardware signer.
+Phase 18 requires a recorded KingPepe Team upgrade-authority decision
 (multisig, single-key with timelock, or explicitly justified single-key without
-timelock). No choice or deployment is made here. These conditions and full-host
-rollback limits remain visible in readiness; none was removed or marked resolved.
+timelock). If not selected, stop and ask the Team; no choice or deployment is made
+here. Phase 19 separately requires explicit KINGPEPE_TEAM_ACTIVATION_APPROVAL
+before production deployment. Accepted common-host risk and full-host rollback
+limits remain visible; documentation does not claim either has been eliminated.
 
 ## Prior baseline validation
 
