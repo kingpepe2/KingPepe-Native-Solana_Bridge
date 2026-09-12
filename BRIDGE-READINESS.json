@@ -81,6 +81,21 @@
     "fullAudit": "INCOMPLETE",
     "phase09": "NOT_STARTED"
   },
+  "phase085RpcContinuation": {
+    "publishedOperationSha": "8ea5d66f58abc0e756090bc94659860dd7627a55",
+    "publishedOperationCi": "NOT_RUN_ACCOUNT_BLOCKED_RUN_34660593342_ZERO_STEPS_ZERO_ARTIFACTS",
+    "rpcTransport": "IMPLEMENTED_AND_PRIMARY_LOCALLY_VALIDATED_TRANSPORT_BOUNDARY",
+    "nodePassPerPlatform": 712,
+    "vectorsPerPlatform": 2,
+    "runtimeFiles": 156,
+    "runtimeDigest": "0972dadc97b43964838564a4d47afe216a7e61a8a275cc31311e7e6800a72288",
+    "freshNativeToSolana": "COMPLETED",
+    "actualOperationClaimChecks": 14,
+    "reorgRerun": { "pass": 8, "fail": 0, "scope": "ACTUAL_REGTEST_AFTER_REAL_MINT_NOT_FULL_PROTECTED_SERVICE" },
+    "windowsFullSecurity": "PRIOR_122_PASS_BELONGS_TO_OPERATION_REVISION_FINAL_CURRENT_CLONE_RERUN_REQUIRED",
+    "freshClone": "NOT_RUN",
+    "phase09": "NOT_STARTED"
+  },
   "securityRemediation": {
     "baselineSha": "2b5c82971834d6299969c05a9889c950dae2ef91",
     "publishedImplementationSha": "cba77159f5afbbea5aa1f95030e1b90c5fc990df",

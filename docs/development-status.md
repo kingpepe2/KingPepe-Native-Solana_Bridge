@@ -1,5 +1,40 @@
 # KingPepe Native - Solana Bridge Development Status
 
+## RPC boundary correction after operation-journal publication
+
+Operation/accounting increment 8ea5d66f58abc0e756090bc94659860dd7627a55 is now
+published PRIVATE; tree 2ffc0a9dee7517d549f01ea70b0b8e0501d173ef. Its complete
+122-test Windows security run passed with zero failures/skips/cancellations.
+The 236-file source/staged exports, all 178 previous commits and its one outgoing
+commit passed Gitleaks. [Exact Actions 34660593342](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34660593342)
+ran zero steps in four failed-to-start jobs and generated zero artifacts.
+GitHub again reports: "The job was not started because recent account payments
+have failed or your spending limit needs to be increased. Please check the
+'Billing & plans' section in your settings". NOT_RUN_ACCOUNT_BLOCKED, not PASS.
+
+The previously separate RPC corrections below are now integrated into the
+primary checkout: Native and Solana redirects are rejected; Solana requests,
+streamed responses, UTF-8, response IDs, error envelopes and socket deadlines
+are validated. Malformed provider error codes cannot become exception text.
+No dependency, consensus, FROST algorithm or authority policy is changed.
+Actual isolated HTTP tests reproduced the defects before correction. They are
+transport tests, not substitute blockchain evidence.
+
+Renewed primary Windows/WSL Node: 712 PASS each, zero failures/skips/cancellations,
+plus two canonical vectors each. Fresh actual deposit reaches COMPLETED and all
+fourteen operation/claim checks pass. The actual post-mint Native reorg rerun
+passes eight checks with a separate COMPLETED deposit prerequisite. Both daemon
+runs rebuilt both SBF programs using the unchanged locked source and existing
+external compilation cache; this is not a cold reproducibility claim. Renewed
+npm audit is zero, 236-file provenance and guardrails pass. Rust/dependency
+versions are unchanged from the preceding 97-test/quality/license evidence.
+The 156-file runtime digest is
+0972dadc97b43964838564a4d47afe216a7e61a8a275cc31311e7e6800a72288.
+The prior 122 Windows security pass belongs to the operation revision, not a
+new final protected-service/clean-clone certification. Full protected controller,
+outbox/recovery integration and final retrospective audit remain incomplete.
+Separate reconciliation/dispatch candidates are not yet published.
+
 ## Protected operation journal continuation
 
 Coordinator commit 9de05a715c8a2c124a2c456b7cb8a50cdb6014ca is published PRIVATE,

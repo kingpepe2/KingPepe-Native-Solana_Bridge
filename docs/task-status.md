@@ -1,5 +1,19 @@
 # KingPepe Native - Solana Bridge Task Status
 
+## Current RPC correction
+
+Operation/accounting commit 8ea5d66f58abc0e756090bc94659860dd7627a55 is published
+PRIVATE after the complete 122-pass Windows security run and publication scans.
+Actions 34660593342 is account-blocked: zero steps in four jobs, zero artifacts.
+The next narrow fix integrates the reproduced Native/Solana redirect and
+Solana response-bounds/identity/redaction corrections. Primary Node passes 712
+per platform, two vectors each; a fresh actual deposit and fourteen operation
+checks pass. The accompanying actual post-mint reorg rerun passes eight; npm
+reports zero vulnerabilities, provenance 236 and guardrails pass.
+Next: finish scans/review and publish the RPC correction, then integrate the
+separately tested reconciliation/dispatch work and complete protected recovery.
+No Phase 09 or production work. Final clean-clone/re-audit remain incomplete.
+
 ## Current operation-journal continuation
 
 Published PRIVATE coordinator SHA: 9de05a715c8a2c124a2c456b7cb8a50cdb6014ca.

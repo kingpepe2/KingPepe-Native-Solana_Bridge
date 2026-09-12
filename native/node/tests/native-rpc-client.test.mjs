@@ -22,6 +22,27 @@ const GENESIS = h("kingpepe-regtest-genesis");
 const BEST_BLOCK = h("kingpepe-regtest-best-block");
 const TXID = h("kingpepe-regtest-utxo");
 
+for (const method of ["getblockchaininfo", "sendrawtransaction"]) test("Native RPC refuses redirected " + method + " without contacting another endpoint", async () => {
+  let forwarded = 0;
+  const destination = http.createServer((request, response) => {
+    forwarded++; let body = "";
+    request.on("data", bytes => { body += bytes; });
+    request.on("end", () => { const input = JSON.parse(body); writeJson(response, { id: input.id, result: "synthetic", error: null }); });
+  });
+  await new Promise(resolve => destination.listen(0, "127.0.0.1", resolve));
+  const redirect = http.createServer((request, response) => {
+    request.resume(); response.writeHead(307, { location: "http://127.0.0.1:" + destination.address().port }); response.end();
+  });
+  await new Promise(resolve => redirect.listen(0, "127.0.0.1", resolve));
+  try {
+    const client = new NativeRpcClient({ endpoint: "http://127.0.0.1:" + redirect.address().port });
+    await assert.rejects(client.call(method, method === "sendrawtransaction" ? ["00"] : []));
+    assert.equal(forwarded, 0, "RedirectMustNotReceiveRpcBody");
+  } finally {
+    for (const server of [redirect, destination]) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+  }
+});
+
 test("ordinary RPC adapter cannot invoke local forced-fork test controls", async () => {
   let contacted = false;
   const client = new NativeRpcClient({ fetchFn: async () => { contacted = true; throw new Error("UnexpectedRequest"); } });

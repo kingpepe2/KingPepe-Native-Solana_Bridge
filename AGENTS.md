@@ -23,7 +23,24 @@
 
 ## Current task: Phase 08.5 security remediation
 
-Latest published PRIVATE increment: 9de05a715c8a2c124a2c456b7cb8a50cdb6014ca,
+Latest published operation/accounting increment is
+8ea5d66f58abc0e756090bc94659860dd7627a55 (PRIVATE). Its complete Windows security
+rerun passed 122; Node 699 per platform, two vectors each, Rust 97/quality and
+real-chain checks 55/26/18/8/13/14 pass in their documented scopes. Source/staged
+236-file exports, 178 prior commits and its outgoing commit passed Gitleaks.
+Exact Actions 34660593342 is NOT_RUN_ACCOUNT_BLOCKED: four jobs, zero steps,
+zero artifacts. Do not attribute later work to that SHA.
+
+Current logical correction rejects Native/Solana RPC redirects and bounds the
+Solana submission transport's request/streamed response, UTF-8, response ID,
+error-code diagnostics and header/body deadlines. Actual isolated HTTP tests
+reproduced the defects. Primary Node passes 712 per platform plus two vectors;
+fresh real deposit reaches COMPLETED with fourteen operation/claim checks.
+The actual eight-check post-mint reorg rerun also passes; publication scans/review
+follow. These are not full protected
+controller or final clean-clone results. Phase 09 remains NOT_STARTED.
+
+Prior published PRIVATE coordinator increment: 9de05a715c8a2c124a2c456b7cb8a50cdb6014ca,
 security(phase-08.5): persist coordinator signing and integrity reports.
 The 227-file tree passed current/staged and outgoing scans; 177 prior commits
 were scanned separately. Exact Actions 34640680967 executed zero steps in four

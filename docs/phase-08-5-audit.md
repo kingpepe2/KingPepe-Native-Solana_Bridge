@@ -1,5 +1,18 @@
 # Phase 08.5 retrospective audit
 
+## Current RPC correction (not final re-audit)
+
+Operation increment 8ea5d66f58abc0e756090bc94659860dd7627a55 is published PRIVATE.
+Its exact Actions 34660593342 is NOT_RUN_ACCOUNT_BLOCKED, zero steps/artifacts.
+The reproduced Native/Solana redirect and Solana envelope/resource/redaction
+issues are corrected in the next primary worktree. Node passes 712 per platform
+plus two vectors; the actual deposit and fourteen operation checks pass. The
+actual post-mint reorg rerun passes eight; publication scans/review follow.
+Earlier Phase 06/07 audit
+results do not certify this new correction. Full Phases 01-08 re-audit, protected
+controller/recovery integration and final clean clone remain incomplete.
+SAFE_TO_BEGIN_PHASE_09=false.
+
 ## Current operation/accounting remediation (not final re-audit)
 
 Published coordinator 9de05a715c8a2c124a2c456b7cb8a50cdb6014ca passes its

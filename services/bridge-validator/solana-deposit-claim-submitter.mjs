@@ -27,6 +27,9 @@ const UINT_DECIMAL = /^(0|[1-9][0-9]*)$/u;
 const BASE64_TRANSACTION = /^[A-Za-z0-9+/]+={0,2}$/u;
 const BASE58_LIKE = /^[1-9A-HJ-NP-Za-km-z]{32,128}$/u;
 const JSON_RPC_VERSION = "2.0";
+const MAX_SOLANA_RPC_REQUEST_BYTES = 65_536;
+const MAX_SOLANA_RPC_RESPONSE_BYTES = 2_097_152;
+const SOLANA_RPC_TIMEOUT_MS = 10_000;
 const INSTRUCTION_FAILURE_REASONS = new Set(["InvalidAccountData", "InvalidArgument", "InvalidInstructionData", "InsufficientFunds", "ProgramFailedToComplete", "ComputationalBudgetExceeded", "AccountNotRentExempt", "AccountAlreadyInitialized", "IncorrectProgramId"]);
 const EXECUTION_FAULTS = new Set(["SBF_STACK_ACCESS_VIOLATION", "SBF_ACCESS_VIOLATION", "SBF_HEAP_EXHAUSTED", "SBF_COMPUTE_BUDGET_EXCEEDED"]);
 
@@ -278,6 +281,7 @@ export class SolanaDepositClaimSubmitter {
 export class SolanaLocalRpcClient {
   #endpoint;
   #fetchImpl;
+  #nextId = 0;
 
   constructor(options) {
     const value = requireObject(options, "options");
@@ -295,32 +299,47 @@ export class SolanaLocalRpcClient {
     if (!Array.isArray(params)) {
       throw new Error("SolanaRpcParamsMustBeArray");
     }
-    const response = await this.#fetchImpl(this.#endpoint, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        jsonrpc: JSON_RPC_VERSION,
-        id: "kingpepe-solana-local-rpc",
-        method,
-        params,
-      }),
-    });
+    const id = ++this.#nextId;
+    if (!Number.isSafeInteger(id)) throw rpcError("SolanaRpcRequestIdentityExhausted", method);
+    const body = JSON.stringify({ jsonrpc: JSON_RPC_VERSION, id, method, params });
+    if (Buffer.byteLength(body) > MAX_SOLANA_RPC_REQUEST_BYTES) throw rpcError("SolanaRpcRequestTooLarge", method);
+    let response;
+    try {
+      response = await this.#fetchImpl(this.#endpoint, {
+        method: "POST", redirect: "error", signal: AbortSignal.timeout(SOLANA_RPC_TIMEOUT_MS),
+        headers: { "content-type": "application/json" }, body,
+      });
+    } catch { throw rpcError("SolanaRpcTransportUnavailable", method); }
     if (!response.ok) {
+      await response.body?.cancel();
       throw rpcError("SolanaRpcHttpFailure", method, response.status);
     }
     let envelope;
     try {
-      envelope = await response.json();
+      if (!response.body) throw new Error("ResponseBodyRequired");
+      const reader = response.body.getReader(), parts = []; let size = 0;
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          size += value.length;
+          if (size > MAX_SOLANA_RPC_RESPONSE_BYTES) throw new Error("ResponseLimit");
+          parts.push(value);
+        }
+      } finally { await reader.cancel(); }
+      envelope = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(parts)));
     } catch {
       throw rpcError("SolanaRpcInvalidJson", method);
     }
-    if (!envelope || envelope.jsonrpc !== JSON_RPC_VERSION) {
+    if (!envelope || Array.isArray(envelope) || envelope.jsonrpc !== JSON_RPC_VERSION || envelope.id !== id ||
+        (!Object.hasOwn(envelope, "result") && !Object.hasOwn(envelope, "error"))) {
       throw rpcError("SolanaRpcInvalidEnvelope", method);
     }
     if (envelope.error !== null && envelope.error !== undefined) {
-      const error = rpcError("SolanaRpcRejected", method, envelope.error?.code);
+      const code = envelope.error?.code;
+      if (typeof envelope.error !== "object" || Array.isArray(envelope.error) || !Number.isInteger(code) ||
+          code < -0x8000_0000 || code > 0x7fff_ffff) throw rpcError("SolanaRpcInvalidEnvelope", method);
+      const error = rpcError("SolanaRpcRejected", method, code);
       const failure = envelope.error?.data?.err?.InstructionError;
       const logs = envelope.error?.data?.logs;
       if (Array.isArray(logs)) {
@@ -342,6 +361,7 @@ export class SolanaLocalRpcClient {
       }
       throw error;
     }
+    if (!Object.hasOwn(envelope, "result")) throw rpcError("SolanaRpcInvalidEnvelope", method);
     return envelope.result;
   }
 

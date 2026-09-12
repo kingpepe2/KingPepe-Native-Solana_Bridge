@@ -2,6 +2,13 @@
   "schemaVersion": "1.0",
   "generatedAt": "2026-09-12T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
+  "phase085RpcTransportReview": {
+    "baseline": "8ea5d66f58abc0e756090bc94659860dd7627a55",
+    "filesBefore": 236,
+    "filesAfter": 236,
+    "sourceImports": "None. Original narrow transport corrections and actual isolated HTTP regressions. Existing built-in fetch/Web Streams APIs are used; no upstream source or dependency change.",
+    "scope": "Local Native/Solana RPC endpoint and parser boundary, not provider honesty, production observation or full service recovery."
+  },
   "phase085DepositOperationReview": {
     "baseline": "9de05a715c8a2c124a2c456b7cb8a50cdb6014ca",
     "filesBefore": 227,

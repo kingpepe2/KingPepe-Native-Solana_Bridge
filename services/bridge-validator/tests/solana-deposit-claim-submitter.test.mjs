@@ -28,9 +28,101 @@ import {
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
 const ZERO_HASH = "00".repeat(32);
 
+for (const method of ["getBlockHeight", "sendTransaction"]) {
+  test("Solana local RPC rejects redirected " + method + " before contacting another endpoint", async () => {
+    let redirectedRequests = 0;
+    const destination = createServer((request, response) => {
+      redirectedRequests++;
+      request.resume();
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ jsonrpc: "2.0", id: "kingpepe-solana-local-rpc", result: 1 }));
+    });
+    await new Promise(resolve => destination.listen(0, "127.0.0.1", resolve));
+    const redirect = createServer((request, response) => {
+      request.resume();
+      response.writeHead(307, { location: "http://127.0.0.1:" + destination.address().port });
+      response.end();
+    });
+    await new Promise(resolve => redirect.listen(0, "127.0.0.1", resolve));
+    try {
+      const client = new SolanaLocalRpcClient({ endpoint: "http://127.0.0.1:" + redirect.address().port });
+      // HTTP transport only: neither isolated server is a blockchain node.
+      await assert.rejects(client.call(method, method === "sendTransaction" ? ["PUBLIC_TEST_PACKET"] : []));
+      assert.equal(redirectedRequests, 0);
+    } finally {
+      for (const server of [redirect, destination]) {
+        server.closeAllConnections();
+        await new Promise(resolve => server.close(resolve));
+      }
+    }
+  });
+}
+
 function h(label) {
   return createHash("sha256").update(label).digest("hex");
 }
+
+for (const [name, makeBody] of [
+  ["wrong response identity", () => JSON.stringify({ jsonrpc: "2.0", id: "wrong", result: 1 })],
+  ["missing result", id => JSON.stringify({ jsonrpc: "2.0", id })],
+  ["null error without result", id => JSON.stringify({ jsonrpc: "2.0", id, error: null })],
+  ["oversized response", id => JSON.stringify({ jsonrpc: "2.0", id, result: "x".repeat(2_097_153) })],
+  ["invalid UTF8", id => Buffer.concat([Buffer.from(JSON.stringify({ jsonrpc: "2.0", id, result: "" }).slice(0, -2)), Buffer.from([0xff]), Buffer.from('"}')])],
+]) test("Solana local RPC rejects " + name, async () => {
+  const server = createServer(async (request, response) => {
+    let body = "";
+    for await (const chunk of request) body += chunk;
+    const { id } = JSON.parse(body);
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(makeBody(id));
+  });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const client = new SolanaLocalRpcClient({ endpoint: "http://127.0.0.1:" + server.address().port });
+    await assert.rejects(client.call("getHealth"));
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+});
+
+test("Solana local RPC rejects malformed error codes without reflecting provider text", async () => {
+  const marker = "PUBLIC_TEST_UNTRUSTED_PROVIDER_TEXT";
+  for (const code of [marker, { privateText: marker }, null, 0.5, 0x8000_0000, -0x8000_0001]) {
+    const server = createServer(async (request, response) => {
+      let body = "";
+      for await (const chunk of request) body += chunk;
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ jsonrpc: "2.0", id: JSON.parse(body).id, error: { code, message: marker } }));
+    });
+    await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+    try {
+      const client = new SolanaLocalRpcClient({ endpoint: "http://127.0.0.1:" + server.address().port });
+      await assert.rejects(client.call("getHealth"), error =>
+        error.message === "SolanaRpcInvalidEnvelope:getHealth" && !JSON.stringify(error).includes(marker));
+    } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+  }
+});
+
+test("Solana local RPC bounds request size before contacting a server", async () => {
+  let contacted = false;
+  const client = new SolanaLocalRpcClient({ endpoint: "http://127.0.0.1:8899", fetchImpl: async () => {
+    contacted = true; return new Response(JSON.stringify({ jsonrpc: "2.0", id: "kingpepe-solana-local-rpc", result: "ok" }));
+  } });
+  await assert.rejects(client.call("sendTransaction", ["x".repeat(65_537)]));
+  assert.equal(contacted, false);
+});
+
+for (const bodyStarted of [false, true]) test("Solana local RPC times out an actual " + (bodyStarted ? "response body" : "response header") + " stall", { timeout: 20000 }, async () => {
+  const server = createServer((request, response) => {
+    request.resume();
+    if (bodyStarted) { response.writeHead(200, { "content-type": "application/json" }); response.write('{"jsonrpc":'); }
+    // Deliberately no response completion; the client's fixed deadline must
+    // abort the real socket. No shortened test-only runtime deadline is used.
+  });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const client = new SolanaLocalRpcClient({ endpoint: "http://127.0.0.1:" + server.address().port });
+    await assert.rejects(client.getBlockHeight(), /SolanaRpcTransportUnavailable|SolanaRpcInvalidJson/u);
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+});
 
 function p2tr(label) {
   return `5120${h(label)}`;
@@ -728,7 +820,7 @@ test("missing, negative and inexact block heights cannot authorize claim broadca
     assert.equal((await submitter.submitDepositClaim(fixture.request)).reason, "SOLANA_RPC_BLOCK_HEIGHT_UNAVAILABLE");
     assert.equal(rpc.sendCalls.length, 0);
     const client = new SolanaLocalRpcClient({ endpoint: "http://127.0.0.1:8899",
-      fetchImpl: async () => ({ ok: true, json: async () => ({ jsonrpc: "2.0", result: height }) }) });
+      fetchImpl: async (_url, options) => new Response(JSON.stringify({ jsonrpc: "2.0", id: JSON.parse(options.body).id, result: height })) });
     await assert.rejects(() => client.getBlockHeight());
   }
 });
