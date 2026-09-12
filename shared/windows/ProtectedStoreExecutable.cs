@@ -29,8 +29,6 @@ namespace KingPepe.LocalProtection {
           Console.Out.Write(serializer.Serialize(ProtectedStore.Execute(request,arguments[0])));
           return 0;
         } finally { Array.Clear(buffer,0,buffer.Length); input.Clear(); }
-      } catch(ProtectedWitnessRollbackException) {
-        Console.Error.Write("WINDOWS_PROTECTED_WITNESS_ROLLBACK"); return 1;
       } catch {
         // No source paths, principal names, request values or exception text.
         Console.Error.Write("WINDOWS_PROTECTED_STORE_REJECTED"); return 1;

@@ -175,7 +175,7 @@ export class ProtectedSolanaDeploymentMonitor {
     integrity.assertDeployment({ environment: "localnet", nativeGenesis: self.#manifest.nativeGenesisHex, solanaDeployment: self.#manifest.solanaDeploymentHex, keyEpoch: self.#manifest.config.keyEpoch });
     check(store.context.environment === "localnet" && store.context.nativeGenesis === self.#manifest.nativeGenesisHex && store.context.solanaDeployment === self.#manifest.solanaDeploymentHex && store.context.keyEpoch === self.#manifest.config.keyEpoch);
     self.#digest = deploymentManifestDigest(self.#manifest); self.#guard = integrity; self.#rpc = rpc; self.#store = store;
-    try { self.#lease = await store.acquireLifetimeLease(); self.#progress(); return self; }
+    try { self.#lease = await store.acquireLease(); self.#progress(); return self; }
     catch (error) {
       try { if (error.integrityCode === "SOLANA_PROGRESS_INTEGRITY") await integrity.report(self.#digest, error.integrityCode, error.evidenceDigest); }
       finally { await self.close(); }

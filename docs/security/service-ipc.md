@@ -1,70 +1,38 @@
-# Protected service IPC increment
+# Authenticated local service access
 
-Copyright (c) 2026 KingPepe Team. All Rights Reserved.
+Required local service channels use Node TLS 1.3 with mutually pinned
+certificates and exact role/method authorization. Loopback is routing only.
+Service private keys and replay state are loaded from Windows protected local
+storage. FROST private shares have no signing-endpoint export method.
 
-This Phase 08.5 increment uses Node's TLS 1.3 implementation, mutually trusted
-certificate pins and exact service-role pairings. Loopback is only routing.
-TLS private keys and replay state are loaded from service-auth Windows DPAPI
-stores outside the checkout. No plaintext or unauthenticated fallback exists.
-Private FROST shares have no IPC export route. Native signing still uses the
-unchanged, upstream-unaudited Noble 2.3.0 schnorr_FROST implementation.
+Requests bind deployment/genesis, environment, epoch, both endpoint roles,
+connection generation, fresh challenge, TLS exporter, operation, method and
+request ID. Canonical bounded framing and explicit admission/completion
+deadlines reject tampering, oversized input, stale requests and wrong roles.
+The server records consumption before invoking the handler. Replayed transport
+IDs are rejected; a new transport request still must satisfy the application's
+same-operation idempotency rules. Replay capacity fails closed, never silently
+prunes. Private capabilities prevent caller-built objects from impersonating
+already validated protected clients.
 
-The channel binds Native genesis, Solana deployment, key epoch, environment,
-both roles, endpoint generation, a fresh challenge and TLS exporter. Each
-request also binds an operation ID, method, request ID, admission expiry and
-bounded completion deadline (V2; see global-integrity.md).
-The client snapshots the bounded JSON wire payload before its first asynchronous
-boundary. Later caller mutation cannot change the request recorded before TLS
-connection. Protected transport and FROST-peer capabilities are privately
-registered only after construction validates real protected credentials; a
-matching JavaScript prototype is not authentication. This API hardening is not
-protection from arbitrary hostile code already controlling a signing process.
-Canonical bounded framing rejects alternate encodings, malformed/oversized
-input and unauthorized methods. The server persists a consumed request ID
-before invoking the service. Replay records are never silently pruned; capacity
-exhaustion stops service pending controlled maintenance. Clock rollback fails
-closed. A lost response does not authorize replay of a transport request ID;
-application operation/session idempotency is a separate required control.
+The FROST handler requires the actual exclusive protected state adapter and
+each participant's Native evidence validator. The attester verifies evidence
+before signing the exact canonical message. DKG is not exposed through the
+transaction-signing endpoint. No unauthenticated or plaintext fallback exists.
 
-Service-auth storage V3 additionally retains a bounded integrity-incident outbox
-for the exact service-to-supervisor role. A confirmed report is DPAPI/CAS-persisted
-before opening its TLS connection. Failed delivery and lost acknowledgements
-never remove it. Reopened guards redeliver retained incidents before admitting
-work; even a direct transport assertRunning request cannot bypass a retained
-incident. Status/source observation may continue after the supervisor confirms
-its durable hard stop. The wire protocol and deadlines remain V2, unchanged.
-V1/V2 storage or a missing outbox field is rejected, not migrated, reset or
-silently re-enrolled. Existing state must not be discarded to make startup pass.
-There is no runtime incident clear/prune or production enrollment path.
+Confirmed integrity reports use the same authenticated channel and are retained
+before sending. An unavailable supervisor or lost response cannot turn a
+retained incident into signing permission. The runtime has no automatic
+incident-clear endpoint. This is one bridge pause authority, not independent
+consensus or a physically distributed trust model.
 
-The FROST handler validates the operation against the real signing request and
-invokes the participant's configured Native verifier. The remote coordinator
-reuses the existing signature-share, aggregate and independent BIP340 checks.
-The attester handler requires its own configured evidence verifier; caller
-proof flags cannot supply the verifier result. DKG provisioning is not exposed
-through the coordinator signing endpoint. Supervisor integrity transport now
-supports role-restricted status, action checks and contradiction reports; there
-is no runtime clear/reset endpoint. Complete bridge recovery remains unfinished.
+Enrollment factories currently permit isolated localnet tests only. Windows
+certificate tests use installed OpenSSL to create disposable credentials outside
+source and remove generation-time plaintext before enrollment. CurrentUser
+certificate/DPAPI tests are not cross-service Windows-principal certification.
+No production enrollment, rotation or activation is claimed.
 
-Current enrollment factories are explicitly localnet-only. This is not a
-production certificate ceremony, rotation service or activation mechanism.
-Credentials use distinct certificates, but tests on the present workstation
-still share one Windows security principal. A process with that same token can
-potentially access its DPAPI stores. Cross-service denial requires actual
-separate service accounts and an isolated elevated Windows test environment.
-TLS authentication tests are not a substitute for that test.
-
-The Windows suite generates disposable certificates using the installed Git
-for Windows OpenSSL test executable (observed 3.5.7), selected through the
-test-only KINGPEPE_TEST_OPENSSL setting when it is not on PATH. All generated
-material remains outside the source tree; temporary plaintext key-generation
-output is removed before DPAPI enrollment. No certificates or keys are tracked.
-This utility is a test prerequisite, not the bridge's TLS implementation.
-
-The separate protected signer adapter now requires a lifetime OS handle and
-persistent fence (signer-fencing.md). Co-restoring every protected checkpoint is
-still outside the rollback guarantee. The tests do not yet prove separate
-Windows service-process crash recovery or the secured whole-bridge E2E.
-
-Reference-only API use: [Node TLS](https://nodejs.org/api/tls.html).
-No Node/OpenSSL implementation or example code is copied or vendored.
+See [operation recovery](deposit-operation-recovery.md) for application retry
+ordering and [protected storage](windows-protected-storage.md) for residual
+same-host and snapshot limitations. [Node TLS](https://nodejs.org/api/tls.html)
+is an external runtime API; its implementation is not copied into the project.

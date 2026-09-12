@@ -17,7 +17,6 @@ import { schnorr } from "@noble/curves/secp256k1.js";
 import { ProjectAttester, verifyProjectAttestation } from "../../services/attesters/attestation-service.mjs";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { decodeCanonicalBridgeMessage } from "../../shared/protocol/canonical-message.mjs";
-import { witnessTestAction } from "./protected-witness-test-helper.mjs";
 
 if (process.platform !== "win32") throw new Error("WINDOWS_PROTECTED_STORAGE_TESTS_REQUIRE_WINDOWS");
 const repoRoot = path.resolve(import.meta.dirname, "../..");
@@ -29,14 +28,12 @@ function fixture(t, role = "KINGPEPE_FROST_A", purpose = "frost-state", override
     assert(path.dirname(parent) === path.resolve(os.tmpdir()) && path.basename(parent).startsWith("kingpepe-protected-test-"), "UnsafeTemporaryCleanupTarget");
     try { rmSync(parent, { recursive: true }); } catch { throw new Error("WindowsTestCleanupFailed"); }
   });
-  const options = { root: path.join(parent, "state"), anchorRoot: path.join(parent, "anchor"), repoRoot,
+  const options = { root: path.join(parent, "state"), repoRoot,
     context: { role, purpose, serviceSid, environment: "localnet", nativeGenesis: REGTEST_GENESIS,
       solanaDeployment: h("protected-local-deployment"), instanceId: randomBytes(32).toString("hex"), keyEpoch: 1, ...overrides } };
-  t.after(() => witnessTestAction(options, "DELETE"));
   return { parent, options };
 }
 const stateFile = options => path.join(options.root, "state.protected");
-const anchorFile = options => path.join(options.anchorRoot, "state.protected");
 function sameProtectedBytes(actual, expected) {
   // Assertions must never retain secret bytes or encrypted operational blobs
   // in actual/expected fields that a failing test reporter could print.
@@ -53,7 +50,7 @@ test("real Windows DPAPI encrypts before disk and restores the exact payload", t
   const { options } = fixture(t); const secret = randomBytes(128);
   const store = WindowsProtectedStore.create(options, secret);
   assert.equal(readFileSync(stateFile(options)).includes(secret), false);
-  assert.deepEqual(readdirSync(options.root), ["state.protected"]);
+  assert.deepEqual(readdirSync(options.root), ["lease.protected", "lock.protected", "state.protected"]);
   sameProtectedBytes(store.read().payload, secret);
   assert.equal(store.write(randomBytes(64), "1").revision, "2");
   assert.equal(new WindowsProtectedStore(options).read().revision, "2");
@@ -69,7 +66,7 @@ test("created protected files have explicit private DACLs on a fixed local volum
   const { options } = fixture(t); WindowsProtectedStore.create(options, randomBytes(32));
   const ps = path.join(process.env.SystemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
   const script = '$ErrorActionPreference="Stop";try{$r=[Console]::In.ReadToEnd()|ConvertFrom-Json;$sid=[Security.Principal.WindowsIdentity]::GetCurrent().User;foreach($p in $r.files){$a=[IO.File]::GetAccessControl($p);if(-not $a.AreAccessRulesProtected -or -not $a.GetOwner([Security.Principal.SecurityIdentifier]).Equals($sid)){throw "ACL"};if(([IO.DriveInfo]([IO.Path]::GetPathRoot($p))).DriveType -ne [IO.DriveType]::Fixed){throw "VOLUME"}};[Console]::Out.Write("VERIFIED");exit 0}catch{[Console]::Error.Write("TEST_FILE_POLICY_REJECTED");exit 1}';
-  const result = spawnSync(ps, ["-NoProfile", "-NonInteractive", "-Command", script], { input: JSON.stringify({ files: [stateFile(options), anchorFile(options), path.join(options.anchorRoot, "lock.protected")] }), windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
+  const result = spawnSync(ps, ["-NoProfile", "-NonInteractive", "-Command", script], { input: JSON.stringify({ files: [stateFile(options), path.join(options.root, "lock.protected"), path.join(options.root, "lease.protected")] }), windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
   assert(result.status === 0 && result.stdout.toString("utf8") === "VERIFIED", "ProtectedFilePolicyNotVerified");
 });
 test("protected storage refuses reinitialization without overwriting", t => {
@@ -96,53 +93,23 @@ test("encrypted context rejects wrong role epoch deployment network and instance
     assert.throws(() => new WindowsProtectedStore({ ...options, context: { ...options.context, ...change } }).read());
   }
 });
-test("copied encrypted state and anchor cannot authorize a different root", t => {
+test("copied encrypted state cannot authorize a different root", t => {
   const { parent, options } = fixture(t); WindowsProtectedStore.create(options, randomBytes(32));
-  const clone = { ...options, root: path.join(parent, "copy-state"), anchorRoot: path.join(parent, "copy-anchor") };
-  t.after(() => witnessTestAction(clone, "DELETE"));
+  const clone = { ...options, root: path.join(parent, "copy-state") };
   // Create exact valid ACLs at both destinations, so this tests cryptographic
   // location binding rather than failure due to inherited copy permissions.
   WindowsProtectedStore.create(clone, randomBytes(32));
   writeFileSync(stateFile(clone), readFileSync(stateFile(options)));
-  writeFileSync(anchorFile(clone), readFileSync(anchorFile(options)));
   assert.throws(() => new WindowsProtectedStore(clone).read());
 });
-test("retained protected anchor detects old state restoration on reopen", t => {
-  const { options } = fixture(t); const store = WindowsProtectedStore.create(options, randomBytes(32));
-  const old = readFileSync(stateFile(options)); store.write(randomBytes(32), "1");
-  writeFileSync(stateFile(options), old);
-  assert.throws(() => new WindowsProtectedStore(options).read());
-});
+
 test("compare-and-swap refuses a stale writer without changing current state", t => {
   const { options } = fixture(t); const a = WindowsProtectedStore.create(options, randomBytes(32)), b = new WindowsProtectedStore(options);
   const old = b.read(); const updated = randomBytes(32); a.write(updated, "1");
   assert.throws(() => b.write(randomBytes(32), old.revision));
   sameProtectedBytes(a.read().payload, updated);
 });
-test("retained registry witness rejects co-restored file state and anchor on reopen", t => {
-  const { options } = fixture(t); const store = WindowsProtectedStore.create(options, randomBytes(32));
-  const oldState = readFileSync(stateFile(options)), oldAnchor = readFileSync(anchorFile(options));
-  store.write(randomBytes(32), "1"); writeFileSync(stateFile(options), oldState); writeFileSync(anchorFile(options), oldAnchor);
-  assert.throws(() => store.read(), /ProtectedStateRollbackDetected/u);
-  assert.throws(() => store.write(randomBytes(32), "1"), /ProtectedStateRollbackDetected/u);
-  assert.throws(() => new WindowsProtectedStore(options).read(), /ProtectedStateRollbackDetected/u);
-});
 
-test("full registry/profile and file co-restore remains an explicitly measured limitation", t => {
-  const { options } = fixture(t), store = WindowsProtectedStore.create(options, randomBytes(32));
-  const state = readFileSync(stateFile(options)), anchor = readFileSync(anchorFile(options)), witness = witnessTestAction(options, "READ");
-  store.write(randomBytes(32), "1");
-  writeFileSync(stateFile(options), state); writeFileSync(anchorFile(options), anchor); witnessTestAction(options, "RESTORE", witness);
-  assert.throws(() => store.read(), /ProtectedStateRollbackDetected/u);
-  assert.equal(new WindowsProtectedStore(options).read().revision, "1");
-  witness.fill(0);
-});
-
-for (const action of ["DELETE", "CORRUPT", "WIDEN"]) test("retained witness fails closed without fallback: " + action, t => {
-  const { options } = fixture(t); WindowsProtectedStore.create(options, randomBytes(32));
-  witnessTestAction(options, "CHECK_ACL"); witnessTestAction(options, action);
-  assert.throws(() => new WindowsProtectedStore(options).read(), /WindowsProtectedStoreRejected/u);
-});
 test("Windows directories reject widened ACLs before releasing plaintext", t => {
   const { options } = fixture(t); const store = WindowsProtectedStore.create(options, randomBytes(32));
   const ps = path.join(process.env.SystemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
@@ -156,55 +123,32 @@ test("closed protected store cannot read or write", t => {
   assert.throws(() => store.read(), /ProtectedStoreClosed/u); assert.throws(() => store.write(randomBytes(32), "1"), /ProtectedStoreClosed/u);
 });
 
-function committedPair(t) {
+function committedState(t) {
   const { options } = fixture(t); const store = WindowsProtectedStore.create(options, randomBytes(32));
-  const oldState = readFileSync(stateFile(options)), oldAnchor = readFileSync(anchorFile(options));
-  const next = randomBytes(32); store.write(next, "1");
-  const nextState = readFileSync(stateFile(options)), nextAnchor = readFileSync(anchorFile(options));
-  return { options, oldState, oldAnchor, nextState, nextAnchor, next };
+  const previous = readFileSync(stateFile(options)), next = randomBytes(32);
+  store.write(next, "1"); return { options, previous, next, candidate: readFileSync(stateFile(options)) };
 }
-
-// Real encrypted on-disk commit images exercise each interrupted replacement
-// boundary. These are fault reconstructions, not power-loss certification.
-for (const boundary of ["BOTH_CANDIDATES_FLUSHED", "ANCHOR_REPLACED", "BOTH_REPLACED"]) {
-  test(`authenticated prepared state recovers exactly once at ${boundary}`, t => {
-    const p = committedPair(t);
-    if (boundary !== "BOTH_REPLACED") {
-      writeFileSync(stateFile(p.options), p.oldState);
-      writeFileSync(path.join(p.options.root, "candidate.protected"), p.nextState, { flag: "wx" });
-    }
-    if (boundary === "BOTH_CANDIDATES_FLUSHED") {
-      writeFileSync(anchorFile(p.options), p.oldAnchor);
-      writeFileSync(path.join(p.options.anchorRoot, "candidate.protected"), p.nextAnchor, { flag: "wx" });
-    }
-    const store = new WindowsProtectedStore(p.options);
-    assert.equal(store.read().revision, "2"); sameProtectedBytes(store.read().payload, p.next);
-    assert.equal(new WindowsProtectedStore(p.options).read().revision, "2");
-    assert.equal(existsSync(path.join(p.options.root, "candidate.protected")), false);
-    assert.equal(existsSync(path.join(p.options.anchorRoot, "candidate.protected")), false);
-  });
-}
-for (const boundary of ["STATE_CANDIDATE_ONLY", "ANCHOR_CANDIDATE_ONLY", "CORRUPT_CANDIDATE", "SKIPPED_REVISION"]) {
-  test(`ambiguous protected commit refuses recovery at ${boundary}`, t => {
-    const p = committedPair(t);
-    if (boundary === "SKIPPED_REVISION") {
-      new WindowsProtectedStore(p.options).write(randomBytes(32), "2");
-      p.nextState = readFileSync(stateFile(p.options)); p.nextAnchor = readFileSync(anchorFile(p.options));
-    }
-    writeFileSync(stateFile(p.options), p.oldState); writeFileSync(anchorFile(p.options), p.oldAnchor);
-    if (boundary !== "ANCHOR_CANDIDATE_ONLY") {
-      if (boundary === "CORRUPT_CANDIDATE") p.nextState[p.nextState.length - 1] ^= 1;
-      writeFileSync(path.join(p.options.root, "candidate.protected"), p.nextState, { flag: "wx" });
-    }
-    if (boundary !== "STATE_CANDIDATE_ONLY") writeFileSync(path.join(p.options.anchorRoot, "candidate.protected"), p.nextAnchor, { flag: "wx" });
-    assert.throws(() => new WindowsProtectedStore(p.options).read(), { message: "WindowsProtectedStoreRejected" });
-  });
-}
-test("missing or corrupt protected anchor never authorizes unanchored state", t => {
-  const { options } = fixture(t); const store = WindowsProtectedStore.create(options, randomBytes(32));
-  writeFileSync(anchorFile(options), randomBytes(32)); assert.throws(() => store.read());
-  unlinkSync(anchorFile(options)); assert.throws(() => store.read());
+test("authenticated atomic candidate recovers once after a write interruption", t => {
+  const p = committedState(t);
+  writeFileSync(stateFile(p.options), p.previous);
+  writeFileSync(path.join(p.options.root, "candidate.protected"), p.candidate, { flag: "wx" });
+  const store = new WindowsProtectedStore(p.options);
+  assert.equal(store.read().revision, "2"); sameProtectedBytes(store.read().payload, p.next);
+  assert.equal(new WindowsProtectedStore(p.options).read().revision, "2");
+  assert.equal(existsSync(path.join(p.options.root, "candidate.protected")), false);
 });
+for (const invalid of ["CORRUPT", "SKIPPED_REVISION"]) test("ambiguous atomic candidate fails closed: " + invalid, t => {
+  const p = committedState(t);
+  if (invalid === "CORRUPT") p.candidate[p.candidate.length - 1] ^= 1;
+  else {
+    new WindowsProtectedStore(p.options).write(randomBytes(32), "2");
+    p.candidate = readFileSync(stateFile(p.options));
+  }
+  writeFileSync(stateFile(p.options), p.previous);
+  writeFileSync(path.join(p.options.root, "candidate.protected"), p.candidate, { flag: "wx" });
+  assert.throws(() => new WindowsProtectedStore(p.options).read(), { message: "WindowsProtectedStoreRejected" });
+});
+
 test("hard-linked protected state is refused", t => {
   const { parent, options } = fixture(t); const store = WindowsProtectedStore.create(options, randomBytes(32));
   linkSync(stateFile(options), path.join(parent, "linked.protected"));
@@ -218,7 +162,7 @@ test("an actual second process holding the protected lock blocks reads and write
   t.after(() => { if (child.exitCode === null) child.kill(); });
   const exited = once(child, "exit");
   const ready = once(child.stdout, "data", { signal: AbortSignal.timeout(10_000) });
-  child.stdin.write(JSON.stringify({ gate: path.join(options.anchorRoot, "lock.protected") }) + "\n");
+  child.stdin.write(JSON.stringify({ gate: path.join(options.root, "lock.protected") }) + "\n");
   assert.equal((await ready)[0].toString("utf8").trim(), "LOCKED");
   assert.throws(() => store.read(), { message: "WindowsProtectedStoreRejected" });
   assert.throws(() => store.write(randomBytes(32), "1"), { message: "WindowsProtectedStoreRejected" });
@@ -259,7 +203,7 @@ test("real A+B FROST signs and reopens using only encrypted persistent state", t
   const retry = new NativeFrostCoordinator({ signers, publicPackage: dkg.publicPackage, aggregateTweakedXOnlyPublicKey: dkg.aggregateTweakedXOnlyPublicKey }).signAutomatically(intent);
   assert.equal(retry.signatureHex, signed.signatureHex);
   signers.forEach(s => s.close());
-  for (const o of options) assert.deepEqual(readdirSync(o.root), ["state.protected"]);
+  for (const o of options) assert.deepEqual(readdirSync(o.root), ["lease.protected", "lock.protected", "state.protected"]);
 });
 test("attester loads a distinct DPAPI-protected seed with deployment binding", t => {
   const vector = JSON.parse(readFileSync(path.join(repoRoot, "solana/modules/bridge-messages/vectors/canonical-v1.json"))).vectors.find(v => v.name === "deposit-claim-v1");

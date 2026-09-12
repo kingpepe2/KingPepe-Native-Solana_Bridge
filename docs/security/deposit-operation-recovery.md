@@ -1,92 +1,94 @@
-# Protected deposit operation journal
+# Deposit operations, delivery and reconciliation
 
-This localnet-only Phase 08.5 increment adds a protected Bridge Validator
-operation/accounting boundary. It does not implement Phase 09, enable production,
-or by itself complete the unattended deposit controller and relayer.
+The protected localnet controller composes the Native verifier, FROST
+coordinator, attesters, fee payer and delivery adapters. Components have narrow
+roles; the controller and relayers contain no private FROST shares. Separate
+journal records represent distinct side effects, not alternative economic
+ledgers. The operation journal is authoritative for reserve and pending credit.
 
-Explicit enrollment binds the service identity, instance, deployment, Native
-genesis, Solana genesis, epoch and exact policy. CurrentUser DPAPI, separate
-external state/anchor roots, the existing retained service-profile witness and
-a lifetime lease are mandatory. Missing, inaccessible or uncertain storage is
-never replaced with plaintext, empty state or a new identity.
+The public lifecycle is observation, validation, sweep, attestation, claim,
+mint and completion. Internal persisted steps distinguish an action prepared
+from a blockchain result observed; collapsing those distinctions would make a
+lost response unsafe. One immutable operation ID binds deposit outpoint,
+recipient, inputs, amount, fees, unsigned transaction and network/deployment.
+Inputs and reserve allocations cannot be reused by a second operation.
 
-An immutable plan retains the recoverable deposit commitment, recipient, exact
-input outpoints/amounts/scripts, unsigned sweep, accepted checkpoint and every
-Native signing intent. It recomputes the transaction and per-input sighashes.
-All inputs are reserved across operation IDs; prior bridge backing cannot become
-another deposit's miner-fee input. The experimental format permits one canonical
-reserve output, separately funded fees and no replacement signaling. Limits are
-bounded localnet parser/storage constraints, not approved production limits.
-At most fifteen input transactions leave room for the sweep in the Native
-verifier's sixteen-transaction evidence packet. The local sweep builder explicitly
-requests non-replacement and rejects replacement-signaling input sequences:
-the pinned Native RPC otherwise defaults to replaceable transactions. This
-disables bridge replacement construction, not the node's general mempool policy
-or the ability of compromised signing identities to create another spend.
+## Persist before an external action
 
-Signed witness bytes must verify against that exact plan before retention.
-Broadcast intent is persisted before releasing those bytes to a relayer. The
-relayer still needs its own fresh global authorization, a query of previous
-outcomes and exact-byte retry; this journal does not authorize alternate inputs,
-RBF, CPFP, a refund or a replacement mint.
+1. Retain observed intent; independently validate Native inputs/finality.
+2. Reserve the exact sweep plan and all input outpoints.
+3. Persist the FROST request/attempt before asking A+B. Both independently
+   validate. Save the verified aggregate before releasing signed bytes.
+4. Retain signed sweep and broadcast intent before enqueue/send.
+5. Query the actual Native outcome, verify finality and retain reserve plus
+   pending credit together. Death before that write leaves a rediscoverable
+   broadcast obligation; death after it must not allocate another credit.
+6. Each attester retains the exact canonical message and unique allocation
+   before signing, then retains its deterministic Ed25519 result before reply.
+7. Retain the Solana unsigned request, then exact signed packet before delivery.
+8. Observe actual finalized claim execution and settle the pending mint credit.
+9. Reconcile a consistent snapshot before marking COMPLETED.
 
-Finalized reserve and its exact owed credit occupy one protected CAS transition.
-The entry point requires an actual Native-verifier result, not serialized
-provider fields or a caller's verification flag. A retained credit remains owed
-while attestation or Solana submission is delayed. Retaining an already-created
-obligation or signature remains possible during a global stop, but that cannot
-authorize another economic action.
+An uncertain FROST PREPARED attempt needs bound abort receipts from both
+participants before another attempt. A saved aggregate can be returned exactly
+without generating new nonces. A fee-payer signature is not mint authority.
+Only verified project receipts and the bridge PDA authorize on-chain minting.
 
-Mint settlement requires a live genesis-bound finalized claim observation. The
-observer verifies the canonical signed legacy transaction packet, its exact
-claim/recipient/amount/program identities, the reported SPL MintToChecked CPI,
-and the exact integer recipient balance increase. An unrelated successful
-transaction plus a pre-existing claim is insufficient. The receipt retains the
-transaction identity and rooted slot; it is not a boolean settlement flag.
-This remains RPC_OBSERVATION. Signed transaction verification does not prove the
-RPC's execution metadata honest or replace deployment-integrity monitoring.
+## Retry rules
 
-The Native observation/broadcast client and local Solana submission client reject
-HTTP redirects; a local endpoint cannot silently forward the request elsewhere.
-The latter now binds each response ID, bounds requests to 64 KiB and streamed
-responses to 2 MiB, rejects malformed UTF-8/missing results/error codes, and
-aborts stalled headers or bodies after ten seconds. Arbitrary provider error
-fields are not used as diagnostics. Actual isolated HTTP failure regressions
-exercise these boundaries separately from actual-chain execution. These localnet
-limits do not establish RPC honesty or approve a production observation source.
+Native delivery observes the old transaction first. Retry cannot change inputs
+or signed bytes; no RBF/CPFP or replacement payout is generated. A not-found
+response is uncertainty, not proof that a transaction never existed.
 
-Reopen checks the complete authenticated image and policy. An uncertain write
-can be recovered only at the exact expected next revision with matching bytes.
-Detected rollback or authenticated journal corruption is reported through the
-durable global-integrity outbox, including when its supervisor is unreachable.
-Retained input locks and credits are not automatically pruned. Capacity exhaustion
-fails closed. Full privileged host/profile/state co-restore remains a risk.
+Solana receipt/claim delivery retains every packet and previous signature.
+Before rebuilding an expired blockhash, it checks actual status, finalized
+height and claim state. A new packet is the same economic operation, not a new
+credit. RPC errors, absent authentication and missing state cannot be interpreted
+as a successful negative lookup. An already finalized claim must not mint again.
 
-The accounting view distinguishes unresolved signed sweeps, finalized reserve,
-authorized unminted credits and recorded mint settlement. It is not an assertion
-that every on-chain outcome has already reached the journal. A consistent
-reconciliation service must independently query chain outcomes and catch up
-missing credit/mint facts before classifying surplus or permitting new actions.
-The journal exposes a mutually authenticated RECONCILIATION-only read API.
-One operation per page, exact revision binding and a final revision check prevent
-mixing changing journal snapshots. The client validates and freezes the complete
-image; a page failure or concurrent update requires a fresh read. This grants no
-write/signing capability and does not itself constitute chain reconciliation.
+Expired canonical credit remains owed. Renewal across expiry/epochs is not
+implemented by silently changing the message. Queue/session capacity is bounded
+and does not auto-prune replay records. These limits need operational planning
+before production; they are not approved production transfer limits.
 
-Reservation and broadcast preparation request fresh global authorization before
-entering the short journal critical section. Reconciliation needs that same
-journal to establish health, so holding its lock across the asynchronous guard
-would block the evidence on which admission depends. The current complete image,
-lease, revision, exact plan and input reservations are checked inside the CAS.
-There is no cached permission or relaxed deadline. Actual DPAPI/mTLS regressions
-keep snapshot reads available while authorization waits and require an intervening
-durable stop to reject the action without a journal mutation.
+## Accounting and pause
 
-Portable tests use actual ephemeral FROST and packet signatures with explicitly
-synthetic chain/execution fixtures. Actual local-validator claim tests are a
-separate gate. Windows journal tests use real current-principal DPAPI and mTLS,
-not distinct service identities. Neither category certifies complete protected
-service recovery. The full controller, broadcast-to-credit rediscovery, protected
-claim outbox and all-boundary real-chain process-kill matrix remain required.
-Live reconciliation is now a separate component with its own documented tests.
-No per-transfer Team approval or verification bypass is added.
+Under one consistent observation:
+
+- journal reserve = pending credits + recorded issued value;
+- observed registered reserve = journal reserve;
+- Manager issued counter + unpaid bridge burns = recorded issued value;
+- actual SPL supply cannot exceed the Manager issued counter;
+- required backing = actual supply + unpaid bridge burns + pending credits.
+
+A direct SPL burn reduces actual supply, not bridge-issued accounting or payout
+rights. Subsequent bridge burns/mints must preserve that difference. Donations
+and unregistered reserve moves do not automatically become available backing.
+Native miner fees cannot consume another operation's reserve.
+
+Reconciliation reads a stable journal revision and finalized Solana bank,
+bracketed by an unchanged Native tip. Concurrent change, missing/stale sources,
+mempool uncertainty or a mint needing journal catch-up means WAIT, not fabricated
+surplus/deficit. A confirmed contradiction pauses new authorization and retains
+the affected operation/evidence for KingPepe Team review.
+
+The current authority uses RUNNING (ACTIVE), PAUSED_POLICY and
+HARD_STOP_INTEGRITY (serious PAUSED) labels. It requires fresh observer and
+reconciliation results after restart. Healthy sources never clear a manual or
+integrity pause. Read-only observation may continue. No automatic balance repair,
+token confiscation, refund, remint or pause-clear path is provided.
+
+## Limits and evidence
+
+Protected records use the shared DPAPI atomic-state/process-lock implementation,
+not separate rollback anchors. Reopening validates the complete retained image.
+Missing state is never replaced automatically. Off-chain pause cannot revoke
+a signature or transaction already released; those outcomes must still be
+observed and accounted.
+
+Portable fixtures, CurrentUser Windows protected tests and actual-chain tests
+are different evidence. Current results are in development-status.md.
+The Linux E2E fixture is explicitly isolated test storage. Full service/power-loss
+recovery and complete host-snapshot freshness must not be inferred from a happy
+path or a component test. The protected controller is localnet-only and does not
+implement Native withdrawals yet. No production systems are enabled.

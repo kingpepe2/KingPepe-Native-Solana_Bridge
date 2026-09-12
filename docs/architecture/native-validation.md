@@ -71,8 +71,9 @@ uses the committed recovery script and a real FROST BIP342 sweep to a separate
 reserve. See [recovery construction and scope](../../native/recovery/README.md).
 Both winner orders and forced pre-mint recovery/sweep forks are exercised by
 ten real-node checks; the verifier rejects disconnected or recovered backing.
-Post-mint deep-reorg response, production storage/fencing and complete failure
-testing remain Phase 08 gaps.
+Post-acceptance conflicts pause authorization and retain affected operations;
+see [chain checks](../security/solana-deployment-monitor.md). Production
+validation policy and complete power-loss recovery are not certified.
 
 Each role rebuilds the temporary script against the expected deployment, Mint,
 recipient, amount, epochs, intent nonce, Native user recovery public key, FROST

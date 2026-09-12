@@ -8,7 +8,7 @@ import os from "node:os";
 import { validateRuntimeStateRoot } from "../../shared/runtime-path-boundary.mjs";
 if (process.platform !== "win32") throw new Error("WINDOWS_PROTECTED_EXECUTABLE_TESTS_REQUIRE_WINDOWS");
 const repoRoot = path.resolve(import.meta.dirname, "../..");
-for (const mode of ["SAME_IMPLEMENTATION", "TAMPER", "MISSING", "HARDLINK", "WRONG_ACL"]) {
+for (const mode of ["TAMPER", "MISSING", "HARDLINK", "WRONG_ACL"]) {
   test("source-built protected executable " + mode.toLowerCase(), t => {
     const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-helper-test-"));
     validateRuntimeStateRoot(root, repoRoot);

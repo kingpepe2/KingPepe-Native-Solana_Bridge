@@ -9,7 +9,7 @@ invokes raw Native evidence validation for each role. The generic attester class
 alone accepts evidence through a policy interface; it is not a validating node.
 Two signatures prove who signed, not that their chain assertions are true.
 
-Phase 08.5 copies the attester key into a private field, freezes normalized policy
+The attester copies its key into a private field, freezes normalized policy
 and identity, isolates caller mutation, makes close irreversible and checks the
 actual clock when no test clock is supplied. Explicit historical vector clocks
 are test inputs, not an expiry bypass or a production clock source.
@@ -30,7 +30,7 @@ error responses never become evidence; provider details are not surfaced.
 
 The withdrawal observer remains a POLICY MODEL, not a running withdrawal
 service. It checks supplied program/authority, transaction, burn and account
-fields against expected values. Phase 08.5 corrects its PDA helper to real Solana
+fields against expected values. Its PDA helper uses actual Solana
 derivation, adds Native protocol/network/genesis binding and exact slot/root
 validation, and unconditionally blocks non-localnet use. A configured=true flag
 cannot select a nonexistent production observer.
@@ -43,16 +43,14 @@ model are not independent chain proofs. Shared-host services or sources are not
 physically independent observers. The model is KingPepe Team controlled,
 PROJECT_ATTESTED_2_OF_2, not decentralized or trustless.
 
-ProgramData address/hash and upgrade-authority comparisons currently operate on
-supplied identity objects. There is no complete independently sourced, continuous
-deployed-bytecode/authority watcher wired to a durable bridge-wide stop.
-The deposit observer does not independently collect genesis/ProgramData history.
-A static program ID or an arbitrary RPC finalized claim cannot supply those
-missing guarantees. Production observation remains BLOCKED.
+The separate deployment adapter reads actual genesis, program/ProgramData,
+authority, Mint and configuration accounts against a pinned manifest. Confirmed
+changes pause new authorization; missing/stale sources suspend it. See
+[chain checks](../security/solana-deployment-monitor.md). A static program ID or
+arbitrary RPC finalized label is not independent consensus proof.
 
-Local claim/accounting hard stops persist in their scoped journals. This does
-not establish a global stop across all services, coordinator replacement,
-co-restored snapshots or post-mint deep reorganizations. Complete service
-recovery, protected attester key storage, authenticated IPC, freshness/fencing
-and production observation still require implementation/review. The local E2E
-is evidence of the exercised flow only. External review is NOT_RUN.
+Protected local storage, authenticated IPC and durable operation recovery are
+implemented separately from the lightweight test adapters. Full-host snapshot
+freshness and distinct service-principal certification are not claimed. Current
+executed results belong in development-status.md. Production observation is
+NOT_CONFIGURED and external review is NOT_RUN.

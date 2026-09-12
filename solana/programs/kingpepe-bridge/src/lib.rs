@@ -379,6 +379,8 @@ pub struct WithdrawalRecord {
 pub struct BridgeStateAccount {
     pub state: ProgramState,
     pub config: BridgeConfig,
+    /// Bridge-issued units minus bridge-recorded burns, not live SPL supply.
+    /// Direct SPL burns do not erase the separately reconciled difference.
     pub minted_supply: u128,
     pub burned_unpaid_withdrawals: u128,
 }
@@ -845,10 +847,11 @@ fn process_accept_deposit_claim_accounts(
     }
     validate_recipient_token_account(recipient_token_account, mint.key)?;
 
-    let supply_after_mint = unpack_mint(mint)?
-        .supply
-        .checked_add(message.amount_atomic)
-        .ok_or(BridgeError::ArithmeticOverflow)?;
+    let issued_after_mint = checked_issued_after_mint(
+        state.minted_supply,
+        unpack_mint(mint)?.supply,
+        message.amount_atomic,
+    )?;
 
     invoke_mint_to_checked_if_enabled(
         &config,
@@ -860,7 +863,7 @@ fn process_accept_deposit_claim_accounts(
         token_cpi_mode,
     )?;
 
-    state.minted_supply = supply_after_mint as u128;
+    state.minted_supply = issued_after_mint;
     let record = DepositClaimRecord {
         operation_id: message.operation_id,
         message_digest: digest,
@@ -971,10 +974,11 @@ fn process_record_withdrawal_accounts(
         .burned_unpaid_withdrawals
         .checked_add(message.amount_atomic as u128)
         .ok_or(BridgeError::ArithmeticOverflow)?;
-    let supply_after_burn = unpack_mint(mint)?
-        .supply
-        .checked_sub(burn.amount_atomic)
-        .ok_or(BridgeError::BurnMismatch)?;
+    let issued_after_burn = checked_issued_after_burn(
+        state.minted_supply,
+        unpack_mint(mint)?.supply,
+        burn.amount_atomic,
+    )?;
     let (_, bump) = Pubkey::find_program_address(
         &[WITHDRAWAL_RECORD_PDA_SEED_PREFIX, &message.withdrawal_id],
         program_id,
@@ -1017,15 +1021,47 @@ fn process_record_withdrawal_accounts(
         burn_authority: burn.authority,
     };
     state.burned_unpaid_withdrawals = new_unpaid;
-    // A burn changes the liability's form, not the total amount owed. This is
-    // the last bridge-operation snapshot; direct SPL burns require Mint reads.
-    state.minted_supply = supply_after_burn as u128;
+    // A bridge burn changes liability form. Preserve the separately reconciled
+    // direct-SPL-burn difference; it never authorizes reserve extraction.
+    state.minted_supply = issued_after_burn;
     write_account_data(
         withdrawal_record,
         &encode_withdrawal_record_account(&record)?,
     )?;
     write_account_data(bridge_state, &encode_bridge_state_account(&state)?)?;
     Ok(())
+}
+
+fn checked_issued_after_mint(
+    issued: u128,
+    live_supply: u64,
+    amount: u64,
+) -> Result<u128, BridgeError> {
+    if u128::from(live_supply) > issued {
+        return Err(BridgeError::AccountMismatch);
+    }
+    live_supply
+        .checked_add(amount)
+        .ok_or(BridgeError::ArithmeticOverflow)?;
+    issued
+        .checked_add(u128::from(amount))
+        .ok_or(BridgeError::ArithmeticOverflow)
+}
+
+fn checked_issued_after_burn(
+    issued: u128,
+    live_supply: u64,
+    amount: u64,
+) -> Result<u128, BridgeError> {
+    if u128::from(live_supply) > issued {
+        return Err(BridgeError::AccountMismatch);
+    }
+    live_supply
+        .checked_sub(amount)
+        .ok_or(BridgeError::BurnMismatch)?;
+    issued
+        .checked_sub(u128::from(amount))
+        .ok_or(BridgeError::BurnMismatch)
 }
 
 fn validate_withdrawal_native_domain(
@@ -2588,6 +2624,15 @@ mod tests {
 
     #[test]
     fn bridge_account_execution_mints_once_from_verified_receipt() {
+        account_model_mint_with_direct_burn_difference(0);
+    }
+
+    #[test]
+    fn bridge_account_model_mint_preserves_direct_burn_difference() {
+        account_model_mint_with_direct_burn_difference(20);
+    }
+
+    fn account_model_mint_with_direct_burn_difference(direct_burn: u128) {
         let config = account_execution_config();
         let message = deposit_message(&config);
         let digest = message.message_digest().unwrap();
@@ -2732,6 +2777,14 @@ mod tests {
             .borrow_mut()
             .copy_from_slice(&encoded_state_account(&config));
 
+        let mut prior_state = read_bridge_state_account(&state_account).unwrap();
+        prior_state.minted_supply = direct_burn;
+        write_account_data(
+            &state_account,
+            &encode_bridge_state_account(&prior_state).unwrap(),
+        )
+        .unwrap();
+
         process_instruction_accounts_with_token_cpi(
             &id(),
             &accounts,
@@ -2740,7 +2793,10 @@ mod tests {
         )
         .unwrap();
         let state = read_bridge_state_account(&state_account).unwrap();
-        assert_eq!(state.minted_supply, message.amount_atomic as u128);
+        assert_eq!(
+            state.minted_supply,
+            direct_burn + u128::from(message.amount_atomic)
+        );
         let claim = decode_deposit_claim_account(&claim_account.data.borrow()).unwrap();
         assert_eq!(claim.record.operation_id, message.operation_id);
         assert_eq!(claim.record.message_digest, digest);
@@ -2777,7 +2833,7 @@ mod tests {
             read_bridge_state_account(&state_account)
                 .unwrap()
                 .minted_supply,
-            message.amount_atomic as u128
+            direct_burn + u128::from(message.amount_atomic)
         );
 
         assert_eq!(
@@ -2789,6 +2845,46 @@ mod tests {
             ),
             Err(EntrypointError::NotEnoughAccounts)
         );
+    }
+
+    #[test]
+    fn issued_counter_preserves_direct_burn_difference_and_exact_boundaries() {
+        for difference in [0, 1, u128::from(u64::MAX)] {
+            let issued = 100 + difference;
+            assert_eq!(checked_issued_after_mint(issued, 100, 20), Ok(issued + 20));
+            assert_eq!(checked_issued_after_burn(issued, 100, 20), Ok(issued - 20));
+            assert_eq!(checked_issued_after_burn(issued, 100, 100), Ok(difference));
+        }
+        assert_eq!(
+            checked_issued_after_mint(u128::MAX, 0, 1),
+            Err(BridgeError::ArithmeticOverflow)
+        );
+        assert_eq!(
+            checked_issued_after_mint(u128::from(u64::MAX), u64::MAX, 1),
+            Err(BridgeError::ArithmeticOverflow)
+        );
+        assert_eq!(
+            checked_issued_after_burn(100, 90, 91),
+            Err(BridgeError::BurnMismatch)
+        );
+        assert_eq!(
+            checked_issued_after_burn(0, 0, 1),
+            Err(BridgeError::BurnMismatch)
+        );
+    }
+
+    #[test]
+    fn issued_counter_rejects_unaccounted_live_supply_before_either_cpi() {
+        for (issued, live) in [(0, 1), (99, 100), (u128::from(u64::MAX) - 1, u64::MAX)] {
+            assert_eq!(
+                checked_issued_after_mint(issued, live, 1),
+                Err(BridgeError::AccountMismatch)
+            );
+            assert_eq!(
+                checked_issued_after_burn(issued, live, 1),
+                Err(BridgeError::AccountMismatch)
+            );
+        }
     }
 
     #[test]
@@ -2827,6 +2923,15 @@ mod tests {
 
     #[test]
     fn bridge_account_model_updates_preallocated_withdrawal_without_token_cpi() {
+        account_model_withdrawal_with_direct_burn_difference(0);
+    }
+
+    #[test]
+    fn bridge_account_model_withdrawal_preserves_direct_burn_difference() {
+        account_model_withdrawal_with_direct_burn_difference(20);
+    }
+
+    fn account_model_withdrawal_with_direct_burn_difference(direct_burn: u128) {
         let config = account_execution_config();
         let message = withdrawal_message(&config);
         let burn_authority_key = Pubkey::new_unique();
@@ -2893,6 +2998,16 @@ mod tests {
         .encode()
         .unwrap();
 
+        // The fixture must represent previously issued bridge units, not an
+        // impossible zero-issued bridge with a nonzero live SPL supply.
+        let mut prior_state = read_bridge_state_account(&state_account).unwrap();
+        prior_state.minted_supply = u128::from(message.amount_atomic) + direct_burn;
+        write_account_data(
+            &state_account,
+            &encode_bridge_state_account(&prior_state).unwrap(),
+        )
+        .unwrap();
+
         process_instruction_accounts_with_token_cpi(
             &id(),
             &[
@@ -2934,6 +3049,7 @@ mod tests {
         )
         .unwrap();
         let state = read_bridge_state_account(&state_account).unwrap();
+        assert_eq!(state.minted_supply, direct_burn);
         assert_eq!(
             state.burned_unpaid_withdrawals,
             message.amount_atomic as u128

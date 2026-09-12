@@ -1,66 +1,42 @@
-# Local deployment-integrity monitoring
+# Chain identity and pause checks
 
-Copyright (c) 2026 KingPepe Team. All Rights Reserved.
+The observer compares an authorized manifest with actual cluster genesis,
+Manager/Transceiver program identities, loader/ProgramData relation, upgrade
+authority, Mint, PDA mint authority, no freeze authority, standard Token Program
+and exact configuration PDAs/epochs. It never enrolls a new identity from an RPC
+reply. Initial zero supply is checked separately at setup.
 
-The observer queries the actual cluster genesis and one finalized bank snapshot
-containing Manager, Transceiver, Mint, configuration PDAs and ProgramData accounts.
-It compares these to an explicitly supplied manifest. It never enrolls an
-unexpected program, authority, Mint or genesis from an RPC reply.
+One finalized account snapshot supplies a consistent bank context. The existing
+loader parser also compares the approved executable length/hash and zero
+allocated tail; these are ordinary manifest checks, not a separate binary
+attestation service. Build hashes identify binaries, not Program IDs. Normal
+SBPF v0 and local upgrade-test SBPF v3 builds are distinct evidence.
 
-The manifest binds source SHA, identity version, both program identities,
-loader, ProgramData PDA, upgrade authority, deployment slot, compiled executable
-length/hash, allocated data length, Mint authority/precision, Native genesis,
-Solana deployment, protocol/network, epochs and separate attester identities.
-Configuration addresses are recomputed PDAs. Rust configuration codecs are
-checked exactly; the Manager's two economic counters are decoded separately.
-Traditional SPL Token, PDA mint authority, initialized Mint and no freeze
-authority are mandatory. Initial supply is separately checked at enrollment.
+The localnet RPC is bounded, timed and redirect-free. Genesis is checked before
+and after observation. Solana remains RPC_OBSERVATION; a provider's finalized
+label or signed transaction does not independently prove execution metadata.
+Program/Mint/authority changes cause a retained integrity pause, not only a log.
+Missing or stale RPC results suspend authorization without inventing a deficit.
 
-For the upgradeable loader, Program and ProgramData discriminants and their
-relationship are checked. The hash covers the exact approved executable length
-after the 45-byte loader metadata; any allocated tail must be zero. Allocated
-length, deployment slot and authority remain separately pinned. A Program ID
-does not identify the executable hash. Legacy-loader handling is explicit and
-never silently substituted for upgradeable-loader handling.
+Native validation uses the pinned KingPepe source and independent raw parser
+for headers, PoW, difficulty, chainwork, Merkle inclusion and transaction facts.
+Canonical choice/current UTXO state still rely on the configured validating node.
+Merkle inclusion alone is not unspentness. Temporary deposits are not reserve.
 
-HTTP access is read-only, localnet-only, bounded, timed and redirect-free. A
-single getMultipleAccounts response supplies a consistent bank context; genesis
-is checked before and after the read. This remains RPC_OBSERVATION under the
-configured source's trust boundary, not independent Solana consensus validation.
-Loopback is a test-network restriction, not authentication or proof of honesty.
+Before finality, reorganization means wait and re-evaluate. A higher-work branch
+invalidating an accepted deposit/sweep records exact impacted operations and
+backing, then pauses new economic authorization. The original evidence is kept.
+A healthy chain or ordinary restart cannot clear the incident. No automatic
+confiscation, balance correction, token burn or replacement mint exists.
 
-The Windows service wrapper requires genuine DPAPI progress storage, an exclusive
-lifetime handle and a matching authenticated supervisor client. Progress binds
-the complete manifest digest, genesis and last finalized slot. Persist-before-
-return, retained revisions, clock checks and bounded no-progress age prevent a
-normal restart from refreshing stale evidence automatically. Conflicting data
-for an already observed finalized bank or an authenticated invalid progress
-record reports an integrity incident. Source outage, malformed data or a lagging
-RPC suspends observation rather than fabricating a reserve deficit.
+Progress records bind network, manifest, height/work or finalized slot.
+Backward/conflicting observations fail or wait according to whether evidence
+proves contradiction. They do not guarantee detection when all host state is
+restored together. Protected adapters use the same DPAPI/process-lock mechanism,
+not independent registry witnesses or a new incident platform.
 
-Confirmed deployment differences propagate through authenticated supervisor
-reporting to durable HARD_STOP_INTEGRITY. Once stopped, a healthy response and
-ordinary observer/supervisor restart cannot clear that stop. The observer may
-continue read-only collection. Runtime methods do not clear or approve changes.
-
-## Evidence and unfinished integration
-
-The real-validator test uses fresh disposable upgradeable deployments and a real
-Native-to-Solana deposit, then deliberately mutates test authorities/bytecode.
-It explicitly builds SBPF v3 with pinned cargo-build-sbf/platform tools for the
-upgrade probe. The normal SBPF v0 build is separately retained and tested. A
-larger replacement first extends ProgramData, then waits for a later finalized
-bank before upgrading; preflight, signature checks and finality remain enabled.
-Parser fixtures separately exercise malformed inputs. Current-principal Windows
-tests exercise actual DPAPI, mTLS reporting and stop persistence; they are not
-cross-account certification or a protected Windows whole-bridge chain E2E.
-Exact outcomes and source scope belong in development-status, not inferred here.
-
-Continuous source-health admission for all economic services, the independent
-progress witness, complete operation recovery and protected chain integration
-are unfinished. Do not equate a monitor component with the complete Phase 07/08
-gate. Co-restoring all local state and enforcement records remains a residual
-host rollback risk. Polling cannot revoke an already released attestation or
-on-chain transaction, nor prove that an RPC provider did not hide a change.
-Production observation, manifest approval, provisioning and activation remain
-disabled/not configured. No production identity is disclosed here.
+Actual local-validator identity mutations and regtest competing branches are
+tested separately from parser fixtures. See deployment/local-e2e-build.md and
+development-status.md for commands and exact outcomes. Production observation,
+manifest approval, provisioning, independent review and activation remain
+unconfigured. No production identities are included here.

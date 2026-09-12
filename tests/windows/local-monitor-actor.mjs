@@ -26,7 +26,6 @@ function options(value, role, purpose) {
   assert.equal(value.context.environment, "localnet"); assert.equal(value.context.nativeGenesis, REGTEST_GENESIS);
   const root = path.dirname(path.resolve(value.root));
   assert.equal(path.dirname(root), path.resolve(os.tmpdir())); assert(path.basename(root).startsWith("kingpepe-ipc-test-"));
-  assert.equal(path.dirname(path.resolve(value.anchorRoot)), root);
   return value;
 }
 async function start(p) {

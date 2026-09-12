@@ -15,7 +15,7 @@ import { SPL_TOKEN_PROGRAM_ID_BASE58 as TOKEN } from "../../services/bridge-vali
 import { DEPLOYMENT_MONITOR_PROTOCOL, UPGRADEABLE_LOADER, LocalDeploymentRpc, deploymentDigest,
   validateDeploymentManifest, verifyDeploymentSnapshot } from "../../services/solana-observer/deployment-integrity.mjs";
 import { validateRuntimeFile } from "../../shared/runtime-path-boundary.mjs";
-import { packet } from "./local-withdrawal-record.mjs";
+import { packet } from "./local-transaction-packet.mjs";
 
 function identity() {
   const { privateKey, publicKey } = generateKeyPairSync("ed25519");

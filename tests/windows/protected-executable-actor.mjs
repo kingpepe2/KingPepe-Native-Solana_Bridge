@@ -12,13 +12,7 @@ try {
   assert(Object.isFrozen(helper));
   const identity = windowsCurrentServiceSid(); assert(typeof identity === "string");
   const ps = path.join(process.env.SystemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
-  if (mode === "SAME_IMPLEMENTATION") {
-    const legacy = spawnSync(ps, ["-NoLogo", "-NoProfile", "-NonInteractive", "-File",
-      path.resolve(import.meta.dirname, "../../shared/windows/protected-store-driver.ps1")],
-    { input: JSON.stringify({ operation: "identity" }), windowsHide: true, timeout: 30000, stdio: ["pipe", "pipe", "pipe"] });
-    assert(legacy.status === 0 && legacy.stderr.length === 0 && JSON.parse(legacy.stdout).sid === identity, "WindowsIdentityMismatch");
-    assert.equal(windowsProtectedExecutable().sha256, helper.sha256);
-  } else if (mode === "TAMPER") {
+  if (mode === "TAMPER") {
     const old = readFileSync(helper.executable), changed = Buffer.from(old); changed[0] ^= 1;
     writeFileSync(helper.executable, changed);
     assert.throws(windowsCurrentServiceSid, { message: "WindowsProtectedExecutableRejected" });

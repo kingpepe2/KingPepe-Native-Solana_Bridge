@@ -110,13 +110,14 @@ The SQLite API is release-candidate stability 1.2; its inclusion in the pinned
 Node runtime is not production approval. `.npmrc` requires exact engine pins.
 
 Run `node .github/scripts/dependency-license-audit.mjs` after locked installation.
-CI also verifies the pinned cargo-audit binary and audits all five Cargo.lock
+CI also verifies the pinned cargo-audit binary and audits all four Cargo.lock
 files. The retained bincode unmaintained warning remains visible. No advisory
 ignore or production activation exception is added.
 
-Phase 08.5 adds `node solana/tests/local-withdrawal-record.mjs` with a separate
+The core regression includes `node solana/tests/local-withdrawal-record.mjs` with a separate
 fresh external root. It first completes a real Native-to-Solana deposit, then
-executes 26 finalized burn/record prerequisite checks, including fresh and
+executes 29 finalized burn/record prerequisite checks plus five subsequent
+deposit/mint accounting checks, including fresh and
 pre-funded PDAs, wrong domains/accounts, duplicate requests, insufficient rent,
 later-instruction rollback and direct burns without entitlement. Negative
 transactions use skipPreflight so validator execution, not simulation, supplies

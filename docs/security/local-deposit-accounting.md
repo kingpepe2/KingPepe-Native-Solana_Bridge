@@ -86,14 +86,15 @@ process exit is not a power-loss or complete bridge-service restart test.
 
 A retained newer checkpoint rejects an older database. Restoring both database
 and checkpoint to the same old snapshot leaves no evidence of lost events;
-tests explicitly demonstrate this limitation. An independent retained anchor
-and chain/journal reconciliation are still required before production signing.
+tests explicitly demonstrate this limitation. Chain/journal reconciliation and
+an authorized recovery policy remain necessary before production signing.
 This code does not detect every hidden clone, privileged filesystem mutation or
 hostile mount. Path prechecks are not atomic race-proof file opens or service ACLs.
 
-The harness uses one disposable deposit journal. Complete multi-operation
-service recovery, claim refresh across message expiry, global reconciliation,
-post-mint deep-reorg handling and bridge-wide hard stops remain incomplete.
+The harness uses one disposable journal per deposit. Its accounting is not the
+protected operation controller. See [operation recovery](deposit-operation-recovery.md)
+for the durable service path, reconciliation and retained pause boundaries.
+Renewal across message expiry and production recovery policy remain unimplemented.
 Other claim/sweep and FROST state stores are not authenticated by this journal.
 Plain local test-key storage is not protected production storage or a fallback
 for an unavailable protected-secret adapter. Mainnet remains disabled.

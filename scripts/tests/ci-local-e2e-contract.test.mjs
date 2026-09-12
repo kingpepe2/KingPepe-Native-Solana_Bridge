@@ -72,6 +72,11 @@ function completeResult() {
 for (const [name, change, expected] of [
   ["accepts all record prerequisites", () => {}, 0],
   ["rejects the previous 23-check subset", r => { r.withdrawalRecord.pass = 23; }, 1],
+  ["rejects the previous 26-check subset", r => { r.withdrawalRecord.pass = 26; }, 1],
+  ["requires the post-direct-burn withdrawal check", r => { r.withdrawalRecord.passed.pop(); }, 1],
+  ["requires a subsequent real deposit mint", r => { delete r.depositCounter; }, 1],
+  ["rejects a deposit-counter regression failure", r => { r.depositCounter.fail = 1; }, 1],
+  ["requires the post-direct-burn claim replay check", r => { r.depositCounter.passed.pop(); }, 1],
   ["requires the real fresh-PDA check", r => { r.withdrawalRecord.passed.shift(); }, 1],
   ["rejects a record regression failure", r => { r.withdrawalRecord.fail = 1; }, 1],
   ["rejects an expanded Phase 09 scope", r => { r.phase09 = "STARTED"; }, 1],
@@ -79,11 +84,17 @@ for (const [name, change, expected] of [
   test(`CI withdrawal prerequisite gate ${name}`, () => {
     const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-ci-gate-test-"));
     try {
-      const result = { phase09: "NOT_STARTED", withdrawalRecord: { pass: 26, fail: 0, passed: [
+      const result = { phase09: "NOT_STARTED", withdrawalRecord: { pass: 29, fail: 0, passed: [
         "FRESH_USER_FRESH_PDA_FINALIZED_BURN_AND_RECORD", "DUPLICATE_WITHDRAWAL_NEW_NONCE_REJECTED",
         "MISSING_USER_SIGNATURE_REJECTED", "INSUFFICIENT_RECORD_RENT_ROLLS_BACK",
         "PREFUNDED_SYSTEM_PDA_SAFELY_INITIALIZED", "LATER_INSTRUCTION_FAILURE_ROLLS_BACK_BURN_RECORD_AND_RENT",
         "DIRECT_SPL_BURN_CREATES_NO_WITHDRAWAL_ENTITLEMENT",
+        "DIRECT_BURN_DIFFERENCE_SURVIVES_BRIDGE_WITHDRAWAL", "DIRECT_BURN_ACCOUNTING_REMAINS_COVERED",
+        "POST_DIRECT_BURN_WITHDRAWAL_REPLAY_REJECTED",
+      ] }, depositCounter: { pass: 5, fail: 0, passed: [
+        "SECOND_NATIVE_SWEEP_VERIFIED_WITH_CREDIT_RETAINED", "DIRECT_BURN_DIFFERENCE_SURVIVES_VERIFIED_MINT",
+        "TWO_RESERVES_RECONCILE_WITH_UNPAID_WITHDRAWALS", "REOPENED_POST_DIRECT_BURN_MINT_DOES_NOT_MINT_AGAIN",
+        "POST_DIRECT_BURN_NEW_TRANSACTION_CLAIM_REPLAY_REJECTED",
       ] } };
       change(result);
       writeFileSync(path.join(root, "withdrawal-record-result.json"), JSON.stringify(result), { flag: "wx", mode: 0o600 });

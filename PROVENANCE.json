@@ -2,413 +2,7 @@
   "schemaVersion": "1.0",
   "generatedAt": "2026-09-12T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
-  "phase085ProtectedDeliveryReview": {
-    "baseline": "5edcc111feffcb1ced31b236dc3928d19fa9acbd",
-    "filesBefore": 248,
-    "filesAfter": 279,
-    "sourceImports": "None. Original durable signing dispatch, Native/Solana delivery, raw reserve-credit reconstruction and a source-built Windows DPAPI helper. Existing reviewed codecs and pinned crypto are unchanged; no upstream code, binary or dependency is imported.",
-    "scope": "Primary Node, CurrentUser Windows security, cold Rust/SBF builds and actual Native/Solana delivery component tests pass. Remaining chain regression and publication review are recorded separately. Not the full protected controller, cross-account certification or final clean-clone audit."
-  },
-  "phase085ReconciliationReview": {
-    "baseline": "a2861f8676e20c30c26ec93202f877441a7990f5",
-    "filesBefore": 236,
-    "filesAfter": 248,
-    "sourceImports": "None. Original read-only coherent economic snapshots, protected progress and incident reporting, actual local-chain regressions and isolated Windows test processes. Existing raw Native verifier, Solana parser and Windows protection are reused.",
-    "scope": "Reconciliation boundary under primary integration validation. Not full protected deposit workflow, distinct service-principal certification or final clean-clone audit."
-  },
-  "phase085RpcTransportReview": {
-    "baseline": "8ea5d66f58abc0e756090bc94659860dd7627a55",
-    "filesBefore": 236,
-    "filesAfter": 236,
-    "sourceImports": "None. Original narrow transport corrections and actual isolated HTTP regressions. Existing built-in fetch/Web Streams APIs are used; no upstream source or dependency change.",
-    "scope": "Local Native/Solana RPC endpoint and parser boundary, not provider honesty, production observation or full service recovery."
-  },
-  "phase085DepositOperationReview": {
-    "baseline": "9de05a715c8a2c124a2c456b7cb8a50cdb6014ca",
-    "filesBefore": 227,
-    "filesAfter": 236,
-    "sourceImports": "None. Original protected deposit state/accounting adapter, read-only authenticated snapshots, existing canonical packet verifier integration, explicit non-replacement sweep construction and local-chain execution checks. Native RPC default checked in the existing pinned source; no upstream implementation copied or cryptographic dependency changed.",
-    "scope": "Operation/observation boundary locally component-tested, not a complete unattended controller, broadcast-credit rediscovery service or final clean-clone certification."
-  },
-  "phase085CoordinatorRecoveryReview": {
-    "baseline": "1e0a04152b7be2e87305afcc7bb6d8d093b5981d",
-    "filesBefore": 224,
-    "filesAfter": 227,
-    "sourceImports": "None. Original protected coordinator intent/attempt/aggregate journal, protected integrity-report outbox and same-principal Windows process-kill regressions. Existing pinned FROST and Windows protection APIs are reused.",
-    "scope": "Coordinator signing boundary only; full deposit-operation and broadcast-credit recovery remain incomplete."
-  },
-  "phase085AttesterRecoveryReview": {
-    "baseline": "f99c08c6bb50803b7db9ddbd0c3c7862f5d23d15",
-    "filesBefore": 220,
-    "filesAfter": 224,
-    "sourceImports": "None. Original protected attester operation journal, strict retained-image validation and isolated Windows process-kill regressions. Existing Noble Ed25519 and Windows protected storage are reused unchanged.",
-    "scope": "Attester boundary only; full deposit operation and broadcast-credit service recovery remain incomplete."
-  },
-  "phase085AcceptanceRecoveryReview": {
-    "baseline": "858dc041c922add58f0af1c98efeca8094774339",
-    "filesBefore": 219,
-    "filesAfter": 220,
-    "sourceImports": "None. Original retained acceptance-prefix revalidation, existing independent Rust verifier integration and real local-chain regression.",
-    "scope": "Fixed evidence identity for delayed signing/attestation; current chain and UTXO checks remain mandatory. This is not complete durable operation recovery."
-  },
-  "phase085SourceHealthReview": {
-    "baseline": "3dc8288aeb25e19608dc37b35b06428632b4d4cb",
-    "filesBefore": 216,
-    "filesAfter": 219,
-    "sourceImports": "None. Original generation-bound source admission window, authenticated authority methods, observer integration and tests.",
-    "scope": "Freshness gating is not chain proof, completed reconciliation/recovery wiring or production activation. Windows component fixtures explicitly identify synthetic source evidence."
-  },
-  "phase085RetainedWitnessReview": {
-    "baseline": "00a6cf10024bec5b4ba3a644f7560c1ac64df5e4",
-    "filesBefore": 215,
-    "filesAfter": 216,
-    "sourceImports": "None. Original Windows registry/DPAPI witness glue and exact isolated test cleanup. Microsoft APIs are reference-only; no sample source or OS binaries redistributed.",
-    "limits": "Separately retained service-profile evidence detects file-package restore, not co-restored whole-host/profile state or privileged compromise. Cross-service identity testing remains environment-blocked."
-  },
-  "phase085NativeReorgReview": {
-    "baseline": "920347acd70dc0dd48344780fe9d6c7928de6e37",
-    "filesBefore": 210,
-    "filesAfter": 215,
-    "sourceImports": "None. Original bounded current-branch observation, accepted-basis comparison, protected wrapper and isolated reorg tests. Existing independent Rust proof verifier and authoritative Native node are reused unchanged.",
-    "scope": "Components under validation, including a separately retained profile witness. Not complete service-wide recovery, hardware rollback assurance or protected Windows chain certification."
-  },
-  "phase085DeploymentMonitorReview": {
-    "baseline": "fd6aca9ebbe508e26818b0f33c67fad37bfb193f",
-    "filesBefore": 205,
-    "filesAfter": 210,
-    "sourceImports": "None. Original RPC/manifest/loader validation, protected progress wrapper and tests. Wire/account facts referenced from official Solana documentation, installed SDK loader definitions and existing original Rust codecs; no upstream implementation copied.",
-    "scope": "Component work under validation, not whole-bridge recovery or production observation certification."
-  },
-  "phase085GlobalIntegrityReview": {
-    "baseline": "e60902646bde39855a1686a9295ab20ff59ef09b",
-    "filesBefore": 202,
-    "filesAfter": 205,
-    "sourceImports": "None. Original protected supervisor integrity state, role/action/report protocol, authenticated runtime guards and regressions. Existing Windows/Node/Noble APIs are dependencies or references, not imported source.",
-    "scope": "Partial integration: protected Windows signer/coordinator/attester boundary and persistent global stop. Full service crash recovery, live detectors, broadcast-credit persistence and complete protected E2E remain separate work."
-  },
-  "phase085FencingReview": {
-    "baseline": "9ad57981aac1aec209737cc4a420b4ee7e19ce4c",
-    "filesBefore": 198,
-    "filesAfter": 202,
-    "filesDeleted": 0,
-    "filesMoved": 0,
-    "sourceImports": "None. Original lifetime-handle helper, protected signer fence/CAS adapter, process-kill tests and documentation; reference-only Windows/.NET API use. Noble cryptography, third-party notices and locked dependencies are unchanged.",
-    "scope": "Localnet protected signer-instance component, not full-host rollback, cross-account certification, durable global stop or full bridge service recovery."
-  },
-  "phase085IpcReview": {
-    "baseline": "84ef95fba316944dd9c205e0f965d3b9ff725e64",
-    "sourceImports": "None. Original Node TLS framing, protected credential/replay glue, restricted service handlers and regression tests. Existing Noble aggregate verification reused without changing its cryptography. Node/OpenSSL implementations are not copied or vendored.",
-    "scope": "Localnet protected transport and handler increment, not complete Windows service isolation, lifetime fencing or service-wide recovery. No production/legacy changes or secret material in source."
-  },
-  "purpose": "file-by-file provenance classification for local tracked content",
-  "phase085ProtectedStoreReview": {
-    "baseline": "2b5c82971834d6299969c05a9889c950dae2ef91",
-    "filesBefore": 186,
-    "filesAfter": 193,
-    "filesDeleted": 0,
-    "filesMoved": 0,
-    "sourceImports": "None. Original C#/PowerShell/Node glue calls existing Windows DPAPI and filesystem APIs; no Microsoft implementation or sample code imported. Noble signing algorithm and all dependency/toolchain pins unchanged.",
-    "scope": "User-scoped encrypted local state, protected directory checks, exact context/revision binding, encrypted FROST and separate attester adapters, Windows regressions, publication guard extension and maintenance documentation. No production material or legacy mutation.",
-    "terminology": "GetOwner/SetOwner and Windows ACL ownership are official filesystem API concepts, not KingPepe project governance roles. Synthetic SID constants are non-operational negative-test vectors; actual identities are never committed.",
-    "followUpReview": "Original Windows test-only fixed-error byte comparisons and cleanup errors prevent assertion reporters from printing disposable secrets or protected blobs on failure. One added regression; no runtime implementation, dependency, license, file-count or operational-data change. Implementation clean-clone evidence binds cba77159f5afbbea5aa1f95030e1b90c5fc990df.",
-    "filePolicyReview": "Original fixed-drive policy and explicit FileSecurity descriptor at creation, using documented .NET APIs without copying upstream source. One real Windows file-policy regression. No dependency, license, file count or production configuration change. Earlier test-output correction is f212983a67a43d7f988eb3ec878a322c2c16190d."
-  },
-  "phase085AuditReview": {
-    "baseline": "9ea5e198b57f48086a0c7861123a6d79d14e8560",
-    "filesBefore": 180,
-    "filesAfter": 186,
-    "filesDeleted": 0,
-    "filesMoved": 0,
-    "scope": "Phases 01-08 audit fixes only; Phase 09 NOT_STARTED. Original PDA lifecycle/Native domain and script checks, independent real validator tests, exact fee-liability correction, attester policy boundary and source audit checks. No upstream source code imported.",
-    "legalBoundary": "Original changes are proprietary; existing BIP-341 vector attribution and third-party dependency licenses remain unchanged. Generated lockfiles are classified as generated metadata, not third-party source ownership. Existing origin history includes Apache-licensed foundation d7778be782054fe77a42133b01a799b19833cb96; this audit neither imports nor rewrites it and makes no retroactive revocation or fresh-history claim."
-  },
-  "phase08RecoveryRevalidationReview": {
-    "filesBefore": 180,
-    "filesAfter": 180,
-    "sourceSha": "f3166cded981ee92f63841e7ea09f9ed948ad7ea",
-    "changes": "Status, continuity and readiness only: fresh pinned-runtime validation, successful local deposit, failed supplemental validator withdrawal-record probe and repeated exact-HEAD CI execution blocker. No implementation, dependency, toolchain-pin or license change.",
-    "sourceImports": "None; existing verified external tools reused. Temporary diagnostic code and operational test material are not source imports.",
-    "filesDeleted": 0,
-    "filesMoved": 0
-  },
-  "phase08CiContinuityReview": {
-    "filesBefore": 180,
-    "filesAfter": 180,
-    "sourceSha": "0133a6cc7f22bf880249a72a62502aa4bf3a638b",
-    "changes": "Continuity documentation and readiness metadata only: source locally retested, private push confirmed, account-level CI execution blocker recorded without private account details. No implementation, test, dependency, license or third-party changes.",
-    "sourceImports": "None",
-    "filesDeleted": 0,
-    "filesMoved": 0
-  },
-  "phase08DkgHandoffReview": {
-    "filesBefore": 179,
-    "filesAfter": 180,
-    "newFiles": [
-      "native/frost/policy/dkg-messages.mjs"
-    ],
-    "filesDeleted": 0,
-    "filesMoved": 0,
-    "changes": "Original strict DKG inner-message snapshots, announced/private polynomial binding, cryptographically verified durable incoming handoff at both participants before finalization, digest-bound retries and saved-setup resume. Eighteen new regressions. Removed superseded permissive inline round-one parsing.",
-    "sourceImports": "None; original policy helpers and pinned Noble DKG APIs used unchanged. No cryptographic algorithm, pseudocode or vectors copied.",
-    "dependencyChanges": "None; dependencies, lockfiles, toolchains and required licenses/notices preserved.",
-    "scope": "Local process/file setup recovery, not authenticated confidential IPC, protected storage, ongoing signer leases, full rollback or power-loss proof. No production keys or services created and no legacy material changed."
-  },
-  "phase08VolatileNonceReview": {
-    "filesBefore": 179,
-    "filesAfter": 179,
-    "newFiles": [],
-    "filesDeleted": 0,
-    "filesMoved": 0,
-    "changes": "Original V2 public-reservation/full-request state, signer-private volatile nonce buffers, failure-safe disposal, validated uncertain-session recovery, exact completed-share retry, closed-instance guard and 16 new regressions including actual SIGKILL and missing active epoch. Removed private nonce serialization/deserialization and reused the original session/tombstone consistency checks.",
-    "sourceImports": "None; existing original policy/state helpers and pinned Node/noble APIs reused without copying upstream implementation, pseudocode or vectors.",
-    "dependencyChanges": "None; lockfiles, toolchains, licenses and third-party notices unchanged.",
-    "scope": "Local process/file-snapshot nonce safety only; not full memory snapshot/clone rollback, protected share storage, ongoing signer exclusivity or economic-journal fencing. No production material created, migrated, moved or deleted."
-  },
-  "phase08StateLifecycleReview": {
-    "filesBefore": 179,
-    "filesAfter": 179,
-    "newFiles": [],
-    "filesDeleted": 0,
-    "filesMoved": 0,
-    "changes": "Original explicit local capability-gated exclusive signer-envelope creation, fail-closed existing-state load/save, redacted I/O and JSON errors, exact counter/record checks, reviewed fresh-vs-reopen integration and 13 regressions including two real child processes. Removed implicit missing-file initialization.",
-    "sourceImports": "None; existing original policy/path helpers and Node filesystem/process APIs reused. No upstream or legacy implementation copied.",
-    "dependencyChanges": "None; lockfiles, toolchains, licenses and third-party notices preserved.",
-    "scope": "Cooperative local state lifecycle only, not protected storage, atomic concurrent update fencing, ongoing signer exclusivity, nonce restart or rollback assurance. No production data created, moved or deleted."
-  },
-  "phase08NonceAbortReview": {
-    "filesBefore": 179,
-    "filesAfter": 179,
-    "newFiles": [],
-    "filesDeleted": 0,
-    "filesMoved": 0,
-    "changes": "Original bound abort API/receipts, current session/tombstone consistency, both-participant coordinator cleanup, signed-share preservation, absorbing instance refusal and 23 new regressions plus strengthened enrollment rejection. Superseded bare-session-ID abort path removed.",
-    "sourceImports": "None; existing original request/policy helpers and pinned cryptographic APIs reused. RFC 9591 used as protocol-failure reference only; no pseudocode or third-party implementation copied.",
-    "dependencyChanges": "None; lockfiles, toolchains, licenses and third-party notices unchanged.",
-    "scope": "Cooperating synchronous APIs only; not authenticated protected state, durable global stops, reserved nonce restart safety or rollback proof. No production material created, moved or deleted."
-  },
-  "phase08FullIntentEnrollmentReview": {
-    "filesBefore": 179,
-    "filesAfter": 179,
-    "newFiles": [],
-    "filesDeleted": 0,
-    "filesMoved": 0,
-    "changes": "Original complete normalized 28-field immutable signing-intent enrollment/digest comparison, strict intent field set, sweep integration and 11 new regressions. Removed superseded partial normalization/matching and manual subset construction; fixtures now enroll complete public synthetic intents.",
-    "sourceImports": "None. Existing original canonical intent validation/hash helpers reused; no cryptographic primitive or third-party source copied or modified.",
-    "dependencyChanges": "None; pinned dependencies, toolchains, lockfiles and third-party notices unchanged.",
-    "scope": "Policy/input equality, not evidence truth, authenticated storage/transport or complete nonce failure/recovery. No production material created, moved or deleted."
-  },
-  "phase08DkgBindingReview": {
-    "filesBefore": 178,
-    "filesAfter": 179,
-    "newFiles": [
-      "native/frost/policy/dkg-request.mjs"
-    ],
-    "filesDeleted": 0,
-    "filesMoved": 0,
-    "changes": "Original immutable V2 DKG deployment/context/session metadata; exact active-key and role selection; coordinator option and all-round request checks; bounded retained epochs and delayed older-epoch finalization rejection; 24 original regressions. Superseded inline request handling and unused imports removed.",
-    "sourceImports": "None; uses existing original policy helpers, verified REGTEST identity and pinned library API. No third-party cryptographic implementation or vectors copied or modified.",
-    "dependencyChanges": "None; pinned dependencies, lockfiles, toolchains and required third-party notices preserved.",
-    "scope": "Structural/API binding only, not authenticated DKG transport, protected signer state, nonce rollback or production key ceremony. Incompatible state rejected without migration, replacement or deletion. No operational data published."
-  },
-  "phase08SigningRequestReview": {
-    "filesBefore": 177,
-    "filesAfter": 178,
-    "newFiles": [
-      "native/frost/policy/signing-request.mjs"
-    ],
-    "filesDeleted": 0,
-    "filesMoved": 0,
-    "changes": "Original shared immutable V1 signing-request construction/validation, participant-bound session recomputation before state/key access, removal of superseded inline request validation/construction and 14 original regressions.",
-    "sourceImports": "None. RFC 9591 consulted for input-validation and nonce/protocol-failure boundaries only; no pseudocode or vectors copied. Native message/ciphersuite and valid existing V1 transcript representation unchanged.",
-    "dependencyChanges": "None; pinned dependencies, lockfiles, toolchains and third-party notices preserved.",
-    "scope": "Request metadata/API safety only, not DKG deployment binding, complete nonce abort/restart, protected storage or production signing. No operational material moved or deleted."
-  },
-  "phase08SignerPolicyReview": {
-    "filesBefore": 177,
-    "filesAfter": 177,
-    "filesDeleted": 0,
-    "filesMoved": 0,
-    "newFiles": [],
-    "changes": "Original local-only FROST policy guard, private immutable authorization snapshot, bounded data validation, explicit local DKG-only capability, matching harness integration and 33 regression tests. Existing REGTEST identity reused from the reviewed Native evidence source.",
-    "sourceImports": "None. Existing Node standard library APIs used; no third-party or legacy implementation copied. Per-file classifications and required third-party notices unchanged.",
-    "dependencyChanges": "None; all dependency, toolchain, lockfile and license pins unchanged.",
-    "terminologyReview": "No new prohibited KingPepe project-role terms; official protocol and third-party terms preserved.",
-    "scope": "Local API configuration and mutation boundary, not independent evidence by itself, production activation, a hostile-code sandbox or authenticated signer state. No operational data moved, deleted or published."
-  },
-  "phase08StopCiCorrectionReview": {
-    "filesBefore": 176,
-    "filesAfter": 177,
-    "newFiles": [
-      "scripts/tests/ci-local-e2e-contract.test.mjs"
-    ],
-    "filesDeleted": 0,
-    "filesMoved": 0,
-    "changes": "Correct obsolete CI claim-check count without bypassing rejection gates; add original tests executing the actual workflow acceptance contract; record failed-SHA evidence and known unaudited dependency/policy boundaries.",
-    "sourceImports": "None. Upstream versioned README consulted for its FROST audit disclaimer; no implementation copied or derived.",
-    "dependencyChanges": "None; pinned versions, lockfiles and licenses unchanged."
-  },
-  "phase08AbsorbingStopReview": {
-    "filesBefore": 175,
-    "filesAfter": 176,
-    "filesDeleted": 0,
-    "filesMoved": 0,
-    "newFiles": [
-      "shared/operation-hard-stop.mjs"
-    ],
-    "changes": "Original common absorbing-stop guard, operation-journal retry/late-write protection, pipeline ledger boundary checks, exact-ledger stop state, race/reopen tests and an isolated stopped-worker probe using a real local claim packet.",
-    "sourceImports": "None. Uses the existing Node standard library; no upstream implementation copied or derived. Existing third-party notices and licenses preserved.",
-    "dependencyChanges": "None; toolchain and npm/Cargo lockfiles unchanged.",
-    "terminologyReview": "No KingPepe project-role use of prohibited terminology in the increment; official Solana and third-party terms preserved.",
-    "scope": "Cooperating local workers and authenticated local credit ledger only, not a complete bridge-wide integrity stop, service fencing or rollback guarantee. No operational data deleted, moved or published."
-  },
-  "phase08AuthenticatedCreditReview": {
-    "filesBefore": 171,
-    "filesAfter": 175,
-    "filesDeleted": 0,
-    "filesMoved": 0,
-    "newFiles": [
-      ".npmrc",
-      "services/bridge-validator/local-deposit-ledger.mjs",
-      "services/bridge-validator/tests/local-deposit-ledger.test.mjs",
-      "docs/security/local-deposit-accounting.md"
-    ],
-    "changes": "Original SQLite/HMAC local deposit accounting, existing exact-ledger fork reuse, real pending-credit/finalized-mint integration, bounded replay and auxiliary-file guards, sticky local stops and actual process/filesystem regression tests.",
-    "sourceImports": "Node/SQLite API, runtime and security documentation used as reference. No source implementation or vector copied. Existing third-party attributions and licenses retained; runtime binaries remain external.",
-    "dependencyChanges": "Node 24.21.0 / npm 11.19.0 / bundled SQLite 3.53.4 pinned after compatibility and upstream security review. No npm or Rust graph change and no SQLite addon. Added strict engine configuration.",
-    "terminologyReview": "New original files contain no prohibited KingPepe project-role terms; official protocol and third-party terms remain unchanged.",
-    "scope": "Local single-deposit authenticated credit/settlement journal, not production protected storage, complete rollback detection or full multi-operation service recovery. No operational data deleted, moved or published."
-  },
-  "phase08Review": {
-    "filesBefore": 152,
-    "filesAfter": 155,
-    "filesDeleted": 0,
-    "filesMoved": 0,
-    "newFiles": [
-      ".github/scripts/dependency-license-audit.mjs",
-      "scripts/tests/dependency-license-audit.test.mjs",
-      "solana/tests/local-deposit-security.mjs"
-    ],
-    "consolidation": "Removed duplicate fee-payer signing code and oversized bundle implementation; condensed stale AGENTS/readiness summaries while retaining stage evidence in status documents.",
-    "dependencyChanges": "Replaced solana-program 1.18.26 and spl-token 4.0.0 graph with solana-program 3.0.0 / spl-token-interface 2.0.0, added explicit system-interface and sysvar test APIs; removed obsolete zeroize_derive pins.",
-    "terminologyReview": "Case-insensitive project-role terminology reviewed. Solana account ownership terms are SOLANA_PROTOCOL_TERM; tar --no-same-owner is THIRD_PARTY_TERM. No project governance role uses that terminology.",
-    "sourceImports": "No upstream source implementation or legacy files imported in this increment. Existing BIP-341 public vector material retains DERIVED_FROM_THIRD_PARTY classification and BSD-3-Clause attribution/terms."
-  },
-  "phase08DomainReview": {
-    "newFiles": 0,
-    "dependencyChanges": "None",
-    "changes": "Original protocol/Native-domain configuration validation, compact mandatory-zero initialization encoding, matching local setup wiring and real-validator adversarial checks. No upstream source copied."
-  },
-  "phase08RawEvidenceReview": {
-    "filesBefore": 155,
-    "filesAfter": 160,
-    "filesDeleted": 0,
-    "filesMoved": 0,
-    "newFiles": [
-      "native/proof/src/evidence.rs",
-      "native/proof/src/bin/kingpepe-native-evidence.rs",
-      "native/node/native-raw-evidence.mjs",
-      "native/node/tests/native-raw-evidence.test.mjs",
-      "scripts/local-native-evidence-verifier.mjs"
-    ],
-    "sourceImports": "Original implementation against pinned Native consensus/serialization facts. No third-party implementation copied and no legacy Git history imported.",
-    "dependencyChanges": "None; executable uses the existing locked Native proof crate and standard library.",
-    "cleanup": "Removed unused RPC-object-only deposit fingerprint helper after repository-wide usage review; retained independently implemented Rust and JavaScript transaction parsers.",
-    "terminologyReview": "New and changed original implementation contains no KingPepe project-role use of the prohibited terminology; protocol and third-party terms remain unchanged."
-  },
-  "phase08RecoveryScriptReview": {
-    "filesBefore": 160,
-    "filesAfter": 164,
-    "filesDeleted": 0,
-    "filesMoved": 0,
-    "newFiles": [
-      "native/node/native-tapscript.mjs",
-      "native/recovery/taproot-deposit.mjs",
-      "native/node/tests/native-tapscript.test.mjs",
-      "solana/tests/local-native-recovery.mjs"
-    ],
-    "sourceImports": "Original bounded implementation against BIP341/BIP342/BIP112 standard facts and the pinned Native interpreter; no upstream implementation copied. Existing third-party vector and dependency notices retained.",
-    "dependencyChanges": "None; uses the existing pinned curve dependency and Node standard library.",
-    "terminologyReview": "No new project-role terminology requiring replacement; existing Solana protocol and third-party terms preserved."
-  },
-  "phase08RecoverableIntegrationReview": {
-    "filesBefore": 164,
-    "filesAfter": 164,
-    "filesDeleted": 0,
-    "filesMoved": 0,
-    "newFiles": [],
-    "changes": "Original integration of the existing recovery scripts into the automatic REGTEST deposit flow; separate Native user public recovery key, immutable intent reconstruction in each role, mixed FROST BIP342/key-path sweep and actual finalized witness verification. Expanded unit and real-daemon negative tests.",
-    "sourceImports": "No third-party or legacy implementation imported. Native getaddressinfo public-key behavior checked against pinned src/wallet/rpc/addresses.cpp.",
-    "dependencyChanges": "None",
-    "cleanup": "Removed non-recoverable deposit-intent construction from the normal local flow; retained key-path cryptographic regression tests and reserve fee signing."
-  },
-  "phase08RecoveryPsbtReview": {
-    "filesBefore": 164,
-    "filesAfter": 167,
-    "filesDeleted": 0,
-    "filesMoved": 0,
-    "newFiles": [
-      "native/recovery/recovery-psbt.mjs",
-      "native/node/tests/recovery-psbt.test.mjs",
-      "solana/tests/local-recovery-psbt.mjs"
-    ],
-    "changes": "Original bounded offline PSBT encoding/inspection, V2 public-commitment Miniscript-compatible script construction and real isolated Native wallet recovery tests. V1 prefix replaced only for new REGTEST outputs; old external test data preserved.",
-    "sourceImports": "No third-party source or vector copied. BIP174/BIP371 field facts and pinned Native Miniscript/PSBT behavior referenced; required existing notices unchanged.",
-    "dependencyChanges": "None",
-    "terminologyReview": "New original files contain no prohibited project-role terminology; protocol and required third-party terminology preserved."
-  },
-  "phase08RecoveryRaceReview": {
-    "filesBefore": 167,
-    "filesAfter": 168,
-    "filesDeleted": 0,
-    "filesMoved": 0,
-    "newFiles": [
-      "solana/tests/local-recovery-races.mjs"
-    ],
-    "changes": "Original real-daemon tests for competing mature FROST sweep and Native-wallet recovery, both winner orders and forced pre-mint alternative forks. REGTEST CLI controls remain unavailable through the ordinary RPC adapter. Explicit unconfirmed classification and bounded legacy HTTP/JSON-RPC error parsing distinguish chain state from infrastructure/parser failures without exposing provider text.",
-    "sourceImports": "No code copied; pinned Native generateblock and invalidateblock behavior reviewed. Existing provenance and notices preserved.",
-    "dependencyChanges": "None"
-  },
-  "phase08ClaimRetryReview": {
-    "filesBefore": 168,
-    "filesAfter": 169,
-    "filesDeleted": 0,
-    "filesMoved": 0,
-    "newFiles": [
-      "solana/tests/local-claim-retry.mjs"
-    ],
-    "changes": "Original exact signed-claim packet reconstruction, pre-broadcast transaction identity persistence, status-aware retry and process-crash/real-blockhash-expiry tests. Existing synthetic unit fixtures now use the official SPL Token Program and actual packet signatures.",
-    "sourceImports": "Reference-only Solana transaction/RPC definitions; no upstream implementation copied. Required existing vector attribution and third-party notices retained.",
-    "dependencyChanges": "None",
-    "terminologyReview": "No new KingPepe project-role terminology requiring renaming; official protocol and third-party terms preserved."
-  },
-  "phase08AccountingReview": {
-    "filesBefore": 169,
-    "filesAfter": 169,
-    "filesDeleted": 0,
-    "filesMoved": 0,
-    "newFiles": [],
-    "changes": "Original canonical-operation-bound in-memory deposit accounting, zero project fee guard, retry conservation tests and failure-atomic Rust snapshot/reserve transitions. Removed the unsafe amount-only deposit ledger API after reviewing all call sites; retained independently implemented Rust reserve verification and arithmetic models.",
-    "sourceImports": "No third-party source, vectors or legacy implementation imported. Existing required licenses and notices retained.",
-    "dependencyChanges": "None",
-    "terminologyReview": "No new project-role naming violations. Existing Solana protocol and third-party terms remain unchanged.",
-    "scope": "In-memory accounting correction, not durable credit recovery, authenticated journals, full service restart or external review."
-  },
-  "phase08RuntimePathReview": {
-    "filesBefore": 169,
-    "filesAfter": 171,
-    "filesDeleted": 0,
-    "filesMoved": 0,
-    "newFiles": [
-      "shared/runtime-path-boundary.mjs",
-      "scripts/tests/runtime-path-boundary.test.mjs"
-    ],
-    "changes": "Original common filesystem boundary for FROST state, three journals, Native RPC cookies and local runtime planning. Forty filesystem tests use isolated temporary roots and no operational keys. Actual checkout protection cannot be disabled by a caller-supplied root.",
-    "cleanup": "Consolidated repeated lexical containment/resolution checks and removed an unused recursive FROST state deletion method after repository-wide call-site review. No operational data deleted or moved.",
-    "sourceImports": "Node 22.23.2 path/fs API definitions consulted as reference only; no upstream code copied. Existing licenses and notices retained.",
-    "dependencyChanges": "None",
-    "terminologyReview": "No new KingPepe project-role naming violations; existing Solana/SPL account terms preserved.",
-    "scope": "Runtime path validation is not authenticated persistence, OS service isolation, atomic race-proof file opening, full rollback detection or host-compromise protection."
-  },
+  "purpose": "Exact file-by-file origin and retained bridge-purpose classification; implementation evidence is recorded separately.",
   "provenancePolicy": {
     "originalCodeLicense": "Proprietary (Copyright (c) 2026 KingPepe Team)",
     "provenanceClassifications": [
@@ -418,1480 +12,1451 @@
       "DERIVED_FROM_THIRD_PARTY",
       "GENERATED_FILE",
       "BUILD_OR_CONFIGURATION_METADATA"
-    ]
+    ],
+    "historicalLicensing": "Previously distributed Apache-licensed versions retain their historical grants. This cleanup neither rewrites history nor claims retroactive revocation.",
+    "thirdPartyBoundary": "Required upstream terms and selected BIP-341 vector attribution remain. Reference/API use does not transfer upstream ownership."
+  },
+  "cleanup": {
+    "baseline": "bdb996e45df33535a78d983afab22aa60a47cf15",
+    "filesBefore": 293,
+    "filesAfter": 239,
+    "removed": "README-only placeholders, unused deterministic Rust signing scaffold, persistent signer fencing/registry witnesses and duplicate historical documentation. Real Node FROST, core economic/restart tests and required legal notices remain.",
+    "importedSource": "None during simplification; prior file-origin notes retained except corrected obsolete implementation descriptions."
   },
   "trackedFiles": [
     {
-      "path": "docs/security/solana-deposit-delivery.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original signed-packet transport, durability and evidence boundaries; no operational identities."
-    },
-    {
-      "path": "services/relayer/solana-deposit-delivery.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original exact receipt/claim packet, deployment-account and retained-outcome codec; no copied upstream implementation."
-    },
-    {
-      "path": "services/relayer/protected-solana-deposit-outbox.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original protected persist-before-send transport and concrete actual-bank observation; not mint authority."
-    },
-    {
-      "path": "services/relayer/solana-deposit-ipc.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original exact-role IPC service/client and immutable response binding."
-    },
-    {
-      "path": "services/relayer/tests/solana-deposit-delivery.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original packet/account/outcome regression tests using synthetic public evidence and ephemeral test identities."
-    },
-    {
-      "path": "tests/integration/solana-delivery-fixture.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original synthetic Solana account fixture and ephemeral genuine signatures; not chain verification."
-    },
-    {
-      "path": "solana/tests/local-windows-solana-outbox-host.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original actual regtest/validator host for Windows delivery failures; disposable state external to checkout."
-    },
-    {
-      "path": "tests/windows/local-solana-outbox.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original actual DPAPI/mTLS and validator receipt/claim crash recovery tests; pending credit is explicit test initialization."
-    },
-    {
-      "path": "tests/windows/local-solana-outbox-actor.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original disposable process-kill test actor; only actual validator acknowledgement reaches the selected boundary."
-    },
-    {
-      "path": "shared/windows/ProtectedStoreExecutable.cs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original bounded/redacted executable entry for the existing reviewed Windows DPAPI/ACL/CAS implementation; no copied upstream implementation."
-    },
-    {
-      "path": "shared/windows/protected-helper-build.ps1",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original one-time per-process compilation of adjacent reviewed source with the installed Windows Framework compiler into an atomic private external directory."
-    },
-    {
-      "path": "shared/windows/protected-executable.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original source/executable hash and path binding with fail-closed cache validation; no generated binaries or operational state are tracked."
-    },
-    {
-      "path": "tests/windows/protected-executable-actor.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original isolated executable-integrity test actor; generated code remains external, with no production identity or secrets."
-    },
-    {
-      "path": "tests/windows/protected-executable.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original actual Windows executable hash, hard-link, ACL, corruption and no-fallback tests under the current test principal."
-    },
-    {
-      "path": "docs/security/windows-protected-executable.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original implementation and evidence boundary for the source-built Windows protection helper, preserving cross-service and privileged-host limitations."
-    },
-    {
-      "path": "docs/security/native-reserve-credit.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original protected reserve-credit derivation, replay and recovery limitations."
-    },
-    {
-      "path": "docs/security/native-sweep-delivery.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original candidate delivery design, evidence scope and remaining integration limitations."
-    },
-    {
-      "path": "docs/security/sweep-job-recovery.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original queue/restart boundary and limitation description."
-    },
-    {
-      "path": "native/frost/coordinator/protected-sweep-jobs.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original Windows-protected dispatch/worker around the existing exact A+B signer and coordinator journal."
-    },
-    {
-      "path": "native/frost/coordinator/sweep-job-ipc.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original mutually authenticated role-specific queue API and independently verified public result."
-    },
-    {
-      "path": "native/frost/coordinator/sweep-job-state.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original bounded immutable signing-job codec; no cryptographic implementation copied."
-    },
-    {
-      "path": "native/frost/tests/sweep-job-state.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original codec/security regressions with ephemeral external test material and explicitly synthetic chain facts."
-    },
-    {
-      "path": "services/bridge-validator/native-reserve-credit.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original concrete raw Native reserve-to-credit recovery and independent attester evidence reconstruction. Existing canonical encoding and economic validators reused."
-    },
-    {
-      "path": "services/bridge-validator/tests/native-reserve-credit.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original credit recovery input/capability boundary tests; no fixture proof flags accepted."
-    },
-    {
-      "path": "services/relayer/native-sweep-ipc.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original pinned-role Native delivery IPC handler/client."
-    },
-    {
-      "path": "services/relayer/native-sweep-outbox.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original protected exact signed Native sweep outbox; existing economic codec and Native verifier reused. No imported upstream code."
-    },
-    {
-      "path": "services/relayer/tests/native-sweep-outbox.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original codec and capability regression tests; synthetic chain facts with ephemeral real FROST signatures."
-    },
-    {
-      "path": "solana/tests/local-native-reserve-credit.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original actual regtest credit derivation and substituted-message regression. No second mint or production state."
-    },
-    {
-      "path": "solana/tests/local-windows-native-outbox-host.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original isolated real-chain test orchestration for protected Windows delivery; no embedded keys."
-    },
-    {
-      "path": "tests/windows/local-native-outbox-actor.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original disposable worker actor for actual post-broadcast process termination."
-    },
-    {
-      "path": "tests/windows/local-native-outbox.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original current-principal protected real-regtest delivery and process-kill test."
-    },
-    {
-      "path": "native/frost/coordinator/protected-signing-journal.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original bounded public-transcript/aggregate journal with protected CAS, retained witness, exact A+B abort recovery and global integrity reporting; no imported crypto implementation."
-    },
-    {
-      "path": "tests/windows/coordinator-recovery-actor.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original same-principal Windows process-kill actor exercising actual protected journal, authenticated FROST endpoints and synthetic Native evidence; not chain validation."
-    },
-    {
-      "path": "docs/security/coordinator-signing-recovery.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original coordinator persistence ordering, uncertainty handling and residual-risk documentation without live deployment identities."
-    },
-    {
-      "path": "services/attesters/authorization-journal.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original strict protected attester binding/result journal and authenticated global-stop integration; no imported cryptographic or OS implementation."
-    },
-    {
-      "path": "services/attesters/tests/authorization-journal.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original portable retained-image codec regressions using public messages and ephemeral in-memory attestation keys; not protected-service or chain evidence."
-    },
-    {
-      "path": "tests/windows/attester-recovery-actor.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original isolated same-principal Windows process-kill test actor with real DPAPI/mTLS and explicitly synthetic Native evidence."
-    },
-    {
-      "path": "docs/security/attester-authorization-recovery.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original attester persistence ordering, test scope and residual risk documentation; no operational identities or private deployment values."
-    },
-    {
-      "path": "solana/tests/local-acceptance-checkpoint.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original real regtest/local-validator acceptance-prefix, delayed signing and immutable-credit regression; isolated generated test state remains external."
-    },
-    {
-      "path": "tests/windows/integrity-authority-actor.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original isolated current-principal test supervisor with bounded private child-control frames and explicitly synthetic health reports; no runtime fallback or cross-account certification."
-    },
-    {
-      "path": "shared/source-health-window.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original bounded one-use current-supervisor-generation source admission state; no transfer or consensus authority."
-    },
-    {
-      "path": "scripts/tests/source-health-window.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original pure freshness/replay/role/restart tests with explicit non-chain fixtures and a unit clock; no operational state."
-    },
-    {
-      "path": "tests/windows/protected-witness-test-helper.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original exact-key LOCALNET registry fault and cleanup helper for registered temporary test roots; no production recovery/reset API or operational values."
-    },
-    {
-      "path": "tests/integration/native-progress-fixture.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original shared synthetic Native progress/incident fixture for parser and protected persistence tests; not genuine blockchain evidence."
-    },
-    {
-      "path": "native/node/native-integrity.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original exact accepted-basis comparison and protected observer wrapper. No upstream consensus code or cryptographic implementation copied."
-    },
-    {
-      "path": "native/node/tests/native-integrity.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original explicitly synthetic policy comparisons and capability rejection tests; not blockchain or protected-service evidence."
-    },
-    {
-      "path": "solana/tests/local-native-reorg.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original isolated real regtest competing-branch test after real Solana mint, with separate-process incident policy replay and no automatic economic repair."
-    },
-    {
-      "path": "docs/security/native-reorg-monitor.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original non-operational description and explicit evidence/integration limits, with no private deployment values."
-    },
-    {
-      "path": "services/solana-observer/deployment-integrity.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original strict manifest, bounded read-only RPC, executable/config checks and protected monitor integration. No upstream implementation copied."
-    },
-    {
-      "path": "services/solana-observer/tests/deployment-integrity.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original parser, substitution, exact-integer and bounded HTTP regressions; not chain evidence."
-    },
-    {
-      "path": "solana/tests/local-deployment-integrity.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original isolated real-validator upgradeable deployment/mutation regression; external disposable keys only."
-    },
-    {
-      "path": "tests/integration/deployment-fixture.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original synthetic account/parser fixture, explicitly not executable bytecode or chain proof."
-    },
-    {
-      "path": "docs/security/solana-deployment-monitor.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original non-operational monitoring model, source trust, validation scopes and remaining limitations."
-    },
-    {
-      "path": "shared/service-integrity-policy.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original bounded role/action/report authorization map for global integrity service; no third-party code."
-    },
-    {
-      "path": "services/supervisor/protected-integrity.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original leased DPAPI integrity authority and pinned authenticated remote guard, with absorbing stop and no automatic clear."
-    },
-    {
-      "path": "docs/security/global-integrity.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original non-operational control description, timing rationale, integration scope and explicit limitations."
-    },
-    {
-      "path": "shared/windows/protected-lease-driver.ps1",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original fixed private-parent-pipe helper holding an existing restrictive Windows lifetime file handle; no Microsoft code imported."
-    },
-    {
-      "path": "native/frost/state/windows-fenced-state-store.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original protected lifetime fence, role/domain/epoch/revision/high-water binding and prepared-image recovery adapter."
-    },
-    {
-      "path": "tests/windows/signer-fencing.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original actual DPAPI, duplicate-process, SIGKILL, rollback and real FROST recovery tests with external disposable state."
-    },
-    {
-      "path": "docs/security/signer-fencing.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original non-operational fencing design and explicit retained-anchor/full-host assurance limits."
-    },
-    {
       "path": ".gitattributes",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Original text-only LF checkout policy for reproducible Windows/WSL source inspection; binary files are not normalized."
-    },
-    {
-      "path": "docs/phase-08-5-audit.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original retrospective audit, measured local coverage and explicit unresolved security dependencies; not external certification or private deployment data."
-    },
-    {
-      "path": "docs/phase-08-5-blocker-inventory.json",
-      "classification": "GENERATED_FILE",
-      "notes": "Generated source-keyword location inventory with reviewed classifications; no runtime state, live identities or secret content."
-    },
-    {
-      "path": "solana/tests/local-withdrawal-record.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original isolated real-validator audit regression for atomic burn/withdrawal record lifecycle only; no Phase 09 payout implementation or imported code."
-    },
-    {
-      "path": "scripts/source-audit.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original exact provenance coverage and non-secret publication-boundary checks."
-    },
-    {
-      "path": "scripts/tests/source-audit.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original executable publication/provenance guard regressions; synthetic non-operational values only."
-    },
-    {
-      "path": "native/frost/policy/dkg-messages.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original bounded canonical DKG input snapshots and project handoff digest binding around unchanged pinned primitive APIs; no upstream source copied. Not authenticated transport."
-    },
-    {
-      "path": "native/frost/policy/dkg-request.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original V2 project DKG context/request metadata validation. No upstream primitive or vectors copied; Native ciphersuite unchanged."
-    },
-    {
-      "path": "native/frost/policy/signing-request.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original immutable project request/session metadata helpers, retaining existing V1 representation and the actual Native Taproot sighash. No cryptographic implementation or third-party source copied."
-    },
-    {
-      "path": "scripts/tests/ci-local-e2e-contract.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original executable validation-contract regressions for the checked-in CI script. External report fixtures, no keys or economic operations; not blockchain E2E evidence."
-    },
-    {
-      "path": "shared/operation-hard-stop.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original absorbing-stop decision guard shared by deposit, sweep and claim journals. Node standard-library deep equality; no third-party source copied."
-    },
-    {
-      "path": ".npmrc",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Exact package engine enforcement only; no registry credentials or private endpoints."
-    },
-    {
-      "path": "services/bridge-validator/local-deposit-ledger.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original local-only authenticated SQLite accounting journal and replay. Uses existing exact accounting and Node APIs; no upstream implementation copied or operational state included."
-    },
-    {
-      "path": "services/bridge-validator/tests/local-deposit-ledger.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original actual-filesystem, SQLite, concurrency and process-exit regressions; ephemeral authentication material is created outside source. Public message fixtures, not operational wallets."
-    },
-    {
-      "path": "docs/security/local-deposit-accounting.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Sanitized engineering contract, canonical journal encoding, tests and limitations. No private deployment values or recovery inventory."
-    },
-    {
-      "path": "shared/runtime-path-boundary.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original shared component-aware runtime path checks with existing-parent resolution, linked-file rejection and filesystem identity comparison. Node APIs used without copied implementation."
-    },
-    {
-      "path": "scripts/tests/runtime-path-boundary.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original real-filesystem boundary regressions on isolated external temporary roots. Public markers and ephemeral cookie fixture only; no operational shares or upstream code."
-    },
-    {
-      "path": "solana/tests/local-claim-retry.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original local-validator worker-crash and real-blockhash-expiry test; restarts from the existing external signed-claim journal without receiving signing keys. No upstream implementation copied."
-    },
-    {
-      "path": "solana/tests/local-recovery-races.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original isolated REGTEST competing FROST/user-wallet spend and forced-fork test; separate non-production funding, no minted credit or upstream code copied."
-    },
-    {
-      "path": "solana/tests/local-recovery-psbt.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original isolated Native wallet PSBT compatibility test; no private key export and no production wallet access."
-    },
-    {
-      "path": "native/recovery/recovery-psbt.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original bounded REGTEST-only unsigned PSBTv0/BIP371 encoding and subset inspection against standard field definitions; no upstream implementation copied, no secret access or signing. Wallet compatibility requires real tests."
-    },
-    {
-      "path": "native/node/tests/recovery-psbt.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original public format and resource-boundary fixtures, not operational identities, wallet signing or chain proofs."
-    },
-    {
-      "path": "native/node/native-tapscript.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original bounded public Taproot tree/control-block implementation against BIP341 standard facts using the pinned curve dependency; no upstream implementation copied. Public NUMS point is not an operational wallet identity."
-    },
-    {
-      "path": "native/recovery/taproot-deposit.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original REGTEST deposit-intent encoding, two-branch CSV recovery script policy and unsigned offline transaction preparation; no secret generation or broadcast."
-    },
-    {
-      "path": "native/node/tests/native-tapscript.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original construction/encoding/sighash tests with public generator-point fixtures and explicit invalid witness bytes; not operational keys or successful node-spend claims."
-    },
-    {
-      "path": "solana/tests/local-native-recovery.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Real isolated Native regtest CSV script tests. Simulated user secret exists only in ephemeral process memory and is cleared; never returned, persisted, passed in command arguments or logged."
-    },
-    {
-      "path": "native/proof/src/evidence.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Bounded REGTEST raw-header/Merkle evidence verification and negative tests, using pinned Native consensus facts; not copied upstream implementation or full block/UTXO validation."
-    },
-    {
-      "path": "native/proof/src/bin/kingpepe-native-evidence.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "REGTEST-only bounded stdin verifier; emits fixed-shape non-secret digests/counts and generic failure."
-    },
-    {
-      "path": "native/node/native-raw-evidence.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Canonical evidence encoder, local node collector, Rust process boundary and independently evaluated signing/reserve policies; no keys or broadcast authority."
-    },
-    {
-      "path": "native/node/tests/native-raw-evidence.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Explicit encoder and source-boundary models with malformed-input/resource/substitution tests. Fixtures are not claimed as full consensus-valid Native blocks."
-    },
-    {
-      "path": "scripts/local-native-evidence-verifier.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Pinned local proof executable build and REGTEST adapter construction; resolved build/runtime roots remain outside the checkout."
-    },
-    {
-      "path": "solana/tests/local-deposit-security.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Real isolated REGTEST/local-validator adversarial wrapper for completed retry, new-nonce duplicate backing rejection and unchanged Mint supply. Disposable runtime identities remain outside Git."
+      "notes": "Original text-only LF checkout policy for reproducible Windows/WSL source inspection; binary files are not normalized.",
+      "purpose": "REQUIRED_BUILD"
     },
     {
       "path": ".github/scripts/dependency-license-audit.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Declared dependency-license metadata and proprietary local-package boundary validation; not third-party source copying or external legal review."
-    },
-    {
-      "path": "scripts/tests/dependency-license-audit.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original negative tests for missing/changed license metadata, dependency source and local publication boundary."
-    },
-    {
-      "path": "scripts/local-e2e-toolchain.json",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Pinned isolated development tools and upstream archive integrity references; no deployment identities or state."
-    },
-    {
-      "path": "docs/deployment/local-e2e-build.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Safe local build procedure; direct SBF invocation and external artifact boundary."
+      "notes": "Declared dependency-license metadata and proprietary local-package boundary validation; not third-party source copying or external legal review.",
+      "purpose": "REQUIRED_TOOLING"
     },
     {
       "path": ".github/scripts/guardrails.py",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Repository guardrail script developed for local policy enforcement."
+      "notes": "Repository guardrail script developed for local policy enforcement.",
+      "purpose": "REQUIRED_TOOLING"
     },
     {
       "path": ".github/workflows/ci.yml",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "CI workflow configuration, pinned tooling, full-history secret scan and SBF builds. The tar --no-same-owner flag is a THIRD_PARTY_TERM, not a KingPepe governance role."
+      "notes": "CI workflow configuration, pinned tooling, full-history secret scan and SBF builds. The tar --no-same-owner flag is a THIRD_PARTY_TERM, not a KingPepe governance role.",
+      "purpose": "REQUIRED_BUILD"
     },
     {
       "path": ".gitignore",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Publication-boundary and build artifact ignore rules."
+      "notes": "Publication-boundary and build artifact ignore rules.",
+      "purpose": "CORE_SECURITY"
+    },
+    {
+      "path": ".npmrc",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Exact package engine enforcement only; no registry credentials or private endpoints.",
+      "purpose": "REQUIRED_BUILD"
     },
     {
       "path": "AGENTS.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Operational and governance instructions for this repository."
+      "notes": "Operational and governance instructions for this repository.",
+      "purpose": "REQUIRED_DOCUMENTATION"
     },
     {
       "path": "BRIDGE-READINESS.json",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Readiness-gate state machine artifact."
-    },
-    {
-      "path": "LICENSE",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Repository proprietary rights statement."
-    },
-    {
-      "path": "package-lock.json",
-      "classification": "GENERATED_FILE",
-      "notes": "Generated npm lockfile pinning Node runtime dependencies."
-    },
-    {
-      "path": "package.json",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Root Node package metadata and test/local E2E scripts."
-    },
-    {
-      "path": "PROVENANCE.json",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Added by phase-02 structure pass; classification derived from file role."
-    },
-    {
-      "path": "README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Project-facing introduction and activation status."
-    },
-    {
-      "path": "SECURITY.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Security boundary and operational controls."
-    },
-    {
-      "path": "THIRD_PARTY_NOTICES.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Third-party attribution index for external references."
-    },
-    {
-      "path": "UPSTREAM-REFERENCES.json",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Reference matrix against the upstream NTT repository."
-    },
-    {
-      "path": "app/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
-    },
-    {
-      "path": "cli/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+      "notes": "Readiness-gate state machine artifact.",
+      "purpose": "REQUIRED_DOCUMENTATION"
     },
     {
       "path": "config/examples/localnet.example.json",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type.",
+      "purpose": "CORE_BRIDGE"
     },
     {
       "path": "config/schemas/bridge-local.schema.json",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
-    },
-    {
-      "path": "db-backup/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
-    },
-    {
-      "path": "deployment/devnet/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
-    },
-    {
-      "path": "deployment/localnet/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
-    },
-    {
-      "path": "deployment/mainnet/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
-    },
-    {
-      "path": "deployment/manifests/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
-    },
-    {
-      "path": "deployment/windows/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
-    },
-    {
-      "path": "docs/architecture/ntt-comparison.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Architecture comparison notes created for this project."
-    },
-    {
-      "path": "docs/architecture/protocol-messages.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Canonical protocol message and accounting model documentation."
-    },
-    {
-      "path": "docs/architecture/solana-programs.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Phase 05 Solana bridge manager and transceiver boundary documentation."
-    },
-    {
-      "path": "docs/architecture/native-validation.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Phase 06 Native proof, reserve, recovery, and trust-boundary documentation updated in Phase 08 for separate reserve-sweep fee-funding evidence."
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type.",
+      "purpose": "CORE_BRIDGE"
     },
     {
       "path": "docs/architecture/attestation-and-observation.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Phase 07 project attestation and Solana observation trust-boundary documentation."
+      "notes": "Phase 07 project attestation and Solana observation trust-boundary documentation.",
+      "purpose": "REQUIRED_DOCUMENTATION"
     },
     {
-      "path": "docs/security/software-frost.md",
+      "path": "docs/architecture/native-validation.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Software FROST implementation, Native signing evidence, and same-host risk notes."
+      "notes": "Phase 06 Native proof, reserve, recovery, and trust-boundary documentation updated in Phase 08 for separate reserve-sweep fee-funding evidence.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "docs/architecture/ntt-comparison.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Architecture comparison notes created for this project.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "docs/architecture/protocol-messages.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Canonical protocol message and accounting model documentation.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "docs/architecture/solana-programs.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Phase 05 Solana bridge manager and transceiver boundary documentation.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "docs/deployment/local-e2e-build.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Safe local build procedure; direct SBF invocation and external artifact boundary.",
+      "purpose": "REQUIRED_DOCUMENTATION"
     },
     {
       "path": "docs/development-status.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Phase progress and status reporting."
-    },
-    {
-      "path": "docs/task-status.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Historical phase status document."
-    },
-    {
-      "path": "monitoring/grafana/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
-    },
-    {
-      "path": "monitoring/metrics/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
-    },
-    {
-      "path": "monitoring/prometheus/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
-    },
-    {
-      "path": "native/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Native integration notes and crate layout."
-    },
-    {
-      "path": "native/frost/Cargo.lock",
-      "classification": "GENERATED_FILE",
-      "notes": "Rust dependency lockfile for frost crate."
-    },
-    {
-      "path": "native/frost/Cargo.toml",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Crate dependency and feature declarations."
-    },
-    {
-      "path": "native/frost/coordinator/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Coordinator role notes."
-    },
-    {
-      "path": "native/frost/coordinator/native-frost-coordinator.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original exact A+B coordination, both-recipient durable DKG handoff before finalization, explicit saved-setup resume and synchronous signing abort. No coordinator private signing share; confidential peer transport remains incomplete."
-    },
-    {
-      "path": "native/frost/index.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 04 Node FROST runtime export surface, including signing-intent validation and canonical transcript helpers for Phase 08 bridge-validator boundaries."
-    },
-    {
-      "path": "native/frost/policy/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Policy role notes."
-    },
-    {
-      "path": "native/frost/policy/native-signing-policy.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 04 Native signing policy and validated-operation snapshot binding, extended in Phase 08 to bind the exact transaction input index authorized for each reserve-sweep FROST signature."
-    },
-    {
-      "path": "native/frost/recovery/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Recovery role notes."
-    },
-    {
-      "path": "native/frost/signer/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Signer role notes."
-    },
-    {
-      "path": "native/frost/signer/native-frost-signer.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original FROST participant integration with context/inner-message/polynomial-bound DKG, verified durable handoff and digest-bound setup resume, volatile nonce buffers and validated uncertain-session reopen. Uses the pinned primitive unchanged; not protected storage or full rollback assurance."
-    },
-    {
-      "path": "native/frost/src/coordinator.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Coordinator state machine and orchestration logic."
-    },
-    {
-      "path": "native/frost/src/lib.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Native FROST crate API surface and exports."
-    },
-    {
-      "path": "native/frost/src/policy.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Policy enforcement logic and types."
-    },
-    {
-      "path": "native/frost/src/recovery.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Recovery-oriented data types and checks."
-    },
-    {
-      "path": "native/frost/src/signer.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Signer abstractions and request validation."
-    },
-    {
-      "path": "native/frost/src/state.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "State models and persistence abstractions."
-    },
-    {
-      "path": "native/frost/state/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Local signer-state lifecycle, explicit capability-gated creation, fail-closed reopen and remaining authentication/fencing/restart limitations."
-    },
-    {
-      "path": "native/frost/state/file-state-store.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original external V2 signer-state boundary with explicit local-policy-gated exclusive creation, existing-state-only load/save, redacted errors and shared envelope checks. V1 rejected without migration/deletion; not protected storage or complete rollback assurance."
-    },
-    {
-      "path": "native/frost/tests/frost_runtime_node.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original real A+B FROST, DKG transcript/handoff/failure/resume and policy/request/abort/volatile-nonce tests; competing setup processes and an actual SIGKILL after reservation. Keys remain temporary outside source and never printed. Not full service restart/rollback proof."
-    },
-    {
-      "path": "native/frost/tests/signing_runtime_tests.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Runtime and integration tests for coordinator/signer behavior."
-    },
-    {
-      "path": "native/node/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Native node observation boundary notes updated for the Phase 08 local REGTEST RPC adapter and local Taproot transaction/sighash evidence helper."
-    },
-    {
-      "path": "native/node/native-rpc-client.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 loopback-first KingPepe JSON-RPC adapter for local REGTEST observation, UTXO checks, controlled local broadcast, endpoint/auth boundary enforcement, and exact atomic amount parsing."
-    },
-    {
-      "path": "native/node/native-taproot-transaction.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 local Native transaction parser/serializer, BIP-341 key-path SIGHASH_DEFAULT evidence helper, and Taproot witness attachment boundary. It is KingPepe-specific source informed by public BIP-341 Taproot rules and does not contain keys, signing material, or operational state."
-    },
-    {
-      "path": "native/node/tests/native-rpc-client.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 Native RPC adapter tests using a disposable loopback HTTP server and temporary non-production auth cookie outside the repository."
-    },
-    {
-      "path": "native/node/tests/native-taproot-transaction.test.mjs",
-      "classification": "DERIVED_FROM_THIRD_PARTY",
-      "notes": "Phase 08 local Taproot transaction tests. The BIP-341 wallet test vector values are selected public bitcoin/bips vector data under BSD-3-Clause; the surrounding KingPepe-specific tests and assertions are original project test code."
-    },
-    {
-      "path": "native/proof/Cargo.lock",
-      "classification": "GENERATED_FILE",
-      "notes": "Generated Rust lockfile for the Phase 06 Native proof crate."
-    },
-    {
-      "path": "native/proof/Cargo.toml",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Crate dependency and package metadata for Native proof validation."
-    },
-    {
-      "path": "native/proof/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Native proof crate documentation updated in Phase 06."
-    },
-    {
-      "path": "native/proof/src/bytes.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Hex, byte-order, and SHA256d helpers for Native proof validation."
-    },
-    {
-      "path": "native/proof/src/chain.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "KingPepe Native mainnet/regtest parameters, header-chain finality, activation, and chainwork validation."
-    },
-    {
-      "path": "native/proof/src/deposit.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Temporary deposit evidence validation against transaction, Merkle, finality, and UTXO observations."
-    },
-    {
-      "path": "native/proof/src/difficulty.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "KingPepe Native difficulty retargeting and compact target checks based on reviewed source facts."
-    },
-    {
-      "path": "native/proof/src/header.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Native block-header parsing, compact target encoding, PoW, and block-proof arithmetic."
-    },
-    {
-      "path": "native/proof/src/lib.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Native proof crate API surface and typed errors."
-    },
-    {
-      "path": "native/proof/src/merkle.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Native transaction Merkle branch reconstruction and verification."
-    },
-    {
-      "path": "native/proof/src/node.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Native source and UTXO observation trust-boundary validation."
-    },
-    {
-      "path": "native/proof/src/transaction.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Bounded KingPepe Native transaction parser and txid/wtxid calculation."
-    },
-    {
-      "path": "native/recovery/Cargo.lock",
-      "classification": "GENERATED_FILE",
-      "notes": "Generated Rust lockfile for the Phase 06 Native recovery crate."
-    },
-    {
-      "path": "native/recovery/Cargo.toml",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Crate dependency and package metadata for Native recovery validation."
-    },
-    {
-      "path": "native/recovery/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Native recovery crate documentation updated in Phase 06."
-    },
-    {
-      "path": "native/recovery/src/lib.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Temporary-deposit recovery eligibility checks without signing or broadcasting."
-    },
-    {
-      "path": "native/reserve/Cargo.lock",
-      "classification": "GENERATED_FILE",
-      "notes": "Generated Rust lockfile for the Phase 06 Native reserve crate."
-    },
-    {
-      "path": "native/reserve/Cargo.toml",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Crate dependency and package metadata for Native reserve validation."
-    },
-    {
-      "path": "native/reserve/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Native reserve crate documentation updated in Phase 08 for credited-reserve allocation and separate Native fee-funding evidence."
-    },
-    {
-      "path": "native/reserve/src/lib.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Canonical reserve sweep, allocation, mint-credit transition, and separate Native fee-funding checks."
-    },
-    {
-      "path": "rust-toolchain.toml",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
-    },
-    {
-      "path": "scripts/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
-    },
-    {
-      "path": "scripts/local-e2e-readiness.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 local E2E readiness gate that checks required disposable localnet executables, Solana ABI validation/execution readiness, and Anchor localnet configuration without reading secrets."
-    },
-    {
-      "path": "scripts/local-e2e-orchestrator.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 local-only Native REGTEST and Solana local-validator orchestration plan. Generic REGTEST command safety conventions were reviewed from the read-only legacy KingPepe repository; TON-specific flow was excluded. The REGTEST allowlist includes createrawtransaction for unsigned local reserve-sweep drafting only and rejects wallet raw-signing RPC shortcuts."
-    },
-    {
-      "path": "scripts/local-e2e-bootstrap.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 local-only bootstrap runner and reusable infrastructure harness for version checks, Anchor build, disposable validator startup, health checks, injected Native-to-Solana flow execution, and cleanup without production secrets or unsupported E2E success claims."
-    },
-    {
-      "path": "scripts/local-e2e-native-to-solana.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original REGTEST/local-validator automatic deposit integration: Native-user public recovery key, committed temporary CSV deposit, separate fee funding, raw evidence checks, real FROST BIP342 sweep to a distinct reserve, separately keyed Ed25519 attestations, SPL mint and reconciliation. Runtime material stays external; no production readiness claim."
-    },
-    {
-      "path": "scripts/tests/local-e2e-readiness.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 readiness-gate tests using temporary fake toolchain and manifest fixtures only, including validate-only ABI classification."
-    },
-    {
-      "path": "scripts/tests/local-e2e-orchestrator.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 local E2E orchestration tests using temporary fake toolchain paths outside the repository."
-    },
-    {
-      "path": "scripts/tests/local-e2e-bootstrap.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 local bootstrap runner and reusable infrastructure harness tests using injected fake executor only."
-    },
-    {
-      "path": "scripts/tests/local-e2e-native-to-solana.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 local Native-to-Solana command runner tests using injected fake executors, temporary run roots outside the repository, disposable FROST Taproot custody generation, wrong-source and wrong-txid rejection fixtures, explicit fee-funding, full credited-reserve allocation checks, per-input Taproot sighash evidence checks, real disposable A+B FROST reserve-sweep signature and witness-attachment coverage, local reserve-sweep broadcast/finality validation fixtures, local Solana setup context sanitization, setup-finalized handoff coverage, and no operational secrets."
-    },
-    {
-      "path": "services/attesters/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Attester service role and Phase 07 implementation notes."
-    },
-    {
-      "path": "services/attesters/attestation-service.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 07 Ed25519 project attestation service with canonical-message and Native evidence policy checks."
-    },
-    {
-      "path": "services/attesters/index.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 07 attester service export surface."
-    },
-    {
-      "path": "services/attesters/tests/attestation-service.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 07 attestation tests using ephemeral in-memory test keys only."
-    },
-    {
-      "path": "services/bridge-validator/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Bridge validator service role notes and Phase 08 source-boundary implementation status."
-    },
-    {
-      "path": "services/bridge-validator/automatic-deposit-pipeline.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 automatic Native-to-Solana deposit orchestration boundary using existing FROST, attestation, adapter, and exact-accounting checks, with synchronous and asynchronous local adapter entrypoints and explicit nonzero Native miner fee-funding input requirements."
-    },
-    {
-      "path": "services/bridge-validator/index.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Bridge validator service export surface, including Phase 08 deposit pipeline, reserve-sweep, Solana submitter, transaction-plan, localnet setup-plan, and localnet setup-submitter boundaries."
-    },
-    {
-      "path": "services/bridge-validator/localnet-solana-setup-plan.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 localnet-only Solana setup transaction planner for zero-supply KPEPE Mint, recipient SPL token account, transceiver config PDA, and bridge state PDA initialization with injected runtime signers."
-    },
-    {
-      "path": "services/bridge-validator/localnet-solana-setup-submitter.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 localnet-only Solana setup submitter that queries local rent exemption, requests disposable local-validator airdrop funding, sends the signed setup transaction, verifies Mint/token/PDA account ownership and allocation, sanitizes runtime signer handles from reports, and never stores keypair files."
-    },
-    {
-      "path": "services/bridge-validator/native-reserve-sweep-adapters.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 local Native reserve-sweep relayer and verifier adapters with FROST transcript checks, persist-before-broadcast, retry idempotency, and RPC observation trust classification."
-    },
-    {
-      "path": "services/bridge-validator/native-reserve-sweep-signing-intent.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 localnet boundary that requires validated Native Taproot sighash evidence before preparing input-specific FROST reserve-sweep signing intents and signer-policy authorizations, with the credited deposit amount preserved as canonical reserve allocation and Native miner fee evidence bound separately."
-    },
-    {
-      "path": "services/bridge-validator/localnet-solana-deposit-claim-bridge.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 localnet adapter connecting signed bundled Solana deposit-claim planning to the durable submitter boundary, including Ed25519 attestation, transceiver receipt, bridge claim, and derived per-operation observer account pass-through."
-    },
-    {
-      "path": "services/bridge-validator/solana-deposit-claim-submitter.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 localnet Solana deposit claim submission boundary with canonical-message, attestation-threshold, persist-before-broadcast, status retry, per-operation observer account binding, finalized claim-observation checks, and loopback-only RPC helpers for setup account reads, rent queries, and local-validator airdrops."
-    },
-    {
-      "path": "services/bridge-validator/solana-deposit-claim-transaction-plan.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 localnet Solana deposit claim instruction, PDA, legacy transaction serialization, Ed25519 attestation verifier, transceiver receipt, bridge claim bundle, optional payer/System Program account wiring for program-owned PDA allocation, and injected fee-payer signing boundary."
-    },
-    {
-      "path": "services/bridge-validator/tests/automatic-deposit-pipeline.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 deposit pipeline tests using temporary in-memory keys and temp-directory FROST state outside the repository, including promise-returning adapter coverage, source-level Native reserve-sweep relayer/verifier integration fixtures, explicit reserve-sweep fee-funding input fixtures, localnet Solana bridge/observer integration fixtures, and adapter-journal restart retry coverage."
-    },
-    {
-      "path": "services/bridge-validator/tests/native-reserve-sweep-adapters.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 Native reserve-sweep adapter tests using disposable fake local RPC fixtures and no operational keys or state."
-    },
-    {
-      "path": "services/bridge-validator/tests/native-reserve-sweep-signing-intent.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 Native reserve-sweep signing-intent boundary tests using public synthetic hashes only and no operational keys or state, including separate deposit-input and fee-funding-input authorization coverage."
-    },
-    {
-      "path": "services/bridge-validator/tests/localnet-solana-deposit-claim-bridge.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 tests for localnet Solana deposit-claim bridge adapter transaction preparation, submission, retry, dependency failure behavior, and real observer per-operation account pass-through."
-    },
-    {
-      "path": "services/bridge-validator/tests/localnet-solana-setup-plan.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 tests for localnet Solana setup transaction planning, SPL Token initialize instruction encoding, PDA initialization account ordering, and injected runtime signer validation."
-    },
-    {
-      "path": "services/bridge-validator/tests/localnet-solana-setup-submitter.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 tests for localnet Solana setup submission, account verification, idempotent already-present setup, partial/conflicting account hard stops, dependency waits, and sanitized result boundaries using fake local RPC only."
-    },
-    {
-      "path": "services/bridge-validator/tests/solana-deposit-claim-submitter.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 Solana deposit claim submitter tests using disposable local RPC fixtures, runtime-generated public test attestations, and temp-directory journal state outside the repository."
-    },
-    {
-      "path": "services/bridge-validator/tests/solana-deposit-claim-transaction-plan.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 Solana deposit claim transaction-plan and bundled transceiver-receipt tests using in-memory ephemeral fee-payer and attester signing material with deterministic non-production public identities, including payer/System Program account wiring for local validator PDA allocation."
-    },
-    {
-      "path": "services/indexer/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Indexer service role notes."
-    },
-    {
-      "path": "services/reconciliation/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Reconciliation service role notes."
-    },
-    {
-      "path": "services/relayer/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Relayer service role notes."
-    },
-    {
-      "path": "services/solana-observer/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Solana observer role and Phase 07 implementation notes."
-    },
-    {
-      "path": "services/solana-observer/index.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 07/08 Solana observer service export surface."
-    },
-    {
-      "path": "services/solana-observer/solana-deposit-claim-observer.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 localnet-only Solana deposit-claim observer and RPC boundary for finalized claim observation."
-    },
-    {
-      "path": "services/solana-observer/solana-withdrawal-observer.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 07 finalized Solana withdrawal observation and program/authority hard-stop checks."
-    },
-    {
-      "path": "services/solana-observer/tests/solana-deposit-claim-observer.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 Solana deposit-claim observer tests for finalized localnet observations, account codecs, and RPC boundaries."
-    },
-    {
-      "path": "services/solana-observer/tests/solana-withdrawal-observer.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 07 Solana observer tests for finalized withdrawals, direct burns, and unauthorized identity changes."
-    },
-    {
-      "path": "services/supervisor/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Supervisor service role notes."
-    },
-    {
-      "path": "shared/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Shared utility documentation updated for Phase 07 canonical-message helpers."
-    },
-    {
-      "path": "shared/protocol/canonical-message.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Executable service-side canonical message encoder/decoder and digest helpers."
-    },
-    {
-      "path": "solana/Anchor.toml",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Anchor workspace configuration with deterministic non-production localnet Program IDs."
-    },
-    {
-      "path": "solana/Cargo.toml",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Workspace dependency and crate manifest."
-    },
-    {
-      "path": "solana/Cargo.lock",
-      "classification": "GENERATED_FILE",
-      "notes": "Rust dependency lockfile for Solana workspace, including Solana program dependency graph and compatible transitive pins for the repository toolchain."
-    },
-    {
-      "path": "solana/fuzz/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
-    },
-    {
-      "path": "solana/modules/bridge-messages/Cargo.toml",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Bridge message module manifest."
-    },
-    {
-      "path": "solana/modules/bridge-messages/src/lib.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Canonical message schema and validation logic."
-    },
-    {
-      "path": "solana/modules/bridge-messages/tests/messages_smoke.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Message module tests."
-    },
-    {
-      "path": "solana/modules/bridge-messages/vectors/canonical-v1.json",
-      "classification": "GENERATED_FILE",
-      "notes": "Public deterministic test vectors for canonical protocol encoding; not operational key material."
-    },
-    {
-      "path": "solana/programs/kingpepe-bridge/Cargo.toml",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Bridge manager program manifest with cdylib/lib crate types, pinned solana-program and spl-token no-entrypoint dependencies, and no-entrypoint test feature; direct sha2 dependency removed after moving mint authority derivation to real Solana PDA primitives."
-    },
-    {
-      "path": "solana/programs/kingpepe-bridge/src/lib.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Bridge manager implementation with Phase 08 economic instruction ABI decoding, real Solana PDA mint-authority derivation, fixed binary account-state codecs, account execution, optional signed System Program CPI allocation for bridge state and deposit-claim PDAs, SPL Token mint_to_checked and burn_checked CPI construction, and localnet-only activation."
-    },
-    {
-      "path": "solana/programs/kingpepe-bridge/tests/bridge_smoke.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Bridge manager smoke test."
-    },
-    {
-      "path": "solana/programs/kingpepe-transceiver/Cargo.toml",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Transceiver program manifest with cdylib/lib crate types, solana-program dependency, and no-entrypoint test feature."
-    },
-    {
-      "path": "solana/programs/kingpepe-transceiver/src/lib.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Transceiver implementation, receipt validation, Phase 07 Ed25519 instruction binding, Phase 08 economic instruction ABI decoding, fixed binary config/receipt account codecs, optional signed System Program CPI allocation for config and verified-receipt PDAs, instructions-sysvar Ed25519 loading, and receipt account execution."
-    },
-    {
-      "path": "solana/programs/kingpepe-transceiver/tests/transceiver_smoke.rs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Transceiver smoke test."
-    },
-    {
-      "path": "solana/rust-toolchain.toml",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Rust toolchain pinning for reproducibility."
-    },
-    {
-      "path": "solana/scripts/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
-    },
-    {
-      "path": "solana/tests/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
-    },
-    {
-      "path": "solana/ts/idl/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
-    },
-    {
-      "path": "solana/ts/lib/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
-    },
-    {
-      "path": "solana/ts/lib/protocol.ts",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "TypeScript canonical protocol encoder and digest helpers."
-    },
-    {
-      "path": "solana/ts/scripts/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
-    },
-    {
-      "path": "solana/ts/scripts/verify-vectors.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Node-based vector verifier used by CI without production secrets."
-    },
-    {
-      "path": "solana/ts/sdk/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
-    },
-    {
-      "path": "tests/adversarial/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
-    },
-    {
-      "path": "tests/integration/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
-    },
-    {
-      "path": "tests/recovery/README.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type."
-    },
-    {
-      "path": "shared/windows/ProtectedStore.cs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original DPAPI CurrentUser, exact ACL, protected revision/checkpoint and encrypted commit recovery implementation using OS APIs, not copied Microsoft code."
-    },
-    {
-      "path": "shared/windows/protected-store-driver.ps1",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original bounded redirected-pipe helper; no operational secret, identity or runtime state."
-    },
-    {
-      "path": "shared/windows/protected-store.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original strict immutable protected-context parser and Windows child-process storage adapter; no plaintext or non-Windows fallback."
-    },
-    {
-      "path": "native/frost/state/windows-protected-state-store.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original real FROST state-interface adapter with encrypted persistence and policy/revision binding. Noble cryptographic implementation remains external and unchanged."
-    },
-    {
-      "path": "scripts/tests/protected-store-contract.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original portable context/capability rejection tests with explicitly synthetic non-operational identity values."
-    },
-    {
-      "path": "tests/windows/protected-storage.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original real Windows DPAPI/ACL, encrypted FROST and attester tests with ephemeral material outside source; no cross-service validation or production claim."
-    },
-    {
-      "path": "docs/security/windows-protected-storage.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original non-operational description of the protected-store implementation, measured limits, API references and outstanding security requirements."
-    },
-    {
-      "path": "shared/windows/service-ipc.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original mutually pinned TLS framing and DPAPI credential/replay adapter; reference-only use of Node TLS APIs."
-    },
-    {
-      "path": "native/frost/signer/protected-service.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original restricted FROST service handler and authenticated peer client; no private-share export or cryptographic algorithm replacement."
-    },
-    {
-      "path": "services/attesters/protected-service.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original operation-bound attester handler requiring a separately configured evidence verifier."
-    },
-    {
-      "path": "tests/windows/service-ipc.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original real TLS/DPAPI adversarial and FROST signature tests; disposable credentials generated externally, no operational material included."
-    },
-    {
-      "path": "docs/security/service-ipc.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original engineering description, test prerequisites and explicit remaining integration limitations."
-    },
-    {
-      "path": "services/bridge-validator/deposit-operation-state.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original strict localnet operation image codec and input/credit accounting using existing transaction, FROST witness and economic primitives."
-    },
-    {
-      "path": "services/bridge-validator/protected-deposit-journal.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original mandatory protected operation journal, CAS/lease recovery and verified-fact entry points; no runtime data."
-    },
-    {
-      "path": "services/bridge-validator/protected-deposit-snapshot.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original mutually authenticated, role-restricted and revision-bound read-only journal pagination. Not an economic authority or chain proof."
-    },
-    {
-      "path": "services/bridge-validator/tests/deposit-operation-state.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original parser/accounting and capability tests with explicitly synthetic chain evidence and externally created ephemeral test state."
-    },
-    {
-      "path": "tests/integration/deposit-operation-fixture.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original reusable real FROST/transaction fixture; chain data synthetic, private test material external and never returned."
-    },
-    {
-      "path": "services/solana-observer/deposit-mint-execution.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original exact signed-packet, reported MintToChecked CPI and atomic balance-delta verification. Reuses existing original packet builder and external pinned Noble Ed25519."
-    },
-    {
-      "path": "services/solana-observer/tests/deposit-mint-execution.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original real ephemeral packet-signature tests; reported execution is explicitly a synthetic parser fixture."
-    },
-    {
-      "path": "solana/tests/local-protected-claim-observation.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original actual regtest/local-validator deposit and finalized claim/genesis/execution regression; no production or protected Windows full-flow claim."
+      "notes": "Phase progress and status reporting.",
+      "purpose": "REQUIRED_DOCUMENTATION"
     },
     {
       "path": "docs/security/deposit-operation-recovery.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original engineering description of operation retention, observation checks and explicit uncompleted integration, without private deployment data."
+      "notes": "Original engineering description of operation retention, observation checks and explicit uncompleted integration, without private deployment data.",
+      "purpose": "REQUIRED_DOCUMENTATION"
     },
     {
-      "path": "docs/security/deposit-reconciliation.md",
+      "path": "docs/security/local-deposit-accounting.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original accounting, trust and test-scope explanation; official Agave links are reference-only."
+      "notes": "Sanitized engineering contract, canonical journal encoding, tests and limitations. No private deployment values or recovery inventory.",
+      "purpose": "REQUIRED_DOCUMENTATION"
     },
     {
-      "path": "services/reconciliation/deposit-reconciliation.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original exact accounting and read-only Native/Solana coherent snapshot comparison; no new cryptography or third-party source import."
-    },
-    {
-      "path": "services/reconciliation/protected-deposit-reconciliation.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original protected monotonic progress and incident retention using existing DPAPI, authenticated journal and global-stop adapters."
-    },
-    {
-      "path": "services/reconciliation/tests/deposit-reconciliation.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original exact arithmetic and account-layout tests with explicitly synthetic fixtures."
-    },
-    {
-      "path": "services/reconciliation/tests/protected-reconciliation-progress.test.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original bounded canonical progress, network and monotonic journal revision regression tests."
-    },
-    {
-      "path": "solana/tests/local-reconciliation.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original actual regtest/validator reconciliation and higher-work post-mint fork regression. Pinned Agave behavior is referenced, not copied."
-    },
-    {
-      "path": "solana/tests/local-windows-reconciliation-host.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original isolated WSL chain/control harness; generated test data stays outside checkout and test control is not production IPC."
-    },
-    {
-      "path": "tests/integration/reconciliation-fixture.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original synthetic non-operational account and accounting fixture; no chain proof or private key."
-    },
-    {
-      "path": "tests/windows/local-integrity-host.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original isolated test authority process hosting actual mutually authenticated endpoints. Test control carries only external configuration references, not keys or signing shares."
-    },
-    {
-      "path": "tests/windows/local-monitor-actor.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original isolated test observer process with actual chain reads, protected progress and mTLS health reports; no synthetic health or production provisioning."
-    },
-    {
-      "path": "tests/windows/local-reconciliation.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original real Windows protected reconciliation/live-chain probe; not full deposit workflow or distinct-principal certification."
-    },
-    {
-      "path": "tests/windows/local-security-fixture.mjs",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original current-principal disposable Windows test enrollment helper, not a production installer or cross-service identity claim."
-    },
-    {
-      "path": "docs/security/deposit-fee-payer.md",
+      "path": "docs/security/service-ipc.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original constrained transaction-identity boundary, failure evidence and limitations."
+      "notes": "Original engineering description, test prerequisites and explicit remaining integration limitations.",
+      "purpose": "REQUIRED_DOCUMENTATION"
     },
     {
-      "path": "docs/security/protected-deposit-controller.md",
+      "path": "docs/security/software-frost.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original controller boundaries, test scopes, failure record and remaining integration limitations without operational values."
+      "notes": "Software FROST implementation, Native signing evidence, and same-host risk notes.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "docs/security/solana-deployment-monitor.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original non-operational monitoring model, source trust, validation scopes and remaining limitations.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "docs/security/windows-protected-storage.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original non-operational description of the protected-store implementation, measured limits, API references and outstanding security requirements.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "LICENSE",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Repository proprietary rights statement.",
+      "purpose": "THIRD_PARTY_LEGAL"
+    },
+    {
+      "path": "native/frost/coordinator/native-frost-coordinator.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original exact A+B coordination, both-recipient durable DKG handoff before finalization, explicit saved-setup resume and synchronous signing abort. No coordinator private signing share; confidential peer transport remains incomplete.",
+      "purpose": "CORE_SECURITY"
+    },
+    {
+      "path": "native/frost/coordinator/protected-signing-journal.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original bounded public-transcript/aggregate journal using DPAPI atomic state, exact A+B abort recovery and pause reporting; no imported cryptographic implementation.",
+      "purpose": "CORE_SECURITY"
+    },
+    {
+      "path": "native/frost/coordinator/protected-sweep-jobs.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original Windows-protected dispatch/worker around the existing exact A+B signer and coordinator journal.",
+      "purpose": "CORE_SECURITY"
+    },
+    {
+      "path": "native/frost/coordinator/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Coordinator role notes.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "native/frost/coordinator/sweep-job-ipc.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original mutually authenticated role-specific queue API and independently verified public result.",
+      "purpose": "CORE_SECURITY"
+    },
+    {
+      "path": "native/frost/coordinator/sweep-job-state.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original bounded immutable signing-job codec; no cryptographic implementation copied.",
+      "purpose": "CORE_SECURITY"
+    },
+    {
+      "path": "native/frost/index.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 04 Node FROST runtime export surface, including signing-intent validation and canonical transcript helpers for Phase 08 bridge-validator boundaries.",
+      "purpose": "CORE_SECURITY"
+    },
+    {
+      "path": "native/frost/policy/dkg-messages.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original bounded canonical DKG input snapshots and project handoff digest binding around unchanged pinned primitive APIs; no upstream source copied. Not authenticated transport.",
+      "purpose": "CORE_SECURITY"
+    },
+    {
+      "path": "native/frost/policy/dkg-request.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original V2 project DKG context/request metadata validation. No upstream primitive or vectors copied; Native ciphersuite unchanged.",
+      "purpose": "CORE_SECURITY"
+    },
+    {
+      "path": "native/frost/policy/native-signing-policy.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 04 Native signing policy and validated-operation snapshot binding, extended in Phase 08 to bind the exact transaction input index authorized for each reserve-sweep FROST signature.",
+      "purpose": "CORE_SECURITY"
+    },
+    {
+      "path": "native/frost/policy/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Policy role notes.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "native/frost/policy/signing-request.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original immutable project request/session metadata helpers, retaining existing V1 representation and the actual Native Taproot sighash. No cryptographic implementation or third-party source copied.",
+      "purpose": "CORE_SECURITY"
+    },
+    {
+      "path": "native/frost/signer/native-frost-signer.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original FROST participant integration with context/inner-message/polynomial-bound DKG, verified durable handoff and digest-bound setup resume, volatile nonce buffers and validated uncertain-session reopen. Uses the pinned primitive unchanged; not protected storage or full rollback assurance.",
+      "purpose": "CORE_SECURITY"
+    },
+    {
+      "path": "native/frost/signer/protected-service.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original restricted FROST service handler and authenticated peer client; no private-share export or cryptographic algorithm replacement.",
+      "purpose": "CORE_SECURITY"
+    },
+    {
+      "path": "native/frost/signer/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Signer role notes.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "native/frost/state/file-state-store.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original external V2 signer-state boundary with explicit local-policy-gated exclusive creation, existing-state-only load/save, redacted errors and shared envelope checks. V1 rejected without migration/deletion; not protected storage or complete rollback assurance.",
+      "purpose": "CORE_SECURITY"
+    },
+    {
+      "path": "native/frost/state/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original documentation distinguishing protected runtime storage from the explicit disposable JSON test adapter.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "native/frost/state/windows-protected-state-store.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original real FROST state-interface adapter with encrypted persistence and policy/revision binding. Noble cryptographic implementation remains external and unchanged.",
+      "purpose": "CORE_SECURITY"
+    },
+    {
+      "path": "native/frost/tests/frost_runtime_node.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original real A+B FROST, DKG transcript/handoff/failure/resume and policy/request/abort/volatile-nonce tests; competing setup processes and an actual SIGKILL after reservation. Keys remain temporary outside source and never printed. Not full service restart/rollback proof.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "native/frost/tests/sweep-job-state.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original codec/security regressions with ephemeral external test material and explicitly synthetic chain facts.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "native/node/native-integrity.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original exact accepted-basis comparison and protected observer wrapper. No upstream consensus code or cryptographic implementation copied.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "native/node/native-raw-evidence.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Canonical evidence encoder, local node collector, Rust process boundary and independently evaluated signing/reserve policies; no keys or broadcast authority.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "native/node/native-rpc-client.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 loopback-first KingPepe JSON-RPC adapter for local REGTEST observation, UTXO checks, controlled local broadcast, endpoint/auth boundary enforcement, and exact atomic amount parsing.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "native/node/native-taproot-transaction.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 local Native transaction parser/serializer, BIP-341 key-path SIGHASH_DEFAULT evidence helper, and Taproot witness attachment boundary. It is KingPepe-specific source informed by public BIP-341 Taproot rules and does not contain keys, signing material, or operational state.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "native/node/native-tapscript.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original bounded public Taproot tree/control-block implementation against BIP341 standard facts using the pinned curve dependency; no upstream implementation copied. Public NUMS point is not an operational wallet identity.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "native/node/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Native node observation boundary notes updated for the Phase 08 local REGTEST RPC adapter and local Taproot transaction/sighash evidence helper.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "native/node/tests/native-integrity.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original explicitly synthetic policy comparisons and capability rejection tests; not blockchain or protected-service evidence.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "native/node/tests/native-raw-evidence.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Explicit encoder and source-boundary models with malformed-input/resource/substitution tests. Fixtures are not claimed as full consensus-valid Native blocks.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "native/node/tests/native-rpc-client.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 Native RPC adapter tests using a disposable loopback HTTP server and temporary non-production auth cookie outside the repository.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "native/node/tests/native-taproot-transaction.test.mjs",
+      "classification": "DERIVED_FROM_THIRD_PARTY",
+      "notes": "Phase 08 local Taproot transaction tests. The BIP-341 wallet test vector values are selected public bitcoin/bips vector data under BSD-3-Clause; the surrounding KingPepe-specific tests and assertions are original project test code.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "native/node/tests/native-tapscript.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original construction/encoding/sighash tests with public generator-point fixtures and explicit invalid witness bytes; not operational keys or successful node-spend claims.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "native/node/tests/recovery-psbt.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original public format and resource-boundary fixtures, not operational identities, wallet signing or chain proofs.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "native/proof/Cargo.lock",
+      "classification": "GENERATED_FILE",
+      "notes": "Generated Rust lockfile for the Phase 06 Native proof crate.",
+      "purpose": "REQUIRED_BUILD"
+    },
+    {
+      "path": "native/proof/Cargo.toml",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Crate dependency and package metadata for Native proof validation.",
+      "purpose": "REQUIRED_BUILD"
+    },
+    {
+      "path": "native/proof/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Native proof crate documentation updated in Phase 06.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "native/proof/src/bin/kingpepe-native-evidence.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "REGTEST-only bounded stdin verifier; emits fixed-shape non-secret digests/counts and generic failure.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "native/proof/src/bytes.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Hex, byte-order, and SHA256d helpers for Native proof validation.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "native/proof/src/chain.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "KingPepe Native mainnet/regtest parameters, header-chain finality, activation, and chainwork validation.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "native/proof/src/deposit.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Temporary deposit evidence validation against transaction, Merkle, finality, and UTXO observations.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "native/proof/src/difficulty.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "KingPepe Native difficulty retargeting and compact target checks based on reviewed source facts.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "native/proof/src/evidence.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Bounded REGTEST raw-header/Merkle evidence verification and negative tests, using pinned Native consensus facts; not copied upstream implementation or full block/UTXO validation.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "native/proof/src/header.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Native block-header parsing, compact target encoding, PoW, and block-proof arithmetic.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "native/proof/src/lib.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Native proof crate API surface and typed errors.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "native/proof/src/merkle.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Native transaction Merkle branch reconstruction and verification.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "native/proof/src/node.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Native source and UTXO observation trust-boundary validation.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "native/proof/src/transaction.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Bounded KingPepe Native transaction parser and txid/wtxid calculation.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "native/recovery/Cargo.lock",
+      "classification": "GENERATED_FILE",
+      "notes": "Generated Rust lockfile for the Phase 06 Native recovery crate.",
+      "purpose": "REQUIRED_BUILD"
+    },
+    {
+      "path": "native/recovery/Cargo.toml",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Crate dependency and package metadata for Native recovery validation.",
+      "purpose": "REQUIRED_BUILD"
+    },
+    {
+      "path": "native/recovery/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Native recovery crate documentation updated in Phase 06.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "native/recovery/recovery-psbt.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original bounded REGTEST-only unsigned PSBTv0/BIP371 encoding and subset inspection against standard field definitions; no upstream implementation copied, no secret access or signing. Wallet compatibility requires real tests.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "native/recovery/src/lib.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Temporary-deposit recovery eligibility checks without signing or broadcasting.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "native/recovery/taproot-deposit.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original REGTEST deposit-intent encoding, two-branch CSV recovery script policy and unsigned offline transaction preparation; no secret generation or broadcast.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "native/reserve/Cargo.lock",
+      "classification": "GENERATED_FILE",
+      "notes": "Generated Rust lockfile for the Phase 06 Native reserve crate.",
+      "purpose": "REQUIRED_BUILD"
+    },
+    {
+      "path": "native/reserve/Cargo.toml",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Crate dependency and package metadata for Native reserve validation.",
+      "purpose": "REQUIRED_BUILD"
+    },
+    {
+      "path": "native/reserve/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Native reserve crate documentation updated in Phase 08 for credited-reserve allocation and separate Native fee-funding evidence.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "native/reserve/src/lib.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Canonical reserve sweep, allocation, mint-credit transition, and separate Native fee-funding checks.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "package-lock.json",
+      "classification": "GENERATED_FILE",
+      "notes": "Generated npm lockfile pinning Node runtime dependencies.",
+      "purpose": "REQUIRED_BUILD"
+    },
+    {
+      "path": "package.json",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Root Node package metadata and test/local E2E scripts.",
+      "purpose": "REQUIRED_BUILD"
+    },
+    {
+      "path": "PROVENANCE.json",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Added by phase-02 structure pass; classification derived from file role.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Project-facing introduction and activation status.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type.",
+      "purpose": "REQUIRED_BUILD"
+    },
+    {
+      "path": "scripts/local-e2e-bootstrap.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original version-pinned direct-SBF build and isolated chain startup/cleanup harness; no production state or fabricated execution claims.",
+      "purpose": "REQUIRED_TOOLING"
+    },
+    {
+      "path": "scripts/local-e2e-native-to-solana.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original REGTEST/local-validator automatic deposit integration: Native-user public recovery key, committed temporary CSV deposit, separate fee funding, raw evidence checks, real FROST BIP342 sweep to a distinct reserve, separately keyed Ed25519 attestations, SPL mint and reconciliation. Runtime material stays external; no production readiness claim.",
+      "purpose": "REQUIRED_TOOLING"
+    },
+    {
+      "path": "scripts/local-e2e-orchestrator.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 local-only Native REGTEST and Solana local-validator orchestration plan. Generic REGTEST command safety conventions were reviewed from the read-only legacy KingPepe repository; TON-specific flow was excluded. The REGTEST allowlist includes createrawtransaction for unsigned local reserve-sweep drafting only and rejects wallet raw-signing RPC shortcuts.",
+      "purpose": "REQUIRED_TOOLING"
+    },
+    {
+      "path": "scripts/local-e2e-readiness.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 local E2E readiness gate that checks required disposable localnet executables, Solana ABI validation/execution readiness, and Anchor localnet configuration without reading secrets.",
+      "purpose": "REQUIRED_TOOLING"
+    },
+    {
+      "path": "scripts/local-e2e-toolchain.json",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Pinned isolated development tools and upstream archive integrity references; no deployment identities or state.",
+      "purpose": "REQUIRED_TOOLING"
+    },
+    {
+      "path": "scripts/local-native-evidence-verifier.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Pinned local proof executable build and REGTEST adapter construction; resolved build/runtime roots remain outside the checkout.",
+      "purpose": "REQUIRED_TOOLING"
+    },
+    {
+      "path": "scripts/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "scripts/source-audit.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original exact provenance coverage and non-secret publication-boundary checks.",
+      "purpose": "REQUIRED_TOOLING"
+    },
+    {
+      "path": "scripts/tests/ci-local-e2e-contract.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original executable validation-contract regressions for the checked-in CI script. External report fixtures, no keys or economic operations; not blockchain E2E evidence.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "scripts/tests/dependency-license-audit.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original negative tests for missing/changed license metadata, dependency source and local publication boundary.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "scripts/tests/local-e2e-bootstrap.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 local bootstrap runner and reusable infrastructure harness tests using injected fake executor only.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "scripts/tests/local-e2e-native-to-solana.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 local Native-to-Solana command runner tests using injected fake executors, temporary run roots outside the repository, disposable FROST Taproot custody generation, wrong-source and wrong-txid rejection fixtures, explicit fee-funding, full credited-reserve allocation checks, per-input Taproot sighash evidence checks, real disposable A+B FROST reserve-sweep signature and witness-attachment coverage, local reserve-sweep broadcast/finality validation fixtures, local Solana setup context sanitization, setup-finalized handoff coverage, and no operational secrets.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "scripts/tests/local-e2e-orchestrator.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 local E2E orchestration tests using temporary fake toolchain paths outside the repository.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "scripts/tests/local-e2e-readiness.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 readiness-gate tests using temporary fake toolchain and manifest fixtures only, including validate-only ABI classification.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "scripts/tests/protected-store-contract.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original portable context/capability rejection tests with explicitly synthetic non-operational identity values.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "scripts/tests/runtime-path-boundary.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original real-filesystem boundary regressions on isolated external temporary roots. Public markers and ephemeral cookie fixture only; no operational shares or upstream code.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "scripts/tests/source-audit.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original executable publication/provenance guard regressions; synthetic non-operational values only.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "scripts/tests/source-health-window.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original pure freshness/replay/role/restart tests with explicit non-chain fixtures and a unit clock; no operational state.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "SECURITY.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Security boundary and operational controls.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "services/attesters/attestation-service.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 07 Ed25519 project attestation service with canonical-message and Native evidence policy checks.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/attesters/authorization-journal.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original strict protected attester binding/result journal and authenticated global-stop integration; no imported cryptographic or OS implementation.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/attesters/index.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 07 attester service export surface.",
+      "purpose": "CORE_BRIDGE"
     },
     {
       "path": "services/attesters/protected-client.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original role-bound protected attester client with exact canonical context and Ed25519 response verification; no private key or upstream source."
+      "notes": "Original role-bound protected attester client with exact canonical context and Ed25519 response verification; no private key or upstream source.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/attesters/protected-service.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original operation-bound attester handler requiring a separately configured evidence verifier.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/attesters/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Attester service role and Phase 07 implementation notes.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "services/attesters/tests/attestation-service.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 07 attestation tests using ephemeral in-memory test keys only.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "services/attesters/tests/authorization-journal.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original portable retained-image codec regressions using public messages and ephemeral in-memory attestation keys; not protected-service or chain evidence.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "services/bridge-validator/automatic-deposit-pipeline.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 automatic Native-to-Solana deposit orchestration boundary using existing FROST, attestation, adapter, and exact-accounting checks, with synchronous and asynchronous local adapter entrypoints and explicit nonzero Native miner fee-funding input requirements.",
+      "purpose": "CORE_BRIDGE"
     },
     {
       "path": "services/bridge-validator/deposit-controller-state.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original bounded immutable orchestration-state validation; economic accounting is reused from the existing operation journal."
+      "notes": "Original bounded immutable orchestration-state validation; economic accounting is reused from the existing operation journal.",
+      "purpose": "CORE_BRIDGE"
     },
     {
       "path": "services/bridge-validator/deposit-fee-payer-ipc.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original exact-role/context signing request and immutable validated response over protected IPC."
+      "notes": "Original exact-role/context signing request and immutable validated response over protected IPC.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/bridge-validator/deposit-operation-state.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original strict localnet operation image codec and input/credit accounting using existing transaction, FROST witness and economic primitives.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/bridge-validator/index.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Bridge validator service export surface, including Phase 08 deposit pipeline, reserve-sweep, Solana submitter, transaction-plan, localnet setup-plan, and localnet setup-submitter boundaries.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/bridge-validator/local-deposit-ledger.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original local-only authenticated SQLite accounting journal and replay. Uses existing exact accounting and Node APIs; no upstream implementation copied or operational state included.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/bridge-validator/localnet-solana-deposit-claim-bridge.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 localnet adapter connecting signed bundled Solana deposit-claim planning to the durable submitter boundary, including Ed25519 attestation, transceiver receipt, bridge claim, and derived per-operation observer account pass-through.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/bridge-validator/localnet-solana-setup-plan.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 localnet-only Solana setup transaction planner for zero-supply KPEPE Mint, recipient SPL token account, transceiver config PDA, and bridge state PDA initialization with injected runtime signers.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/bridge-validator/localnet-solana-setup-submitter.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 localnet-only Solana setup submitter that queries local rent exemption, requests disposable local-validator airdrop funding, sends the signed setup transaction, verifies Mint/token/PDA account ownership and allocation, sanitizes runtime signer handles from reports, and never stores keypair files.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/bridge-validator/native-reserve-credit.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original concrete raw Native reserve-to-credit recovery and independent attester evidence reconstruction. Existing canonical encoding and economic validators reused.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/bridge-validator/native-reserve-sweep-adapters.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 local Native reserve-sweep relayer and verifier adapters with FROST transcript checks, persist-before-broadcast, retry idempotency, and RPC observation trust classification.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/bridge-validator/native-reserve-sweep-signing-intent.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 localnet boundary that requires validated Native Taproot sighash evidence before preparing input-specific FROST reserve-sweep signing intents and signer-policy authorizations, with the credited deposit amount preserved as canonical reserve allocation and Native miner fee evidence bound separately.",
+      "purpose": "CORE_BRIDGE"
     },
     {
       "path": "services/bridge-validator/protected-deposit-controller.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original LOCALNET protected controller composing existing independently verified services and durable journals; no production activation or private key."
+      "notes": "Original LOCALNET protected controller composing existing independently verified services and durable journals; no production activation or private key.",
+      "purpose": "CORE_BRIDGE"
     },
     {
       "path": "services/bridge-validator/protected-deposit-fee-payer.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original protected key lifecycle and exact canonical deposit transaction preparation; no arbitrary signer or mint authority."
+      "notes": "Original protected key lifecycle and exact canonical deposit transaction preparation; no arbitrary signer or mint authority.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/bridge-validator/protected-deposit-journal.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original mandatory protected operation journal, CAS/lease recovery and verified-fact entry points; no runtime data.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/bridge-validator/protected-deposit-snapshot.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original mutually authenticated, role-restricted and revision-bound read-only journal pagination. Not an economic authority or chain proof.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/bridge-validator/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Bridge validator service role notes and Phase 08 source-boundary implementation status.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "services/bridge-validator/solana-deposit-claim-submitter.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 localnet Solana deposit claim submission boundary with canonical-message, attestation-threshold, persist-before-broadcast, status retry, per-operation observer account binding, finalized claim-observation checks, and loopback-only RPC helpers for setup account reads, rent queries, and local-validator airdrops.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/bridge-validator/solana-deposit-claim-transaction-plan.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 localnet Solana deposit claim instruction, PDA, legacy transaction serialization, Ed25519 attestation verifier, transceiver receipt, bridge claim bundle, optional payer/System Program account wiring for program-owned PDA allocation, and injected fee-payer signing boundary.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/bridge-validator/tests/automatic-deposit-pipeline.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 deposit pipeline tests using temporary in-memory keys and temp-directory FROST state outside the repository, including promise-returning adapter coverage, source-level Native reserve-sweep relayer/verifier integration fixtures, explicit reserve-sweep fee-funding input fixtures, localnet Solana bridge/observer integration fixtures, and adapter-journal restart retry coverage.",
+      "purpose": "CORE_TEST"
     },
     {
       "path": "services/bridge-validator/tests/deposit-controller-state.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original controller codec and attester-client adversarial regressions; synthetic chain data clearly separated from actual chain execution."
+      "notes": "Original controller codec and attester-client adversarial regressions; synthetic chain data clearly separated from actual chain execution.",
+      "purpose": "CORE_TEST"
     },
     {
       "path": "services/bridge-validator/tests/deposit-fee-payer.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original request/response/capability/role tests using ephemeral synthetic evidence."
+      "notes": "Original request/response/capability/role tests using ephemeral synthetic evidence.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "services/bridge-validator/tests/deposit-operation-state.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original parser/accounting and capability tests with explicitly synthetic chain evidence and externally created ephemeral test state.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "services/bridge-validator/tests/local-deposit-ledger.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original actual-filesystem, SQLite, concurrency and process-exit regressions; ephemeral authentication material is created outside source. Public message fixtures, not operational wallets.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "services/bridge-validator/tests/localnet-solana-deposit-claim-bridge.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 tests for localnet Solana deposit-claim bridge adapter transaction preparation, submission, retry, dependency failure behavior, and real observer per-operation account pass-through.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "services/bridge-validator/tests/localnet-solana-setup-plan.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 tests for localnet Solana setup transaction planning, SPL Token initialize instruction encoding, PDA initialization account ordering, and injected runtime signer validation.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "services/bridge-validator/tests/localnet-solana-setup-submitter.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 tests for localnet Solana setup submission, account verification, idempotent already-present setup, partial/conflicting account hard stops, dependency waits, and sanitized result boundaries using fake local RPC only.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "services/bridge-validator/tests/native-reserve-credit.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original credit recovery input/capability boundary tests; no fixture proof flags accepted.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "services/bridge-validator/tests/native-reserve-sweep-adapters.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 Native reserve-sweep adapter tests using disposable fake local RPC fixtures and no operational keys or state.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "services/bridge-validator/tests/native-reserve-sweep-signing-intent.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 Native reserve-sweep signing-intent boundary tests using public synthetic hashes only and no operational keys or state, including separate deposit-input and fee-funding-input authorization coverage.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "services/bridge-validator/tests/solana-deposit-claim-submitter.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 Solana deposit claim submitter tests using disposable local RPC fixtures, runtime-generated public test attestations, and temp-directory journal state outside the repository.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "services/bridge-validator/tests/solana-deposit-claim-transaction-plan.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 Solana deposit claim transaction-plan and bundled transceiver-receipt tests using in-memory ephemeral fee-payer and attester signing material with deterministic non-production public identities, including payer/System Program account wiring for local validator PDA allocation.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "services/reconciliation/deposit-reconciliation.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original exact accounting and read-only Native/Solana coherent snapshot comparison; no new cryptography or third-party source import.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/reconciliation/protected-deposit-reconciliation.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original protected monotonic progress and incident retention using existing DPAPI, authenticated journal and global-stop adapters.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/reconciliation/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Reconciliation service role notes.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "services/reconciliation/tests/deposit-reconciliation.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original exact arithmetic and account-layout tests with explicitly synthetic fixtures.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "services/reconciliation/tests/protected-reconciliation-progress.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original bounded canonical progress, network and monotonic journal revision regression tests.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "services/relayer/native-sweep-ipc.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original pinned-role Native delivery IPC handler/client.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/relayer/native-sweep-outbox.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original protected exact signed Native sweep outbox; existing economic codec and Native verifier reused. No imported upstream code.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/relayer/protected-solana-deposit-outbox.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original protected persist-before-send transport and concrete actual-bank observation; not mint authority.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/relayer/solana-deposit-delivery.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original exact receipt/claim packet, deployment-account and retained-outcome codec; no copied upstream implementation.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/relayer/solana-deposit-ipc.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original exact-role IPC service/client and immutable response binding.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/relayer/tests/native-sweep-outbox.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original codec and capability regression tests; synthetic chain facts with ephemeral real FROST signatures.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "services/relayer/tests/solana-deposit-delivery.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original packet/account/outcome regression tests using synthetic public evidence and ephemeral test identities.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "services/solana-observer/deployment-integrity.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original strict manifest, bounded read-only RPC, executable/config checks and protected monitor integration. No upstream implementation copied.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/solana-observer/deposit-mint-execution.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original exact signed-packet, reported MintToChecked CPI and atomic balance-delta verification. Reuses existing original packet builder and external pinned Noble Ed25519.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/solana-observer/index.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 07/08 Solana observer service export surface.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/solana-observer/solana-deposit-claim-observer.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 localnet-only Solana deposit-claim observer and RPC boundary for finalized claim observation.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/solana-observer/solana-withdrawal-observer.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 07 finalized Solana withdrawal observation and program/authority hard-stop checks.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "services/solana-observer/tests/deployment-integrity.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original parser, substitution, exact-integer and bounded HTTP regressions; not chain evidence.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "services/solana-observer/tests/deposit-mint-execution.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original real ephemeral packet-signature tests; reported execution is explicitly a synthetic parser fixture.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "services/solana-observer/tests/solana-deposit-claim-observer.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 08 Solana deposit-claim observer tests for finalized localnet observations, account codecs, and RPC boundaries.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "services/solana-observer/tests/solana-withdrawal-observer.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Phase 07 Solana observer tests for finalized withdrawals, direct burns, and unauthorized identity changes.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "services/supervisor/protected-integrity.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original leased DPAPI integrity authority and pinned authenticated remote guard, with absorbing stop and no automatic clear.",
+      "purpose": "CORE_SECURITY"
+    },
+    {
+      "path": "services/supervisor/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Supervisor service role notes.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "shared/operation-hard-stop.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original absorbing-stop decision guard shared by deposit, sweep and claim journals. Node standard-library deep equality; no third-party source copied.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "shared/protocol/canonical-message.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Executable service-side canonical message encoder/decoder and digest helpers.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "shared/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Shared utility documentation updated for Phase 07 canonical-message helpers.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "shared/runtime-path-boundary.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original shared component-aware runtime path checks with existing-parent resolution, linked-file rejection and filesystem identity comparison. Node APIs used without copied implementation.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "shared/service-integrity-policy.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original bounded role/action/report authorization map for global integrity service; no third-party code.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "shared/source-health-window.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original bounded one-use current-supervisor-generation source admission state; no transfer or consensus authority.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "shared/windows/protected-executable.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original source/executable hash and path binding with fail-closed cache validation; no generated binaries or operational state are tracked.",
+      "purpose": "CORE_SECURITY"
+    },
+    {
+      "path": "shared/windows/protected-helper-build.ps1",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original one-time per-process compilation of adjacent reviewed source with the installed Windows Framework compiler into an atomic private external directory.",
+      "purpose": "CORE_SECURITY"
+    },
+    {
+      "path": "shared/windows/protected-lease-driver.ps1",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original fixed private-parent-pipe helper holding an existing restrictive Windows lifetime file handle; no Microsoft code imported.",
+      "purpose": "CORE_SECURITY"
+    },
+    {
+      "path": "shared/windows/protected-store.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original bounded Node-to-Windows protected-store adapter and process lock; no plaintext fallback, registry witness or persistent fence.",
+      "purpose": "CORE_SECURITY"
+    },
+    {
+      "path": "shared/windows/ProtectedStore.cs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original Windows CurrentUser DPAPI, fixed-volume single-principal ACL, atomic encrypted state/revision and simple process lock using installed OS APIs; no Microsoft sample or implementation imported.",
+      "purpose": "CORE_SECURITY"
+    },
+    {
+      "path": "shared/windows/ProtectedStoreExecutable.cs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original bounded/redacted executable entry for the existing reviewed Windows DPAPI/ACL/CAS implementation; no copied upstream implementation.",
+      "purpose": "CORE_SECURITY"
+    },
+    {
+      "path": "shared/windows/service-ipc.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original mutually pinned TLS framing and DPAPI credential/replay adapter; reference-only use of Node TLS APIs.",
+      "purpose": "CORE_SECURITY"
+    },
+    {
+      "path": "solana/Anchor.toml",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Anchor workspace configuration with deterministic non-production localnet Program IDs.",
+      "purpose": "REQUIRED_BUILD"
+    },
+    {
+      "path": "solana/Cargo.lock",
+      "classification": "GENERATED_FILE",
+      "notes": "Rust dependency lockfile for Solana workspace, including Solana program dependency graph and compatible transitive pins for the repository toolchain.",
+      "purpose": "REQUIRED_BUILD"
+    },
+    {
+      "path": "solana/Cargo.toml",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Workspace dependency and crate manifest.",
+      "purpose": "REQUIRED_BUILD"
+    },
+    {
+      "path": "solana/modules/bridge-messages/Cargo.toml",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Bridge message module manifest.",
+      "purpose": "REQUIRED_BUILD"
+    },
+    {
+      "path": "solana/modules/bridge-messages/src/lib.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Canonical message schema and validation logic.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "solana/modules/bridge-messages/tests/messages_smoke.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Message module tests.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "solana/modules/bridge-messages/vectors/canonical-v1.json",
+      "classification": "GENERATED_FILE",
+      "notes": "Public deterministic test vectors for canonical protocol encoding; not operational key material.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "solana/programs/kingpepe-bridge/Cargo.toml",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Bridge manager program manifest with cdylib/lib crate types, pinned solana-program and spl-token no-entrypoint dependencies, and no-entrypoint test feature; direct sha2 dependency removed after moving mint authority derivation to real Solana PDA primitives.",
+      "purpose": "REQUIRED_BUILD"
+    },
+    {
+      "path": "solana/programs/kingpepe-bridge/src/lib.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Bridge manager implementation with Phase 08 economic instruction ABI decoding, real Solana PDA mint-authority derivation, fixed binary account-state codecs, account execution, optional signed System Program CPI allocation for bridge state and deposit-claim PDAs, SPL Token mint_to_checked and burn_checked CPI construction, and localnet-only activation.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "solana/programs/kingpepe-bridge/tests/bridge_smoke.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Bridge manager smoke test.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "solana/programs/kingpepe-transceiver/Cargo.toml",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Transceiver program manifest with cdylib/lib crate types, solana-program dependency, and no-entrypoint test feature.",
+      "purpose": "REQUIRED_BUILD"
+    },
+    {
+      "path": "solana/programs/kingpepe-transceiver/src/lib.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Transceiver implementation, receipt validation, Phase 07 Ed25519 instruction binding, Phase 08 economic instruction ABI decoding, fixed binary config/receipt account codecs, optional signed System Program CPI allocation for config and verified-receipt PDAs, instructions-sysvar Ed25519 loading, and receipt account execution.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "solana/programs/kingpepe-transceiver/tests/transceiver_smoke.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Transceiver smoke test.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "solana/rust-toolchain.toml",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Rust toolchain pinning for reproducibility.",
+      "purpose": "REQUIRED_BUILD"
+    },
+    {
+      "path": "solana/tests/local-acceptance-checkpoint.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original real regtest/local-validator acceptance-prefix, delayed signing and immutable-credit regression; isolated generated test state remains external.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "solana/tests/local-claim-retry.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original local-validator worker-crash and real-blockhash-expiry test; restarts from the existing external signed-claim journal without receiving signing keys. No upstream implementation copied.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "solana/tests/local-deployment-integrity.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated real-validator upgradeable deployment/mutation regression; external disposable keys only.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "solana/tests/local-deposit-security.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Real isolated REGTEST/local-validator adversarial wrapper for completed retry, new-nonce duplicate backing rejection and unchanged Mint supply. Disposable runtime identities remain outside Git.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "solana/tests/local-native-recovery.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Real isolated Native regtest CSV script tests. Simulated user secret exists only in ephemeral process memory and is cleared; never returned, persisted, passed in command arguments or logged.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "solana/tests/local-native-reorg.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated real regtest competing-branch test after real Solana mint, with separate-process incident policy replay and no automatic economic repair.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "solana/tests/local-native-reserve-credit.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original actual regtest credit derivation and substituted-message regression. No second mint or production state.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "solana/tests/local-protected-claim-observation.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original actual regtest/local-validator deposit and finalized claim/genesis/execution regression; no production or protected Windows full-flow claim.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "solana/tests/local-reconciliation.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original actual regtest/validator reconciliation and higher-work post-mint fork regression. Pinned Agave behavior is referenced, not copied.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "solana/tests/local-recovery-psbt.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated Native wallet PSBT compatibility test; no private key export and no production wallet access.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "solana/tests/local-recovery-races.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated REGTEST competing FROST/user-wallet spend and forced-fork test; separate non-production funding, no minted credit or upstream code copied.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "solana/tests/local-transaction-packet.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original test-only Solana transaction compiler extracted unchanged from the withdrawal regression to eliminate circular test-entrypoint imports. Not a production signing SDK; no key material is tracked.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "solana/tests/local-windows-native-outbox-host.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated real-chain test orchestration for protected Windows delivery; no embedded keys.",
+      "purpose": "CORE_TEST"
     },
     {
       "path": "solana/tests/local-windows-protected-controller-host.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original explicit Localnet real-chain host for disposable protected-service tests; no upstream source import, production installation or cross-SID certification."
+      "notes": "Original explicit Localnet real-chain host for disposable protected-service tests; no upstream source import, production installation or cross-SID certification.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "solana/tests/local-windows-reconciliation-host.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated WSL chain/control harness; generated test data stays outside checkout and test control is not production IPC.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "solana/tests/local-windows-solana-outbox-host.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original actual regtest/validator host for Windows delivery failures; disposable state external to checkout.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "solana/tests/local-withdrawal-record.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original real-validator fresh burn/record, failure atomicity and direct-burn/second-deposit accounting regressions. Ephemeral test material remains external.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "solana/tests/README.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Added by phase-02 structure pass; classification assigned by path/type.",
+      "purpose": "REQUIRED_DOCUMENTATION"
+    },
+    {
+      "path": "solana/ts/lib/protocol.ts",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "TypeScript canonical protocol encoder and digest helpers.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "solana/ts/scripts/verify-vectors.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Node-based vector verifier used by CI without production secrets.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
+      "path": "tests/integration/deployment-fixture.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original synthetic account/parser fixture, explicitly not executable bytecode or chain proof.",
+      "purpose": "CORE_TEST"
     },
     {
       "path": "tests/integration/deposit-controller-fixture.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original disposable external FROST and in-memory Ed25519 fixture for controller codec tests; no operational material or raw secret vectors committed."
+      "notes": "Original disposable external FROST and in-memory Ed25519 fixture for controller codec tests; no operational material or raw secret vectors committed.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "tests/integration/deposit-operation-fixture.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original reusable real FROST/transaction fixture; chain data synthetic, private test material external and never returned.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "tests/integration/native-progress-fixture.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original shared synthetic Native progress/incident fixture for parser and protected persistence tests; not genuine blockchain evidence.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "tests/integration/reconciliation-fixture.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original synthetic non-operational account and accounting fixture; no chain proof or private key.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "tests/integration/solana-delivery-fixture.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original synthetic Solana account fixture and ephemeral genuine signatures; not chain verification.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "tests/windows/attester-recovery-actor.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated same-principal Windows process-kill test actor with real DPAPI/mTLS and explicitly synthetic Native evidence.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "tests/windows/coordinator-recovery-actor.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original same-principal Windows process-kill actor exercising actual protected journal, authenticated FROST endpoints and synthetic Native evidence; not chain validation.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "tests/windows/integrity-authority-actor.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated current-principal test supervisor with bounded private child-control frames and explicitly synthetic health reports; no runtime fallback or cross-account certification.",
+      "purpose": "CORE_TEST"
     },
     {
       "path": "tests/windows/local-deposit-service-actor.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original explicit CurrentUser separate protected-role process fixture; no upstream source import, production installation or cross-SID certification."
+      "notes": "Original explicit CurrentUser separate protected-role process fixture; no upstream source import, production installation or cross-SID certification.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "tests/windows/local-integrity-host.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated test authority process hosting actual mutually authenticated endpoints. Test control carries only external configuration references, not keys or signing shares.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "tests/windows/local-monitor-actor.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated test observer process with actual chain reads, protected progress and mTLS health reports; no synthetic health or production provisioning.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "tests/windows/local-native-outbox-actor.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original disposable worker actor for actual post-broadcast process termination.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "tests/windows/local-native-outbox.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original current-principal protected real-regtest delivery and process-kill test.",
+      "purpose": "CORE_TEST"
     },
     {
       "path": "tests/windows/local-protected-controller.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original disposable Windows protected-service and actual-chain test orchestration; no upstream source import, production installation or cross-SID certification."
+      "notes": "Original disposable Windows protected-service and actual-chain test orchestration; no upstream source import, production installation or cross-SID certification.",
+      "purpose": "CORE_TEST"
     },
     {
-      "path": "tests/windows/signer-startup.test.mjs",
+      "path": "tests/windows/local-reconciliation.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original actual CurrentUser service-startup, protected-state and durable incident-delivery regressions. Synthetic plan never reaches chain RPC; no imported upstream source, operational secrets or cross-SID certification."
+      "notes": "Original real Windows protected reconciliation/live-chain probe; not full deposit workflow or distinct-principal certification.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "tests/windows/local-security-fixture.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original current-principal disposable Windows test enrollment helper, not a production installer or cross-service identity claim.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "tests/windows/local-solana-outbox-actor.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original disposable process-kill test actor; only actual validator acknowledgement reaches the selected boundary.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "tests/windows/local-solana-outbox.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original actual DPAPI/mTLS and validator receipt/claim crash recovery tests; pending credit is explicit test initialization.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "tests/windows/protected-executable-actor.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated executable-integrity test actor; generated code remains external, with no production identity or secrets.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "tests/windows/protected-executable.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original actual Windows executable hash, hard-link, ACL, corruption and no-fallback tests under the current test principal.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "tests/windows/protected-storage.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original real Windows DPAPI/ACL, encrypted FROST and attester tests with ephemeral material outside source; no cross-service validation or production claim.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "tests/windows/service-ipc.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original real TLS/DPAPI adversarial and FROST signature tests; disposable credentials generated externally, no operational material included.",
+      "purpose": "CORE_TEST"
+    },
+    {
+      "path": "THIRD_PARTY_NOTICES.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Third-party attribution index for external references.",
+      "purpose": "THIRD_PARTY_LEGAL"
+    },
+    {
+      "path": "UPSTREAM-REFERENCES.json",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Reference matrix against the upstream NTT repository.",
+      "purpose": "REQUIRED_DOCUMENTATION"
     }
-  ],
-  "phase085ProtectedControllerReview": {
-    "baseline": "27a4fcf647ccb9518d003eff46c9a152ae0b6ba8",
-    "filesBefore": 279,
-    "filesAfter": 292,
-    "sourceImports": "None. Original Localnet protected controller, separate canonical Solana fee payer, exact attester clients and current-principal real-chain test service composition. Existing reviewed FROST, chain verification, storage and economic journal implementations are reused without importing third-party source or changing dependencies.",
-    "scope": "Separate frozen candidate reached COMPLETED through actual protected Windows services and independent Linux chain rechecks. Primary integration, the complete actual service restart matrix and final clean-clone certification remain under validation. Cross-service SID certification is not claimed."
-  }
+  ]
 }

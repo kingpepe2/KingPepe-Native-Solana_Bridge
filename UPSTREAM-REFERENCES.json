@@ -1,60 +1,5 @@
 {
-  "generatedAt": "2026-09-11T00:00:00Z",
-  "phase085AttesterRecovery": {
-    "use": "Reference-only Ed25519 deterministic signing semantics and existing Windows CurrentUser DPAPI boundary. No RFC sample implementation or Microsoft source imported; pinned Noble signing remains unchanged.",
-    "urls": ["https://www.rfc-editor.org/rfc/rfc8032#section-5.1.6", "https://learn.microsoft.com/en-us/windows/win32/api/dpapi/nf-dpapi-cryptprotectdata"],
-    "limits": "Retaining a project attestation is not Native FROST signing, independent consensus proof or an external audit."
-  },
-  "phase085DeploymentMonitor": {
-    "use": "Reference-only RPC bank-context/genesis definitions and loader metadata layout; no upstream code imported. Existing original Rust account codecs define bridge configuration. Actual pinned Agave 4.2.2 validator tests check upgradeable Program/ProgramData relationships.",
-    "urls": ["https://solana.com/docs/rpc/http/getgenesishash", "https://solana.com/docs/rpc/http/getmultipleaccounts", "https://raw.githubusercontent.com/anza-xyz/agave/v4.2.2/programs/bpf_loader/src/lib.rs"],
-    "loaderLayoutReference": "Installed solana-program 1.18.26 SDK bpf_loader_upgradeable.rs, UpgradeableLoaderState metadata definitions; layout checked against actual Agave 4.2.2 local state, not assumed to certify all loaders.",
-    "limits": "RPC observation, not full chain validation or external audit. No production identities or operational configuration included."
-  },
-  "phase085ServiceIpc": {
-    "use": "Reference-only Node TLS 1.3 APIs; existing pinned Node 24.21.0 runtime. No source or binaries copied. Windows tests used installed Git for Windows OpenSSL 3.5.7 solely to generate disposable certificates outside source.",
-    "urls": ["https://nodejs.org/api/tls.html", "https://github.com/nodejs/node/blob/v24.21.0/doc/api/tls.md"],
-    "limits": "Localnet enrollment, not production PKI or cross-service identity certification."
-  },
-  "phase085WindowsProtection": {
-    "checkedAt": "2026-09-11",
-    "use": "Original glue using installed Windows PowerShell 5.1 and .NET Framework DPAPI CurrentUser, protected DACLs and exclusive file handles. No upstream source or sample code copied, no OS binaries vendored, no dependency version change.",
-    "urls": [
-      "https://learn.microsoft.com/en-us/windows/win32/api/dpapi/nf-dpapi-cryptprotectdata",
-      "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.protecteddata",
-      "https://learn.microsoft.com/en-us/dotnet/api/system.io.fileshare",
-      "https://learn.microsoft.com/en-us/windows/win32/services/service-security-and-access-rights",
-      "https://learn.microsoft.com/en-us/dotnet/api/system.io.driveinfo.drivetype",
-      "https://learn.microsoft.com/en-us/dotnet/api/system.io.filestream.-ctor",
-      "https://learn.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-regcreatekeyexw",
-      "https://learn.microsoft.com/en-us/dotnet/api/microsoft.win32.registrykey.flush"
-    ],
-    "retainedWitness": "Original registry witness: exclusive initial nonvolatile key creation with explicit DACL, exact encrypted-state hash/revision, synchronous flush before acknowledgement. .NET Framework registry handle APIs also inspected in the installed runtime. No Microsoft implementation copied.",
-    "limits": "Current-identity tests do not prove cross-service isolation. Separate lifetime leases and retained profile witnesses improve cooperating-process/file-restore safety, not whole-host/profile co-restore assurance. No production or external audit approval."
-  },
-  "phase08LocalAccountingRuntime": {
-    "nodeVersion": "24.21.0",
-    "npmVersion": "11.19.0",
-    "sqliteVersion": "3.53.4",
-    "checkedAt": "2026-09-10",
-    "urls": [
-      "https://nodejs.org/en/blog/release/v24.21.0",
-      "https://nodejs.org/en/blog/release/v24.20.0",
-      "https://nodejs.org/dist/v24.21.0/SHASUMS256.txt",
-      "https://github.com/nodejs/node/blob/v24.21.0/doc/api/sqlite.md",
-      "https://github.com/nodejs/node/blob/v24.21.0/src/node_sqlite.cc",
-      "https://github.com/nodejs/node/blob/v24.21.0/deps/sqlite/sqlite3.h",
-      "https://www.sqlite.org/security.html",
-      "https://www.sqlite.org/pragma.html",
-      "https://www.sqlite.org/atomiccommit.html",
-      "https://www.sqlite.org/cves.html",
-      "https://www.sqlite.org/copyright.html"
-    ],
-    "use": "Node built-in SQLite runtime dependency, not copied source. Original authenticated local accounting journal and tests use defensive mode, bounded fixed SQL, an authorization callback, exclusive local leases and authenticated replay. Exact runtime binaries were tested; no reliance on unavailable StatementSync.close.",
-    "licenseBoundary": "Node is MIT with separately licensed bundled components; SQLite deliverable code is dedicated to the public domain. Runtime distribution notices remain with the external archives. No claim of exclusive KingPepe rights over either runtime.",
-    "runtimeSelection": "Compared pinned Node 22.23.2, 24.20.0 and 24.21.0. Selected 24.21.0 with SQLite 3.53.4 and additional binding error-handling fixes; hashes in scripts/local-e2e-toolchain.json. No native addon added.",
-    "limitations": "node:sqlite API is release-candidate stability 1.2. Runtime CVEs require separate review from npm/Cargo audits. Not production approval, proof of full rollback detection, service isolation or power-loss safety."
-  },
+  "generatedAt": "2026-09-12T00:00:00Z",
   "phase08DevelopmentTools": {
     "agaveRelease": "https://github.com/anza-xyz/agave/releases/tag/v4.2.2",
     "solanaProgramCrate": "3.0.0",
@@ -73,7 +18,7 @@
     "license": "Apache-2.0",
     "rationale": "Reference for Solana manager/transceiver layout, replay structure, and message organization.",
     "verificationDate": "2026-09-10",
-    "phase085Review": "Actual main/tree and releases rechecked: main remains the selected commit (Sui rate-limit fixes); latest inspected CLI 1.10.0+cli. Programs, messages, versioned TS IDLs, tests/fuzz and license inspected. Reference only; no copied or modified NTT implementation or upstream audit coverage. See docs/architecture/ntt-comparison.md."
+    "review": "Actual main/tree and releases rechecked: main remains the selected commit (Sui rate-limit fixes); latest inspected CLI 1.10.0+cli. Programs, messages, versioned TS IDLs, tests/fuzz and license inspected. Reference only; no copied or modified NTT implementation or upstream audit coverage. See docs/architecture/ntt-comparison.md."
   },
   "nativeSourceReference": {
     "project": "kingpepe2/king-pepe-source-code",
@@ -83,10 +28,25 @@
     "verificationSource": "Recovery facts cross-checked against the exact upstream source commit/tree and checksum-verified archive; daemon/CLI built and exercised in isolated REGTEST.",
     "phase06Use": "KingPepe Native genesis, decimals, PoW, difficulty, chainwork, activation, address, transaction, and header format facts",
     "phase08Use": "KingPepe REGTEST 8-decimal atomic units, coinbase maturity 20, Taproot activation, Bech32 HRP rkpepe, median-time-past 11 and two-hour future-header bound for isolated FROST deposits and raw header/Merkle verification",
-    "phase08HeaderTimeSources": ["src/chain.h: MAX_FUTURE_BLOCK_TIME and GetMedianTimePast", "src/validation.cpp: ContextualCheckBlockHeader"],
-    "phase08RecoverySources": ["src/kernel/chainparams.cpp: REGTEST CSVHeight=1 and Taproot ALWAYS_ACTIVE", "src/script/interpreter.cpp: CHECKSEQUENCEVERIFY", "src/bitcoin-cli.cpp: ParseResult suppresses null output", "src/wallet/rpc/addresses.cpp: getaddressinfo single-key public-key and ismine fields"],
-    "phase08PsbtSources": ["src/wallet/scriptpubkeyman.cpp: FillPSBT locates keys using public taproot origins", "src/script/sign.cpp: SignTaprootScript parses Miniscript and uses SHA256 preimages", "src/script/miniscript.h: OLDER, SHA256 and VERIFY fragment compilation"],
-    "phase08ForcedForkSources": ["src/rpc/mining.cpp: generateblock selects explicit transactions, uses an empty mempool template and calls TestBlockValidity", "src/rpc/blockchain.cpp: invalidateblock and reconsiderblock test/debug invalidation/activation; invoked only against fresh isolated REGTEST state. ReconsiderBlock clears failure flags and invokes ActivateBestChain; no production RPC allowance added."],
+    "phase08HeaderTimeSources": [
+      "src/chain.h: MAX_FUTURE_BLOCK_TIME and GetMedianTimePast",
+      "src/validation.cpp: ContextualCheckBlockHeader"
+    ],
+    "phase08RecoverySources": [
+      "src/kernel/chainparams.cpp: REGTEST CSVHeight=1 and Taproot ALWAYS_ACTIVE",
+      "src/script/interpreter.cpp: CHECKSEQUENCEVERIFY",
+      "src/bitcoin-cli.cpp: ParseResult suppresses null output",
+      "src/wallet/rpc/addresses.cpp: getaddressinfo single-key public-key and ismine fields"
+    ],
+    "phase08PsbtSources": [
+      "src/wallet/scriptpubkeyman.cpp: FillPSBT locates keys using public taproot origins",
+      "src/script/sign.cpp: SignTaprootScript parses Miniscript and uses SHA256 preimages",
+      "src/script/miniscript.h: OLDER, SHA256 and VERIFY fragment compilation"
+    ],
+    "phase08ForcedForkSources": [
+      "src/rpc/mining.cpp: generateblock selects explicit transactions, uses an empty mempool template and calls TestBlockValidity",
+      "src/rpc/blockchain.cpp: invalidateblock and reconsiderblock test/debug invalidation/activation; invoked only against fresh isolated REGTEST state. ReconsiderBlock clears failure flags and invokes ActivateBestChain; no production RPC allowance added."
+    ],
     "phase08RpcErrorSource": "src/httprpc.cpp: JSONErrorReply returns HTTP 400/404/500 with the request ID and numeric JSON-RPC error; provider message text is not needed or exposed by the bridge",
     "status": "reference-facts-only-no-git-history-import"
   },
@@ -99,7 +59,11 @@
     },
     {
       "project": "Solana transaction and RPC definitions",
-      "urls": ["https://solana.com/docs/core/transactions", "https://solana.com/docs/rpc/http/sendtransaction", "https://solana.com/docs/rpc/http/getsignaturestatuses"],
+      "urls": [
+        "https://solana.com/docs/core/transactions",
+        "https://solana.com/docs/rpc/http/sendtransaction",
+        "https://solana.com/docs/rpc/http/getsignaturestatuses"
+      ],
       "checkedAt": "2026-09-10",
       "use": "Reference-only 64-byte first transaction signature identity, atomic transactions, submission versus execution, and searchTransactionHistory status queries. The existing canonical claim planner is reused to validate the complete signed packet; no upstream implementation copied."
     },
@@ -141,7 +105,7 @@
   ],
   "comparison": {
     "solanaProgramStructure": "matched-pattern",
-    "fuzzAndTestOrganization": "intended-adopt",
+    "fuzzAndTestOrganization": "reference-only; retain core parser and actual-chain tests",
     "attestationModel": "KingPepe-specific PROJECT_ATTESTED_2_OF_2; NTT reviewed for transceiver/message boundary patterns only",
     "chainSpecificModules": "excluded"
   },
@@ -189,7 +153,69 @@
     },
     {
       "area": "direct source imports",
-      "reason": "No NTT source imported through the Phase 08.5 audit; dependency APIs and architecture references are not vendored implementations."
+      "reason": "No NTT source imported; dependency APIs and architecture references are not vendored implementations."
     }
-  ]
+  ],
+  "attesterRecovery": {
+    "use": "Reference-only Ed25519 deterministic signing semantics and existing Windows CurrentUser DPAPI boundary. No RFC sample implementation or Microsoft source imported; pinned Noble signing remains unchanged.",
+    "urls": [
+      "https://www.rfc-editor.org/rfc/rfc8032#section-5.1.6",
+      "https://learn.microsoft.com/en-us/windows/win32/api/dpapi/nf-dpapi-cryptprotectdata"
+    ],
+    "limits": "Retaining a project attestation is not Native FROST signing, independent consensus proof or an external audit."
+  },
+  "deploymentChecks": {
+    "use": "Reference-only RPC bank-context/genesis definitions and loader metadata layout; no upstream code imported. Existing original Rust account codecs define bridge configuration. Actual pinned Agave 4.2.2 validator tests check upgradeable Program/ProgramData relationships.",
+    "urls": [
+      "https://solana.com/docs/rpc/http/getgenesishash",
+      "https://solana.com/docs/rpc/http/getmultipleaccounts",
+      "https://raw.githubusercontent.com/anza-xyz/agave/v4.2.2/programs/bpf_loader/src/lib.rs"
+    ],
+    "loaderLayoutReference": "Installed solana-program 1.18.26 SDK bpf_loader_upgradeable.rs, UpgradeableLoaderState metadata definitions; layout checked against actual Agave 4.2.2 local state, not assumed to certify all loaders.",
+    "limits": "RPC observation, not full chain validation or external audit. No production identities or operational configuration included."
+  },
+  "serviceIpc": {
+    "use": "Reference-only Node TLS 1.3 APIs; existing pinned Node 24.21.0 runtime. No source or binaries copied. Windows tests used installed Git for Windows OpenSSL 3.5.7 solely to generate disposable certificates outside source.",
+    "urls": [
+      "https://nodejs.org/api/tls.html",
+      "https://github.com/nodejs/node/blob/v24.21.0/doc/api/tls.md"
+    ],
+    "limits": "Localnet enrollment, not production PKI or cross-service identity certification."
+  },
+  "windowsProtection": {
+    "checkedAt": "2026-09-11",
+    "use": "Original glue using installed Windows PowerShell 5.1 and .NET Framework DPAPI CurrentUser, protected DACLs and exclusive file handles. No upstream source or sample code copied, no OS binaries vendored, no dependency version change.",
+    "urls": [
+      "https://learn.microsoft.com/en-us/windows/win32/api/dpapi/nf-dpapi-cryptprotectdata",
+      "https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.protecteddata",
+      "https://learn.microsoft.com/en-us/dotnet/api/system.io.fileshare",
+      "https://learn.microsoft.com/en-us/windows/win32/services/service-security-and-access-rights",
+      "https://learn.microsoft.com/en-us/dotnet/api/system.io.driveinfo.drivetype",
+      "https://learn.microsoft.com/en-us/dotnet/api/system.io.filestream.-ctor"
+    ],
+    "limits": "CurrentUser tests do not prove cross-service isolation. Atomic DPAPI images and exclusive process handles do not guarantee full-host/snapshot rollback detection. No production or external-audit approval."
+  },
+  "localAccountingRuntime": {
+    "nodeVersion": "24.21.0",
+    "npmVersion": "11.19.0",
+    "sqliteVersion": "3.53.4",
+    "checkedAt": "2026-09-10",
+    "urls": [
+      "https://nodejs.org/en/blog/release/v24.21.0",
+      "https://nodejs.org/en/blog/release/v24.20.0",
+      "https://nodejs.org/dist/v24.21.0/SHASUMS256.txt",
+      "https://github.com/nodejs/node/blob/v24.21.0/doc/api/sqlite.md",
+      "https://github.com/nodejs/node/blob/v24.21.0/src/node_sqlite.cc",
+      "https://github.com/nodejs/node/blob/v24.21.0/deps/sqlite/sqlite3.h",
+      "https://www.sqlite.org/security.html",
+      "https://www.sqlite.org/pragma.html",
+      "https://www.sqlite.org/atomiccommit.html",
+      "https://www.sqlite.org/cves.html",
+      "https://www.sqlite.org/copyright.html"
+    ],
+    "use": "Node built-in SQLite runtime dependency, not copied source. Original authenticated local accounting journal and tests use defensive mode, bounded fixed SQL, an authorization callback, exclusive local leases and authenticated replay. Exact runtime binaries were tested; no reliance on unavailable StatementSync.close.",
+    "licenseBoundary": "Node is MIT with separately licensed bundled components; SQLite deliverable code is dedicated to the public domain. Runtime distribution notices remain with the external archives. No claim of exclusive KingPepe rights over either runtime.",
+    "runtimeSelection": "Compared pinned Node 22.23.2, 24.20.0 and 24.21.0. Selected 24.21.0 with SQLite 3.53.4 and additional binding error-handling fixes; hashes in scripts/local-e2e-toolchain.json. No native addon added.",
+    "limitations": "node:sqlite API is release-candidate stability 1.2. Runtime CVEs require separate review from npm/Cargo audits. Not production approval, proof of full rollback detection, service isolation or power-loss safety."
+  }
 }

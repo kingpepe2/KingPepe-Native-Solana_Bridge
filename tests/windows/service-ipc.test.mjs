@@ -12,7 +12,6 @@ import { WindowsProtectedStore, windowsCurrentServiceSid } from "../../shared/wi
 import { ProtectedServiceIpc, encodeIpcEnrollment } from "../../shared/windows/service-ipc.mjs";
 import { nativeFrostIpcHandler, ProtectedRemoteFrostPeer } from "../../native/frost/signer/protected-service.mjs";
 import { WindowsProtectedFrostStateStore } from "../../native/frost/state/windows-protected-state-store.mjs";
-import { WindowsFencedFrostStateStore } from "../../native/frost/state/windows-fenced-state-store.mjs";
 import { NativeFrostSigner, NativeFrostCoordinator, createNativeSigningPolicy, createNativeFrostSigningRequest, runTwoPartyDkg,
   FROST_SIGNING_INTENT_PROTOCOL, FROST_SIGNING_MODE, REQUIRED_FROST_SIGNERS } from "../../native/frost/index.mjs";
 import { REGTEST_GENESIS } from "../../native/node/native-raw-evidence.mjs";
@@ -30,7 +29,6 @@ import { LocalDeploymentRpc, ProtectedSolanaDeploymentMonitor } from "../../serv
 import { LocalNativeEvidenceVerifier } from "../../native/node/native-raw-evidence.mjs";
 import { ProtectedNativeIntegrityMonitor, compareNativeProgress } from "../../native/node/native-integrity.mjs";
 import { nativeProgressFixture } from "../integration/native-progress-fixture.mjs";
-import { witnessTestAction } from "./protected-witness-test-helper.mjs";
 import { SOURCE_HEALTH_ROLES } from "../../shared/source-health-window.mjs";
 import { depositOperationFixture } from "../integration/deposit-operation-fixture.mjs";
 import { ProtectedDepositOperationJournal } from "../../services/bridge-validator/protected-deposit-journal.mjs";
@@ -58,16 +56,13 @@ if (process.platform !== "win32") throw new Error("WINDOWS_IPC_TESTS_REQUIRE_WIN
 const repoRoot = path.resolve(import.meta.dirname, "../.."), serviceSid = windowsCurrentServiceSid();
 const h = v => createHash("sha256").update(v).digest("hex");
 const deployment = h("protected-ipc-local-deployment"), protocol = "KINGPEPE_SERVICE_IPC_V2";
-const cleanups = new Map(), witnessOptions = new Map();
+const cleanups = new Map();
 function temporary(t) {
   const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-ipc-test-"));
   cleanups.set(root, []);
-  witnessOptions.set(root, new Map());
   t.after(async () => {
     let failed = false;
     for (const fn of cleanups.get(root)) { try { await fn(); } catch { failed = true; } }
-    for (const opts of witnessOptions.get(root).values()) { try { witnessTestAction(opts, "DELETE"); } catch { failed = true; } }
-    witnessOptions.delete(root);
     cleanups.delete(root);
     assert(path.dirname(root) === path.resolve(os.tmpdir()) && path.basename(root).startsWith("kingpepe-ipc-test-"), "UnsafeTestCleanup");
     try { rmSync(root, { recursive: true }); } catch { failed = true; }
@@ -85,12 +80,10 @@ function certificate(root, name) {
   return { privateKeyPem, certificatePem };
 }
 function options(root, name, role, purpose = "service-auth", instanceId = h(name)) {
-  const opts = { root: path.join(root, name), anchorRoot: path.join(root, name + "-anchor"), repoRoot,
+  const opts = { root: path.join(root, name), repoRoot,
     context: { role, purpose, serviceSid, environment: "localnet", nativeGenesis: REGTEST_GENESIS,
       solanaDeployment: deployment, instanceId, keyEpoch: 1 } };
-  // Negative tests mutate enrollment inputs. Cleanup retains the independently
-  // registered LOCALNET snapshot, not those subsequently corrupted references.
-  witnessOptions.get(root).set(name, structuredClone(opts)); return opts;
+  return opts;
 }
 function enroll(opts, own, peer, peerRole) {
   const bytes = encodeIpcEnrollment({ ...own, peerCertificatePem: peer.certificatePem, peerRole });
@@ -266,13 +259,7 @@ test("protected controller uncertain successful CAS recovers the identical retai
   assert.equal((await f.controller.submit(f.plan)).state, "OBSERVED");
   assert.deepEqual((await f.controller.inspect(f.plan.operationId)).record.plan, f.plan); assert.equal(f.calls, 0);
 });
-test("protected controller copied old file image cannot revive against the retained profile witness", async t => {
-  const f = await protectedControllerFixture(t), files = [path.join(f.opts.root, "state.protected"), path.join(f.opts.anchorRoot, "state.protected")];
-  const old = files.map(file => readFileSync(file)); await f.controller.submit(f.plan); await f.controller.close();
-  files.forEach((file, i) => { writeFileSync(file, old[i]); old[i].fill(0); });
-  await assert.rejects(f.open()); assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
-  await f.global.restart(); assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY"); assert.equal(f.calls, 0);
-});
+
 test("protected controller authenticated malformed state propagates durable global stop", async t => {
   const f = await protectedControllerFixture(t), r = f.store.read(); r.payload.fill(0);
   f.store.write(Buffer.from("malformed-controller-fixture"), r.revision);
@@ -485,13 +472,9 @@ test("protected Solana delivery recovers committed observation after lost protec
   assert.equal((await f.outbox.runOne()).state, "WAITING_FOR_DEPENDENCY"); assert(lost);
   await f.reopen(); assert.equal((await f.client.status(f.delivery)).state, "FINALIZED_ACCOUNT"); assert.equal(f.control.sends.length, 0);
 });
-test("protected Solana delivery refuses duplicate lifetime and restored stale journal", async t => {
+test("protected Solana delivery refuses a concurrent process", async t => {
   const f = await protectedSolanaDeliveryFixture(t);
   await assert.rejects(ProtectedSolanaDepositOutbox.open({ store: new WindowsProtectedStore(f.opts), integrity: f.peer.guard, policy: f.policy, endpoint: f.endpoint }));
-  const files = [f.opts.root, f.opts.anchorRoot].map(root => path.join(root, "state.protected")), previous = files.map(file => readFileSync(file));
-  await f.client.enqueue(f.delivery); await f.outbox.close();
-  files.forEach((file, i) => writeFileSync(file, previous[i])); previous.forEach(b => b.fill(0));
-  await assert.rejects(f.reopen()); assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
 });
 
 for (const method of ["reservePlan", "prepareBroadcast"]) for (const stopped of [false, true]) {
@@ -594,14 +577,9 @@ test("protected deposit operations preserve existing risk read-only during durab
   await assert.rejects(reopened.prepareBroadcast(id), /IntegrityAuthorizationStopped/u);
 });
 
-test("protected deposit operations reject duplicate lifetime lease and co-restored data plus anchor", async t => {
+test("protected deposit operations reject a concurrent process", async t => {
   const f = await protectedDepositFixture(t);
   await assert.rejects(f.open(), /DepositJournalUnavailable/u);
-  const files = [path.join(f.opts.root, "state.protected"), path.join(f.opts.anchorRoot, "state.protected")], old = files.map(file => readFileSync(file));
-  await f.journal.reservePlan(f.plan); await f.journal.retainSigned(f.plan.operationId, f.signedTransactionHex); await f.journal.close();
-  try { files.forEach((file, index) => writeFileSync(file, old[index])); } finally { old.forEach(bytes => bytes.fill(0)); }
-  await assert.rejects(f.open(), /DepositJournalUnavailable/u);
-  assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
 });
 
 test("protected deposit operations reject malformed authenticated journal without resetting it", async t => {
@@ -962,8 +940,7 @@ async function protectedCoordinatorFixture(t, sweepJobFixture = false) {
   const signers = [], verificationCounts = [0, 0], stateStores = []; let duringEvidence;
   for (const [i, v] of f.entries()) {
     const base = WindowsProtectedFrostStateStore.createLocal(options(v.root, "native-state", v.role, "frost-state"), policy);
-    const fenceOptions = options(v.root, "native-fence", v.role, "signer-fence", base.context.instanceId);
-    const stateStore = await WindowsFencedFrostStateStore.createLocal({ base, fenceOptions, policy });
+    const stateStore = await base.acquireExclusive();
     stateStores.push(stateStore);
     cleanups.get(v.root).push(() => stateStore.close());
     signers.push(new NativeFrostSigner({ signerId: v.role, index: i, policy, stateStore,
@@ -987,7 +964,7 @@ async function protectedCoordinatorFixture(t, sweepJobFixture = false) {
     const handler = nativeFrostIpcHandler(signers[i], guards[i].guard);
     ports.push(await f[i].server.listen(async input => {
       try { return await handler(input); } catch (error) {
-        const allowed = ["ProtectedSignerStateIntegrityRejected", "ProtectedSignerFenceRejected", "ProtectedLifetimeLeaseLost",
+        const allowed = ["ProtectedFrostStateInvalid", "ProtectedStateRollbackDetected", "ProtectedProcessLeaseLost",
           "IntegrityStateRejected", "IntegrityResponseRollback", "IntegrityStopRollback", "IntegrityAuthorizationStopped", "IpcRequestRejected",
           "FROST fresh independent Native evidence required"];
         handlerFaults.push(input.method + ":" + (allowed.includes(error?.message) ? error.message : "UNCLASSIFIED"));
@@ -1006,7 +983,10 @@ async function protectedCoordinatorFixture(t, sweepJobFixture = false) {
 
 test("signer rechecks durable stop after read-only evidence before nonce reservation", async t => {
   const f = await protectedCoordinatorFixture(t); await f.global.enableTestSources();
-  const before = f.stateStores.map(store => store.publicFence());
+  // Compare the actual retained signer state, not a removed fence API. Only a
+  // boolean reaches an assertion reporter; private state is never printed.
+  const snapshot = store => h(JSON.stringify(store.load()));
+  const before = f.stateStores.map(snapshot);
   let reported = false;
   f.setEvidenceHook(async index => {
     if (!reported) { reported = true; await f.guards[index].guard.report(f.intent.operationId, "SIGNER_ROLLBACK", h("stop-during-evidence")); }
@@ -1014,7 +994,7 @@ test("signer rechecks durable stop after read-only evidence before nonce reserva
   const request = createNativeFrostSigningRequest(f.intent);
   for (const [i, peer] of f.peers.entries()) {
     await assert.rejects(peer.signingCommitment(request), /IpcRequestRejected/u);
-    assert.deepEqual(f.stateStores[i].publicFence(), before[i], "StopMustPreventNonceOrStateMutation");
+    assert(snapshot(f.stateStores[i]) === before[i], "StopMustPreventNonceOrStateMutation");
   }
   assert.deepEqual(f.verificationCounts, [1, 1], "OnlyReadOnlyVerificationMayContinue");
   assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
@@ -1076,15 +1056,10 @@ test("durable sweep dispatch returns real A+B aggregate without synchronous long
   assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
 });
 
-test("durable sweep dispatch rejects duplicate lifetime and co-restored accepted state", async t => {
+test("durable sweep dispatch rejects a concurrent process", async t => {
   const f = await protectedSweepJobsFixture(t);
   const duplicate = new WindowsProtectedStore(f.opts);
   await assert.rejects(ProtectedSweepJobs.open({ store: duplicate, integrity: f.coordinatorGuard, policy: f.policy, ...f.dkg, signers: f.peers, signingJournal: f.journal }), /SweepJobUnavailable/u);
-  const files = [f.opts.root, f.opts.anchorRoot].map(root => path.join(root, "state.protected")), old = files.map(file => readFileSync(file));
-  await f.client.enqueue(f.intent); await f.jobs.close();
-  files.forEach((file, i) => writeFileSync(file, old[i])); old.forEach(b => b.fill(0));
-  await assert.rejects(f.reopen(), /SweepJobUnavailable/u);
-  assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
 });
 
 test("actual protected A+B FROST signing through authenticated endpoints", async t => {
@@ -1243,18 +1218,11 @@ test("protected coordinator recovers an exact committed aggregate after lost per
   assert.equal(journal.lookup(f.intent).request.attempt, 1);
 });
 
-test("protected coordinator rejects duplicate process and retained-witness rollback with global stop", async t => {
-  const f = await protectedCoordinatorFixture(t), files = [path.join(f.journalOptions.root, "state.protected"), path.join(f.journalOptions.anchorRoot, "state.protected")];
-  const old = files.map(file => readFileSync(file));
+test("protected coordinator rejects an actual concurrent process", async t => {
+  const f = await protectedCoordinatorFixture(t);
   const journal = await ProtectedCoordinatorSigningJournal.open({ store: f.journalStore, integrity: f.coordinatorGuard, ...f.dkg });
   cleanups.get(f.root).push(() => journal.close());
-  // A separate real process cannot activate the same protected journal.
   await assert.rejects(coordinatorActor(f), /CoordinatorJournalUnavailable/u);
-  await journal.runExclusive(() => journal.prepare(f.intent)); await journal.close();
-  files.forEach((file, index) => { writeFileSync(file, old[index]); old[index].fill(0); });
-  await assert.rejects(ProtectedCoordinatorSigningJournal.open({ store: new WindowsProtectedStore(f.journalOptions), integrity: f.coordinatorGuard, ...f.dkg }));
-  assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
-  await f.global.restart(); assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
 });
 
 test("protected coordinator rejects authenticated malformed journal and concurrent mutation", async t => {
@@ -1415,7 +1383,7 @@ for (const role of ["ATTESTER_A", "ATTESTER_B"]) attesterRecoveryTest("real prot
   const port = await f.server.listen(async input => {
     try { return await handler(input); } catch (error) {
       const safe = ["AttesterJournalInvalid", "AttesterJournalPolicyRejected", "AttesterJournalAuthenticatedStateInvalid", "AttesterJournalConcurrentMutation",
-        "IntegrityAuthorizationStopped", "IpcRequestRejected", "ProtectedLifetimeLeaseLost", "WindowsProtectedStoreRejected"];
+        "IntegrityAuthorizationStopped", "IpcRequestRejected", "ProtectedProcessLeaseLost", "WindowsProtectedStoreRejected"];
       handlerFailure = safe.includes(error?.message) ? error.message : "UNCLASSIFIED"; throw error;
     }
   }), { input } = f;
@@ -1542,7 +1510,7 @@ attesterRecoveryTest("protected attester rejects duplicate process, changed back
   const port = await f.server.listen(async input => {
     try { return await handler(input); } catch (error) {
       const safe = ["AttesterJournalInvalid", "AttesterJournalPolicyRejected", "AttesterJournalAuthenticatedStateInvalid",
-        "AttesterJournalConcurrentMutation", "IntegrityAuthorizationStopped", "IpcRequestRejected", "ProtectedLifetimeLeaseLost", "WindowsProtectedStoreRejected"];
+        "AttesterJournalConcurrentMutation", "IntegrityAuthorizationStopped", "IpcRequestRejected", "ProtectedProcessLeaseLost", "WindowsProtectedStoreRejected"];
       handlerFailure = safe.includes(error?.message) ? error.message : "UNCLASSIFIED"; throw error;
     }
   });
@@ -1559,20 +1527,7 @@ attesterRecoveryTest("protected attester rejects duplicate process, changed back
   assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
 });
 
-attesterRecoveryTest("protected attester file-package rollback is rejected by retained witness and stops authority", async t => {
-  const f = await protectedAttesterFixture(t), { attester, guard } = f;
-  const image = readFileSync(path.join(f.journalOptions.root, "state.protected"));
-  const anchor = readFileSync(path.join(f.journalOptions.anchorRoot, "state.protected"));
-  const journal = await ProtectedAttesterAuthorizationJournal.open({ attester, integrity: guard, store: f.journalStore });
-  cleanups.get(f.root).push(() => journal.close()); await f.global.enableTestSources();
-  const signed = await journal.authorize({ encodedMessageHex: f.encoded, evidence: f.evidence }); assert(verifyProjectAttestation(signed, f.encoded));
-  await journal.close();
-  writeFileSync(path.join(f.journalOptions.root, "state.protected"), image); image.fill(0);
-  writeFileSync(path.join(f.journalOptions.anchorRoot, "state.protected"), anchor); anchor.fill(0);
-  await assert.rejects(ProtectedAttesterAuthorizationJournal.open({ attester, integrity: guard, store: new WindowsProtectedStore(f.journalOptions) }));
-  assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
-  await f.global.restart(); assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
-});
+
 
 attesterRecoveryTest("protected attester rejects wrong seed instance and unavailable or corrupt journal without signing", async t => {
   const f = await protectedAttesterFixture(t), { attester, guard } = f;
@@ -1592,7 +1547,7 @@ attesterRecoveryTest("protected attester rejects wrong seed instance and unavail
   unlinkSync(file);
   await assert.rejects(journal.authorize({ encodedMessageHex: f.encoded, evidence: f.evidence })); assert.equal(signs, 0);
   // Exact current ciphertext restored only in this isolated fault test. No runtime
-  // repair path exists and a stale authenticated image remains witness-rejected.
+  // repair path exists. Restored complete snapshots require manual review.
   writeFileSync(file, saved); saved.fill(0);
 });
 
@@ -1714,19 +1669,4 @@ test("protected Native incident persists and re-reports after actual authority a
   await monitor.close(); await f.restart();
   monitor = await ProtectedNativeIntegrityMonitor.open({ expectedPolicy: fixture.expectedPolicy, verifier, integrity: peer.guard, store: new WindowsProtectedStore(opts) });
   assert.equal((await monitor.poll()).state, "HARD_STOP_INTEGRITY"); assert.equal(f.authority.status().incidentCount, 1);
-});
-
-test("retained progress witness turns co-restored observation files into a durable global stop", async t => {
-  // Actual protected files, profile witness and mutually authenticated guard;
-  // progress bytes are synthetic and never treated as Native chain proof.
-  const f = await integrityFixture(t), peer = await f.peer("NATIVE_OBSERVER"), signer = await f.peer("KINGPEPE_FROST_B");
-  const { expectedPolicy, stored } = nativeProgressFixture(), opts = options(peer.root, "witness-progress", "NATIVE_OBSERVER", "chain-progress");
-  const bytes = Buffer.from(JSON.stringify(stored)), store = WindowsProtectedStore.create(opts, bytes); bytes.fill(0);
-  const files = [path.join(opts.root, "state.protected"), path.join(opts.anchorRoot, "state.protected")], old = files.map(p => readFileSync(p));
-  const current = store.read(); store.write(current.payload, current.revision); current.payload.fill(0); store.close();
-  files.forEach((p, i) => writeFileSync(p, old[i]));
-  const verifier = new LocalNativeEvidenceVerifier({ rpc: {}, executable: path.join(peer.root, "unused-native-verifier") });
-  await assert.rejects(ProtectedNativeIntegrityMonitor.open({ expectedPolicy, verifier, integrity: peer.guard, store: new WindowsProtectedStore(opts) }));
-  assert.equal(f.authority.status().state, "HARD_STOP_INTEGRITY");
-  await f.restart(); await assert.rejects(signer.guard.assertRunning(h("rolled-back-progress"), "FROST_SIGN"));
 });

@@ -188,18 +188,28 @@ jobs:
           export PATH="${KINGPEPE_CI_TOOL_ROOT}/solana-release/bin:${KINGPEPE_CI_TOOL_ROOT}/native-build/bin:${PATH}"
           export KINGPEPE_LOCAL_E2E_ROOT="${KINGPEPE_CI_TOOL_ROOT}/withdrawal-record-run"
           export KINGPEPE_LOCAL_BUILD_ROOT="${KINGPEPE_CI_TOOL_ROOT}/build"
+          export KINGPEPE_TEST_SOURCE_SHA="${GITHUB_SHA}"
           node solana/tests/local-withdrawal-record.mjs > "${KINGPEPE_CI_TOOL_ROOT}/withdrawal-record-result.json"
           node --input-type=module -e '
             import {readFileSync} from "node:fs";
             const r = JSON.parse(readFileSync(process.env.KINGPEPE_CI_TOOL_ROOT + "/withdrawal-record-result.json", "utf8"));
             console.log(JSON.stringify({sourceSha: process.env.GITHUB_SHA, ...r}));
-            if (r.withdrawalRecord?.pass !== 26 || r.withdrawalRecord?.fail !== 0 || r.phase09 !== "NOT_STARTED") process.exit(1);
+            if (r.withdrawalRecord?.pass !== 29 || r.withdrawalRecord?.fail !== 0 || r.phase09 !== "NOT_STARTED") process.exit(1);
             for (const check of ["FRESH_USER_FRESH_PDA_FINALIZED_BURN_AND_RECORD",
               "DUPLICATE_WITHDRAWAL_NEW_NONCE_REJECTED", "MISSING_USER_SIGNATURE_REJECTED",
               "INSUFFICIENT_RECORD_RENT_ROLLS_BACK", "PREFUNDED_SYSTEM_PDA_SAFELY_INITIALIZED",
               "LATER_INSTRUCTION_FAILURE_ROLLS_BACK_BURN_RECORD_AND_RENT",
-              "DIRECT_SPL_BURN_CREATES_NO_WITHDRAWAL_ENTITLEMENT"]) {
+              "DIRECT_SPL_BURN_CREATES_NO_WITHDRAWAL_ENTITLEMENT",
+              "DIRECT_BURN_DIFFERENCE_SURVIVES_BRIDGE_WITHDRAWAL",
+              "DIRECT_BURN_ACCOUNTING_REMAINS_COVERED", "POST_DIRECT_BURN_WITHDRAWAL_REPLAY_REJECTED"]) {
               if (!r.withdrawalRecord.passed.includes(check)) process.exit(1);
+            }
+            if (r.depositCounter?.pass !== 5 || r.depositCounter?.fail !== 0) process.exit(1);
+            for (const check of ["SECOND_NATIVE_SWEEP_VERIFIED_WITH_CREDIT_RETAINED",
+              "DIRECT_BURN_DIFFERENCE_SURVIVES_VERIFIED_MINT", "TWO_RESERVES_RECONCILE_WITH_UNPAID_WITHDRAWALS",
+              "REOPENED_POST_DIRECT_BURN_MINT_DOES_NOT_MINT_AGAIN",
+              "POST_DIRECT_BURN_NEW_TRANSACTION_CLAIM_REPLAY_REJECTED"]) {
+              if (!r.depositCounter.passed.includes(check)) process.exit(1);
             }
           '
 
@@ -284,7 +294,7 @@ jobs:
           curl --fail --location --silent --show-error --max-time 120 "${url}" --output "${audit_root}/audit.tgz"
           printf '%s  %s\n' "${expected}" "${audit_root}/audit.tgz" | sha256sum --check
           tar -xzf "${audit_root}/audit.tgz" -C "${audit_root}" --strip-components=1 --no-same-owner
-          for lockfile in solana/Cargo.lock native/{frost,proof,reserve,recovery}/Cargo.lock; do
+          for lockfile in solana/Cargo.lock native/{proof,reserve,recovery}/Cargo.lock; do
             "${audit_root}/cargo-audit" audit --file "${lockfile}" --deny unsound --deny yanked
           done
       - name: Check dependency license metadata and local proprietary boundary
@@ -293,8 +303,6 @@ jobs:
         run: |
           cd solana
           cargo fmt --check --all
-      - name: Validate native Rust formatting
-        run: cargo fmt --check --manifest-path native/frost/Cargo.toml
       - name: Validate native proof formatting
         run: cargo fmt --check --manifest-path native/proof/Cargo.toml
       - name: Validate native reserve formatting
@@ -305,8 +313,6 @@ jobs:
         run: |
           cd solana
           cargo clippy --locked --workspace --all-targets -- -D warnings
-      - name: Run native clippy
-        run: cargo clippy --locked --manifest-path native/frost/Cargo.toml --all-targets -- -D warnings
       - name: Run native proof clippy
         run: cargo clippy --locked --manifest-path native/proof/Cargo.toml --all-targets -- -D warnings
       - name: Run native reserve clippy
@@ -339,10 +345,6 @@ jobs:
         run: npm run test:relayer
       - name: Run local E2E readiness gate tests
         run: npm run test:local-e2e-readiness
-      - name: Validate native FROST runtime
-        run: cargo check --locked --manifest-path native/frost/Cargo.toml
-      - name: Run native FROST tests
-        run: cargo test --locked --manifest-path native/frost/Cargo.toml
       - name: Validate native proof crate
         run: cargo check --locked --manifest-path native/proof/Cargo.toml --all-targets
       - name: Run native proof tests
@@ -380,8 +382,8 @@ jobs:
       - name: Windows DPAPI and protected-state failure regressions (current test identity)
         shell: pwsh
         run: |
-          # Startup tests use the actual service entry point, which requires a
-          # genuine verifier artifact even though rejected startup makes no RPC.
+          # Protected controller fixtures require the genuine source-built
+          # Native verifier, not an executable placeholder or an RPC assertion.
           rustup toolchain install --profile minimal nightly-2023-10-29
           if ($LASTEXITCODE -ne 0) { throw 'TEST_NATIVE_TOOLCHAIN_UNAVAILABLE' }
           $testBuild = Join-Path $env:RUNNER_TEMP ('kingpepe-native-verifier-' + [guid]::NewGuid().ToString('N'))
@@ -435,10 +437,6 @@ jobs:
         run: npm run test:relayer
       - name: Run local E2E readiness gate tests
         run: npm run test:local-e2e-readiness
-      - name: Validate native FROST runtime
-        run: cargo check --locked --manifest-path native/frost/Cargo.toml
-      - name: Run native FROST tests
-        run: cargo test --locked --manifest-path native/frost/Cargo.toml
       - name: Validate native proof crate
         run: cargo check --locked --manifest-path native/proof/Cargo.toml --all-targets
       - name: Run native proof tests

@@ -1,8 +1,8 @@
 # Solana Program Boundary
 
-## Current Phase 08 update
+## Current program boundary
 
-Phase 08.5 adds the actual withdrawal-record lifecycle prerequisite. Instruction
+The withdrawal-record lifecycle is implemented on chain. Instruction
 tag 3 uses nine accounts, in order: writable bridge state, writable withdrawal
 record PDA, writable source token account, writable Mint, user burn authority
 signer, SPL Token Program, read-only Transceiver config PDA, writable rent payer
@@ -21,16 +21,17 @@ silently accepted. This format check is not proof of control of a recipient key.
 
 BurnChecked CPI, record creation and both bridge counters commit atomically.
 Any later instruction failure rolls back allocation, rent, burn and record.
-The bridge-operation supply snapshot is refreshed from the actual SPL Mint;
-gross burned value remains owed. Direct SPL burns change actual Mint supply but
-create no record, and observers must read Mint supply instead of trusting a stale
-last-operation counter. This implements no Native withdrawal payout or Phase 09.
+The Manager counter tracks bridge-issued value minus recorded bridge burns;
+it is not overwritten with actual SPL supply. Direct SPL burns change actual
+Mint supply but create no payout entitlement. Later bridge burns and mints
+preserve that difference, while gross recorded burns remain owed. Reconciliation
+reads both counters and actual supply. No Native withdrawal payout exists yet.
 The real-validator suite is solana/tests/local-withdrawal-record.mjs; host models
 explicitly do not prove Token CPI or fresh-account creation.
 
 Both direct Rust programs compile to SBF and execute the real local deposit
-path. The historical Phase 05 model description below is not a complete
-on-chain security certification. Initial enrollment requires the exact Mint
+path. Host-only models are not complete on-chain security certification.
+Initial enrollment requires the exact Mint
 identity to sign both Manager and Transceiver setup; the fee payer alone cannot
 take over that Mint's configuration. SPL mint authority stays exclusively a PDA.
 
@@ -76,48 +77,3 @@ The local deposit run validates bridge PDA Mint authority, zero initial supply,
 freeze authority None, and the finalized 100000000 atomic-unit Mint supply.
 Withdrawal daemon E2E, complete security cases and production deployment are
 not certified by this run. No Anchor-generated IDL is claimed.
-
-## Historical Phase 05 implementation
-
-Phase 05 replaces the placeholder bridge and transceiver crates with Rust
-program-boundary logic:
-
-- `kingpepe-transceiver`
-  - Validates canonical message domain against configured manager, mint,
-    deployment, and key epoch.
-  - Requires exactly two distinct authorized attestation identities.
-  - Parses Solana Ed25519 verifier instruction data and binds the verified
-    instruction message bytes to the canonical bridge message.
-  - Creates verified-message receipts.
-  - Rejects duplicate attesters, inactive transceiver state, wrong domains, and
-    already consumed receipts.
-  - Rejects wrong Ed25519 program IDs, offset substitution, message
-    substitution, and duplicate public keys.
-
-- `kingpepe-bridge`
-  - Enforces protected initialization and rejects reinitialization.
-  - Requires zero initial KPEPE supply.
-  - Requires mint decimals to match verified Native decimals.
-  - Requires the bridge-derived mint authority PDA.
-  - Requires freeze authority to be none.
-  - Rejects wrong mint, token program, transceiver, PDA, account aliasing, and
-    wrong message kind.
-  - Consumes transceiver receipts before mint accounting and prevents deposit
-    replay.
-  - Records Solana-to-Native withdrawals only with a matching BurnChecked model.
-  - Keeps burned withdrawals as unpaid liabilities until later settlement.
-  - Keeps Mainnet activation disabled.
-
-## Historical Phase 05 boundary limits
-
-This phase is not a production SBF/Anchor deployment:
-
-- Attestation services and Solana observer models are implemented in Phase 07,
-  but are not yet connected to local end-to-end flows.
-- Native proof/reserve validation is implemented in Phase 06.
-- Local validator end-to-end flows are Phase 08 and Phase 09.
-- Production program IDs, Mint, ProgramData, and authority manifests are not
-  configured.
-
-The current crates provide tested program-state and account-validation logic
-that later phases will bind to deployable Solana instructions and IDL.

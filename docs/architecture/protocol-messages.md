@@ -70,7 +70,7 @@ Coverage is checked as:
 
 A Solana burn moves liability form. It does not remove the bridge's Native payout obligation until the payout is finalized.
 
-Phase 08.5 corrected early fee-surplus recognition. Burning gross 1000 with a
+The model prevents early fee-surplus recognition. Burning gross 1000 with a
 5-atomic miner-fee allowance creates 995 net unpaid plus 5 reserved fee liability,
 not 5 operator surplus. Reservation and broadcast move only the net liability.
 Finalized settlement requires a broadcast obligation and discharges net and

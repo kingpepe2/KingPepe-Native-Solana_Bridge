@@ -48,7 +48,7 @@ export class ProtectedDepositController {
     self.#chain = new LocalDeploymentRpc({ endpoint }); self.#rpc = new SolanaLocalRpcClient({ endpoint });
     self.#observer = new SolanaDepositClaimObserver({ endpoint, config: { environment: "localnet", cluster: "localnet",
       managerProgramIdHex: op.managerProgramId, transceiverProgramIdHex: op.transceiverProgramId, mintHex: op.mint, nativeDecimals: 8 } });
-    try { self.#lease = await store.acquireLifetimeLease(); self.#read(); INSTANCES.add(self); return self; }
+    try { self.#lease = await store.acquireLease(); self.#read(); INSTANCES.add(self); return self; }
     catch (error) { try { await self.#report(error); } finally { await self.close(); } throw new Error("DepositControllerUnavailable"); }
   }
   assertBinding(policy, integrity) {
@@ -72,7 +72,7 @@ export class ProtectedDepositController {
     finally { b.fill(0); }
   }
   async #report(error) {
-    const confirmed = ["ProtectedStateRollbackDetected", "ProtectedLifetimeLeaseLost", "DepositControllerAuthenticatedStateInvalid",
+    const confirmed = ["ProtectedStateRollbackDetected", "ProtectedProcessLeaseLost", "DepositControllerAuthenticatedStateInvalid",
       "DepositControllerJournalConflict", "DepositControllerCreditChanged", "DepositControllerMintMissing"].includes(error?.message) ||
       !!error?.incident || !!error?.integrityCode;
     if (!confirmed) return; this.#stopped = true;

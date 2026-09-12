@@ -81,7 +81,7 @@ export class ProtectedCoordinatorSigningJournal {
     self.#key = structuredClone({ publicPackage, aggregateTweakedXOnlyPublicKey });
     self.#guard = integrity; self.#store = store;
     try {
-      self.#lease = await store.acquireLifetimeLease(); self.#read();
+      self.#lease = await store.acquireLease(); self.#read();
       JOURNALS.add(self); return self;
     } catch (error) {
       try { await self.#reportStorageError(error); } finally { await self.close(); }
