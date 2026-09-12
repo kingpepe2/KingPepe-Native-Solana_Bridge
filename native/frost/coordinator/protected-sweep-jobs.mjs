@@ -125,7 +125,14 @@ export class ProtectedSweepJobs {
       await this.#report(error);
       // Exact bytes/attempt identity remain in their respective protected
       // journals. Unavailability is a bounded wait, never fabricated success.
-      return Object.freeze({ state: this.#stopped ? "HARD_STOP_INTEGRITY" : "WAITING_FOR_DEPENDENCY", reason: "SWEEP_JOB_UNAVAILABLE" });
+      // Fixed public error classes only. Never echo a transport exception,
+      // request payload, private path, credential or protected journal value.
+      const reason = new Map([["IpcRequestRejected", "SIGNER_OR_GUARD_TRANSPORT_REJECTED"],
+        ["FrostCoordinatorAbortIncomplete", "SIGNER_ABORT_NOT_CONFIRMED"],
+        ["IntegrityAuthorizationStopped", "SOURCE_ADMISSION_SUSPENDED"],
+        ["SweepJobBusy", "SWEEP_JOB_BUSY"], ["CoordinatorJournalUnavailable", "SIGNING_JOURNAL_UNAVAILABLE"],
+        ["CoordinatorJournalBusy", "SIGNING_JOURNAL_BUSY"]]).get(error?.message) ?? "SWEEP_JOB_UNAVAILABLE";
+      return Object.freeze({ state: this.#stopped ? "HARD_STOP_INTEGRITY" : "WAITING_FOR_DEPENDENCY", reason });
     } finally { this.#running = false; }
   }
   async run({ signal, intervalMs = 1000, onStatus = () => {} }) {

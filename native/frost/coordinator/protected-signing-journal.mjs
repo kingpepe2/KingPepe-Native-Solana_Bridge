@@ -10,6 +10,7 @@ import { createNativeFrostSigningRequest, validateNativeFrostSigningRequest, val
 export const COORDINATOR_JOURNAL_PROTOCOL = "KINGPEPE_COORDINATOR_SIGNING_V1";
 export const MAX_COORDINATOR_REQUESTS = 256; // Never prune consumed signing identities.
 const MAX_BYTES = 900_000, JOURNALS = new WeakSet();
+const BRIDGE_PURPOSES = new Set(["RESERVE_SWEEP", "WITHDRAWAL"]);
 const digest = bytes => createHash("sha256").update(bytes).digest("hex");
 function check(ok, code = "CoordinatorJournalInvalid") { if (!ok) throw new Error(code); }
 function fields(v, names) {
@@ -97,7 +98,7 @@ export class ProtectedCoordinatorSigningJournal {
     const read = this.#store.read();
     try {
       const value = decodeCoordinatorSigningState(read.payload, this.#key), context = this.#store.context;
-      for (const { request } of value.records) check(request.intent.nativeNetwork === "regtest" && request.intent.purpose === "RESERVE_SWEEP" &&
+      for (const { request } of value.records) check(request.intent.nativeNetwork === "regtest" && BRIDGE_PURPOSES.has(request.intent.purpose) &&
         request.intent.nativeGenesisHash === context.nativeGenesis && request.intent.solanaDeployment === context.solanaDeployment && request.epoch === context.keyEpoch);
       // Accept only our exact uncertain CAS completion, never an unrelated
       // concurrent write merely because its DPAPI authentication is valid.
@@ -133,7 +134,7 @@ export class ProtectedCoordinatorSigningJournal {
   }
   #intent(intent) {
     const snapshot = validateNativeSigningIntent(intent), context = this.#store.context;
-    check(snapshot.purpose === "RESERVE_SWEEP" && snapshot.nativeNetwork === "regtest" && snapshot.nativeGenesisHash === context.nativeGenesis &&
+    check(BRIDGE_PURPOSES.has(snapshot.purpose) && snapshot.nativeNetwork === "regtest" && snapshot.nativeGenesisHash === context.nativeGenesis &&
       snapshot.solanaDeployment === context.solanaDeployment && snapshot.keyEpoch === context.keyEpoch, "CoordinatorJournalContextMismatch");
     return snapshot;
   }

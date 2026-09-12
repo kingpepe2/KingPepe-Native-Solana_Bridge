@@ -923,12 +923,12 @@ test("IPC diagnostics expose fixed codes only and preserve request rejection", a
   assert(!JSON.stringify([f.server.lastRejection, f.client.lastRejection]).includes(privateDiagnostic), "IpcDiagnosticLeakedPrivateContext");
 });
 
-async function protectedCoordinatorFixture(t, sweepJobFixture = false) {
+async function protectedCoordinatorFixture(t, sweepJobFixture = false, purpose = "RESERVE_SWEEP") {
   const global = await isolatedIntegrityFixture(t);
   const guards = await Promise.all(REQUIRED_FROST_SIGNERS.map(role => global.peer(role)));
   const coordinatorPeer = await global.peer("COORDINATOR"), coordinatorGuard = coordinatorPeer.guard;
   const f = [fixture(t, "KINGPEPE_FROST_A"), fixture(t, "KINGPEPE_FROST_B")];
-  const intent = { protocol: FROST_SIGNING_INTENT_PROTOCOL, mode: FROST_SIGNING_MODE, purpose: "RESERVE_SWEEP", nativeNetwork: "regtest",
+  const intent = { protocol: FROST_SIGNING_INTENT_PROTOCOL, mode: FROST_SIGNING_MODE, purpose, nativeNetwork: "regtest",
     nativeGenesisHash: REGTEST_GENESIS, solanaDeployment: deployment, bridgeProgramId: h("bridge"), transceiverProgramId: h("transceiver"), mint: h("mint"), keyEpoch: 1,
     signingRequestId: h("request"), operationId: h("operation"), withdrawalId: h("deposit"), proofFingerprint: h("proof"), unsignedNativeTransactionId: h("transaction"),
     transactionCommitment: h("commitment"), signingInputIndex: 0, taprootSighashHex: h("sighash"), recipientScriptPubKeyHex: "5120" + h("reserve"), amountAtomic: "1000", feeAtomic: "10",
@@ -1060,6 +1060,25 @@ test("durable sweep dispatch rejects a concurrent process", async t => {
   const f = await protectedSweepJobsFixture(t);
   const duplicate = new WindowsProtectedStore(f.opts);
   await assert.rejects(ProtectedSweepJobs.open({ store: duplicate, integrity: f.coordinatorGuard, policy: f.policy, ...f.dkg, signers: f.peers, signingJournal: f.journal }), /SweepJobUnavailable/u);
+});
+
+test("protected withdrawal aggregate persists across coordinator restart without another signature", async t => {
+  // Actual DPAPI, TLS and FROST; this fixture models chain evidence. The
+  // separate real-chain round trip remains the Native-acceptance proof.
+  const f = await protectedCoordinatorFixture(t, false, "WITHDRAWAL");
+  let journal = await ProtectedCoordinatorSigningJournal.open({ store: f.journalStore, integrity: f.coordinatorGuard, ...f.dkg });
+  cleanups.get(f.root).push(() => journal.close());
+  const coordinator = () => new NativeFrostCoordinator({ signers: f.peers, ...f.dkg, integrity: f.coordinatorGuard, signingJournal: journal });
+  await f.global.enableTestSources();
+  const signed = await coordinator().signAutomaticallyWithNativeEvidence(f.intent);
+  assert(schnorr.verify(Buffer.from(signed.signatureHex, "hex"), Buffer.from(f.intent.taprootSighashHex, "hex"), Buffer.from(f.dkg.aggregateTweakedXOnlyPublicKey, "hex")));
+  const counts = [...f.verificationCounts];
+  await journal.close();
+  journal = await ProtectedCoordinatorSigningJournal.open({ store: new WindowsProtectedStore(f.journalOptions), integrity: f.coordinatorGuard, ...f.dkg });
+  assert.deepEqual(await coordinator().signAutomaticallyWithNativeEvidence(f.intent), signed);
+  assert.deepEqual(f.verificationCounts, counts);
+  assert.throws(() => journal.lookup({ ...f.intent, purpose: "RESERVE_SWEEP" }), /CoordinatorJournalRequestChanged/u);
+  assert.throws(() => journal.lookup({ ...f.intent, purpose: "RESERVE_MIGRATION" }), /CoordinatorJournalContextMismatch/u);
 });
 
 test("actual protected A+B FROST signing through authenticated endpoints", async t => {
