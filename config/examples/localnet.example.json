@@ -1,0 +1,20 @@
+{
+  "environment": "localnet",
+  "nativeNetwork": "kingpepe-regtest",
+  "solanaCluster": "localnet",
+  "frost": {
+    "participantAStateRoot": "${FROST_A_STATE_ROOT}",
+    "participantBStateRoot": "${FROST_B_STATE_ROOT}",
+    "policyEpoch": 1
+  },
+  "attestation": {
+    "attesterAKeyRef": "${ATTESTER_A_KEY_REF}",
+    "attesterBKeyRef": "${ATTESTER_B_KEY_REF}"
+  },
+  "program": {
+    "bridgeProgramId": "PLACEHOLDER_BRIDGE_PROGRAM_ID",
+    "transceiverProgramId": "PLACEHOLDER_TRANSCIEVER_PROGRAM_ID",
+    "mint": "PLACEHOLDER_MINT_ADDRESS",
+    "tokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+  }
+}
