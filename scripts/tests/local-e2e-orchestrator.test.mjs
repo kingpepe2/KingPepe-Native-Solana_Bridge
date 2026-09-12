@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -139,7 +139,8 @@ test("fake complete toolchain produces a ready local-only execution plan", () =>
       assert.equal(build.executable, "cargo-build-sbf");
       assert(build.args.includes("--locked"));
       assert.equal(build.args[build.args.indexOf("--sbf-out-dir") + 1], plan.paths.sbfOutDir);
-      assert(build.args[build.args.indexOf("--target-dir") + 1].startsWith(runRoot + path.sep));
+      const physicalRunRoot = path.join(realpathSync.native(root), "run");
+      assert(build.args[build.args.indexOf("--target-dir") + 1].startsWith(physicalRunRoot + path.sep));
     }
     assert.notEqual(plan.commands[0].args.at(-1), plan.commands[1].args.at(-1));
     assert(plan.commands[2].args.includes("--bpf-program"));

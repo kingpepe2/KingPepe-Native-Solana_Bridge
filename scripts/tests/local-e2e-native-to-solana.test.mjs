@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, renameSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, realpathSync, renameSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -572,7 +572,7 @@ test("flow config keeps local runtime state under the local E2E run root and out
       runId: "config-test",
     });
     assert.equal(config.amountAtomic, "100000000");
-    assert.equal(path.relative(runRoot, config.stateRoot).startsWith(".."), false);
+    assert.equal(path.relative(realpathSync.native(runRoot), config.stateRoot).startsWith(".."), false);
     assert.throws(
       () =>
         createNativeToSolanaFlowConfig({
