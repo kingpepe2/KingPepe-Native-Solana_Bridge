@@ -139,8 +139,9 @@ root for the 18 real deployment/authority/bytecode checks. Set
 the manifest rejects an absent or malformed SHA. CI supplies `GITHUB_SHA`.
 An uncommitted worktree may be tested, but the report must identify it as worktree
 evidence, not certification of its parent commit. This probe builds explicit
-SBPF v3 upgrade-test binaries; normal program builds remain SBPF v0. The hashes
-are different and must not be interchanged in manifests. The real upgrade test
+SBPF v3 upgrade-test binaries; normal program builds remain SBPF v0. Their hashes
+identify distinct build artifacts. The V2 runtime manifest carries deployment
+identities and accepted slots, not binary hashes. The real upgrade test
 uses the required ProgramData extension and waits for a later finalized bank.
 
 Run `node solana/tests/local-native-reorg.mjs` in another fresh external root

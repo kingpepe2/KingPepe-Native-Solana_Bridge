@@ -126,12 +126,6 @@ export function evaluateProgramAndAuthorityIdentity(expected, observation) {
   if (transceiver.programDataAddressHex !== expected.transceiverProgramDataAddressHex) {
     return { state: HARD_STOP, reason: "UNAUTHORIZED_TRANSCEIVER_PROGRAMDATA_CHANGE" };
   }
-  if (manager.binaryHashHex !== expected.managerProgramBinaryHashHex) {
-    return { state: HARD_STOP, reason: "UNAUTHORIZED_MANAGER_BINARY_CHANGE" };
-  }
-  if (transceiver.binaryHashHex !== expected.transceiverProgramBinaryHashHex) {
-    return { state: HARD_STOP, reason: "UNAUTHORIZED_TRANSCEIVER_BINARY_CHANGE" };
-  }
   if (manager.upgradeAuthorityHex !== expected.upgradeAuthorityHex) {
     return { state: HARD_STOP, reason: "UNAUTHORIZED_MANAGER_UPGRADE_AUTHORITY_CHANGE" };
   }
@@ -201,11 +195,6 @@ function normalizeObserverConfig(config) {
       config.transceiverProgramDataAddressHex,
       "transceiverProgramDataAddressHex",
     ),
-    managerProgramBinaryHashHex: normalizeHashLike(config.managerProgramBinaryHashHex, "managerProgramBinaryHashHex"),
-    transceiverProgramBinaryHashHex: normalizeHashLike(
-      config.transceiverProgramBinaryHashHex,
-      "transceiverProgramBinaryHashHex",
-    ),
     upgradeAuthorityHex: normalizeHashLike(config.upgradeAuthorityHex, "upgradeAuthorityHex"),
     mintHex: normalizeHashLike(config.mintHex, "mintHex"),
     tokenProgramIdHex: normalizeHashLike(config.tokenProgramIdHex, "tokenProgramIdHex"),
@@ -272,7 +261,6 @@ function normalizeProgramIdentity(program, label) {
   return {
     programIdHex: normalizeHashLike(program.programId, `${label}.programId`),
     programDataAddressHex: normalizeHashLike(program.programDataAddress, `${label}.programDataAddress`),
-    binaryHashHex: normalizeHashLike(program.binaryHash, `${label}.binaryHash`),
     upgradeAuthorityHex: normalizeHashLike(program.upgradeAuthority, `${label}.upgradeAuthority`),
   };
 }

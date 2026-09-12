@@ -28,12 +28,11 @@ Its RPC transport is loopback-only, redirect-disabled, timeout/body-bounded and
 requires matching JSON-RPC response IDs. Malformed, oversized, unavailable or
 error responses never become evidence; provider details are not surfaced.
 
-The withdrawal observer remains a POLICY MODEL, not a running withdrawal
-service. It checks supplied program/authority, transaction, burn and account
-fields against expected values. Its PDA helper uses actual Solana
-derivation, adds Native protocol/network/genesis binding and exact slot/root
-validation, and unconditionally blocks non-localnet use. A configured=true flag
-cannot select a nonexistent production observer.
+The retained withdrawal policy model checks supplied protocol fields. The local
+FinalizedWithdrawalReader reads actual finalized creation transactions, exact
+BurnChecked execution, canonical messages and withdrawal PDAs. Its bounded
+discovery feeds the existing durable journal and Native payout service.
+Solana evidence remains RPC_OBSERVATION; non-localnet operation is blocked.
 
 ## Trust and missing guarantees
 

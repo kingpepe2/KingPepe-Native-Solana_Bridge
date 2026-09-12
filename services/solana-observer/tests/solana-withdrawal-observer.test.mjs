@@ -30,8 +30,6 @@ function config(overrides = {}) {
     transceiverProgramIdHex: withdrawalVector.deployment.transceiverProgramId,
     managerProgramDataAddressHex: h("manager-programdata"),
     transceiverProgramDataAddressHex: h("transceiver-programdata"),
-    managerProgramBinaryHashHex: h("manager-binary"),
-    transceiverProgramBinaryHashHex: h("transceiver-binary"),
     upgradeAuthorityHex: h("kingpepe-team-upgrade-authority"),
     mintHex: withdrawalVector.deployment.mint,
     tokenProgramIdHex: h("traditional-spl-token-program"),
@@ -63,13 +61,11 @@ function observation(overrides = {}) {
       manager: {
         programId: expected.managerProgramIdHex,
         programDataAddress: expected.managerProgramDataAddressHex,
-        binaryHash: expected.managerProgramBinaryHashHex,
         upgradeAuthority: expected.upgradeAuthorityHex,
       },
       transceiver: {
         programId: expected.transceiverProgramIdHex,
         programDataAddress: expected.transceiverProgramDataAddressHex,
-        binaryHash: expected.transceiverProgramBinaryHashHex,
         upgradeAuthority: expected.upgradeAuthorityHex,
       },
     },
@@ -160,18 +156,18 @@ test("wrong burn amount, mint, or destination is rejected", () => {
   assert.equal(wrongDestination.reason, "WITHDRAWAL_DESTINATION_MISMATCH");
 });
 
-test("unauthorized program, binary, upgrade authority, or mint authority changes hard-stop", () => {
-  const wrongBinary = evaluateFinalizedWithdrawalObservation(
+test("unauthorized program, upgrade authority, or mint authority changes hard-stop", () => {
+  const wrongProgram = evaluateFinalizedWithdrawalObservation(
     config(),
     observation({
       programs: {
         ...observation().programs,
-        manager: { ...observation().programs.manager, binaryHash: h("different-manager-binary") },
+        manager: { ...observation().programs.manager, programId: h("different-manager-program") },
       },
     }),
   );
-  assert.equal(wrongBinary.state, "HARD_STOP");
-  assert.equal(wrongBinary.reason, "UNAUTHORIZED_MANAGER_BINARY_CHANGE");
+  assert.equal(wrongProgram.state, "HARD_STOP");
+  assert.equal(wrongProgram.reason, "UNAUTHORIZED_PROGRAM_ID_CHANGE");
 
   const wrongUpgradeAuthority = evaluateFinalizedWithdrawalObservation(
     config(),

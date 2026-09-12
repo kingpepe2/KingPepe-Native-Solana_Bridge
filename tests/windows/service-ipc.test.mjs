@@ -55,7 +55,7 @@ import { ProtectedDepositAttesterClient } from "../../services/attesters/protect
 if (process.platform !== "win32") throw new Error("WINDOWS_IPC_TESTS_REQUIRE_WINDOWS");
 const repoRoot = path.resolve(import.meta.dirname, "../.."), serviceSid = windowsCurrentServiceSid();
 const h = v => createHash("sha256").update(v).digest("hex");
-const deployment = h("protected-ipc-local-deployment"), protocol = "KINGPEPE_SERVICE_IPC_V2";
+const deployment = h("protected-ipc-local-deployment"), protocol = "KINGPEPE_SERVICE_IPC_V3";
 const cleanups = new Map();
 function temporary(t) {
   const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-ipc-test-"));
@@ -877,29 +877,26 @@ function rawRequest(f, port, change) {
   return new Promise(resolve => {
     const s = tls.connect({ host: "127.0.0.1", port, servername: "kingpepe-service.invalid", ca: f.serverCert.certificatePem,
       key: f.clientCert.privateKeyPem, cert: f.clientCert.certificatePem, minVersion: "TLSv1.3" });
-    let input = Buffer.alloc(0), sent = false, gotResponse = false;
+    let gotResponse = false;
     s.on("error", () => {}); s.setTimeout(20000, () => s.destroy()); s.on("close", () => resolve(gotResponse));
-    s.on("data", chunk => {
-      if (sent) { gotResponse = true; s.destroy(); return; }
-      input = Buffer.concat([input, chunk]); if (input.length < 4 || input.length < input.readUInt32BE() + 4) return;
-      const hello = JSON.parse(input.subarray(4).toString("utf8"));
-      const value = [protocol, "REQUEST", hello[2], "localnet", "COORDINATOR", f.role, hello[6], hello[7], hello[8], h("raw-request"), h("operation"), "verifyNativeEvidence", Date.now() + 9000, Date.now() + 29000, {}];
+    s.on("data", () => { gotResponse = true; s.destroy(); });
+    s.once("secureConnect", () => {
+      const domain = h(JSON.stringify([protocol, REGTEST_GENESIS, deployment, 1]));
+      const value = [protocol, "REQUEST", domain, "localnet", "COORDINATOR", f.role, h("raw-request"), h("operation"), "verifyNativeEvidence", Date.now() + 9000, Date.now() + 29000, {}];
       const changed = change(value), payload = Buffer.isBuffer(changed) ? changed : Buffer.from(JSON.stringify(changed));
-      const header = Buffer.alloc(4); header.writeUInt32BE(payload.length); sent = true; s.write(Buffer.concat([header, payload]));
+      const header = Buffer.alloc(4); header.writeUInt32BE(payload.length); s.write(Buffer.concat([header, payload]));
     });
   });
 }
 for (const [label, change] of [
-  ["stale request", v => { v[12] = Date.now() - 1; return v; }],
-  ["excess admission lifetime", v => { v[12] = Date.now() + 20000; return v; }],
-  ["excess execution lifetime", v => { v[13] = Date.now() + 60000; return v; }],
-  ["expired execution lifetime", v => { v[13] = Date.now() - 1; return v; }],
+  ["stale request", v => { v[9] = Date.now() - 1; return v; }],
+  ["excess admission lifetime", v => { v[9] = Date.now() + 20000; return v; }],
+  ["excess execution lifetime", v => { v[10] = Date.now() + 60000; return v; }],
+  ["expired execution lifetime", v => { v[10] = Date.now() - 1; return v; }],
   ["wrong deployment", v => { v[2] = h("wrong"); return v; }],
   ["wrong environment", v => { v[3] = "mainnet"; return v; }],
   ["wrong role", v => { v[4] = "KINGPEPE_FROST_B"; return v; }],
-  ["modified session", v => { v[7] = h("substituted"); return v; }],
-  ["modified TLS exporter", v => { v[8] = h("substituted"); return v; }],
-  ["stale endpoint generation", v => { v[6] = "0"; return v; }],
+  ["old wire protocol", v => { v[0] = "KINGPEPE_SERVICE_IPC_V2"; return v; }],
   ["malformed JSON", () => Buffer.from("{")],
   ["oversized wire frame", () => Buffer.alloc(262145)],
 ]) test("authenticated peer rejected: " + label, async t => {
@@ -907,10 +904,20 @@ for (const [label, change] of [
   assert.equal(await rawRequest(f, port, change), false); assert.equal(calls, 0);
 });
 
+test("reopening an IPC listener invalidates the previous listener", async t => {
+  const f = fixture(t); let calls = 0;
+  const oldPort = await f.server.listen(() => { calls++; return true; });
+  const replacement = new ProtectedServiceIpc(new WindowsProtectedStore(f.serverOptions));
+  t.after(() => replacement.close());
+  const port = await replacement.listen(() => true);
+  await assert.rejects(f.client.request(oldPort, request()));
+  assert.equal(calls, 0); assert.equal(await f.client.request(port, request()), true);
+});
+
 test("an admitted request cannot return a late result", async t => {
   const f = fixture(t); let calls = 0;
   const port = await f.server.listen(async () => { calls++; await new Promise(resolve => setTimeout(resolve, 750)); return true; });
-  const accepted = await rawRequest(f, port, v => { v[12] = Date.now() + 200; v[13] = Date.now() + 500; return v; });
+  const accepted = await rawRequest(f, port, v => { v[9] = Date.now() + 200; v[10] = Date.now() + 500; return v; });
   assert.equal(accepted, false); assert.equal(calls, 1); assert.equal(f.server.lastRejection, "IpcExpiredResult");
 });
 
@@ -1479,7 +1486,15 @@ async function attesterActor(f, selectedBoundary = "NONE") {
     });
   };
   const stop = async () => { if (!closed) child.kill(); await ended; };
-  cleanups.get(f.root).push(stop);
+  cleanups.get(f.root).unshift(async () => {
+    if (closed) return;
+    if (selectedBoundary !== "NONE") { await stop(); return; }
+    try {
+      const released = receive("CLOSED");
+      child.stdin.write('["CLOSE",null]\n');
+      assert.equal(await released, true);
+    } finally { await stop(); }
+  });
   const ready = receive("READY");
   child.stdin.write(JSON.stringify(["INIT", { role: f.role, boundary: selectedBoundary, seedOptions: f.opts, policy: f.policy,
     journalOptions: f.journalOptions, serverOptions: f.serverOptions, supervisorOptions: f.supervisor.clientOptions,

@@ -12,7 +12,7 @@ import { createLocalSolanaSetupContext, createNativeToSolanaFlowConfig, executeN
   submitLocalnetSolanaSetup, submitLocalnetSolanaDepositClaim } from "../../scripts/local-e2e-native-to-solana.mjs";
 import { base58Decode, base58Encode, findProgramAddress } from "../../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs";
 import { SPL_TOKEN_PROGRAM_ID_BASE58 as TOKEN } from "../../services/bridge-validator/localnet-solana-setup-plan.mjs";
-import { DEPLOYMENT_MONITOR_PROTOCOL, UPGRADEABLE_LOADER, LocalDeploymentRpc, deploymentDigest,
+import { DEPLOYMENT_MONITOR_PROTOCOL, UPGRADEABLE_LOADER, LocalDeploymentRpc,
   validateDeploymentManifest, verifyDeploymentSnapshot } from "../../services/solana-observer/deployment-integrity.mjs";
 import { validateRuntimeFile } from "../../shared/runtime-path-boundary.mjs";
 import { packet } from "./local-transaction-packet.mjs";
@@ -27,16 +27,14 @@ function identity() {
 export async function localDeploymentManifest({ context, authority, sourceSha }) {
   const { plan, flowConfig: c, localSolanaSetupContext: setup } = context;
   const rpc = new LocalDeploymentRpc({ endpoint: `http://127.0.0.1:${plan.ports.solanaRpcPort}` });
-  const program = (id, file) => {
-    const b = readFileSync(file);
-    return { id, loader: UPGRADEABLE_LOADER, programData: findProgramAddress([base58Decode(id)], base58Decode(UPGRADEABLE_LOADER)).base58,
-      upgradeAuthority: authority, deploymentSlot: "0", binaryLength: b.length, binaryHash: deploymentDigest(b), dataLength: b.length + 45 };
-  };
+  const program = id => ({ id, loader: UPGRADEABLE_LOADER,
+    programData: findProgramAddress([base58Decode(id)], base58Decode(UPGRADEABLE_LOADER)).base58,
+    upgradeAuthority: authority, deploymentSlot: "0" });
   const pda = (seed, id) => findProgramAddress([Buffer.from(seed), base58Decode(setup.mintBase58)], base58Decode(id)).base58;
   const manager = plan.programIds.kingpepeBridge, transceiver = plan.programIds.kingpepeTransceiver;
   return validateDeploymentManifest({ protocol: DEPLOYMENT_MONITOR_PROTOCOL, environment: "localnet", sourceSha, identityVersion: 1,
     nativeGenesisHex: context.nativeSource.nativeGenesisHash, solanaGenesis: await rpc.genesis(), solanaDeploymentHex: c.solanaDeploymentHex,
-    minimumSlot: "0", maximumStallMs: 60000, manager: program(manager, plan.paths.bridgeProgramSo), transceiver: program(transceiver, plan.paths.transceiverProgramSo),
+    minimumSlot: "0", maximumStallMs: 60000, manager: program(manager), transceiver: program(transceiver),
     mint: { id: setup.mintBase58, tokenProgram: TOKEN, authority: pda("kingpepe-mint-authority", manager), decimals: c.nativeDecimals },
     config: { bridgePda: pda("kingpepe-bridge-state", manager), transceiverPda: pda("kingpepe-transceiver-config", transceiver),
       policyEpoch: c.policyEpoch, keyEpoch: c.keyEpoch, protocolId: c.protocolId, nativeNetwork: c.nativeNetwork,
@@ -82,7 +80,7 @@ export async function runLocalDeploymentIntegrity(repoRoot, sourceSha) {
     assert.equal(flow.state, "COMPLETED", "MonitorTestDepositMustComplete");
     const live = verifyDeploymentSnapshot(manifest, await rpc.snapshot(manifest));
     assert.equal(live.mintSupplyAtomic, config.amountAtomic); assert.equal(live.managerMintedAtomic, config.amountAtomic);
-    passed.push("FINALIZED_MINT_OBSERVED_WITH_MATCHING_EXECUTABLES");
+    passed.push("FINALIZED_MINT_OBSERVED_WITH_MATCHING_DEPLOYMENT");
     const liveSnapshot = await rpc.snapshot(manifest);
     // Reject configuration/PDA aliases at manifest admission, never query them
     // as an implicitly approved new deployment.
@@ -97,7 +95,7 @@ export async function runLocalDeploymentIntegrity(repoRoot, sourceSha) {
     ]) { const wrong = structuredClone(manifest); mutation(wrong); assert.throws(() => verifyDeploymentSnapshot(wrong, liveSnapshot)); passed.push(label); }
     for (const [label, mutation] of [
       ["GENESIS_MISMATCH_FROM_LIVE_RPC", m => { m.solanaGenesis = nextAuthority.publicKeyBase58; }],
-      ["BYTECODE_HASH_MISMATCH_FROM_LIVE_PROGRAMDATA", m => { m.manager.binaryHash = "ff".repeat(32); }],
+      ["TRANSCEIVER_DEPLOYMENT_SLOT_MISMATCH_FROM_LIVE_PROGRAMDATA", m => { m.transceiver.deploymentSlot = "1"; }],
       ["UPGRADE_AUTHORITY_MISMATCH_FROM_LIVE_PROGRAMDATA", m => { m.manager.upgradeAuthority = nextAuthority.publicKeyBase58; }],
       ["DEPLOYMENT_SLOT_MISMATCH_FROM_LIVE_PROGRAMDATA", m => { m.manager.deploymentSlot = "1"; }],
       ["ATTESTER_IDENTITY_MISMATCH_FROM_LIVE_CONFIG", m => { m.config.attesters[0] = nextAuthority.publicKeyBase58; }],
@@ -212,12 +210,14 @@ export async function runLocalDeploymentIntegrity(repoRoot, sourceSha) {
     upgradeStage = "WRITE_BUFFER";
     for (let i = 0; i < writes.length; i += 8) signatures.push(...await Promise.all(writes.slice(i, i + 8).map(ix => submit([ix], [nextAuthority]))));
     await confirmed(signatures);
-    if (replacement.length + 45 > manifest.manager.dataLength) {
+    const originalBinary = readFileSync(plan.paths.bridgeProgramSo);
+    const programDataLength = Buffer.from((await rpc.snapshot(manifest)).accounts[5].data[0], "base64").length;
+    if (replacement.length + 45 > programDataLength) {
       upgradeStage = "EXTEND_PROGRAM";
       // Agave 4.2.2 enforces a minimum extension of 10 KiB (SIMD-0431).
       await confirmed([await submit([{ program: UPGRADEABLE_LOADER, accounts: [meta(manifest.manager.programData, true), meta(manifest.manager.id, true),
         meta("11111111111111111111111111111111", false), meta(funding.publicKeyBase58, true, true)],
-        data: Buffer.concat([u32(6), u32(Math.max(10240, replacement.length + 45 - manifest.manager.dataLength))]) }])]);
+        data: Buffer.concat([u32(6), u32(Math.max(10240, replacement.length + 45 - programDataLength))]) }])]);
     }
     // ExtendProgram advances ProgramData's deployment slot. A simulation in
     // that same finalized bank correctly rejects another upgrade. Wait for a
@@ -241,12 +241,13 @@ export async function runLocalDeploymentIntegrity(repoRoot, sourceSha) {
     let byteChange = false;
     for (let n = 0; n < 30; n++) {
       const snapshot = await rpc.snapshot(manifest), data = Buffer.from(snapshot.accounts[5].data[0], "base64");
-      if (deploymentDigest(data.subarray(45, 45 + manifest.manager.binaryLength)) !== manifest.manager.binaryHash) {
-        // Test-only metadata normalization isolates executable mismatch from
-        // the already-tested authority/slot checks. It does NOT approve this code.
+      if (data.subarray(45, 45 + replacement.length).equals(replacement) && !replacement.equals(originalBinary)) {
+        // Build bytes confirm that the test really upgraded the executable.
+        // Runtime rejection uses the retained deployment slot, even after the
+        // separately tested authority change is accounted for in this fixture.
         const expected = structuredClone(manifest); expected.manager.upgradeAuthority = nextAuthority.publicKeyBase58;
-        expected.manager.deploymentSlot = data.readBigUInt64LE(4).toString(); expected.manager.dataLength = data.length;
-        assert.throws(() => verifyDeploymentSnapshot(expected, snapshot), e => e.integrityCode === "SOLANA_DEPLOYMENT_CHANGED");
+        assert.notEqual(data.readBigUInt64LE(4).toString(), expected.manager.deploymentSlot);
+        assert.throws(() => verifyDeploymentSnapshot(expected, snapshot), e => e.integrityCode === "SOLANA_DEPLOYMENT_CHANGED" && e.violation === "UPGRADE_AUTHORITY_OR_SLOT");
         byteChange = true; break;
       }
       await delay(500);

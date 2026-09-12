@@ -6,114 +6,85 @@
   "productionSigningAuthorized": false,
   "productionBroadcastAuthorized": false,
   "lastUpdated": "2026-09-12",
-  "sourceStatus": "PHASE09_PUBLISHED_LOCAL_PASS_PHASE10_LOCAL_SERVICE_INCREMENT",
-  "baselineSha": "bdb996e45df33535a78d983afab22aa60a47cf15",
+  "sourceStatus": "FINAL_SIMPLIFICATION_CORE_VALIDATED_LOCALLY",
   "repository": {
     "visibility": "PUBLIC",
-    "publicationReview": "PASS_SOURCE_STAGED_OUTGOING_HISTORY_AND_CI_LOGS",
-    "reviewedSha": "e7e7f6f247a18f298cb7d92b247fb2dd43cee609"
+    "reviewBaseSha": "ab15b2f38084f024e49d8fae9a13182dfe85721d"
   },
-  "phase08Core": "PASS_LOCALLY",
-  "phase09": "IMPLEMENTED_AND_TESTED_LOCALLY",
-  "coreValidation": {
-    "scope": "EXACT_CLEANUP_SHA_e7e7f6f247a18f298cb7d92b247fb2dd43cee609_UNLESS_MARKED_OTHERWISE",
-    "windowsNode": {
-      "pass": 940,
-      "fail": 0,
-      "skip": 0,
-      "vectors": 2
+  "cleanupReview": {
+    "baseSha": "ab15b2f38084f024e49d8fae9a13182dfe85721d",
+    "filesBefore": 246,
+    "filesAfter": 240,
+    "validation": {
+      "status": "PASS_LOCALLY",
+      "scope": "Combined reviewed working tree; not certification of its parent commit",
+      "sourceBaseSha": "ab15b2f38084f024e49d8fae9a13182dfe85721d",
+      "worktreeDirty": true,
+      "coordinatorCorrectionCommit": "84d8fa0f0eb830a3c9217813f9a907abf437415f",
+      "nodeWindows": {
+        "pass": 963,
+        "fail": 0,
+        "skipped": 0,
+        "canonicalVectors": 2
+      },
+      "nodeWsl": {
+        "pass": 963,
+        "fail": 0,
+        "skipped": 0,
+        "canonicalVectors": 2
+      },
+      "windowsCurrentUserSecurity": {
+        "tests": 139,
+        "pass": 139,
+        "fail": 0,
+        "skipped": 0
+      },
+      "windowsFreshVerifierController": {
+        "pass": 6,
+        "fail": 0,
+        "skipped": 0
+      },
+      "rust": {
+        "pass": 94,
+        "lockedCheck": true,
+        "format": true,
+        "clippy": true
+      },
+      "reproducibleSbfBuilds": {
+        "independentBuilds": 2,
+        "match": true,
+        "managerSha256": "996d0f1ac65b97160bf8ea0cd4c5e77361f4d83f9c15aa0c2ca2c238ea350f46",
+        "transceiverSha256": "58bacbe7119e8793ae93dc0e025ed2ebc96c9a1407b16fdcbbdab2ec4d706eb0",
+        "purpose": "RELEASE_BUILD_EVIDENCE_ONLY"
+      },
+      "realChainChecks": {
+        "deposit": 55,
+        "roundTrip": 25,
+        "withdrawalRecord": 29,
+        "subsequentDepositAccounting": 5,
+        "reconciliation": 10,
+        "acceptanceCheckpoint": 13,
+        "nativeReorg": 8,
+        "deploymentIdentity": 18
+      },
+      "nativeToSolana": "COMPLETED",
+      "solanaToNative": "COMPLETED",
+      "frostExactTwoOfTwo": "PASS",
+      "replay": "PASS",
+      "noDoubleMint": "PASS",
+      "noDoublePayout": "PASS",
+      "restart": "PASS",
+      "pause": "PASS",
+      "reconciliation": "PASS",
+      "sourceAudit": "PASS",
+      "sourceSecretScan": "PASS",
+      "npmAuditVulnerabilities": 0,
+      "dependencyLicenseAudit": "PASS",
+      "exactCommitCi": "Consult the matching GitHub Actions run; worktree results do not certify another SHA"
     },
-    "wslNode": {
-      "pass": 940,
-      "fail": 0,
-      "skip": 0,
-      "vectors": 2
-    },
-    "rust": {
-      "pass": 94,
-      "fail": 0,
-      "check": "PASS",
-      "fmt": "PASS",
-      "clippy": "PASS"
-    },
-    "sbf": "BOTH_BUILT_AND_EXECUTED_LOCALLY",
-    "nativeToSolana": "COMPLETED",
-    "coreChain": {
-      "pass": 55,
-      "fail": 0
-    },
-    "withdrawalRecord": {
-      "pass": 29,
-      "fail": 0
-    },
-    "laterDepositCounter": {
-      "pass": 5,
-      "fail": 0
-    },
-    "windowsSecurity": {
-      "pass": 136,
-      "fail": 0,
-      "skip": 0,
-      "scope": "CURRENT_USER_NOT_DISTINCT_SERVICE_IDENTITIES"
-    },
-    "solanaToNative": "SEE_PHASE09_WORKING_TREE_EVIDENCE",
-    "freshClone": "PASS_EXACT_CLEANUP_SHA",
-    "provenanceBoundary": {
-      "files": 239,
-      "status": "PASS"
-    },
-    "historySecrets": {
-      "commits": 184,
-      "status": "PASS_AFTER_REVIEW"
-    },
-    "historicalCILogs": {
-      "runs": 158,
-      "logs": 134,
-      "zeroStepRuns": 24,
-      "status": "PASS_AFTER_REVIEW"
-    },
-    "otherLocalChain": {
-      "acceptanceCheckpoint": 13,
-      "reconciliation": 10,
-      "reconciliationClaims": 14,
-      "deploymentIntegrity": 18,
-      "nativeReorg": 8,
-      "fail": 0
-    },
-    "guardrails": "PASS"
+    "scope": "WORKING_TREE_CLEANUP_NOT_CERTIFIED_BY_OLDER_RESULTS"
   },
-  "ci": {
-    "status": "EXACT_SHA_FIX_VERIFICATION_IN_PROGRESS",
-    "sourceSha": "e9485ad0cd9a33d185cd45d590fbc2b946fc050c",
-    "runId": 34694101465,
-    "priorRunId": 34692481377,
-    "priorSourceSha": "79e586424c852639d52b55251ac18198ef0c3abe",
-    "priorLinux": "PASS",
-    "priorWindows": {
-      "protectedStorage": "PASS_138",
-      "readiness": "FAIL_3_WINDOWS_PATH_ALIAS_ASSERTIONS"
-    },
-    "correction": "COMPARE_INDEPENDENTLY_RESOLVED_PHYSICAL_PATHS",
-    "correctedLocalTestsPerPlatform": 72
-  },
-  "production": {
-    "configuration": "NOT_CONFIGURED",
-    "deployment": "NOT_DEPLOYED",
-    "devnet": "NOT_RUN",
-    "externalReview": "NOT_RUN",
-    "activationApproval": false
-  },
-  "limitations": [
-    "Single-host compromise/availability affects both FROST participants",
-    "Noble FROST is unaudited",
-    "CurrentUser DPAPI checks do not certify distinct service principals",
-    "No full-host/snapshot rollback guarantee",
-    "Project-attested and configured chain-source trust remain",
-    "Upgrade authority can change program behavior",
-    "Cargo reports bincode 1.3.3 unmaintained: RUSTSEC-2025-0141"
-  ],
-  "next": "Publish the local service increment, verify exact-SHA CI and complete simple operational integration before CLI/UI and Devnet",
-  "phase09Validation": {
+  "priorValidation": {
     "sourceSha": "7f4bb7b3db3a61802b956aba8ee0f76d5e340772",
     "worktreeDirty": false,
     "windowsNode": 962,
@@ -138,25 +109,24 @@
     },
     "exactShaFreshClone": "PASS"
   },
-  "phase10": "LOCAL_SERVICE_PUBLISHED_DISCOVERY_FOLLOWUP_TESTED",
-  "phase10Validation": {
-    "baseSha": "d8ff95d06e0df6c5a54bc351a6b87dedbfb06ea9",
-    "worktreeDirty": true,
-    "windowsNode": 963,
-    "wslNode": 963,
-    "vectorsPerPlatform": 2,
-    "coreChain": 55,
-    "roundTrip": {
-      "pass": 25,
-      "fail": 0,
-      "nativeToSolana": "COMPLETED",
-      "solanaToNative": "COMPLETED",
-      "durableInbox": "PASS",
-      "automaticOnChainDiscovery": "PASS",
-      "separateProcessServiceRestart": "PASS",
-      "acceptedPayoutReorgPause": "PASS"
-    },
-    "exactShaFreshClone": "NOT_RUN",
-    "productionServiceIntegration": "INCOMPLETE"
-  }
+  "production": {
+    "configuration": "NOT_CONFIGURED",
+    "deployment": "NOT_DEPLOYED",
+    "devnet": "NOT_RUN",
+    "externalReview": "NOT_RUN",
+    "activationApproval": false
+  },
+  "limitations": [
+    "Single-host compromise/availability affects both FROST participants",
+    "Noble FROST is unaudited",
+    "CurrentUser DPAPI checks do not certify distinct service principals",
+    "No full-host/snapshot rollback guarantee",
+    "Project-attested and configured chain-source trust remain",
+    "Upgrade authority can change program behavior",
+    "Cargo reports bincode 1.3.3 unmaintained: RUSTSEC-2025-0141"
+  ],
+  "ci": {
+    "status": "CLEANUP_COMMIT_NOT_YET_CREATED"
+  },
+  "next": "STOP_AFTER_CLEANUP_VALIDATION_AND_REPORT"
 }

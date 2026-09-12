@@ -6,7 +6,7 @@ import { SPL_TOKEN_PROGRAM_ID_BASE58 as TOKEN } from "../bridge-validator/localn
 import { requireIntegrityGuard } from "../supervisor/protected-integrity.mjs";
 import { assertWindowsProtectedStore } from "../../shared/windows/protected-store.mjs";
 
-export const DEPLOYMENT_MONITOR_PROTOCOL = "KINGPEPE_DEPLOYMENT_MONITOR_V1";
+export const DEPLOYMENT_MONITOR_PROTOCOL = "KINGPEPE_DEPLOYMENT_MONITOR_V2";
 export const LEGACY_LOADER = "BPFLoader2111111111111111111111111111111111";
 export const UPGRADEABLE_LOADER = "BPFLoaderUpgradeab1e11111111111111111111111";
 const MAX_PROGRAM_BYTES = 2_097_152, MAX_RESPONSE_BYTES = 8_388_608;
@@ -33,15 +33,13 @@ export function validateDeploymentManifest(input) {
   check(bounded(m.identityVersion, 0xffff_ffff) > 0); hash(m.nativeGenesisHex); hash(m.solanaDeploymentHex); key(m.solanaGenesis); uint(m.minimumSlot);
   check(bounded(m.maximumStallMs, 300000) >= 1000);
   for (const p of [m.manager, m.transceiver]) {
-    keys(p, ["id", "loader", "programData", "upgradeAuthority", "deploymentSlot", "binaryLength", "binaryHash", "dataLength"]);
+    keys(p, ["id", "loader", "programData", "upgradeAuthority", "deploymentSlot"]);
     key(p.id); check([LEGACY_LOADER, UPGRADEABLE_LOADER].includes(p.loader));
-    check(bounded(p.binaryLength, MAX_PROGRAM_BYTES) > 4); hash(p.binaryHash);
-    check(bounded(p.dataLength, MAX_PROGRAM_BYTES + 45) >= p.binaryLength);
-    if (p.loader === LEGACY_LOADER) check(p.programData === null && p.upgradeAuthority === null && p.deploymentSlot === null && p.dataLength === p.binaryLength);
+    if (p.loader === LEGACY_LOADER) check(p.programData === null && p.upgradeAuthority === null && p.deploymentSlot === null);
     else {
       check(p.programData === findProgramAddress([key(p.id)], key(UPGRADEABLE_LOADER)).base58);
       if (p.upgradeAuthority !== null) key(p.upgradeAuthority);
-      uint(p.deploymentSlot); check(p.dataLength >= p.binaryLength + 45);
+      uint(p.deploymentSlot);
     }
   }
   keys(m.mint, ["id", "tokenProgram", "authority", "decimals"]);
@@ -101,16 +99,15 @@ export function verifyDeploymentSnapshot(manifest, snapshot) {
       const data = accounts.get(p.programData);
       if (data === null) different("SOLANA_DEPLOYMENT_CHANGED", { absent: p.programData }, "PROGRAMDATA_ABSENT");
       b = accountData(data);
-      if (data.owner !== UPGRADEABLE_LOADER || data.executable || b.length !== p.dataLength || b.length < 45 || b.readUInt32LE() !== 3 || ![0, 1].includes(b[12])) different("SOLANA_DEPLOYMENT_CHANGED", data, "PROGRAMDATA_LAYOUT");
+      if (data.owner !== UPGRADEABLE_LOADER || data.executable || b.length <= 49 || b.length > MAX_PROGRAM_BYTES + 45 || b.readUInt32LE() !== 3 || ![0, 1].includes(b[12])) different("SOLANA_DEPLOYMENT_CHANGED", data, "PROGRAMDATA_LAYOUT");
       slot = b.readBigUInt64LE(4).toString();
       const authority = b[12] === 0 ? null : base58Encode(b.subarray(13, 45));
       if (slot !== p.deploymentSlot || authority !== p.upgradeAuthority) different("SOLANA_DEPLOYMENT_CHANGED", data, "UPGRADE_AUTHORITY_OR_SLOT");
-      // None's serialized unused bytes are not authority data. Hash precisely
-      // the approved executable length and require all allocated tail bytes zero.
       b = b.subarray(45);
-    } else if (b.length !== p.dataLength) different("SOLANA_DEPLOYMENT_CHANGED", a, "PROGRAM_LENGTH");
-    if (b.subarray(0, 4).toString("hex") !== "7f454c46" || b.length < p.binaryLength ||
-        b.subarray(p.binaryLength).some(byte => byte !== 0) || deploymentDigest(b.subarray(0, p.binaryLength)) !== p.binaryHash) different("SOLANA_DEPLOYMENT_CHANGED", { program: p.id, dataHash: deploymentDigest(b), slot: slot ?? null }, "BYTECODE_IDENTITY");
+    }
+    // Identity and the accepted deployment slot detect unauthorized upgrades.
+    // Binary hashes belong to build/release evidence, not runtime enrollment.
+    if (b.length <= 4 || b.length > MAX_PROGRAM_BYTES || b.subarray(0, 4).toString("hex") !== "7f454c46") different("SOLANA_DEPLOYMENT_CHANGED", { program: p.id, slot: slot ?? null }, "PROGRAM_LAYOUT");
   }
   const mint = accounts.get(m.mint.id), bridge = accounts.get(m.config.bridgePda), transceiver = accounts.get(m.config.transceiverPda);
   if (!mint) different("SOLANA_DEPLOYMENT_CHANGED", { missingMint: true }, "MISSING_MINT");

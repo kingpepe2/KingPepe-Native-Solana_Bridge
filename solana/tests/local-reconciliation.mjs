@@ -40,10 +40,10 @@ export async function runLocalReconciliation(repoRoot, sourceSha) {
       stage = "RESTARTED_READER";
       assert.deepEqual((await readDepositReconciliation({ ...input, operations: structuredClone(f.state.operations) })).accounting, result.accounting);
       passed.push("REOPENED_RECORDS_RECONCILE_WITHOUT_SENDING_TRANSACTIONS");
-      stage = "BYTECODE";
-      const wrong = structuredClone(manifest); wrong.manager.binaryHash = "fa".repeat(32);
+      stage = "DEPLOYMENT";
+      const wrong = structuredClone(manifest); wrong.manager.deploymentSlot = "18446744073709551615";
       await assert.rejects(readDepositReconciliation({ ...input, manifest: wrong }), e => e.integrityCode === "SOLANA_DEPLOYMENT_CHANGED");
-      passed.push("ACTUAL_DEPLOYED_BYTES_NOT_REPLACED_BY_LOCAL_EXPECTATION");
+      passed.push("ACTUAL_DEPLOYMENT_SLOT_NOT_REPLACED_BY_LOCAL_EXPECTATION");
       stage = "GENESIS";
       const other = "11111111111111111111111111111111";
       // The operation journal rejects cross-genesis reuse before any RPC. This

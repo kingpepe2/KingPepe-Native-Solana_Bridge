@@ -25,7 +25,8 @@ The Manager counter tracks bridge-issued value minus recorded bridge burns;
 it is not overwritten with actual SPL supply. Direct SPL burns change actual
 Mint supply but create no payout entitlement. Later bridge burns and mints
 preserve that difference, while gross recorded burns remain owed. Reconciliation
-reads both counters and actual supply. No Native withdrawal payout exists yet.
+reads both counters and actual supply. The local withdrawal service verifies
+finalized records and pays Native through exact A+B signing and the journal.
 The real-validator suite is solana/tests/local-withdrawal-record.mjs; host models
 explicitly do not prove Token CPI or fresh-account creation.
 
