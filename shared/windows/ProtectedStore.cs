@@ -106,6 +106,24 @@ namespace KingPepe.LocalProtection {
         Require(stream.Length>0 && stream.Length<=1048576);
       }
     }
+    // Only called immediately after compiling into a newly created private
+    // directory. Elevated Windows tokens can assign a generated file to their
+    // default token principal; explicitly bind this new file to the service.
+    // Existing cached helpers and protected state are never repaired this way.
+    public static void SealCompiledExecutable(string executable,string source) {
+      var sid=WindowsIdentity.GetCurrent().User;
+      string root=Root(Path.GetDirectoryName(executable),Path.GetFullPath(source));
+      Require(Path.GetFileName(executable)=="protected-store.exe"); CheckAcl(root,true,sid);
+      Require((File.GetAttributes(executable)&FileAttributes.ReparsePoint)==0);
+      using(var stream=new FileStream(executable,FileMode.Open,FileSystemRights.FullControl,FileShare.None,4096,FileOptions.None)) {
+        FileInformation info; Require(GetFileInformationByHandle(stream.SafeFileHandle,out info));
+        Require(info.Links==1 && (info.Attributes&(uint)FileAttributes.ReparsePoint)==0 && stream.Length>0 && stream.Length<=1048576);
+        var acl=new FileSecurity(); acl.SetOwner(sid); acl.SetAccessRuleProtection(true,false);
+        acl.AddAccessRule(new FileSystemAccessRule(sid,FileSystemRights.FullControl,AccessControlType.Allow));
+        stream.SetAccessControl(acl);
+      }
+      CheckExecutableDirectory(executable,source);
+    }
     static FileStream Open(string path, FileMode mode, SecurityIdentifier sid) {
       if(mode==FileMode.Open) CheckAcl(path,false,sid);
       FileStream stream;

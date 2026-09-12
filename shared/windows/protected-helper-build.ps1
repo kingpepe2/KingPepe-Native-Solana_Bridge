@@ -30,6 +30,7 @@ try {
     $kpDiagnostics = @(& $kpCompiler '/nologo' '/target:exe' '/optimize+' '/platform:anycpu' '/reference:System.Security.dll' '/reference:System.Web.Extensions.dll' ("/out:" + $kpExecutable) $kpStoreSource $kpEntrySource 2>&1)
     if ($LASTEXITCODE -ne 0 -or $kpDiagnostics.Count -ne 0) { throw 'HELPER_BUILD_FAILED' }
     $kpStage = 'EXECUTABLE_POLICY'
+    [KingPepe.LocalProtection.ProtectedStore]::SealCompiledExecutable($kpExecutable, $kpSourceRoot)
     [KingPepe.LocalProtection.ProtectedStore]::CheckExecutableDirectory($kpExecutable, $kpSourceRoot)
     $kpStage = 'RESULT'
     $kpHash = (Get-FileHash -LiteralPath $kpExecutable -Algorithm SHA256).Hash.ToLowerInvariant()
