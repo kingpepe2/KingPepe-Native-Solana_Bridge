@@ -404,6 +404,18 @@ export function base58Decode(value, label = "base58") {
   if (typeof value !== "string" || !BASE58_PATTERN.test(value)) {
     throw new Error(`${label}:InvalidBase58`);
   }
+  return decodeBase58Value(value, label);
+}
+
+// Instruction payloads are not 32-byte addresses or 64-byte signatures. Keep
+// the existing address/signature bounds and use this explicitly bounded path
+// for the actual getTransaction instruction data.
+export function base58DecodeInstruction(value) {
+  if (typeof value !== "string" || !/^[1-9A-HJ-NP-Za-km-z]{1,1024}$/u.test(value)) throw new Error("InstructionDataInvalidBase58");
+  return decodeBase58Value(value, "instruction");
+}
+
+function decodeBase58Value(value, label) {
   let zeroes = 0;
   while (zeroes < value.length && value[zeroes] === "1") {
     zeroes += 1;
