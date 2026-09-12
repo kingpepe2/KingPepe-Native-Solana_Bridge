@@ -28,9 +28,9 @@ export function windowsProtectedExecutable() {
     if (!retained) {
       const windowsRoot = process.env.SystemRoot;
       check(typeof windowsRoot === "string" && /^[A-Z]:\\[^\r\n\0]+$/iu.test(windowsRoot));
-      const parent = path.resolve(os.tmpdir());
-      const root = path.join(parent, "kingpepe-protected-helper-" + process.pid + "-" + randomBytes(16).toString("hex"));
-      validateRuntimeStateRoot(root, sourceRoot);
+      const root = validateRuntimeStateRoot(path.join(path.resolve(os.tmpdir()),
+        "kingpepe-protected-helper-" + process.pid + "-" + randomBytes(16).toString("hex")), sourceRoot);
+      const parent = path.dirname(root);
       const before = sourceDigest(), input = Buffer.from(JSON.stringify({ root }));
       let result;
       try {
