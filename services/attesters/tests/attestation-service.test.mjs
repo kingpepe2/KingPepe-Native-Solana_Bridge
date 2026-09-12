@@ -12,9 +12,9 @@ import {
 import { decodeCanonicalBridgeMessage, encodeCanonicalBridgeMessage, bytesToHex } from "../../../shared/protocol/canonical-message.mjs";
 import { attesterEvidenceVerifier } from "../protected-service.mjs";
 
-const vectorPath = path.resolve(import.meta.dirname, "../../../solana/modules/bridge-messages/vectors/canonical-v1.json");
+const vectorPath = path.resolve(import.meta.dirname, "../../../solana/modules/bridge-messages/vectors/canonical-borsh-v2.json");
 const vectorFile = JSON.parse(readFileSync(vectorPath, "utf8"));
-const depositVector = vectorFile.vectors.find((vector) => vector.name === "deposit-claim-v1");
+const depositVector = vectorFile.vectors.find((vector) => vector.name === "deposit-claim-v2");
 const decodedDeposit = decodeCanonicalBridgeMessage(depositVector.encodedHex);
 
 function policyFor(role, keypair, overrides = {}) {

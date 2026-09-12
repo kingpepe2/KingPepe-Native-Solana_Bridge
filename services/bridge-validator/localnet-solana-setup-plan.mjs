@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { encodeBridgeAbi } from "../../shared/protocol/solana-bridge-abi.mjs";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import {
   bytesToHex,
@@ -423,77 +424,25 @@ function encodeInitializeAccount3({ tokenAccountOwner }) {
 }
 
 function encodeTransceiverInitialize({
-  protocolId,
-  nativeNetwork,
-  nativeGenesis,
-  transceiverProgram,
-  managerProgram,
-  mint,
-  solanaDeployment,
-  attesters,
-  active,
-  keyEpoch,
+  protocolId, nativeNetwork, nativeGenesis, transceiverProgram, managerProgram,
+  mint, solanaDeployment, attesters, active, keyEpoch,
 }) {
-  const data = concatBytes([
-    Uint8Array.of(TRANSCEIVER_INSTRUCTION_INITIALIZE),
-    transceiverProgram.bytes,
-    managerProgram.bytes,
-    mint.bytes,
-    solanaDeployment.bytes,
-    u32Le(protocolId),
-    u32Le(nativeNetwork),
-    nativeGenesis.bytes,
-    attesters[0].bytes,
-    attesters[1].bytes,
-    Uint8Array.of(active ? 1 : 0),
-    u32Le(keyEpoch),
-  ]);
-  if (data.length !== 1 + TRANSCEIVER_CONFIG_INSTRUCTION_LENGTH) {
-    throw new Error("LocalnetSolanaSetupTransceiverConfigLengthInvalid");
-  }
-  return data;
+  return encodeBridgeAbi("TransceiverInitialize", { tag: TRANSCEIVER_INSTRUCTION_INITIALIZE,
+    config: { transceiverProgramId: transceiverProgram.bytes, managerProgramId: managerProgram.bytes,
+      mint: mint.bytes, solanaDeployment: solanaDeployment.bytes, protocolId, nativeNetwork,
+      nativeGenesis: nativeGenesis.bytes, authorizedAttesters: attesters.map(a => a.bytes), active, keyEpoch } });
 }
 
 function encodeBridgeInitialize({
-  managerProgram,
-  transceiverProgram,
-  solanaDeployment,
-  mint,
-  tokenProgram,
-  mintAuthority,
-  decimals,
-  nativeDecimals,
-  policyEpoch,
-  keyEpoch,
-  depositsPaused,
-  withdrawalsPaused,
-  hardStop,
-  mainnetActivationEnabled,
+  managerProgram, transceiverProgram, solanaDeployment, mint, tokenProgram, mintAuthority,
+  decimals, nativeDecimals, policyEpoch, keyEpoch, depositsPaused, withdrawalsPaused, hardStop, mainnetActivationEnabled,
 }) {
-  const data = concatBytes([
-    Uint8Array.of(BRIDGE_INSTRUCTION_INITIALIZE, 0),
-    managerProgram.bytes,
-    transceiverProgram.bytes,
-    solanaDeployment.bytes,
-    mint.bytes,
-    tokenProgram.bytes,
-    mintAuthority.bytes,
-    // None freeze authority and zero premine are implicit in this compact
-    // initialization ABI, not caller-selectable omitted authorizations.
-    Uint8Array.of(decimals, nativeDecimals),
-    u32Le(policyEpoch),
-    u32Le(keyEpoch),
-    Uint8Array.of(
-      depositsPaused ? 1 : 0,
-      withdrawalsPaused ? 1 : 0,
-      hardStop ? 1 : 0,
-      mainnetActivationEnabled ? 1 : 0,
-    ),
-  ]);
-  if (data.length !== 1 + BRIDGE_CONFIG_INSTRUCTION_LENGTH) {
-    throw new Error("LocalnetSolanaSetupBridgeConfigLengthInvalid");
-  }
-  return data;
+  // None freeze authority and zero premine remain implicit, not caller-selectable.
+  return encodeBridgeAbi("BridgeInitialize", { tag: BRIDGE_INSTRUCTION_INITIALIZE,
+    binding: { environment: 0, managerProgramId: managerProgram.bytes, transceiverProgramId: transceiverProgram.bytes,
+      solanaDeployment: solanaDeployment.bytes, mint: mint.bytes, tokenProgramId: tokenProgram.bytes,
+      mintAuthorityPda: mintAuthority.bytes, decimals, nativeDecimals },
+    policy: { policyEpoch, keyEpoch, depositsPaused, withdrawalsPaused, hardStop, mainnetActivationEnabled } });
 }
 
 function encodeLegacyMessageWithInstructions({

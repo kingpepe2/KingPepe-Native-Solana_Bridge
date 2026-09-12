@@ -2,11 +2,15 @@
 //! operation identity derivation, lifecycle states, and exact accounting
 //! primitives for the KingPepe Native - Solana bridge.
 
+use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-pub const PROTOCOL_MAGIC: [u8; 8] = *b"KPEPBRG1";
-pub const MESSAGE_VERSION: u8 = 1;
+pub mod abi;
+pub mod inputs;
+
+pub const PROTOCOL_MAGIC: [u8; 8] = *b"KPEPBRG2";
+pub const MESSAGE_VERSION: u8 = 2;
 pub const DEPLOYMENT_IDENTITY_LENGTH: usize = 168;
 pub const NATIVE_OUTPOINT_LENGTH: usize = 36;
 pub const MAX_DESTINATION_LENGTH: usize = 128;
@@ -141,7 +145,7 @@ pub enum BridgeStateEvent {
     EnterHardStop,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 pub struct DeploymentIdentity {
     pub protocol_id: u32,
     pub native_network: u32,
@@ -155,20 +159,14 @@ pub struct DeploymentIdentity {
 impl DeploymentIdentity {
     pub fn to_bytes(&self) -> [u8; DEPLOYMENT_IDENTITY_LENGTH] {
         let mut out = [0u8; DEPLOYMENT_IDENTITY_LENGTH];
-        let mut cursor = 0usize;
-        write_fixed(&mut out, &mut cursor, &self.protocol_id.to_le_bytes());
-        write_fixed(&mut out, &mut cursor, &self.native_network.to_le_bytes());
-        write_fixed(&mut out, &mut cursor, &self.native_genesis);
-        write_fixed(&mut out, &mut cursor, &self.solana_deployment);
-        write_fixed(&mut out, &mut cursor, &self.manager_program_id);
-        write_fixed(&mut out, &mut cursor, &self.transceiver_program_id);
-        write_fixed(&mut out, &mut cursor, &self.mint);
-        debug_assert_eq!(cursor, DEPLOYMENT_IDENTITY_LENGTH);
+        borsh::to_writer(&mut out[..], self).expect("fixed deployment schema length");
         out
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(
+    Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, BorshSerialize, BorshDeserialize,
+)]
 pub struct NativeOutpoint {
     pub txid: Hash32,
     pub vout: u32,
@@ -182,8 +180,7 @@ impl NativeOutpoint {
 
     pub fn to_bytes(&self) -> [u8; NATIVE_OUTPOINT_LENGTH] {
         let mut out = [0u8; NATIVE_OUTPOINT_LENGTH];
-        out[0..32].copy_from_slice(&self.txid);
-        out[32..36].copy_from_slice(&self.vout.to_le_bytes());
+        borsh::to_writer(&mut out[..], self).expect("fixed outpoint schema length");
         out
     }
 
@@ -235,6 +232,52 @@ pub struct WithdrawalRequestFields {
     pub nonce: Hash32,
     pub validity: ValidityWindow,
     pub evidence_digest: Hash32,
+}
+
+// These are the sole Borsh wire schemas; CanonicalBridgeMessage remains the
+// economic model. Destination length + fixed storage is deliberate: bounded
+// Solana instruction sizes, with exactly one accepted zero-padded encoding.
+#[derive(BorshSerialize, BorshDeserialize)]
+struct BorshBridgeMessage {
+    magic: [u8; 8],
+    version: u8,
+    action: u8,
+    direction: u8,
+    reserved: u8,
+    deployment: DeploymentIdentity,
+    operation_id: Hash32,
+    deposit_outpoint: NativeOutpoint,
+    withdrawal_id: Hash32,
+    amount_atomic: u64,
+    fee_atomic: u64,
+    destination_length: u16,
+    destination_padded: [u8; MAX_DESTINATION_LENGTH],
+    policy_epoch: u32,
+    key_epoch: u32,
+    nonce: Hash32,
+    valid_from: u64,
+    valid_until: u64,
+    evidence_digest: Hash32,
+}
+
+#[derive(BorshSerialize)]
+struct OperationIdInputs<'a> {
+    domain: [u8; 8],
+    version: u8,
+    action: u8,
+    direction: u8,
+    deployment: &'a DeploymentIdentity,
+    deposit_outpoint: &'a NativeOutpoint,
+    withdrawal_id: Hash32,
+    amount_atomic: u64,
+    fee_atomic: u64,
+    destination: &'a [u8],
+    policy_epoch: u32,
+    key_epoch: u32,
+    nonce: Hash32,
+    valid_from: u64,
+    valid_until: u64,
+    evidence_digest: Hash32,
 }
 
 impl CanonicalBridgeMessage {
@@ -290,47 +333,30 @@ impl CanonicalBridgeMessage {
 
     pub fn encode(&self) -> Result<Vec<u8>, MessageEncodeError> {
         self.validate()?;
-
-        let mut out = vec![0u8; MESSAGE_LENGTH];
-        let mut cursor = 0usize;
-
-        write_fixed(&mut out, &mut cursor, &PROTOCOL_MAGIC);
-        write_fixed(&mut out, &mut cursor, &[self.version]);
-        write_fixed(&mut out, &mut cursor, &[self.action as u8]);
-        write_fixed(&mut out, &mut cursor, &[self.direction as u8]);
-        write_fixed(&mut out, &mut cursor, &[0u8]);
-        write_fixed(&mut out, &mut cursor, &self.deployment.to_bytes());
-        write_fixed(&mut out, &mut cursor, &self.operation_id);
-        write_fixed(&mut out, &mut cursor, &self.deposit_outpoint.to_bytes());
-        write_fixed(&mut out, &mut cursor, &self.withdrawal_id);
-        write_fixed(&mut out, &mut cursor, &self.amount_atomic.to_le_bytes());
-        write_fixed(&mut out, &mut cursor, &self.fee_atomic.to_le_bytes());
-        write_fixed(
-            &mut out,
-            &mut cursor,
-            &(self.destination.len() as u16).to_le_bytes(),
-        );
-
-        let destination_start = cursor;
-        let destination_end = destination_start + self.destination.len();
-        out[destination_start..destination_end].copy_from_slice(&self.destination);
-        cursor += MAX_DESTINATION_LENGTH;
-
-        write_fixed(&mut out, &mut cursor, &self.policy_epoch.to_le_bytes());
-        write_fixed(&mut out, &mut cursor, &self.key_epoch.to_le_bytes());
-        write_fixed(&mut out, &mut cursor, &self.nonce);
-        write_fixed(&mut out, &mut cursor, &self.valid_from.to_le_bytes());
-        write_fixed(&mut out, &mut cursor, &self.valid_until.to_le_bytes());
-        write_fixed(&mut out, &mut cursor, &self.evidence_digest);
-
-        if cursor != MESSAGE_LENGTH {
-            return Err(MessageEncodeError::InvalidLength {
-                expected: MESSAGE_LENGTH,
-                found: cursor,
-            });
-        }
-
-        Ok(out)
+        let mut destination_padded = [0; MAX_DESTINATION_LENGTH];
+        destination_padded[..self.destination.len()].copy_from_slice(&self.destination);
+        let wire = BorshBridgeMessage {
+            magic: PROTOCOL_MAGIC,
+            version: self.version,
+            action: self.action as u8,
+            direction: self.direction as u8,
+            reserved: 0,
+            deployment: self.deployment.clone(),
+            operation_id: self.operation_id,
+            deposit_outpoint: self.deposit_outpoint,
+            withdrawal_id: self.withdrawal_id,
+            amount_atomic: self.amount_atomic,
+            fee_atomic: self.fee_atomic,
+            destination_length: self.destination.len() as u16,
+            destination_padded,
+            policy_epoch: self.policy_epoch,
+            key_epoch: self.key_epoch,
+            nonce: self.nonce,
+            valid_from: self.valid_from,
+            valid_until: self.valid_until,
+            evidence_digest: self.evidence_digest,
+        };
+        borsh::to_vec(&wire).map_err(|_| MessageEncodeError::BorshEncoding)
     }
 
     pub fn decode(bytes: &[u8]) -> Result<Self, MessageDecodeError> {
@@ -340,117 +366,87 @@ impl CanonicalBridgeMessage {
                 found: bytes.len(),
             });
         }
-
-        let mut cursor = DecodeCursor::new(bytes);
-        let magic = cursor.read_array::<8>()?;
-        if magic != PROTOCOL_MAGIC {
+        // from_slice rejects trailing data; no allocation controlled by input.
+        let wire: BorshBridgeMessage =
+            borsh::from_slice(bytes).map_err(|_| MessageDecodeError::InvalidBorsh)?;
+        if wire.magic != PROTOCOL_MAGIC {
             return Err(MessageDecodeError::InvalidMagic);
         }
-
-        let version = cursor.read_u8()?;
-        if version != MESSAGE_VERSION {
+        if wire.version != MESSAGE_VERSION {
             return Err(MessageDecodeError::UnsupportedVersion {
                 expected: MESSAGE_VERSION,
-                found: version,
+                found: wire.version,
             });
         }
-
-        let action = BridgeAction::try_from(cursor.read_u8()?)?;
-        let direction = BridgeDirection::try_from(cursor.read_u8()?)?;
-        let reserved = cursor.read_u8()?;
-        if reserved != 0 {
+        if wire.reserved != 0 {
             return Err(MessageDecodeError::NonZeroReservedByte);
         }
-
-        let deployment = DeploymentIdentity {
-            protocol_id: cursor.read_u32_le()?,
-            native_network: cursor.read_u32_le()?,
-            native_genesis: cursor.read_array::<32>()?,
-            solana_deployment: cursor.read_array::<32>()?,
-            manager_program_id: cursor.read_array::<32>()?,
-            transceiver_program_id: cursor.read_array::<32>()?,
-            mint: cursor.read_array::<32>()?,
-        };
-        let operation_id = cursor.read_array::<32>()?;
-        let deposit_outpoint = NativeOutpoint {
-            txid: cursor.read_array::<32>()?,
-            vout: cursor.read_u32_le()?,
-        };
-        let withdrawal_id = cursor.read_array::<32>()?;
-        let amount_atomic = cursor.read_u64_le()?;
-        let fee_atomic = cursor.read_u64_le()?;
-        let destination_len = cursor.read_u16_le()? as usize;
+        let destination_len = usize::from(wire.destination_length);
         if destination_len > MAX_DESTINATION_LENGTH {
             return Err(MessageDecodeError::DestinationTooLong {
                 max: MAX_DESTINATION_LENGTH,
                 found: destination_len,
             });
         }
-        let destination_padded = cursor.read_array::<MAX_DESTINATION_LENGTH>()?;
-        let destination = destination_padded[..destination_len].to_vec();
-        if destination_padded[destination_len..]
+        if wire.destination_padded[destination_len..]
             .iter()
             .any(|byte| *byte != 0)
         {
             return Err(MessageDecodeError::NonZeroDestinationPadding);
         }
-        let policy_epoch = cursor.read_u32_le()?;
-        let key_epoch = cursor.read_u32_le()?;
-        let nonce = cursor.read_array::<32>()?;
-        let valid_from = cursor.read_u64_le()?;
-        let valid_until = cursor.read_u64_le()?;
-        let evidence_digest = cursor.read_array::<32>()?;
-
-        if cursor.position() != MESSAGE_LENGTH {
-            return Err(MessageDecodeError::InvalidLength {
-                expected: MESSAGE_LENGTH,
-                found: cursor.position(),
-            });
-        }
-
         let message = Self {
-            version,
-            direction,
-            action,
-            deployment,
-            operation_id,
-            deposit_outpoint,
-            withdrawal_id,
-            amount_atomic,
-            fee_atomic,
-            destination,
-            policy_epoch,
-            key_epoch,
-            nonce,
-            valid_from,
-            valid_until,
-            evidence_digest,
+            version: wire.version,
+            action: BridgeAction::try_from(wire.action)?,
+            direction: BridgeDirection::try_from(wire.direction)?,
+            deployment: wire.deployment,
+            operation_id: wire.operation_id,
+            deposit_outpoint: wire.deposit_outpoint,
+            withdrawal_id: wire.withdrawal_id,
+            amount_atomic: wire.amount_atomic,
+            fee_atomic: wire.fee_atomic,
+            destination: wire.destination_padded[..destination_len].to_vec(),
+            policy_epoch: wire.policy_epoch,
+            key_epoch: wire.key_epoch,
+            nonce: wire.nonce,
+            valid_from: wire.valid_from,
+            valid_until: wire.valid_until,
+            evidence_digest: wire.evidence_digest,
         };
         message.validate().map_err(MessageDecodeError::Validation)?;
         Ok(message)
     }
 
-    pub fn derive_operation_id(&self) -> Result<Hash32, MessageEncodeError> {
+    pub fn encode_operation_id_inputs(&self) -> Result<Vec<u8>, MessageEncodeError> {
+        if self.version != MESSAGE_VERSION {
+            return Err(MessageEncodeError::UnsupportedVersion {
+                expected: MESSAGE_VERSION,
+                found: self.version,
+            });
+        }
         validate_destination(&self.destination)?;
-        let mut digest = Sha256::new();
-        digest.update(PROTOCOL_MAGIC);
-        digest.update([MESSAGE_VERSION]);
-        digest.update([self.action as u8]);
-        digest.update([self.direction as u8]);
-        digest.update(self.deployment.to_bytes());
-        digest.update(self.deposit_outpoint.to_bytes());
-        digest.update(self.withdrawal_id);
-        digest.update(self.amount_atomic.to_le_bytes());
-        digest.update(self.fee_atomic.to_le_bytes());
-        digest.update((self.destination.len() as u16).to_le_bytes());
-        digest.update(&self.destination);
-        digest.update(self.policy_epoch.to_le_bytes());
-        digest.update(self.key_epoch.to_le_bytes());
-        digest.update(self.nonce);
-        digest.update(self.valid_from.to_le_bytes());
-        digest.update(self.valid_until.to_le_bytes());
-        digest.update(self.evidence_digest);
-        Ok(digest.finalize().into())
+        let inputs = OperationIdInputs {
+            domain: *b"KPEPID02",
+            version: MESSAGE_VERSION,
+            action: self.action as u8,
+            direction: self.direction as u8,
+            deployment: &self.deployment,
+            deposit_outpoint: &self.deposit_outpoint,
+            withdrawal_id: self.withdrawal_id,
+            amount_atomic: self.amount_atomic,
+            fee_atomic: self.fee_atomic,
+            destination: &self.destination,
+            policy_epoch: self.policy_epoch,
+            key_epoch: self.key_epoch,
+            nonce: self.nonce,
+            valid_from: self.valid_from,
+            valid_until: self.valid_until,
+            evidence_digest: self.evidence_digest,
+        };
+        borsh::to_vec(&inputs).map_err(|_| MessageEncodeError::BorshEncoding)
+    }
+
+    pub fn derive_operation_id(&self) -> Result<Hash32, MessageEncodeError> {
+        Ok(Sha256::digest(self.encode_operation_id_inputs()?).into())
     }
 
     pub fn message_digest(&self) -> Result<Hash32, MessageEncodeError> {
@@ -736,6 +732,7 @@ pub type LedgerState = LedgerSnapshot;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum MessageEncodeError {
+    BorshEncoding,
     UnsupportedVersion { expected: u8, found: u8 },
     InvalidLength { expected: usize, found: usize },
     DestinationEmpty,
@@ -756,6 +753,7 @@ pub enum MessageEncodeError {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum MessageDecodeError {
+    InvalidBorsh,
     UnsupportedVersion { expected: u8, found: u8 },
     InvalidLength { expected: usize, found: usize },
     InvalidMagic,
@@ -823,56 +821,6 @@ fn is_zero_hash(hash: &Hash32) -> bool {
     hash.iter().all(|byte| *byte == 0)
 }
 
-fn write_fixed(out: &mut [u8], cursor: &mut usize, bytes: &[u8]) {
-    let end = *cursor + bytes.len();
-    out[*cursor..end].copy_from_slice(bytes);
-    *cursor = end;
-}
-
-struct DecodeCursor<'a> {
-    bytes: &'a [u8],
-    cursor: usize,
-}
-
-impl<'a> DecodeCursor<'a> {
-    fn new(bytes: &'a [u8]) -> Self {
-        Self { bytes, cursor: 0 }
-    }
-
-    fn position(&self) -> usize {
-        self.cursor
-    }
-
-    fn read_u8(&mut self) -> Result<u8, MessageDecodeError> {
-        Ok(self.read_array::<1>()?[0])
-    }
-
-    fn read_u16_le(&mut self) -> Result<u16, MessageDecodeError> {
-        Ok(u16::from_le_bytes(self.read_array::<2>()?))
-    }
-
-    fn read_u32_le(&mut self) -> Result<u32, MessageDecodeError> {
-        Ok(u32::from_le_bytes(self.read_array::<4>()?))
-    }
-
-    fn read_u64_le(&mut self) -> Result<u64, MessageDecodeError> {
-        Ok(u64::from_le_bytes(self.read_array::<8>()?))
-    }
-
-    fn read_array<const N: usize>(&mut self) -> Result<[u8; N], MessageDecodeError> {
-        let end = self.cursor + N;
-        let bytes = self
-            .bytes
-            .get(self.cursor..end)
-            .ok_or(MessageDecodeError::InvalidLength {
-                expected: MESSAGE_LENGTH,
-                found: end,
-            })?;
-        self.cursor = end;
-        Ok(bytes.try_into().expect("slice length checked"))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -930,6 +878,26 @@ mod tests {
     }
 
     #[test]
+    fn operation_id_preimage_rejects_unsupported_version() {
+        let mut message = sample_deposit_message();
+        message.version = 1;
+        assert!(matches!(
+            message.encode_operation_id_inputs(),
+            Err(MessageEncodeError::UnsupportedVersion {
+                expected: MESSAGE_VERSION,
+                found: 1
+            })
+        ));
+        assert!(matches!(
+            message.derive_operation_id(),
+            Err(MessageEncodeError::UnsupportedVersion {
+                expected: MESSAGE_VERSION,
+                found: 1
+            })
+        ));
+    }
+
+    #[test]
     fn encoding_is_deterministic() {
         let message = sample_deposit_message();
         let encoded = message.encode().expect("encode");
@@ -964,7 +932,7 @@ mod tests {
     fn canonical_vector_prefix_is_stable() {
         let encoded = sample_deposit_message().encode().expect("encode");
         let prefix = hex_lower(&encoded[..12]);
-        assert_eq!(prefix, "4b5045504252473101000000");
+        assert_eq!(prefix, "4b5045504252473202000000");
     }
 
     #[test]

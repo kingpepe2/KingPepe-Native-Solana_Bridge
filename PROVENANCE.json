@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "generatedAt": "2026-09-12T00:00:00Z",
+  "generatedAt": "2026-09-13T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
   "purpose": "Exact file-by-file origin and retained bridge-purpose classification; implementation evidence is recorded separately.",
   "provenancePolicy": {
@@ -24,6 +24,76 @@
     "importedSource": "None during simplification; prior file-origin notes retained except corrected obsolete implementation descriptions."
   },
   "trackedFiles": [
+    {
+      "path": "shared/protocol/bridge-inputs.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original typed Borsh schemas and bounded preimage codecs for bridge signing, DKG context and deposit/withdrawal evidence. Native sighash and Noble primitives are not reimplemented.",
+      "purpose": "CORE_BRIDGE",
+      "reviewDisposition": "KEEP_CORE"
+    },
+    {
+      "path": "shared/protocol/solana-bridge-abi.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original fixed Borsh layouts for bridge-owned Solana instructions and account records, preserving existing authority/PDA checks and bounded account sizes.",
+      "purpose": "CORE_BRIDGE",
+      "reviewDisposition": "KEEP_CORE"
+    },
+    {
+      "path": "shared/protocol/native-inputs.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original Borsh hash-preimage schemas for Native deposit intent, evidence and reserve allocation; Native consensus transaction bytes remain opaque.",
+      "purpose": "CORE_BRIDGE",
+      "reviewDisposition": "KEEP_CORE"
+    },
+    {
+      "path": "native/proof/src/bridge_inputs.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original Native-side Borsh hash-input serializers and cross-language vector verification; no imported source or consensus encoding changes.",
+      "purpose": "CORE_BRIDGE",
+      "reviewDisposition": "KEEP_CORE"
+    },
+    {
+      "path": "solana/modules/bridge-messages/src/abi.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original explicit Rust Borsh ABI structs for bridge-owned instructions/accounts and independent fixed-vector checks; not upstream Solana code.",
+      "purpose": "CORE_BRIDGE",
+      "reviewDisposition": "KEEP_CORE"
+    },
+    {
+      "path": "solana/modules/bridge-messages/src/inputs.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original explicit Rust Borsh reference structs for the bridge's signing/evidence preimages, with cross-language fixture verification; upstream library API use only.",
+      "purpose": "CORE_BRIDGE",
+      "reviewDisposition": "KEEP_CORE"
+    },
+    {
+      "path": "native/proof/vectors/borsh-v2.json",
+      "classification": "GENERATED_FILE",
+      "notes": "Generated deterministic public Borsh serialization inputs, bytes and hashes, independently checked in Rust and TypeScript. Synthetic values are not signing keys, consensus-valid evidence or proof of chain execution.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "native/proof/vectors/inputs-borsh-v2.json",
+      "classification": "GENERATED_FILE",
+      "notes": "Generated deterministic public Borsh serialization inputs, bytes and hashes, independently checked in Rust and TypeScript. Synthetic values are not signing keys, consensus-valid evidence or proof of chain execution.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "solana/modules/bridge-messages/vectors/abi-borsh-v2.json",
+      "classification": "GENERATED_FILE",
+      "notes": "Generated deterministic public Borsh serialization inputs, bytes and hashes, independently checked in Rust and TypeScript. Synthetic values are not signing keys, consensus-valid evidence or proof of chain execution.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "solana/modules/bridge-messages/vectors/inputs-borsh-v2.json",
+      "classification": "GENERATED_FILE",
+      "notes": "Generated deterministic public Borsh serialization inputs, bytes and hashes, independently checked in Rust and TypeScript. Synthetic values are not signing keys, consensus-valid evidence or proof of chain execution.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
     {
       "path": "services/bridge-validator/service-journal-state.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
@@ -1245,7 +1315,7 @@
     {
       "path": "shared/protocol/canonical-message.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Executable service-side canonical message encoder/decoder and digest helpers.",
+      "notes": "Original fixed-field Borsh schemas, strict service-side codec and operation-ID preimages using the upstream Borsh API; no imported implementation.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_SECURITY"
     },
@@ -1369,9 +1439,9 @@
       "reviewDisposition": "KEEP_TEST"
     },
     {
-      "path": "solana/modules/bridge-messages/vectors/canonical-v1.json",
+      "path": "solana/modules/bridge-messages/vectors/canonical-borsh-v2.json",
       "classification": "GENERATED_FILE",
-      "notes": "Public deterministic test vectors for canonical protocol encoding; not operational key material.",
+      "notes": "Generated public deterministic Borsh V2 message/preimage bytes and SHA-256 values, including integer and destination bounds; cross-checked with Rust. Not operational key material.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
@@ -1553,7 +1623,7 @@
     {
       "path": "solana/ts/lib/protocol.ts",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "TypeScript canonical protocol encoder and digest helpers.",
+      "notes": "Original typed TypeScript facade over the shared Borsh codec; obsolete duplicate encoder removed.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },

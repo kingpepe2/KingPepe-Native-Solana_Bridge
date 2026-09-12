@@ -1350,7 +1350,7 @@ test("integrity role, authority lease, pause, missing and corrupt storage fail c
 async function protectedAttesterFixture(t, role = "ATTESTER_A") {
   const global = await isolatedIntegrityFixture(t), supervisor = await global.peer(role), guard = supervisor.guard;
   const f = fixture(t, role, "BRIDGE_VALIDATOR"), seed = randomBytes(32);
-  const vector = JSON.parse(readFileSync(path.join(repoRoot, "solana/modules/bridge-messages/vectors/canonical-v1.json"))).vectors.find(v => v.name === "deposit-claim-v1");
+  const vector = JSON.parse(readFileSync(path.join(repoRoot, "solana/modules/bridge-messages/vectors/canonical-borsh-v2.json"))).vectors.find(v => v.name === "deposit-claim-v2");
   const identity = { ...vector.deployment, nativeGenesis: REGTEST_GENESIS, solanaDeployment: deployment };
   const now = BigInt(Math.floor(Date.now() / 1000)), encoded = Buffer.from(encodeCanonicalBridgeMessage({ ...decodeCanonicalBridgeMessage(vector.encodedHex), operationId: undefined,
     deployment: identity, keyEpoch: 1, validFrom: now - 5n, validUntil: now + 600n })).toString("hex"), decoded = decodeCanonicalBridgeMessage(encoded);

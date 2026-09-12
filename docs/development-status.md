@@ -55,6 +55,29 @@ The separately reviewed coordinator correction is
 sweep and withdrawal purposes, preserves exact intent binding and reuses a retained
 aggregate after restart. Worker errors expose fixed public classes, not secrets.
 
+## Phase 11 migration milestone
+
+The schema, caller, vector and legacy-encoder changes form one atomic migration
+based on e60d4d70261114b075049b0bd5076495ce9f7f2e. Bridge messages now use Borsh
+V2 (`KPEPBRG2`); the old encoder/fixture and duplicate TypeScript implementation
+are removed. Accounting, lifecycle, authority and Native/FROST consensus
+signatures are unchanged. There is no V1 reader or automatic runtime-state
+migration. Update components together; do not discard old private state.
+
+The reviewed migration worktree passed 53 Rust/TypeScript byte/digest vectors
+per platform, plus the two Native verifier packet vectors. Windows and WSL Node
+each passed 979 tests without failures/skips; Rust passed 100 tests with locked
+checks, formatting and Clippy. Both SBF programs build. The 55 deposit checks
+and 25 round-trip checks passed on real local chains; both directions completed
+using Borsh. These results do not certify the parent SHA.
+
+Remaining retained chain regressions and the Windows CurrentUser security suite
+are still running. Phase 11 remains IN_PROGRESS until all required validation,
+publication scans and matching exact-SHA CI pass. The schema inventory is in
+`docs/architecture/protocol-messages.md`. Bincode is still required by the
+retained Solana SDK/System-instruction path, not by a legacy bridge codec;
+its maintenance warning remains visible. Devnet has not started.
+
 ## Phase 10 validation
 
 Service commit: 5512963398d6c2070102cd6781e72f129e3b6cc4, based on
@@ -83,17 +106,11 @@ Later commits must use their own matching CI run, not inherit this certification
 - npm audit: zero vulnerabilities. Locked dependency/license gates: PASS;
   the existing bincode maintenance warning remains visible.
 
-No production or Phase 11 implementation is included in this Phase-10 change set.
-The updated next step is Phase 11 canonical Borsh migration, not SDK/UI work.
-Devnet deployment must wait for that migration and fresh-clone validation;
-the current wire format is not being represented as the future Devnet format.
-Phase 11 must remove obsolete custom/bincode paths, fixtures and dependencies
-once Borsh replaces their real coverage. Do not suppress RUSTSEC-2025-0141 or
-remove an unrelated dependency still required by retained code. The present
-Solana SDK/system-interface dependency graph uses bincode; migrating bridge
-messages alone does not prove that upstream requirement has disappeared. Native
-and Solana consensus transaction encodings are not bridge message schemas.
-No Borsh migration is claimed in Phase 10.
+Phase 10 did not include production deployment or Borsh migration. The separate
+Phase 11 milestone above replaces bridge-owned encoding only; Native and Solana
+consensus transaction encodings remain their actual external protocol formats.
+Devnet must wait for completed migration and fresh-clone validation. Do not
+suppress RUSTSEC-2025-0141 or remove unrelated retained SDK dependencies.
 
 The final directive permits manual encrypted snapshots or existing OS scheduling;
 neither a fixed schedule nor a custom backup service is required. The runbook is
@@ -148,7 +165,8 @@ Historical Phase 09 evidence remains bound to
 ## Limits
 
 This remains LOCALNET/REGTEST software, not production Windows service integration
-or deployment approval. Phase 11, Devnet and Mainnet have not started here.
+or deployment approval. Phase 11 validation is in progress; Devnet and Mainnet
+have not started here.
 Common-host compromise/availability, unaudited Noble FROST, CurrentUser-only Windows
 coverage, no full-host rollback guarantee, configured RPC/attester trust and upgrade
 authority remain explicit limitations. Cargo reports the unsuppressed bincode

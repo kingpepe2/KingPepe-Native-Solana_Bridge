@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { bridgeInputDigest } from "../../../shared/protocol/bridge-inputs.mjs";
 import { types } from "node:util";
 import { REGTEST_GENESIS } from "../../node/native-raw-evidence.mjs";
 
@@ -290,13 +291,13 @@ export function dataArray(value, limit, label) {
 }
 
 export function nativeSigningIntentDigest(intent) {
-  return sha256Canonical(validateNativeSigningIntent(intent));
+  return bridgeInputDigest("NativeSigningIntent", validateNativeSigningIntent(intent));
 }
 
 export function evaluateNativeSigningPolicy(policy, intent) {
   assertNativeSigningPolicy(policy);
   const normalized = validateNativeSigningIntent(intent);
-  const intentDigest = sha256Canonical(normalized);
+  const intentDigest = bridgeInputDigest("NativeSigningIntent", normalized);
   const amount = BigInt(normalized.amountAtomic);
   const fee = BigInt(normalized.feeAtomic);
   const authorization = authorizationSnapshots.get(policy).get(normalized.signingRequestId);
@@ -314,7 +315,7 @@ export function evaluateNativeSigningPolicy(policy, intent) {
     feeWithinPolicy: fee <= policy.maxFeeAtomic,
     reserveChangeScriptExact: normalized.changeScriptPubKeyHex === policy.reserveScriptPubKeyHex,
     authorizedOperationPresent: authorization !== undefined,
-    authorizedOperationExact: authorization !== undefined && sha256Canonical(authorization) === intentDigest,
+    authorizedOperationExact: authorization !== undefined && bridgeInputDigest("NativeSigningIntent", authorization) === intentDigest,
   };
   const failed = Object.entries(checks).filter(([, ok]) => !ok).map(([name]) => name);
   return Object.freeze({

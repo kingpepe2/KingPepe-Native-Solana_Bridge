@@ -1,0 +1,716 @@
+{
+  "schemaVersion": "borsh-2",
+  "scope": "Public deterministic serialization-only fixtures; synthetic cryptographic values are not valid signing keys, signatures, proof or deployment authorization. DKG contribution is zero.",
+  "vectors": [
+    {
+      "name": "NativeSigningIntent",
+      "type": "NativeSigningIntent",
+      "kind": 1,
+      "input": {
+        "protocol": "VECTOR/NativeSigningIntent.protocol",
+        "mode": "VECTOR/NativeSigningIntent.mode",
+        "purpose": "VECTOR/NativeSigningIntent.purpose",
+        "nativeNetwork": "VECTOR/NativeSigningIntent.nativeNetwork",
+        "nativeGenesisHash": "73e26ce839065e046aff60ff39b65c107035ec2a76b1a85020440d9802886e64",
+        "solanaDeployment": "7ae42d422c1e3f36d63eb4b9ae3c31eb0b6b6171c228d04315fb4267cd3b0810",
+        "bridgeProgramId": "22ba565817afcfa44619ec4d42906c0cd274ea652bdcdb0553c92125a11fb8ee",
+        "transceiverProgramId": "347895dff0ac5db0a6f03340d6ca9f666a86acdd5fa5b9280c246fb11ce56a35",
+        "mint": "efb29d842aaf70141ef2628207a3be2af28968bdab512b8ec87a3fd064b9c9aa",
+        "keyEpoch": 4294967295,
+        "signingRequestId": "5a05921ac53590c5a4a950de70176bc1b3ef3049c73301c3227b7468c30ac7f2",
+        "operationId": "299de5dc0a29f8cd549eeea4a94a254945787bc910bad18f0decc946c21c5002",
+        "withdrawalId": "c9ea49b0919d10d741828ed44b8367ef953fb23381fec2818fb744fb81061f4a",
+        "proofFingerprint": "0fb6e0208ecd9045dcd41a9f05103c15fc07ec3697f28c2fedf8eb45cd16ea5d",
+        "unsignedNativeTransactionId": "6e652b4111864809911549f891d441ad6a4a40dae0a762a9d4c8f0b81d0e778e",
+        "transactionCommitment": "3aef78f0b910b49f331cf3efb9a8aabcd4e29a32d74c60bea6295adaf1aecc2a",
+        "signingInputIndex": 1301485955,
+        "taprootSighashHex": "3ea74481c62b525bb7387598b9232c78d406beb359197b08d43e4b79660cdb8d",
+        "recipientScriptPubKeyHex": "5120f4ebb2ca01b77406a9888122c16a0fdaa262115e1f8e9393bdcd17eebd2dd29c",
+        "amountAtomic": "18446744073709551615",
+        "feeAtomic": "1",
+        "changeScriptPubKeyHex": "5120299cdf73da0267988dbea4eb473aece7ee33932741b4468bf8cfd71c589ef4bb",
+        "changeAtomic": "9007199254740993",
+        "inputOutpoints": [
+          {
+            "txid": "c1e411bd905d3e6248b1783b23d2f2a8a7261d856a011af6c70ed97ea33c76a4",
+            "vout": 3304428801
+          },
+          {
+            "txid": "95aa02f71234e084df15da532f040de7e1deabab09a704bc1a03c29ea157e75c",
+            "vout": 3027985042
+          }
+        ],
+        "outputCommitments": [
+          "5d17f21f3c270652dbbd2314ee78a13b313ee03634a630787903ba62cdd6f397",
+          "c4e535fa04afb412e45d3854cf50e6aab5090f937834e2bb73084a2deb1beadc"
+        ],
+        "reserveCommitment": "54ed99e2a9c92e6df703494ad29fd51f81a95b9e85ec64b4ac5c6616bcdca9fa",
+        "pauseWithdrawals": true,
+        "hardStop": false
+      },
+      "encodedHex": "4b50494e50555432010023000000564543544f522f4e61746976655369676e696e67496e74656e742e70726f746f636f6c1f000000564543544f522f4e61746976655369676e696e67496e74656e742e6d6f646522000000564543544f522f4e61746976655369676e696e67496e74656e742e707572706f736528000000564543544f522f4e61746976655369676e696e67496e74656e742e6e61746976654e6574776f726b73e26ce839065e046aff60ff39b65c107035ec2a76b1a85020440d9802886e647ae42d422c1e3f36d63eb4b9ae3c31eb0b6b6171c228d04315fb4267cd3b081022ba565817afcfa44619ec4d42906c0cd274ea652bdcdb0553c92125a11fb8ee347895dff0ac5db0a6f03340d6ca9f666a86acdd5fa5b9280c246fb11ce56a35efb29d842aaf70141ef2628207a3be2af28968bdab512b8ec87a3fd064b9c9aaffffffff5a05921ac53590c5a4a950de70176bc1b3ef3049c73301c3227b7468c30ac7f2299de5dc0a29f8cd549eeea4a94a254945787bc910bad18f0decc946c21c5002c9ea49b0919d10d741828ed44b8367ef953fb23381fec2818fb744fb81061f4a0fb6e0208ecd9045dcd41a9f05103c15fc07ec3697f28c2fedf8eb45cd16ea5d6e652b4111864809911549f891d441ad6a4a40dae0a762a9d4c8f0b81d0e778e3aef78f0b910b49f331cf3efb9a8aabcd4e29a32d74c60bea6295adaf1aecc2a8319934d3ea74481c62b525bb7387598b9232c78d406beb359197b08d43e4b79660cdb8d220000005120f4ebb2ca01b77406a9888122c16a0fdaa262115e1f8e9393bdcd17eebd2dd29cffffffffffffffff0100000000000000220000005120299cdf73da0267988dbea4eb473aece7ee33932741b4468bf8cfd71c589ef4bb010000000000200002000000c1e411bd905d3e6248b1783b23d2f2a8a7261d856a011af6c70ed97ea33c76a40195f5c495aa02f71234e084df15da532f040de7e1deabab09a704bc1a03c29ea157e75c92627bb4020000005d17f21f3c270652dbbd2314ee78a13b313ee03634a630787903ba62cdd6f397c4e535fa04afb412e45d3854cf50e6aab5090f937834e2bb73084a2deb1beadc54ed99e2a9c92e6df703494ad29fd51f81a95b9e85ec64b4ac5c6616bcdca9fa0100",
+      "sha256": "fb5f525c42f2b521f692ac848dea696d0aeadac5df74f8339a779e36b9c9acb8"
+    },
+    {
+      "name": "FrostSession",
+      "type": "FrostSession",
+      "kind": 2,
+      "input": {
+        "protocol": "VECTOR/FrostSession.protocol",
+        "requestId": "355db7a5b8b3c4abb70f81a79f94ab1598d439e76b1dc7f5b50e06e0ca597141",
+        "epoch": 2057994076,
+        "attempt": 615994229,
+        "intentDigest": "702b55d0a224e9f3fc222b0fc4f43df4ce212f59bc0560de32e79e325fcc3c17",
+        "messageHex": "cbc2028591beeddc8515ee6dc8bf349b1d27f6f0d0acee02bde6f6a26626d06d",
+        "participantIds": [
+          "VECTOR/FrostSession.participantIds.0",
+          "VECTOR/FrostSession.participantIds.1"
+        ]
+      },
+      "encodedHex": "4b50494e5055543202001c000000564543544f522f46726f737453657373696f6e2e70726f746f636f6c355db7a5b8b3c4abb70f81a79f94ab1598d439e76b1dc7f5b50e06e0ca5971415c7faa7a7553b724702b55d0a224e9f3fc222b0fc4f43df4ce212f59bc0560de32e79e325fcc3c17cbc2028591beeddc8515ee6dc8bf349b1d27f6f0d0acee02bde6f6a26626d06d24000000564543544f522f46726f737453657373696f6e2e7061727469636970616e744964732e3024000000564543544f522f46726f737453657373696f6e2e7061727469636970616e744964732e31",
+      "sha256": "417a9050e5022de233c3d0251f23eda253f95eba34ac0c8b6d01f798e122bb32"
+    },
+    {
+      "name": "FrostKeyContext",
+      "type": "FrostKeyContext",
+      "kind": 3,
+      "input": {
+        "protocol": "VECTOR/FrostKeyContext.protocol",
+        "environment": "VECTOR/FrostKeyContext.environment",
+        "nativeNetwork": "VECTOR/FrostKeyContext.nativeNetwork",
+        "nativeGenesisHash": "cb4ca2dab6b4ea502ee45fc29b6ed9a7dfe3657e7ba8d989af37501144fa5cb1",
+        "solanaDeployment": "9d69486f874971188c7e018f20aca0c751f838b9d9e2a4ec066e4e05b6b4c776",
+        "bridgeProgramId": "6105b6f157848e76770d13c4044a214586a7a3bc8ae22cc70f691d3f17b55a64",
+        "transceiverProgramId": "63561f9c33dc575821f7debcc35a82818a6871847989a780663a27d8bd72a34d",
+        "mint": "006a28fca06e0b40ecfdd777052f7e07a6f186ae31bcd89c7cebab57e47438d6",
+        "keyEpoch": 4294967295
+      },
+      "encodedHex": "4b50494e5055543203001f000000564543544f522f46726f73744b6579436f6e746578742e70726f746f636f6c22000000564543544f522f46726f73744b6579436f6e746578742e656e7669726f6e6d656e7424000000564543544f522f46726f73744b6579436f6e746578742e6e61746976654e6574776f726bcb4ca2dab6b4ea502ee45fc29b6ed9a7dfe3657e7ba8d989af37501144fa5cb19d69486f874971188c7e018f20aca0c751f838b9d9e2a4ec066e4e05b6b4c7766105b6f157848e76770d13c4044a214586a7a3bc8ae22cc70f691d3f17b55a6463561f9c33dc575821f7debcc35a82818a6871847989a780663a27d8bd72a34d006a28fca06e0b40ecfdd777052f7e07a6f186ae31bcd89c7cebab57e47438d6ffffffff",
+      "sha256": "1ea894134c1c78f3cfadefb6fb3835b2896516d76d81f917a1a98135c8fd19f3"
+    },
+    {
+      "name": "FrostParticipantSet",
+      "type": "FrostParticipantSet",
+      "kind": 4,
+      "input": {
+        "protocol": "VECTOR/FrostParticipantSet.protocol",
+        "participants": [
+          {
+            "signerId": "KINGPEPE_FROST_A",
+            "index": 3670334808
+          },
+          {
+            "signerId": "KINGPEPE_FROST_A",
+            "index": 3945563696
+          }
+        ],
+        "threshold": 2
+      },
+      "encodedHex": "4b50494e50555432040023000000564543544f522f46726f73745061727469636970616e745365742e70726f746f636f6c100000004b494e47504550455f46524f53545f4158ddc4da100000004b494e47504550455f46524f53545f4130862ceb0200",
+      "sha256": "053ed7541e38946b1e352bfdef1a9d7a4f0550bbb2fee169795237e96636c951"
+    },
+    {
+      "name": "FrostDkgSession",
+      "type": "FrostDkgSession",
+      "kind": 5,
+      "input": {
+        "protocol": "VECTOR/FrostDkgSession.protocol",
+        "epoch": 2584290593,
+        "contextDigest": "72c864f36f0e841e247a133a2226d91c9252eea07fdac27bba09be387fedddc0",
+        "participantSetHash": "6102e6bc68fe204c14d2ccee77bdfa20eace0df4b49a9fee589afd6142613c7a",
+        "threshold": 2
+      },
+      "encodedHex": "4b50494e5055543205001f000000564543544f522f46726f7374446b6753657373696f6e2e70726f746f636f6c2125099a72c864f36f0e841e247a133a2226d91c9252eea07fdac27bba09be387fedddc06102e6bc68fe204c14d2ccee77bdfa20eace0df4b49a9fee589afd6142613c7a0200",
+      "sha256": "f17b85671368216795ed533b1d2d63eed14e227fdbe191e7bc31b35dd6351cc8"
+    },
+    {
+      "name": "FrostDkgHandoff",
+      "type": "FrostDkgHandoff",
+      "kind": 6,
+      "input": {
+        "protocol": "VECTOR/FrostDkgHandoff.protocol",
+        "request": {
+          "protocol": "VECTOR/FrostDkgHandoff.request.protocol",
+          "epoch": 4235577402,
+          "context": {
+            "protocol": "VECTOR/FrostDkgHandoff.request.context.protocol",
+            "environment": "VECTOR/FrostDkgHandoff.request.context.environment",
+            "nativeNetwork": "VECTOR/FrostDkgHandoff.request.context.nativeNetwork",
+            "nativeGenesisHash": "313c34f0a45259b70bf95132d46585555ac9843ccd20a10510d769f1e9053ee7",
+            "solanaDeployment": "b104f321cd90c2218445c78e5afe8e4c7d67f43c956d2716eec646df3d3b596a",
+            "bridgeProgramId": "cc62e6a7fcce1ed26c0dd514b56e35d8ffeb26100c761a9daf4e631cb2d23297",
+            "transceiverProgramId": "352a3862a3599b381330fcae6b17578a6c022cd8323919fa8d59eca60c71f311",
+            "mint": "ed718e8c9cbf1877b02335ab56241c0da906e0cbdc6ad4266773fb542552d8b1",
+            "keyEpoch": 4294967295
+          },
+          "contextDigest": "432fdb38a7493ec6f6cd11640f134d34139d5b22a6517e5eb03a3641344fb419",
+          "sessionId": "eebc700f156e5481bc1827199270c4af51a0e7a9b0053efbbece178b86596791",
+          "participantSetHash": "e50b593c8bed7cbf3f567b6cc005bb6394f572ac45caa60848471fd6ae3b1092",
+          "threshold": 2,
+          "participants": [
+            {
+              "signerId": "KINGPEPE_FROST_A",
+              "index": 2584728842
+            },
+            {
+              "signerId": "KINGPEPE_FROST_A",
+              "index": 936587015
+            }
+          ]
+        },
+        "signerId": "KINGPEPE_FROST_A",
+        "round1": [
+          {
+            "identifier": "2c394ae6ea0950686c225ed905f0bdea6a403a384528199d5dd29be0a3bca885",
+            "commitmentsHex": [
+              "b3cc550d40aad601d7c9cca90de2585e4685abfe1ce59bb5c3f4ac66b1d538fab3",
+              "e918b6425a0b47c70bfc0d3eaa809c4b1d7bfe17a8611a0a2a1001e5e013b9b6e9"
+            ],
+            "proofOfKnowledgeHex": "808812d85e7109c8839a65945e15785992d5d983dfeef313934773a0c2783aa1808812d85e7109c8839a65945e15785992d5d983dfeef313934773a0c2783aa1"
+          },
+          {
+            "identifier": "66de6bbbb1ed7387febf63b7960dde626ab676e255e83b9b7b765ccb24e2aa2f",
+            "commitmentsHex": [
+              "9060f6f901adbd25d652d65782e0c908825a1374942b2e1f00ed2268506be15390",
+              "2bd346ff467e72fc8886711a8b2f5bcc8def57b4e6d1939c5b997a708bdcf4892b"
+            ],
+            "proofOfKnowledgeHex": "72949b47e941bb1d7eb38c56a6189d716b345d59bf23288084ec0ba13472af5d72949b47e941bb1d7eb38c56a6189d716b345d59bf23288084ec0ba13472af5d"
+          }
+        ],
+        "incoming": [
+          {
+            "senderId": "VECTOR/FrostDkgHandoff.incoming.0.senderId",
+            "round2": {
+              "identifier": "b205418117dc435bd893aa5961cba24c5624c93fba6fa9567c5e779900c83039",
+              "signingShareHex": "0000000000000000000000000000000000000000000000000000000000000000"
+            }
+          }
+        ]
+      },
+      "encodedHex": "4b50494e5055543206001f000000564543544f522f46726f7374446b6748616e646f66662e70726f746f636f6c27000000564543544f522f46726f7374446b6748616e646f66662e726571756573742e70726f746f636f6c3ac875fc2f000000564543544f522f46726f7374446b6748616e646f66662e726571756573742e636f6e746578742e70726f746f636f6c32000000564543544f522f46726f7374446b6748616e646f66662e726571756573742e636f6e746578742e656e7669726f6e6d656e7434000000564543544f522f46726f7374446b6748616e646f66662e726571756573742e636f6e746578742e6e61746976654e6574776f726b313c34f0a45259b70bf95132d46585555ac9843ccd20a10510d769f1e9053ee7b104f321cd90c2218445c78e5afe8e4c7d67f43c956d2716eec646df3d3b596acc62e6a7fcce1ed26c0dd514b56e35d8ffeb26100c761a9daf4e631cb2d23297352a3862a3599b381330fcae6b17578a6c022cd8323919fa8d59eca60c71f311ed718e8c9cbf1877b02335ab56241c0da906e0cbdc6ad4266773fb542552d8b1ffffffff432fdb38a7493ec6f6cd11640f134d34139d5b22a6517e5eb03a3641344fb419eebc700f156e5481bc1827199270c4af51a0e7a9b0053efbbece178b86596791e50b593c8bed7cbf3f567b6cc005bb6394f572ac45caa60848471fd6ae3b10920200100000004b494e47504550455f46524f53545f410ad50f9a100000004b494e47504550455f46524f53545f41072fd337100000004b494e47504550455f46524f53545f412c394ae6ea0950686c225ed905f0bdea6a403a384528199d5dd29be0a3bca885b3cc550d40aad601d7c9cca90de2585e4685abfe1ce59bb5c3f4ac66b1d538fab3e918b6425a0b47c70bfc0d3eaa809c4b1d7bfe17a8611a0a2a1001e5e013b9b6e9808812d85e7109c8839a65945e15785992d5d983dfeef313934773a0c2783aa1808812d85e7109c8839a65945e15785992d5d983dfeef313934773a0c2783aa166de6bbbb1ed7387febf63b7960dde626ab676e255e83b9b7b765ccb24e2aa2f9060f6f901adbd25d652d65782e0c908825a1374942b2e1f00ed2268506be153902bd346ff467e72fc8886711a8b2f5bcc8def57b4e6d1939c5b997a708bdcf4892b72949b47e941bb1d7eb38c56a6189d716b345d59bf23288084ec0ba13472af5d72949b47e941bb1d7eb38c56a6189d716b345d59bf23288084ec0ba13472af5d2a000000564543544f522f46726f7374446b6748616e646f66662e696e636f6d696e672e302e73656e6465724964b205418117dc435bd893aa5961cba24c5624c93fba6fa9567c5e779900c830390000000000000000000000000000000000000000000000000000000000000000",
+      "sha256": "31f65a3d87b27a7757e30568001db541b1d4d8e0231cd56233ae3407fd715e2e"
+    },
+    {
+      "name": "FrostNonceReservation",
+      "type": "FrostNonceReservation",
+      "kind": 7,
+      "input": {
+        "domain": "VECTOR/FrostNonceReservation.domain",
+        "signerId": "KINGPEPE_FROST_A",
+        "reservationCounter": "9007199254740993",
+        "requestId": "0cf82182b606baabbdde997306f252f7ede9a9478c0f2eaca3628a8212f1bbbd",
+        "epoch": 3121303607,
+        "sessionId": "a566b86c85c1edcd606d195e07257f664bad26f64ae3821f7b1f90b25366df86",
+        "intentDigest": "e3a01b495a06d6d9116aa009f91c19f2e9a2fcd80e2b246745e0e0f3b4895b59",
+        "messageHex": "2af760be904f9c81167516c93bee5edd0e031e6ec4c5788948d38527ac6d99a2",
+        "participantIds": [
+          "VECTOR/FrostNonceReservation.participantIds.0",
+          "VECTOR/FrostNonceReservation.participantIds.1"
+        ],
+        "commitment": {
+          "identifier": "5f90aae6daaa6edddc121312e4be700f3221027c521d396b8f4c2a93460393c9",
+          "hidingHex": "993542af63755df81f40cf7e236239f757be5b5063ad6b16ff780eca478479e299",
+          "bindingHex": "8192a68fd53acff37e38cca64b1ece2571e0fdfb3fb65356603556af6c55d3b581",
+          "intentDigest": "2dd3fa5911809948516dc51afea192fb0bbf246b6b72edbb96a5d1842f86bc33",
+          "messageHex": "bb25e8cf390bb3d5d0028f5dad82c962e20ad9014f44853aa84dcd4d445e3b74",
+          "participantIds": [
+            "VECTOR/FrostNonceReservation.commitment.participantIds.0",
+            "VECTOR/FrostNonceReservation.commitment.participantIds.1"
+          ]
+        }
+      },
+      "encodedHex": "4b50494e50555432070023000000564543544f522f46726f73744e6f6e63655265736572766174696f6e2e646f6d61696e100000004b494e47504550455f46524f53545f4101000000000020000cf82182b606baabbdde997306f252f7ede9a9478c0f2eaca3628a8212f1bbbd37500bbaa566b86c85c1edcd606d195e07257f664bad26f64ae3821f7b1f90b25366df86e3a01b495a06d6d9116aa009f91c19f2e9a2fcd80e2b246745e0e0f3b4895b592af760be904f9c81167516c93bee5edd0e031e6ec4c5788948d38527ac6d99a22d000000564543544f522f46726f73744e6f6e63655265736572766174696f6e2e7061727469636970616e744964732e302d000000564543544f522f46726f73744e6f6e63655265736572766174696f6e2e7061727469636970616e744964732e315f90aae6daaa6edddc121312e4be700f3221027c521d396b8f4c2a93460393c9993542af63755df81f40cf7e236239f757be5b5063ad6b16ff780eca478479e2998192a68fd53acff37e38cca64b1ece2571e0fdfb3fb65356603556af6c55d3b5812dd3fa5911809948516dc51afea192fb0bbf246b6b72edbb96a5d1842f86bc33bb25e8cf390bb3d5d0028f5dad82c962e20ad9014f44853aa84dcd4d445e3b7438000000564543544f522f46726f73744e6f6e63655265736572766174696f6e2e636f6d6d69746d656e742e7061727469636970616e744964732e3038000000564543544f522f46726f73744e6f6e63655265736572766174696f6e2e636f6d6d69746d656e742e7061727469636970616e744964732e31",
+      "sha256": "6101906fd706234509ff91b57b00e407264ae6ffa87cf14fbcebef3c6b889fda"
+    },
+    {
+      "name": "FrostCommitment",
+      "type": "FrostCommitment",
+      "kind": 8,
+      "input": {
+        "identifier": "d996131c83d89a7400386578566729672ae73e6a9ef0312c509598c0a0f86e9d",
+        "hidingHex": "a1155b715e2897348fb061715fa12448a8db116b848d4534f0a4480e73ec75eca1",
+        "bindingHex": "d71612e9d809aaf27d691fa5beeb1f88905c99b4170fd3366e87b08b2c4c1f34d7",
+        "intentDigest": "0229d4a51f2e940464e48c69f8326f7e08e7be23f4c674fd5f040879b3ee8524",
+        "messageHex": "4a8c13750b795034524d8c7d5d127d58c77fa36b4e16cafc890d507f62691674",
+        "participantIds": [
+          "VECTOR/FrostCommitment.participantIds.0",
+          "VECTOR/FrostCommitment.participantIds.1"
+        ],
+        "nonceReservationId": "a1fd2cc3da90d6a0fdb2a02baada9dbf0cfbc7bea41e59cb12452fb1493c064c",
+        "reservationCounter": "9007199254740993"
+      },
+      "encodedHex": "4b50494e505554320800d996131c83d89a7400386578566729672ae73e6a9ef0312c509598c0a0f86e9da1155b715e2897348fb061715fa12448a8db116b848d4534f0a4480e73ec75eca1d71612e9d809aaf27d691fa5beeb1f88905c99b4170fd3366e87b08b2c4c1f34d70229d4a51f2e940464e48c69f8326f7e08e7be23f4c674fd5f040879b3ee85244a8c13750b795034524d8c7d5d127d58c77fa36b4e16cafc890d507f6269167427000000564543544f522f46726f7374436f6d6d69746d656e742e7061727469636970616e744964732e3027000000564543544f522f46726f7374436f6d6d69746d656e742e7061727469636970616e744964732e31a1fd2cc3da90d6a0fdb2a02baada9dbf0cfbc7bea41e59cb12452fb1493c064c0100000000002000",
+      "sha256": "cc748a906cef4f2f6f9776372a438910d3130588cc5bcd6153239cd44ffdb9b3"
+    },
+    {
+      "name": "FrostCommitmentSet",
+      "type": "FrostCommitmentSet",
+      "kind": 9,
+      "input": [
+        {
+          "identifier": "2cc11635aa22131e5e06032c5e8617b9f439f89f9e203c56a742a8f2300f36ae",
+          "hidingHex": "848885884beb94caa1a749319567a72da7998f8c815f48b5211635bfce47b14a84",
+          "bindingHex": "c37e95cd35dbe8a9df30e02d23876679c66b7c5be946a5b18fa89b2940035770c3",
+          "intentDigest": "eb7293ba254d6805478e5487df979b8ebee7783475ab0e922c952563e546fbc5",
+          "messageHex": "0dcde1791b63b9f4ef9a3253d34eecfac1a111b597ead3e214d772efcb5d5f08",
+          "participantIds": [
+            "VECTOR/FrostCommitmentSet.0.participantIds.0",
+            "VECTOR/FrostCommitmentSet.0.participantIds.1"
+          ],
+          "nonceReservationId": "778f3b9a8b7ac1453877400690d69cfeccef25a782b27a0529454af82de54e8e",
+          "reservationCounter": "9007199254740993"
+        },
+        {
+          "identifier": "3fbac16f835509c87e84c990e7f00480658eddc8ea9314356a20fcc7889b5bb7",
+          "hidingHex": "7c6e4da93360bdd0583719d7495199a862cd4d5a53175a84aaa5fa419bad9c0c7c",
+          "bindingHex": "04a707083006a8e457dd1f0396445a92e739bf02f0af74183a3b14ddc516100204",
+          "intentDigest": "aae51a0a4e09f892bf25053542a606110d6c34805153e75af799edb6d82f4c9c",
+          "messageHex": "1a2b2aa113fd3995fd9da4b5fc850ef63c3481a83cd1809e83c3626f134f51f6",
+          "participantIds": [
+            "VECTOR/FrostCommitmentSet.1.participantIds.0",
+            "VECTOR/FrostCommitmentSet.1.participantIds.1"
+          ],
+          "nonceReservationId": "e7ae23c80d83beb3b069d343c8a74ba86d9215fc9b91d891b51a00748906c5ae",
+          "reservationCounter": "9007199254740993"
+        }
+      ],
+      "encodedHex": "4b50494e5055543209002cc11635aa22131e5e06032c5e8617b9f439f89f9e203c56a742a8f2300f36ae848885884beb94caa1a749319567a72da7998f8c815f48b5211635bfce47b14a84c37e95cd35dbe8a9df30e02d23876679c66b7c5be946a5b18fa89b2940035770c3eb7293ba254d6805478e5487df979b8ebee7783475ab0e922c952563e546fbc50dcde1791b63b9f4ef9a3253d34eecfac1a111b597ead3e214d772efcb5d5f082c000000564543544f522f46726f7374436f6d6d69746d656e745365742e302e7061727469636970616e744964732e302c000000564543544f522f46726f7374436f6d6d69746d656e745365742e302e7061727469636970616e744964732e31778f3b9a8b7ac1453877400690d69cfeccef25a782b27a0529454af82de54e8e01000000000020003fbac16f835509c87e84c990e7f00480658eddc8ea9314356a20fcc7889b5bb77c6e4da93360bdd0583719d7495199a862cd4d5a53175a84aaa5fa419bad9c0c7c04a707083006a8e457dd1f0396445a92e739bf02f0af74183a3b14ddc516100204aae51a0a4e09f892bf25053542a606110d6c34805153e75af799edb6d82f4c9c1a2b2aa113fd3995fd9da4b5fc850ef63c3481a83cd1809e83c3626f134f51f62c000000564543544f522f46726f7374436f6d6d69746d656e745365742e312e7061727469636970616e744964732e302c000000564543544f522f46726f7374436f6d6d69746d656e745365742e312e7061727469636970616e744964732e31e7ae23c80d83beb3b069d343c8a74ba86d9215fc9b91d891b51a00748906c5ae0100000000002000",
+      "sha256": "0ab57e27eb896a0e022e2d970000496eaba71bf71e882293ab7949b780a51144"
+    },
+    {
+      "name": "FrostShare",
+      "type": "FrostShare",
+      "kind": 10,
+      "input": {
+        "shareHex": "bacd499ca10e5f2a8357a7c89da6de78758c72a81cb7505c2728a99c2af04422"
+      },
+      "encodedHex": "4b50494e505554320a00bacd499ca10e5f2a8357a7c89da6de78758c72a81cb7505c2728a99c2af04422",
+      "sha256": "d5dbfbc9fe24f2cb2ee992f25952b485f88485c8ab9979e23c4e12f55ef1b3a1"
+    },
+    {
+      "name": "FrostPublicPackage",
+      "type": "FrostPublicPackage",
+      "kind": 11,
+      "input": {
+        "signers": {
+          "min": 2,
+          "max": 2
+        },
+        "commitmentsHex": [
+          "d24b96abf176647d8a6282ae370b176348d643bd90944eb680578830c46e02e8d2",
+          "5bbf0738bcd7041937a097d9661e3a91042a2b0117cd9e2e67f89b486d18244a5b"
+        ],
+        "verifyingSharesHex": [
+          {
+            "identifier": "d8177cd0e1196fade5290928311712fc636da2fbd1d3e3a45eb5ce4a90193444",
+            "shareHex": "595b121e9c5da6974a031d8a14d89920f64c2aa6a142d159bc6cac699f47386f59"
+          },
+          {
+            "identifier": "6be70b63a86451636e2ee9487ce699cf89989b71cdae0cf45f9e386744c046f3",
+            "shareHex": "c9329c98c5bdaf152981913ee6db467bec55cc646225716f2255ee6c578a91f7c9"
+          }
+        ]
+      },
+      "encodedHex": "4b50494e505554320b0002000200d24b96abf176647d8a6282ae370b176348d643bd90944eb680578830c46e02e8d25bbf0738bcd7041937a097d9661e3a91042a2b0117cd9e2e67f89b486d18244a5bd8177cd0e1196fade5290928311712fc636da2fbd1d3e3a45eb5ce4a90193444595b121e9c5da6974a031d8a14d89920f64c2aa6a142d159bc6cac699f47386f596be70b63a86451636e2ee9487ce699cf89989b71cdae0cf45f9e386744c046f3c9329c98c5bdaf152981913ee6db467bec55cc646225716f2255ee6c578a91f7c9",
+      "sha256": "78e6911f84ae79a2c479ab93d807b4e2a3158cbd016041ae4b585d3eb657cbf3"
+    },
+    {
+      "name": "CoordinatorKey",
+      "type": "CoordinatorKey",
+      "kind": 12,
+      "input": {
+        "protocol": "VECTOR/CoordinatorKey.protocol",
+        "publicPackage": {
+          "signers": {
+            "min": 2,
+            "max": 2
+          },
+          "commitmentsHex": [
+            "b2fc14598e402645012f1d463ce469bcb875240209d2443b72f4294e0a0d2f8fb2",
+            "b3b5448ade9a793c8a29b3c25e392d366e31fc15cab984ae6f86da257b5c15eeb3"
+          ],
+          "verifyingSharesHex": [
+            {
+              "identifier": "8575be2aea50e62a7638097e8258e6e424a6571c8db0c5e3ee40b8d99b30e31f",
+              "shareHex": "ed532396931bdd6b1c3e2bb8f9d1f06f46467b8d2de864e12c6997348653fd12ed"
+            },
+            {
+              "identifier": "edcabfcf0cf7436691b1a158b760e5f7afb01dbb9b8ffb7e8fa6d1b18441880c",
+              "shareHex": "e08e6c4094a8ccf5aeceb653c41885ba8fb0426466c9bdea87e67fb09375f0d8e0"
+            }
+          ]
+        },
+        "aggregateTweakedXOnlyPublicKey": "04a6d6803a4b49841b1240466bc1f01a014755e7a4e0a181e289ac1c24d188fb"
+      },
+      "encodedHex": "4b50494e505554320c001e000000564543544f522f436f6f7264696e61746f724b65792e70726f746f636f6c02000200b2fc14598e402645012f1d463ce469bcb875240209d2443b72f4294e0a0d2f8fb2b3b5448ade9a793c8a29b3c25e392d366e31fc15cab984ae6f86da257b5c15eeb38575be2aea50e62a7638097e8258e6e424a6571c8db0c5e3ee40b8d99b30e31fed532396931bdd6b1c3e2bb8f9d1f06f46467b8d2de864e12c6997348653fd12ededcabfcf0cf7436691b1a158b760e5f7afb01dbb9b8ffb7e8fa6d1b18441880ce08e6c4094a8ccf5aeceb653c41885ba8fb0426466c9bdea87e67fb09375f0d8e004a6d6803a4b49841b1240466bc1f01a014755e7a4e0a181e289ac1c24d188fb",
+      "sha256": "2fed93af9b760b11cb761b68d0116ce6a763276a8c92e0cb9c021da024b868ac"
+    },
+    {
+      "name": "DepositPolicy",
+      "type": "DepositPolicy",
+      "kind": 13,
+      "input": {
+        "environment": "VECTOR/DepositPolicy.environment",
+        "nativeGenesis": "b3d9187481e53a23493f64174474606592a671bd6fdabbd59cdb2e7e1f8b370a",
+        "solanaDeployment": "4e80be109a5bd250b62c669855dbd499058683b046b1c12c461b91b6ddfcc786",
+        "solanaGenesis": "85f6bdcf43d17aa45d49a4f17025c052a1dc037f8c28476d331ad0d03f21241f",
+        "minimumSolanaSlot": "9007199254740993",
+        "managerProgramId": "b8ddb3537f45214979f2eeb65f42e5fe8f5e3208cf9a122fb69b57e266dffe27",
+        "transceiverProgramId": "2229ff35e33b1ed1d0169498b247f4cedb7d4a38df526edcaf3db2ceeb5f2a5b",
+        "mint": "036e417bb511a8e7ab3cae1bab6ce206de59faba7c2495ec8c699805736f36b5",
+        "protocolId": 474337278,
+        "nativeNetwork": 2848999610,
+        "policyEpoch": 4001753509,
+        "keyEpoch": 4294967295,
+        "frostPublicKeyHex": "a018dfde50b95ad621c62ac83eedfca78692967876428960dee9b7502916de0f",
+        "csvDelayBlocks": 2887407724,
+        "minimumConfirmations": 1601378532,
+        "maximumAmountAtomic": "18446744073709551615",
+        "maximumFeeAtomic": "1"
+      },
+      "encodedHex": "4b50494e505554320d0020000000564543544f522f4465706f736974506f6c6963792e656e7669726f6e6d656e74b3d9187481e53a23493f64174474606592a671bd6fdabbd59cdb2e7e1f8b370a4e80be109a5bd250b62c669855dbd499058683b046b1c12c461b91b6ddfcc78685f6bdcf43d17aa45d49a4f17025c052a1dc037f8c28476d331ad0d03f21241f0100000000002000b8ddb3537f45214979f2eeb65f42e5fe8f5e3208cf9a122fb69b57e266dffe272229ff35e33b1ed1d0169498b247f4cedb7d4a38df526edcaf3db2ceeb5f2a5b036e417bb511a8e7ab3cae1bab6ce206de59faba7c2495ec8c699805736f36b5fecf451cba48d0a9a5e985eeffffffffa018dfde50b95ad621c62ac83eedfca78692967876428960dee9b7502916de0f6c581aace418735fffffffffffffffff0100000000000000",
+      "sha256": "8643ed64370bca0cd8ada969e067ba4594e97c322d15b9bf721bd3ef33edcf8e"
+    },
+    {
+      "name": "ReserveAllocation",
+      "type": "ReserveAllocation",
+      "kind": 14,
+      "input": {
+        "protocol": "VECTOR/ReserveAllocation.protocol",
+        "policyDigest": "4acc246a56a3b301329a19a349cc078a69792e78636457029d99229327149b7b",
+        "deposit": {
+          "txid": "05d12036f55e0d165513fcd24b10be974b82c0550f7d96378bd72e79d2c1fec5",
+          "vout": 690390474
+        },
+        "sweep": {
+          "txid": "9d32d7acf92fef0a8259872e99d759c68ee8f603da6938e1fc6b23a7fedb1dbc",
+          "vout": 2539935582
+        }
+      },
+      "encodedHex": "4b50494e505554320e0021000000564543544f522f52657365727665416c6c6f636174696f6e2e70726f746f636f6c4acc246a56a3b301329a19a349cc078a69792e78636457029d99229327149b7b05d12036f55e0d165513fcd24b10be974b82c0550f7d96378bd72e79d2c1fec5ca8526299d32d7acf92fef0a8259872e99d759c68ee8f603da6938e1fc6b23a7fedb1dbc5e576497",
+      "sha256": "cfaea35997651f1dc464a77a57227742928dbcae62174dc58d82889ee78b6a42"
+    },
+    {
+      "name": "ReserveCreditEvidence",
+      "type": "ReserveCreditEvidence",
+      "kind": 15,
+      "input": {
+        "protocol": "VECTOR/ReserveCreditEvidence.protocol",
+        "policyDigest": "1f1481b6607f3af5b9fa1f66c2cbe4b0745aef7e0db5e23aba7765797df0a5e9",
+        "allocationId": "cc8fdad402f394a98bbd234f2c02d6aefbfc18b6c037706af60d1296bcdc2897",
+        "proofDigest": "c0ef0065b697b34b8249ecb9d6b3114bca7f19bcb88f9531bff8f2b336cde92d"
+      },
+      "encodedHex": "4b50494e505554320f0025000000564543544f522f5265736572766543726564697445766964656e63652e70726f746f636f6c1f1481b6607f3af5b9fa1f66c2cbe4b0745aef7e0db5e23aba7765797df0a5e9cc8fdad402f394a98bbd234f2c02d6aefbfc18b6c037706af60d1296bcdc2897c0ef0065b697b34b8249ecb9d6b3114bca7f19bcb88f9531bff8f2b336cde92d",
+      "sha256": "891159c18be2753ca45b143e803fd6d6f35a0fdac0440b545a2409bd7eabee3e"
+    },
+    {
+      "name": "ReserveCreditNonce",
+      "type": "ReserveCreditNonce",
+      "kind": 16,
+      "input": {
+        "protocol": "VECTOR/ReserveCreditNonce.protocol",
+        "allocationId": "71ff14756ef1c89bb9b45c83f23bc672b1686116dc9303ca02265b4b0c163023",
+        "depositNonce": "a073781c080364b028a917ae01a3af9c1f2cf88e23b21386e75b98e04ae97c42"
+      },
+      "encodedHex": "4b50494e50555432100022000000564543544f522f526573657276654372656469744e6f6e63652e70726f746f636f6c71ff14756ef1c89bb9b45c83f23bc672b1686116dc9303ca02265b4b0c163023a073781c080364b028a917ae01a3af9c1f2cf88e23b21386e75b98e04ae97c42",
+      "sha256": "58d51b03860176e1112f5c3520ec10d33eadd88bdcdcec3f5d6a0cfdd2ddbccd"
+    },
+    {
+      "name": "TransactionCommitment",
+      "type": "TransactionCommitment",
+      "kind": 17,
+      "input": {
+        "protocol": "VECTOR/TransactionCommitment.protocol",
+        "txidHex": "fbccb45276c3598aa8603198a226aa901108881984fa852cb52a541a5abb999e",
+        "inputOutpoints": [
+          {
+            "txid": "982bfb4d06b2557123a391104633b63de551a6d6c3923bd3438dbb16dc4a90f1",
+            "vout": 1974007477
+          },
+          {
+            "txid": "3c70fdb1bb2738a9ce9414755d700c716ef2f2173c8fcfd20d93f0f9786bc32c",
+            "vout": 1817412579
+          }
+        ],
+        "outputCommitments": [
+          "82c6312d46462f23a4a13e6c658680aff3a91d4cdfc5e814e65649fee009dd89",
+          "1841290e6f5001482978b19e7acec67dbba553d934a16a2c0e75da97e0bef129"
+        ],
+        "shaPrevouts": "c5169b2d0e1f124bd3ef6f9d157ab01a70426ff8d6857dd5db58ee028ef15acb",
+        "shaAmounts": "176dc18c15680ebcb89c81600b67245594327d66ab9ea2f8a9ae46098956b074",
+        "shaScriptPubKeys": "33343621bc77d4eb202cf352b537f73b604f5e8c3ad8894868cd91835737576c",
+        "shaSequences": "e824a0c6c53a75500b5cbc24cfe2da984b8fc8d5fd7c5eacc59a0eb8a4f409cc",
+        "shaOutputs": "b0d3cd8443a990c8808a3ec56af1b6bed6582d699f51aa087906c8fe0b528e0b"
+      },
+      "encodedHex": "4b50494e50555432110025000000564543544f522f5472616e73616374696f6e436f6d6d69746d656e742e70726f746f636f6cfbccb45276c3598aa8603198a226aa901108881984fa852cb52a541a5abb999e02000000982bfb4d06b2557123a391104633b63de551a6d6c3923bd3438dbb16dc4a90f1b5f6a8753c70fdb1bb2738a9ce9414755d700c716ef2f2173c8fcfd20d93f0f9786bc32ce383536c0200000082c6312d46462f23a4a13e6c658680aff3a91d4cdfc5e814e65649fee009dd891841290e6f5001482978b19e7acec67dbba553d934a16a2c0e75da97e0bef129c5169b2d0e1f124bd3ef6f9d157ab01a70426ff8d6857dd5db58ee028ef15acb176dc18c15680ebcb89c81600b67245594327d66ab9ea2f8a9ae46098956b07433343621bc77d4eb202cf352b537f73b604f5e8c3ad8894868cd91835737576ce824a0c6c53a75500b5cbc24cfe2da984b8fc8d5fd7c5eacc59a0eb8a4f409ccb0d3cd8443a990c8808a3ec56af1b6bed6582d699f51aa087906c8fe0b528e0b",
+      "sha256": "febc6b42587e186226a3755e2fef77617bfd900ee4b574400e3d5fa771d3fdd9"
+    },
+    {
+      "name": "IndexedOutput",
+      "type": "IndexedOutput",
+      "kind": 18,
+      "input": {
+        "index": 1918142539,
+        "amountAtomic": "18446744073709551615",
+        "scriptPubKeyHex": "5120a31facb97558b45436d07193402cdc2cabee22fd4af2382ce6771ad5647fb436"
+      },
+      "encodedHex": "4b50494e5055543212004b885472ffffffffffffffff220000005120a31facb97558b45436d07193402cdc2cabee22fd4af2382ce6771ad5647fb436",
+      "sha256": "d4a4f6083de772b809181db3d77f2fce54793d2e4d5cb05fccfffb15697a231d"
+    },
+    {
+      "name": "SweepRequest",
+      "type": "SweepRequest",
+      "kind": 19,
+      "input": {
+        "protocol": "VECTOR/SweepRequest.protocol",
+        "operationIdHex": "76398671d19e700ba6aad88d21b95e6911d3417853d9d5ad88cec0f56cfc0d3b",
+        "depositOutpoint": {
+          "txid": "9f0f1c6cb8074d479881d781438b6be8951d2887e11387542d7d1f0c33acf622",
+          "vout": 1347935616
+        },
+        "unsignedNativeTransactionFingerprintHex": "a6343ad3c44a0fb5c01a3845a5f4f7b71dc2388bca0f98312a7e00ee16b50564",
+        "taprootSighashHex": "5ea800714980ff12bac7f491d1e749575452a50a633e8e2fe405607cdead4119",
+        "transactionCommitment": "a2386bb6c0bfd8aa7dde49821a8a53c3ad6a6d1959b090792372bd7f9efa3308",
+        "proofFingerprintHex": "c4082a3aae9ff186404f5fe3463d09b2fb3f752d1092a9d4f894b59bc6f05fcd"
+      },
+      "encodedHex": "4b50494e5055543213001c000000564543544f522f5377656570526571756573742e70726f746f636f6c76398671d19e700ba6aad88d21b95e6911d3417853d9d5ad88cec0f56cfc0d3b9f0f1c6cb8074d479881d781438b6be8951d2887e11387542d7d1f0c33acf62280dd5750a6343ad3c44a0fb5c01a3845a5f4f7b71dc2388bca0f98312a7e00ee16b505645ea800714980ff12bac7f491d1e749575452a50a633e8e2fe405607cdead4119a2386bb6c0bfd8aa7dde49821a8a53c3ad6a6d1959b090792372bd7f9efa3308c4082a3aae9ff186404f5fe3463d09b2fb3f752d1092a9d4f894b59bc6f05fcd",
+      "sha256": "b7f072b0a9f4548b22628dd4119c100c420f6b7e1de20a2b9d57d66e486a3172"
+    },
+    {
+      "name": "WithdrawalProof",
+      "type": "WithdrawalProof",
+      "kind": 20,
+      "input": {
+        "withdrawal": "dc7d0ce2248c15566ae80127da85fab40c3f73f77724fe823c6fbccdb65cf0b8",
+        "native": "509a2353e35681354aa0c35ac6fe771502c4465631340b0063cb4542380d25d4"
+      },
+      "encodedHex": "4b50494e505554321400dc7d0ce2248c15566ae80127da85fab40c3f73f77724fe823c6fbccdb65cf0b8509a2353e35681354aa0c35ac6fe771502c4465631340b0063cb4542380d25d4",
+      "sha256": "b988981dc3803a8f363ac6e7b8465c98e3939fe24c355053b7abe43319401cd1"
+    },
+    {
+      "name": "WithdrawalSigningRequest",
+      "type": "WithdrawalSigningRequest",
+      "kind": 21,
+      "input": {
+        "purpose": "VECTOR/WithdrawalSigningRequest.purpose",
+        "operationId": "99a743481862a71ffbf16132ef7441aee258ba4c9114cd41efed84264e26b7aa",
+        "txid": "1a979e0d4adfdcc5e61c318b6f671fd54d0f47bd03dcddc105cfbc0d65660a72",
+        "input": 298426092,
+        "sighash": "833868455546610cb3114dbb13a03b20a8af1423d1f3bd3b28f94b9d1a4801b4"
+      },
+      "encodedHex": "4b50494e50555432150027000000564543544f522f5769746864726177616c5369676e696e67526571756573742e707572706f736599a743481862a71ffbf16132ef7441aee258ba4c9114cd41efed84264e26b7aa1a979e0d4adfdcc5e61c318b6f671fd54d0f47bd03dcddc105cfbc0d65660a72ec9ec911833868455546610cb3114dbb13a03b20a8af1423d1f3bd3b28f94b9d1a4801b4",
+      "sha256": "b0baafe63209f447ce876a06c8c81379833a57dded309e8b798a988c8137bfdf"
+    },
+    {
+      "name": "FinalizedWithdrawal",
+      "type": "FinalizedWithdrawal",
+      "kind": 22,
+      "input": {
+        "signature": "feb7f1ea1428fb33c15685e7d8bee3ac146ff0abf38998ab6cb4ae9323e6a7e4feb7f1ea1428fb33c15685e7d8bee3ac146ff0abf38998ab6cb4ae9323e6a7e4",
+        "message": "7cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb",
+        "record": "ad3029f93804dc763699744237b09960f8a63591f9c1ace5492577a0389335b9ad3029f93804dc763699744237b09960f8a63591f9c1ace5492577a0389335b9ad3029f93804dc763699744237b09960f8a63591f9c1ace5492577a0389335b9ad3029f93804dc763699744237b09960f8a63591f9c1ace5492577a0389335b9ad3029f93804dc763699744237b09960f8a63591f9c1ace5492577a0389335b9ad3029f93804dc763699744237b09960f8a63591f9c1ace5492577a0389335b9ad3029f93804dc763699744237b09960f8a63591f9c1ace5492577a0389335b9ad3029f93804dc763699744237b09960f8a63591f9c1ace5492577a0389335b9ad3029f93804dc763699744237b09960f8a63591f9c1ace5492577",
+        "slot": "9007199254740993"
+      },
+      "encodedHex": "4b50494e505554321600feb7f1ea1428fb33c15685e7d8bee3ac146ff0abf38998ab6cb4ae9323e6a7e4feb7f1ea1428fb33c15685e7d8bee3ac146ff0abf38998ab6cb4ae9323e6a7e47cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbb376c4a762be7ef81db126d1639f0b585153c5356c65cd042f40f08d6ccb77cbbad3029f93804dc763699744237b09960f8a63591f9c1ace5492577a0389335b9ad3029f93804dc763699744237b09960f8a63591f9c1ace5492577a0389335b9ad3029f93804dc763699744237b09960f8a63591f9c1ace5492577a0389335b9ad3029f93804dc763699744237b09960f8a63591f9c1ace5492577a0389335b9ad3029f93804dc763699744237b09960f8a63591f9c1ace5492577a0389335b9ad3029f93804dc763699744237b09960f8a63591f9c1ace5492577a0389335b9ad3029f93804dc763699744237b09960f8a63591f9c1ace5492577a0389335b9ad3029f93804dc763699744237b09960f8a63591f9c1ace5492577a0389335b9ad3029f93804dc763699744237b09960f8a63591f9c1ace54925770100000000002000",
+      "sha256": "a0d6f28fc9fad7a582efd8d1195379015236b3258ff18ba3cffef1127e387245"
+    },
+    {
+      "name": "WithdrawalObservation",
+      "type": "WithdrawalObservation",
+      "kind": 23,
+      "input": {
+        "protocol": "VECTOR/WithdrawalObservation.protocol",
+        "cluster": "VECTOR/WithdrawalObservation.cluster",
+        "solanaDeploymentHex": "972a5d5c61637c95a35b6cd42fbeedf4e1bc144c3a49a6dcb306cc79614cc3f2",
+        "transactionSignature": "VECTOR/WithdrawalObservation.transactionSignature",
+        "slot": "9007199254740993",
+        "rootSlot": "9007199254740993",
+        "commitment": "VECTOR/WithdrawalObservation.commitment",
+        "operationIdHex": "3a602c5cae3486fdf3c7d4a3dd8e358486dc68dc1b0b42beb17e5f34b8760ead",
+        "withdrawalIdHex": "a82f5a5283baf0db8490af0a4f89167f2c059eb9112089bffadb0993dc2679ee",
+        "messageDigestHex": "f087481e4807829bf8ae15bca015f6f1d6c7636abbabc18267610bc5f9118036",
+        "grossAmountAtomic": "18446744073709551615",
+        "feeAtomic": "1",
+        "nativeDestinationHex": "5120d9c9dfc85251588b334ff1a82a8af82abc0ec6ba4d49260048d489ba5affd120",
+        "trust": "VECTOR/WithdrawalObservation.trust"
+      },
+      "encodedHex": "4b50494e50555432170025000000564543544f522f5769746864726177616c4f62736572766174696f6e2e70726f746f636f6c24000000564543544f522f5769746864726177616c4f62736572766174696f6e2e636c7573746572972a5d5c61637c95a35b6cd42fbeedf4e1bc144c3a49a6dcb306cc79614cc3f231000000564543544f522f5769746864726177616c4f62736572766174696f6e2e7472616e73616374696f6e5369676e61747572650100000000002000010000000000200027000000564543544f522f5769746864726177616c4f62736572766174696f6e2e636f6d6d69746d656e743a602c5cae3486fdf3c7d4a3dd8e358486dc68dc1b0b42beb17e5f34b8760eada82f5a5283baf0db8490af0a4f89167f2c059eb9112089bffadb0993dc2679eef087481e4807829bf8ae15bca015f6f1d6c7636abbabc18267610bc5f9118036ffffffffffffffff0100000000000000220000005120d9c9dfc85251588b334ff1a82a8af82abc0ec6ba4d49260048d489ba5affd12022000000564543544f522f5769746864726177616c4f62736572766174696f6e2e7472757374",
+      "sha256": "3356aa9fc57b163a96717ec4d6f3be4034278ebe8fe30a25f81833ddf3624aab"
+    },
+    {
+      "name": "DepositReserveEvidence",
+      "type": "DepositReserveEvidence",
+      "kind": 24,
+      "input": {
+        "protocol": "VECTOR/DepositReserveEvidence.protocol",
+        "deposit": {
+          "trust": "VECTOR/DepositReserveEvidence.deposit.trust",
+          "nativeNetwork": 450915091,
+          "nativeGenesisHash": "55ccf3e8703d13a61fd83e0c85a306af35094050f7b7a392fe590ab6f07af7b3",
+          "depositOutpoint": {
+            "txid": "f2bfa228acb703a4ececdf7dd532808d6a12c3c902c7d354b9aa11357fc4608c",
+            "vout": 1143395096
+          },
+          "amountAtomic": "18446744073709551615",
+          "solanaRecipientHex": "2b4f890e882593b1759e37275791095d26be03e74cfcf86e8118ab1e0651f0cd",
+          "proofFingerprint": "f57d77bd9c2bc02b664051aba4bc970ef86c76e3b9c13326fbffa624f11ea87d",
+          "finalitySatisfied": false,
+          "utxoUnspentAtDeposit": false,
+          "noPriorConsumption": false
+        },
+        "reserveSweep": {
+          "reserveAllocationIdHex": "bc510574863b6de0ebbb3c3a8006581438bb5816ed0235c22faaffa805c85e16",
+          "nativeSweepTxidHex": "31afaabb8f6edf4c63b2d5b4548c5b2e8b91af442a93ec6c4b14209f73337b7d",
+          "canonicalReserveScriptPubKeyHex": "5120283694691ea890e51e4908e370796e07c4b21fd27ac30baefd9c687eec6b02ed",
+          "transactionCommitment": "1f256b492742f9d7d86e667da5a89713616628037c9d831a9c49583a3490bf0d",
+          "taprootSighashHex": "3974878ec309df85b9bd0503bc5ecb77ce2af02780dd4271913dc86e4df67b17",
+          "outputCommitments": [
+            "d976dfa7af6ccec845115e2a4dfc9c735526986679a7eb36fc08c5ed887e61b6",
+            "c27138e9bc11b3f9e20e722bd50962adc53a2258c0b1357db6b130bb15c7bd74"
+          ],
+          "changeAtomic": "9007199254740993"
+        }
+      },
+      "encodedHex": "4b50494e50555432180026000000564543544f522f4465706f7369745265736572766545766964656e63652e70726f746f636f6c2b000000564543544f522f4465706f7369745265736572766545766964656e63652e6465706f7369742e7472757374136be01a55ccf3e8703d13a61fd83e0c85a306af35094050f7b7a392fe590ab6f07af7b3f2bfa228acb703a4ececdf7dd532808d6a12c3c902c7d354b9aa11357fc4608c18d32644ffffffffffffffff2b4f890e882593b1759e37275791095d26be03e74cfcf86e8118ab1e0651f0cdf57d77bd9c2bc02b664051aba4bc970ef86c76e3b9c13326fbffa624f11ea87d000000bc510574863b6de0ebbb3c3a8006581438bb5816ed0235c22faaffa805c85e1631afaabb8f6edf4c63b2d5b4548c5b2e8b91af442a93ec6c4b14209f73337b7d220000005120283694691ea890e51e4908e370796e07c4b21fd27ac30baefd9c687eec6b02ed1f256b492742f9d7d86e667da5a89713616628037c9d831a9c49583a3490bf0d3974878ec309df85b9bd0503bc5ecb77ce2af02780dd4271913dc86e4df67b1702000000d976dfa7af6ccec845115e2a4dfc9c735526986679a7eb36fc08c5ed887e61b6c27138e9bc11b3f9e20e722bd50962adc53a2258c0b1357db6b130bb15c7bd740100000000002000",
+      "sha256": "76b972fe9d4ea2e13cc8c3e7840eb38056ef5c9b72dfc30f5f0b17a490e9964d"
+    },
+    {
+      "name": "LocalClaimNonce",
+      "type": "LocalClaimNonce",
+      "kind": 25,
+      "input": {
+        "protocol": "VECTOR/LocalClaimNonce.protocol",
+        "depositOutpoint": {
+          "txid": "9517b6b8628f86454ac92f423cd0cb23391dbd5234139274a14e480f2fbbb47a",
+          "vout": 1101762748
+        },
+        "reserveAllocationIdHex": "024659e3f5399413d2e3bdca97fe5138848f8548ba82c8cf82dd34c6d8579647",
+        "solanaRecipientHex": "f7504d76c52179ffb3b48353080939204634aa801216962d96abf314f9f677c2",
+        "mintHex": "a4b852d2574d76bad42cbd9dd4ef85712b8aa46c94c6802ffff1fbf6d7dd0a74"
+      },
+      "encodedHex": "4b50494e5055543219001f000000564543544f522f4c6f63616c436c61696d4e6f6e63652e70726f746f636f6c9517b6b8628f86454ac92f423cd0cb23391dbd5234139274a14e480f2fbbb47abc90ab41024659e3f5399413d2e3bdca97fe5138848f8548ba82c8cf82dd34c6d8579647f7504d76c52179ffb3b48353080939204634aa801216962d96abf314f9f677c2a4b852d2574d76bad42cbd9dd4ef85712b8aa46c94c6802ffff1fbf6d7dd0a74",
+      "sha256": "0cf3f8c800169d2eff48919e8ce0d317875f6f1f527e80e2e82e285b0950d45d"
+    },
+    {
+      "name": "LocalSweepSummary",
+      "type": "LocalSweepSummary",
+      "kind": 26,
+      "input": {
+        "protocol": "VECTOR/LocalSweepSummary.protocol",
+        "unsignedNativeTransactionFingerprintHex": "6a466667b2644af609c8528074e3029b3b68a75b60f246784328ad0259726867",
+        "nativeSweepTxidHex": "c2cfd631c60f77ca9b3724d242404cacd3e189837cb33830f5e5310ec0898a63",
+        "inputOutpoints": [
+          {
+            "txid": "7084adcae4076d184741573647561c38ff6b2c23f7b1d7031b16c60c9ad32b14",
+            "vout": 2982205971
+          },
+          {
+            "txid": "aa2e1e380ca4494ddaa00634fc9b74082ed40245a7fc97626280d82bb611e4a4",
+            "vout": 1952173038
+          }
+        ],
+        "reserveAmountAtomic": "18446744073709551615",
+        "canonicalReserveScriptPubKeyHex": "512076390d9b58c9bd4eff7af60a1178babf24458678daac385f891b949ee3a945a1",
+        "nativeMinerFeeAtomic": "1",
+        "allSighashDigestHex": "df80338e84345a71dda6d682d3566a359dd940972f67d8561b4a8789bfde3181"
+      },
+      "encodedHex": "4b50494e505554321a0021000000564543544f522f4c6f63616c537765657053756d6d6172792e70726f746f636f6c6a466667b2644af609c8528074e3029b3b68a75b60f246784328ad0259726867c2cfd631c60f77ca9b3724d242404cacd3e189837cb33830f5e5310ec0898a63020000007084adcae4076d184741573647561c38ff6b2c23f7b1d7031b16c60c9ad32b1413dac0b1aa2e1e380ca4494ddaa00634fc9b74082ed40245a7fc97626280d82bb611e4a4eecb5b74ffffffffffffffff22000000512076390d9b58c9bd4eff7af60a1178babf24458678daac385f891b949ee3a945a10100000000000000df80338e84345a71dda6d682d3566a359dd940972f67d8561b4a8789bfde3181",
+      "sha256": "b5b13dd4b5aaa48d577ab643cb4186bde2361bc1d73852f87f0a486f0aad9263"
+    },
+    {
+      "name": "LocalReserveOutput",
+      "type": "LocalReserveOutput",
+      "kind": 27,
+      "input": {
+        "protocol": "VECTOR/LocalReserveOutput.protocol",
+        "nativeSweepTxidHex": "10e8d3f6d5066e84ced4972e58506211f00976f2145b0fbe3acd7bccad649907",
+        "vout": 2266991629,
+        "amountAtomic": "18446744073709551615",
+        "scriptPubKeyHex": "5120e22bfed3a47ab9a11126be2ac3c3776d321ba596eb2d753944e606a81ccc795d"
+      },
+      "encodedHex": "4b50494e505554321b0022000000564543544f522f4c6f63616c526573657276654f75747075742e70726f746f636f6c10e8d3f6d5066e84ced4972e58506211f00976f2145b0fbe3acd7bccad6499070d8c1f87ffffffffffffffff220000005120e22bfed3a47ab9a11126be2ac3c3776d321ba596eb2d753944e606a81ccc795d",
+      "sha256": "832cdc85b2b4ccc3940d2e847ed9a43d1fca2e41dd1e20d8a2ed6626d67e8e66"
+    },
+    {
+      "name": "TaprootEvidenceSet",
+      "type": "TaprootEvidenceSet",
+      "kind": 28,
+      "input": {
+        "protocol": "VECTOR/TaprootEvidenceSet.protocol",
+        "evidences": [
+          {
+            "signingInputIndex": 2165597925,
+            "taprootSighashHex": "ba8314ef1180dd570d9545e857eb14c16390cbc22c6b9062c3127bd7efedacea",
+            "unsignedNativeTransactionFingerprintHex": "2fac5b74908c39be4b92439fad6734064257119a6e9f3ea443fc222744a5ed9f",
+            "nativeSweepTxidHex": "b82ee98f2a14c13135d35cfda8be43847e219c5b01f55325dbd82c8e3cdbfada"
+          },
+          {
+            "signingInputIndex": 140703243,
+            "taprootSighashHex": "a40c8679dbc011f67d06bf0f36fc0cab7a3a1b45cda3206d6abb834d4ac6c7b3",
+            "unsignedNativeTransactionFingerprintHex": "fe6d55c8fae8dd383736b6784377a393debe93e762f2905ddf3adc70f4541c92",
+            "nativeSweepTxidHex": "e5e9e09b10cd83ad2eb7e136a3f0827139ad517174a9df69704183bb16460644"
+          }
+        ]
+      },
+      "encodedHex": "4b50494e505554321c0022000000564543544f522f546170726f6f7445766964656e63655365742e70726f746f636f6c02000000e5661481ba8314ef1180dd570d9545e857eb14c16390cbc22c6b9062c3127bd7efedacea2fac5b74908c39be4b92439fad6734064257119a6e9f3ea443fc222744a5ed9fb82ee98f2a14c13135d35cfda8be43847e219c5b01f55325dbd82c8e3cdbfada0bf66208a40c8679dbc011f67d06bf0f36fc0cab7a3a1b45cda3206d6abb834d4ac6c7b3fe6d55c8fae8dd383736b6784377a393debe93e762f2905ddf3adc70f4541c92e5e9e09b10cd83ad2eb7e136a3f0827139ad517174a9df69704183bb16460644",
+      "sha256": "b1b820b03fa88353a45423b6446f9751f0525a7bf3b806f77a7abf5e3c7bd65f"
+    },
+    {
+      "name": "LocalReserveAllocation",
+      "type": "LocalReserveAllocation",
+      "kind": 29,
+      "input": {
+        "protocol": "VECTOR/LocalReserveAllocation.protocol",
+        "solanaDeploymentHex": "46ec43cd31d77551f9b8cbfc384a23b59a281e27d68286f0df49fcc244f0a626",
+        "mintHex": "a35c7cb03badee32ee63766018a869165efdd8ab0d4b8113e7f5a780e72dd124",
+        "depositOutpoint": {
+          "txid": "f2f53dce538b76339a729f825c359359ef471ff76a7b867d799efc5aaa4d8e33",
+          "vout": 181036467
+        },
+        "unsignedNativeTransactionFingerprintHex": "b8607ceed5677d68445843734018bc845672ad05a7dfbb218a7d4f9cbdbf1baf",
+        "nativeSweepTxidHex": "3b6ac94868d97fb8203f8ffa6096243bea2dcd09284ab7c9e134059dab198a78",
+        "inputOutpoints": [
+          {
+            "txid": "a9183d228e0cad9a197cba4f0bb129f805602d2dcb34af882a76e9abf70ff91e",
+            "vout": 3187511710
+          },
+          {
+            "txid": "7921cd6ae3e411adfa8080593116cfda79aa3259fb3ccc6f0e922975d1549c59",
+            "vout": 2301678922
+          }
+        ],
+        "reserveOutputVout": 1864132158,
+        "reserveAmountAtomic": "18446744073709551615",
+        "canonicalReserveScriptPubKeyHex": "512086e331a242a18f5c0d2e39ede1caee24f72af92abafe7861037272a2dd2ebb1f",
+        "solanaRecipientHex": "0260b25f367e38044c77fa2e314d22a6891fd023f1b930463092414797e5f132"
+      },
+      "encodedHex": "4b50494e505554321d0026000000564543544f522f4c6f63616c52657365727665416c6c6f636174696f6e2e70726f746f636f6c46ec43cd31d77551f9b8cbfc384a23b59a281e27d68286f0df49fcc244f0a626a35c7cb03badee32ee63766018a869165efdd8ab0d4b8113e7f5a780e72dd124f2f53dce538b76339a729f825c359359ef471ff76a7b867d799efc5aaa4d8e33b365ca0ab8607ceed5677d68445843734018bc845672ad05a7dfbb218a7d4f9cbdbf1baf3b6ac94868d97fb8203f8ffa6096243bea2dcd09284ab7c9e134059dab198a7802000000a9183d228e0cad9a197cba4f0bb129f805602d2dcb34af882a76e9abf70ff91e9e91fdbd7921cd6ae3e411adfa8080593116cfda79aa3259fb3ccc6f0e922975d1549c594ad530893e661c6fffffffffffffffff22000000512086e331a242a18f5c0d2e39ede1caee24f72af92abafe7861037272a2dd2ebb1f0260b25f367e38044c77fa2e314d22a6891fd023f1b930463092414797e5f132",
+      "sha256": "7142978f2521a9c2ee6f043c7570bd89fbe6ac6c7e9f7b6e16a1afd0e62e4e16"
+    },
+    {
+      "name": "SweepJobIdentity",
+      "type": "SweepJobIdentity",
+      "kind": 30,
+      "input": {
+        "protocol": "VECTOR/SweepJobIdentity.protocol",
+        "policyDigest": "2178d4c93184374e5986af1601ce1b2507f53773730f751602a355d281c8375f",
+        "signingRequestId": "7b519cd8c10d94016a83a7e959a0a4d2c0dc0cb6548327d1c3dfdc5672c5bae2",
+        "intentDigest": "af82f63b1652bf7936323cabe8c5bfc4d649cca79665970cafc42c63900e76f0"
+      },
+      "encodedHex": "4b50494e505554321e0020000000564543544f522f53776565704a6f624964656e746974792e70726f746f636f6c2178d4c93184374e5986af1601ce1b2507f53773730f751602a355d281c8375f7b519cd8c10d94016a83a7e959a0a4d2c0dc0cb6548327d1c3dfdc5672c5bae2af82f63b1652bf7936323cabe8c5bfc4d649cca79665970cafc42c63900e76f0",
+      "sha256": "d1f2a5eb39241ee3ae9e3a53316e915a07c7670ea77f5696ae075998ca3d639e"
+    },
+    {
+      "name": "IndexedOutputZero",
+      "type": "IndexedOutput",
+      "kind": 18,
+      "input": {
+        "index": 0,
+        "amountAtomic": "0",
+        "scriptPubKeyHex": ""
+      },
+      "encodedHex": "4b50494e50555432120000000000000000000000000000000000",
+      "sha256": "47d9c0e5a373c6c4ff7424e1a97a83fd74c209785f3a4fc43968a92aa43ba0cd"
+    }
+  ]
+}

@@ -64,7 +64,7 @@ test("protected storage never initializes missing state on read or write", t => 
   assert.equal(existsSync(options.root), false);
 });
 test("local economic journal uses an existing DPAPI key without plaintext fallback", t => {
-  const vector = JSON.parse(readFileSync(path.join(repoRoot, "solana/modules/bridge-messages/vectors/canonical-v1.json"))).vectors[0];
+  const vector = JSON.parse(readFileSync(path.join(repoRoot, "solana/modules/bridge-messages/vectors/canonical-borsh-v2.json"))).vectors[0];
   const deployment = Buffer.from(vector.encodedHex.slice(24, 360), "hex");
   Buffer.from(REGTEST_GENESIS, "hex").copy(deployment, 8);
   const deploymentHex = deployment.toString("hex"), id = h("protected-journal-test");
@@ -238,7 +238,7 @@ test("real A+B FROST signs and reopens using only encrypted persistent state", t
   for (const o of options) assert.deepEqual(readdirSync(o.root), ["lease.protected", "lock.protected", "state.protected"]);
 });
 test("attester loads a distinct DPAPI-protected seed with deployment binding", t => {
-  const vector = JSON.parse(readFileSync(path.join(repoRoot, "solana/modules/bridge-messages/vectors/canonical-v1.json"))).vectors.find(v => v.name === "deposit-claim-v1");
+  const vector = JSON.parse(readFileSync(path.join(repoRoot, "solana/modules/bridge-messages/vectors/canonical-borsh-v2.json"))).vectors.find(v => v.name === "deposit-claim-v2");
   const decoded = decodeCanonicalBridgeMessage(vector.encodedHex), seed = randomBytes(32);
   const { options } = fixture(t, "ATTESTER_A", "attester-seed", { nativeGenesis: vector.deployment.nativeGenesis,
     solanaDeployment: vector.deployment.solanaDeployment, keyEpoch: vector.keyEpoch });

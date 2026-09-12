@@ -1,3 +1,4 @@
+import { bridgeInputDigest } from "../../../shared/protocol/bridge-inputs.mjs";
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -443,10 +444,10 @@ test("DKG V2 session hashes match the explicit public metadata transcript", () =
   const context = dkgContextFixture();
   const participants = [{ signerId: REQUIRED_FROST_SIGNERS[0], index: 0 },
     { signerId: REQUIRED_FROST_SIGNERS[1], index: 1 }];
-  const contextDigest = sha256Canonical(context);
-  const participantSetHash = sha256Canonical({ protocol: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_PARTICIPANT_SET/V2",
+  const contextDigest = bridgeInputDigest("FrostKeyContext", context);
+  const participantSetHash = bridgeInputDigest("FrostParticipantSet", { protocol: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_PARTICIPANT_SET/V2",
     participants, threshold: 2 });
-  const sessionId = sha256Canonical({ protocol: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_DKG_SESSION/V2",
+  const sessionId = bridgeInputDigest("FrostDkgSession", { protocol: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_DKG_SESSION/V2",
     epoch: 1, contextDigest, participantSetHash, threshold: 2 });
   const expected = { protocol: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_DKG/V2", epoch: 1, context,
     contextDigest, sessionId, participantSetHash, threshold: 2, participants };
@@ -1097,7 +1098,7 @@ for (const persisted of [false, true]) {
     const first = f.stores[0].load().dkg[f.request.sessionId].finalKey;
     fail = false;
     const resumed = runTwoPartyDkg([reopenSigner(f, 0), reopenSigner(f, 1)], { epoch: 1 });
-    assert.equal(resumed.publicPackageHash === sha256Canonical(first.public), true);
+    assert.equal(resumed.publicPackageHash === bridgeInputDigest("FrostPublicPackage", first.public), true);
   });
 }
 
@@ -1298,7 +1299,7 @@ function frostRequestFor(intent, attempt = 1) {
     requestId: intent.signingRequestId,
     epoch: intent.keyEpoch,
     attempt,
-    sessionId: sha256Canonical({
+    sessionId: bridgeInputDigest("FrostSession", {
       protocol: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_SESSION/V1",
       requestId: intent.signingRequestId,
       epoch: intent.keyEpoch,
@@ -1817,7 +1818,7 @@ test("abort rejects missing or contradictory tombstones without repairing stored
         const { nonceReservationId: ignored, reservationCounter: previous, ...commitment } = session.commitment;
         assert.equal(previous, "1");
         const reservationCounter = 1; // Deliberately noncanonical type for this small public counter.
-        const replacement = sha256Canonical({ domain: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_NONCE_RESERVATION/V1",
+        const replacement = bridgeInputDigest("FrostNonceReservation", { domain: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_NONCE_RESERVATION/V1",
           signerId: REQUIRED_FROST_SIGNERS[0], reservationCounter, requestId: request.requestId, epoch: request.epoch,
           sessionId: request.sessionId, intentDigest: request.intentDigest, messageHex: request.messageHex,
           participantIds: [...request.participantIds].sort(), commitment });
@@ -1827,7 +1828,7 @@ test("abort rejects missing or contradictory tombstones without repairing stored
         session.commitment.nonceReservationId = replacement;
         tombstone.reservationCounter = reservationCounter;
         tombstone.nonceReservationId = replacement;
-        tombstone.commitmentSha256 = sha256Canonical(session.commitment);
+        tombstone.commitmentSha256 = bridgeInputDigest("FrostCommitment", session.commitment);
         delete state.nonceTombstones[nonceId];
         state.nonceTombstones[replacement] = tombstone;
       }]) {

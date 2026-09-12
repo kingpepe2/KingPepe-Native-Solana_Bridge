@@ -33,6 +33,7 @@ struct VectorCase {
     valid_until: String,
     evidence_digest: String,
     operation_id: String,
+    operation_id_inputs_hex: String,
     message_digest: String,
     encoded_hex: String,
 }
@@ -204,7 +205,7 @@ fn canonical_encoding_round_trip() {
 fn shared_golden_vectors_match_rust_encoding() {
     let file: VectorFile = serde_json::from_str(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/vectors/canonical-v1.json"
+        "/vectors/canonical-borsh-v2.json"
     )))
     .expect("parse vector file");
     assert_eq!(file.message_length, MESSAGE_LENGTH);
@@ -218,6 +219,16 @@ fn shared_golden_vectors_match_rust_encoding() {
         let operation_id_hex = hex_lower(&message.operation_id);
 
         assert_eq!(operation_id_hex, case.operation_id, "{}", case.name);
+        assert_eq!(
+            hex_lower(
+                &message
+                    .encode_operation_id_inputs()
+                    .expect("Borsh preimage")
+            ),
+            case.operation_id_inputs_hex,
+            "{}",
+            case.name
+        );
         assert_eq!(digest_hex, case.message_digest, "{}", case.name);
         assert_eq!(encoded_hex, case.encoded_hex, "{}", case.name);
     }

@@ -6,8 +6,11 @@ import path from "node:path";
 import os from "node:os";
 import { test } from "node:test";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { serialize } from "borsh";
 import { collectRegtestEvidence, encodeRegtestEvidence, encodeRegtestEvidenceAtCheckpoint, MAX_RAW_EVIDENCE_BYTES,
-  REGTEST_GENESIS, verifyRegtestEvidencePacket, observedSpentRegtestReserve } from "../native-raw-evidence.mjs";
+  REGTEST_GENESIS, verifyRegtestEvidencePacket, observedSpentRegtestReserve,
+  decodeNativeVerificationResult, NATIVE_VERIFICATION_SCHEMA } from "../native-raw-evidence.mjs";
 import { parseNativeTransactionHex } from "../native-taproot-transaction.mjs";
 
 const h = (byte) => byte.repeat(32);
@@ -16,6 +19,30 @@ const txid = parseNativeTransactionHex(raw).txidHex;
 const bundle = () => ({ genesisHash: REGTEST_GENESIS, tipHash: h("08"), tipHeight: 1,
   chainworkHex: h("00"), minimumConfirmations: 1, headers: ["09".repeat(80)],
   proofs: [{ rawTransactionHex: raw, blockHeight: 1, transactionIndex: 0, transactionIds: [txid] }] });
+
+test("Native Borsh envelope and verification response match fixed Rust vectors", () => {
+  const vector = JSON.parse(readFileSync(new URL("../../proof/vectors/borsh-v2.json", import.meta.url), "utf8"));
+  const packet = encodeRegtestEvidence(vector.input);
+  assert.equal(packet.toString("hex"), vector.encodedHex);
+  assert.equal(createHash("sha256").update(packet).digest("hex"), vector.digest);
+  const response = Buffer.from(serialize(NATIVE_VERIFICATION_SCHEMA, {
+    magic: Buffer.from("KPNEVR02"), digest: Buffer.from(vector.digest, "hex"),
+    tipHash: Buffer.from(vector.input.tipHash, "hex"), tipHeight: vector.input.tipHeight, transactions: 1,
+  }));
+  assert.equal(response.toString("hex"), vector.responseHex);
+  assert.equal(createHash("sha256").update(response).digest("hex"), vector.responseDigest);
+  assert.deepEqual(decodeNativeVerificationResult(response), { digestHex: vector.digest,
+    tipHash: vector.input.tipHash, tipHeight: 1, transactions: 1 });
+  for (let length = 0; length < response.length; length++) {
+    assert.throws(() => decodeNativeVerificationResult(response.subarray(0, length)), /RAW_NATIVE_/);
+  }
+  assert.throws(() => decodeNativeVerificationResult(Buffer.concat([response, Buffer.from([0])])), /RAW_NATIVE_/);
+  for (const offset of [0, 7, 72, 76]) {
+    const bad = Buffer.from(response); bad[offset] ^= 0x80;
+    if (offset >= 72) bad.fill(0xff, offset, offset + 4);
+    assert.throws(() => decodeNativeVerificationResult(bad), /RAW_NATIVE_/);
+  }
+});
 
 test("caller-created errors and copied fields cannot claim a verified spent reserve", () => {
   for (const value of [undefined, null, "RAW_NATIVE_RESERVE_SPENT", new Error("RAW_NATIVE_RESERVE_SPENT"),
@@ -66,7 +93,7 @@ test("acceptance checkpoint rejects domain, field, prefix, finality and digest s
 test("raw evidence packet has fixed-width canonical fields and immutable encoded bytes", () => {
   const input = bundle();
   const encoded = encodeRegtestEvidence(input);
-  assert.equal(encoded.subarray(0, 8).toString(), "KPNEVD01");
+  assert.equal(encoded.subarray(0, 8).toString(), "KPNEVD02");
   assert.equal(encoded.subarray(8, 40).toString("hex"), REGTEST_GENESIS);
   assert.equal(encoded.readUInt32LE(72), 1);
   assert.equal(encoded.readUInt32LE(108), 1);

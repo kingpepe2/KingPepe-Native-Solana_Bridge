@@ -7,6 +7,7 @@
 
 #![allow(unexpected_cfgs)]
 
+use bridge_messages::abi as wire;
 use std::collections::{BTreeMap, BTreeSet};
 
 use bridge_messages::{
@@ -92,58 +93,54 @@ pub fn process_instruction_accounts(
     )
 }
 
-pub fn decode_bridge_instruction(
-    instruction_data: &[u8],
-) -> Result<BridgeInstruction, EntrypointError> {
-    let Some(tag) = instruction_data.first().copied() else {
-        return Err(EntrypointError::EmptyInstruction);
+pub fn decode_bridge_instruction(data: &[u8]) -> Result<BridgeInstruction, EntrypointError> {
+    let tag = *data.first().ok_or(EntrypointError::EmptyInstruction)?;
+    let expected = match tag {
+        BRIDGE_INSTRUCTION_INITIALIZE => 1 + BRIDGE_CONFIG_INSTRUCTION_LENGTH,
+        BRIDGE_INSTRUCTION_ACCEPT_DEPOSIT_CLAIM => 1 + bridge_messages::MESSAGE_LENGTH,
+        BRIDGE_INSTRUCTION_RECORD_WITHDRAWAL_REQUEST => {
+            1 + bridge_messages::MESSAGE_LENGTH + BURN_CHECKED_INSTRUCTION_LENGTH
+        }
+        other => return Err(EntrypointError::UnsupportedInstructionTag(other)),
     };
+    if data.len() != expected {
+        return Err(EntrypointError::InvalidInstructionLength {
+            expected,
+            found: data.len(),
+        });
+    }
     match tag {
         BRIDGE_INSTRUCTION_INITIALIZE => {
-            let expected = 1 + BRIDGE_CONFIG_INSTRUCTION_LENGTH;
-            if instruction_data.len() != expected {
-                return Err(EntrypointError::InvalidInstructionLength {
-                    expected,
-                    found: instruction_data.len(),
-                });
-            }
-            let compact = &instruction_data[1..];
-            let mut full = Vec::with_capacity(BRIDGE_CONFIG_STATE_LENGTH);
-            full.extend_from_slice(&compact[..195]);
-            full.extend_from_slice(&[0; 49]); // None + zero pubkey padding + u128 zero.
-            full.extend_from_slice(&compact[195..]);
-            Ok(BridgeInstruction::Initialize(decode_bridge_config(&full)?))
+            let value: wire::BridgeInitializeWire =
+                borsh::from_slice(data).map_err(|_| EntrypointError::InvalidInstructionEncoding)?;
+            Ok(BridgeInstruction::Initialize(bridge_config_from_wire(
+                wire::BridgeConfigWire {
+                    binding: value.binding,
+                    freeze_tag: 0,
+                    freeze_key: [0; 32],
+                    initial_supply: 0,
+                    policy: value.policy,
+                },
+            )?))
         }
         BRIDGE_INSTRUCTION_ACCEPT_DEPOSIT_CLAIM => {
-            let expected = 1 + bridge_messages::MESSAGE_LENGTH;
-            if instruction_data.len() != expected {
-                return Err(EntrypointError::InvalidInstructionLength {
-                    expected,
-                    found: instruction_data.len(),
-                });
-            }
-            let message = CanonicalBridgeMessage::decode(&instruction_data[1..])
+            let value: wire::AcceptDepositClaimWire =
+                borsh::from_slice(data).map_err(|_| EntrypointError::InvalidInstructionEncoding)?;
+            let message = CanonicalBridgeMessage::decode(&value.message)
                 .map_err(|_| EntrypointError::InvalidCanonicalMessage)?;
             Ok(BridgeInstruction::AcceptDepositClaim(Box::new(message)))
         }
         BRIDGE_INSTRUCTION_RECORD_WITHDRAWAL_REQUEST => {
-            let expected = 1 + bridge_messages::MESSAGE_LENGTH + BURN_CHECKED_INSTRUCTION_LENGTH;
-            if instruction_data.len() != expected {
-                return Err(EntrypointError::InvalidInstructionLength {
-                    expected,
-                    found: instruction_data.len(),
-                });
-            }
-            let message_end = 1 + bridge_messages::MESSAGE_LENGTH;
-            let message = CanonicalBridgeMessage::decode(&instruction_data[1..message_end])
+            let value: wire::RecordWithdrawalWire =
+                borsh::from_slice(data).map_err(|_| EntrypointError::InvalidInstructionEncoding)?;
+            let message = CanonicalBridgeMessage::decode(&value.message)
                 .map_err(|_| EntrypointError::InvalidCanonicalMessage)?;
-            let burn = decode_burn_checked(&instruction_data[message_end..])?;
             Ok(BridgeInstruction::RecordWithdrawalRequest {
                 message: Box::new(message),
-                burn,
+                burn: burn_from_wire(value.burn),
             })
         }
-        other => Err(EntrypointError::UnsupportedInstructionTag(other)),
+        _ => unreachable!("instruction tag checked"),
     }
 }
 
@@ -159,39 +156,41 @@ pub enum BridgeInstruction {
 
 impl BridgeInstruction {
     pub fn encode(&self) -> Result<Vec<u8>, EntrypointError> {
-        let mut out = Vec::new();
-        match self {
-            BridgeInstruction::Initialize(config) => {
+        let encoded = match self {
+            Self::Initialize(config) => {
                 if config.mint_binding.freeze_authority.is_some()
                     || config.mint_binding.initial_supply != 0
                 {
                     return Err(EntrypointError::InvalidInstructionEncoding);
                 }
-                out.push(BRIDGE_INSTRUCTION_INITIALIZE);
-                let mut full = Vec::with_capacity(BRIDGE_CONFIG_STATE_LENGTH);
-                encode_bridge_config(config, &mut full);
-                out.extend_from_slice(&full[..195]);
-                out.extend_from_slice(&full[244..]);
+                let config = bridge_config_wire(config);
+                borsh::to_vec(&wire::BridgeInitializeWire {
+                    tag: BRIDGE_INSTRUCTION_INITIALIZE,
+                    binding: config.binding,
+                    policy: config.policy,
+                })
             }
-            BridgeInstruction::AcceptDepositClaim(message) => {
-                out.push(BRIDGE_INSTRUCTION_ACCEPT_DEPOSIT_CLAIM);
-                out.extend(
-                    message
+            Self::AcceptDepositClaim(message) => borsh::to_vec(&wire::AcceptDepositClaimWire {
+                tag: BRIDGE_INSTRUCTION_ACCEPT_DEPOSIT_CLAIM,
+                message: message
+                    .encode()
+                    .map_err(|_| EntrypointError::InvalidCanonicalMessage)?
+                    .try_into()
+                    .map_err(|_| EntrypointError::InvalidCanonicalMessage)?,
+            }),
+            Self::RecordWithdrawalRequest { message, burn } => {
+                borsh::to_vec(&wire::RecordWithdrawalWire {
+                    tag: BRIDGE_INSTRUCTION_RECORD_WITHDRAWAL_REQUEST,
+                    message: message
                         .encode()
+                        .map_err(|_| EntrypointError::InvalidCanonicalMessage)?
+                        .try_into()
                         .map_err(|_| EntrypointError::InvalidCanonicalMessage)?,
-                );
+                    burn: burn_wire(burn),
+                })
             }
-            BridgeInstruction::RecordWithdrawalRequest { message, burn } => {
-                out.push(BRIDGE_INSTRUCTION_RECORD_WITHDRAWAL_REQUEST);
-                out.extend(
-                    message
-                        .encode()
-                        .map_err(|_| EntrypointError::InvalidCanonicalMessage)?,
-                );
-                encode_burn_checked(burn, &mut out);
-            }
-        }
-        Ok(out)
+        };
+        encoded.map_err(|_| EntrypointError::InvalidInstructionEncoding)
     }
 }
 
@@ -226,86 +225,62 @@ fn decode_bridge_environment(byte: u8) -> Result<BridgeEnvironment, EntrypointEr
     }
 }
 
-fn encode_bridge_config(config: &BridgeConfig, out: &mut Vec<u8>) {
-    out.push(encode_bridge_environment(&config.environment));
-    out.extend(config.manager_program_id);
-    out.extend(config.transceiver_program_id);
-    out.extend(config.solana_deployment);
-    out.extend(config.mint_binding.mint);
-    out.extend(config.mint_binding.token_program_id);
-    out.extend(config.mint_binding.mint_authority_pda);
-    out.push(config.mint_binding.decimals);
-    out.push(config.mint_binding.native_decimals);
-    match config.mint_binding.freeze_authority {
-        Some(freeze_authority) => {
-            out.push(1);
-            out.extend(freeze_authority);
-        }
-        None => {
-            out.push(0);
-            out.extend([0u8; 32]);
-        }
+fn bridge_config_wire(config: &BridgeConfig) -> wire::BridgeConfigWire {
+    let mint = &config.mint_binding;
+    wire::BridgeConfigWire {
+        binding: wire::BridgeBindingWire {
+            environment: encode_bridge_environment(&config.environment),
+            manager_program_id: config.manager_program_id,
+            transceiver_program_id: config.transceiver_program_id,
+            solana_deployment: config.solana_deployment,
+            mint: mint.mint,
+            token_program_id: mint.token_program_id,
+            mint_authority_pda: mint.mint_authority_pda,
+            decimals: mint.decimals,
+            native_decimals: mint.native_decimals,
+        },
+        freeze_tag: u8::from(mint.freeze_authority.is_some()),
+        freeze_key: mint.freeze_authority.unwrap_or([0; 32]),
+        initial_supply: mint.initial_supply,
+        policy: wire::BridgePolicyWire {
+            policy_epoch: config.policy_epoch,
+            key_epoch: config.key_epoch,
+            deposits_paused: config.deposits_paused,
+            withdrawals_paused: config.withdrawals_paused,
+            hard_stop: config.hard_stop,
+            mainnet_activation_enabled: config.mainnet_activation_enabled,
+        },
     }
-    out.extend(config.mint_binding.initial_supply.to_le_bytes());
-    out.extend(config.policy_epoch.to_le_bytes());
-    out.extend(config.key_epoch.to_le_bytes());
-    out.push(config.deposits_paused as u8);
-    out.push(config.withdrawals_paused as u8);
-    out.push(config.hard_stop as u8);
-    out.push(config.mainnet_activation_enabled as u8);
 }
 
-fn decode_bridge_config(data: &[u8]) -> Result<BridgeConfig, EntrypointError> {
-    let mut cursor = InstructionCursor::new(data);
-    let environment = decode_bridge_environment(cursor.read_u8()?)?;
-    let manager_program_id = cursor.read_array::<32>()?;
-    let transceiver_program_id = cursor.read_array::<32>()?;
-    let solana_deployment = cursor.read_array::<32>()?;
-    let mint = cursor.read_array::<32>()?;
-    let token_program_id = cursor.read_array::<32>()?;
-    let mint_authority_pda = cursor.read_array::<32>()?;
-    let decimals = cursor.read_u8()?;
-    let native_decimals = cursor.read_u8()?;
-    let freeze_authority = match cursor.read_u8()? {
-        0 => {
-            let padded = cursor.read_array::<32>()?;
-            if padded != [0u8; 32] {
-                return Err(EntrypointError::InvalidInstructionEncoding);
-            }
-            None
-        }
-        1 => Some(cursor.read_array::<32>()?),
+fn bridge_config_from_wire(value: wire::BridgeConfigWire) -> Result<BridgeConfig, EntrypointError> {
+    let b = value.binding;
+    let p = value.policy;
+    let freeze_authority = match value.freeze_tag {
+        0 if value.freeze_key == [0; 32] => None,
+        1 => Some(value.freeze_key),
         _ => return Err(EntrypointError::InvalidInstructionEncoding),
     };
-    let initial_supply = cursor.read_u128_le()?;
-    let policy_epoch = cursor.read_u32_le()?;
-    let key_epoch = cursor.read_u32_le()?;
-    let deposits_paused = cursor.read_bool()?;
-    let withdrawals_paused = cursor.read_bool()?;
-    let hard_stop = cursor.read_bool()?;
-    let mainnet_activation_enabled = cursor.read_bool()?;
-    cursor.finish()?;
-
     Ok(BridgeConfig {
-        environment,
-        manager_program_id,
-        transceiver_program_id,
-        solana_deployment,
+        environment: decode_bridge_environment(b.environment)?,
+        manager_program_id: b.manager_program_id,
+        transceiver_program_id: b.transceiver_program_id,
+        solana_deployment: b.solana_deployment,
         mint_binding: MintBinding {
-            mint,
-            token_program_id,
-            mint_authority_pda,
-            decimals,
-            native_decimals,
+            mint: b.mint,
+            token_program_id: b.token_program_id,
+            mint_authority_pda: b.mint_authority_pda,
+            decimals: b.decimals,
+            native_decimals: b.native_decimals,
             freeze_authority,
-            initial_supply,
+            initial_supply: value.initial_supply,
         },
-        policy_epoch,
-        key_epoch,
-        deposits_paused,
-        withdrawals_paused,
-        hard_stop,
-        mainnet_activation_enabled,
+        policy_epoch: p.policy_epoch,
+        key_epoch: p.key_epoch,
+        deposits_paused: p.deposits_paused,
+        withdrawals_paused: p.withdrawals_paused,
+        hard_stop: p.hard_stop,
+        mainnet_activation_enabled: p.mainnet_activation_enabled,
     })
 }
 
@@ -871,11 +846,13 @@ fn process_accept_deposit_claim_accounts(
         recipient: message.destination,
     };
     write_account_data(deposit_claim, &encode_deposit_claim_account(&record)?)?;
-    let mut backing_data = Vec::with_capacity(DEPOSIT_BACKING_MARKER_LENGTH);
-    backing_data.extend_from_slice(b"KPBBAK01");
-    backing_data.push(1);
-    backing_data.extend_from_slice(&message.operation_id);
-    backing_data.extend_from_slice(&digest);
+    let backing_data = borsh::to_vec(&wire::DepositBackingWire {
+        magic: *b"KPBBAK01",
+        version: BRIDGE_ACCOUNT_VERSION,
+        operation_id: message.operation_id,
+        message_digest: digest,
+    })
+    .map_err(|_| EntrypointError::InvalidInstructionEncoding)?;
     write_account_data(backing_marker, &backing_data)?;
     write_account_data(bridge_state, &encode_bridge_state_account(&state)?)?;
     Ok(())
@@ -1697,129 +1674,126 @@ pub fn encode_bridge_state_account(
     state: &BridgeStateAccount,
 ) -> Result<Vec<u8>, AccountCodecError> {
     validate_config(&state.config)?;
-    let mut out = Vec::with_capacity(BRIDGE_STATE_ACCOUNT_LENGTH);
-    out.extend(BRIDGE_STATE_ACCOUNT_MAGIC);
-    out.push(BRIDGE_ACCOUNT_VERSION);
-    out.push(program_state_to_u8(&state.state));
-    encode_bridge_config(&state.config, &mut out);
-    out.extend(state.minted_supply.to_le_bytes());
-    out.extend(state.burned_unpaid_withdrawals.to_le_bytes());
-    debug_assert_eq!(out.len(), BRIDGE_STATE_ACCOUNT_LENGTH);
-    Ok(out)
+    borsh::to_vec(&wire::BridgeStateWire {
+        magic: BRIDGE_STATE_ACCOUNT_MAGIC,
+        version: BRIDGE_ACCOUNT_VERSION,
+        state: program_state_to_u8(&state.state),
+        config: bridge_config_wire(&state.config),
+        minted_supply: state.minted_supply,
+        burned_unpaid_withdrawals: state.burned_unpaid_withdrawals,
+    })
+    .map_err(|_| AccountCodecError::InvalidEncoding)
 }
 
-pub fn decode_bridge_state_account(data: &[u8]) -> Result<BridgeStateAccount, AccountCodecError> {
-    if data.len() != BRIDGE_STATE_ACCOUNT_LENGTH {
+fn check_account_header(
+    data: &[u8],
+    length: usize,
+    magic: [u8; 8],
+) -> Result<(), AccountCodecError> {
+    if data.len() != length {
         return Err(AccountCodecError::InvalidAccountLength {
-            expected: BRIDGE_STATE_ACCOUNT_LENGTH,
+            expected: length,
             found: data.len(),
         });
     }
-    let mut cursor = AccountCursor::new(data);
-    if cursor.read_array::<8>()? != BRIDGE_STATE_ACCOUNT_MAGIC {
+    if data[..8] != magic {
         return Err(AccountCodecError::InvalidMagic);
     }
-    if cursor.read_u8()? != BRIDGE_ACCOUNT_VERSION {
+    if data[8] != BRIDGE_ACCOUNT_VERSION {
         return Err(AccountCodecError::UnsupportedVersion);
     }
-    let state = program_state_from_u8(cursor.read_u8()?)?;
-    let config_bytes = cursor.read_array::<BRIDGE_CONFIG_STATE_LENGTH>()?;
+    Ok(())
+}
+
+pub fn decode_bridge_state_account(data: &[u8]) -> Result<BridgeStateAccount, AccountCodecError> {
+    check_account_header(
+        data,
+        BRIDGE_STATE_ACCOUNT_LENGTH,
+        BRIDGE_STATE_ACCOUNT_MAGIC,
+    )?;
+    let value: wire::BridgeStateWire =
+        borsh::from_slice(data).map_err(|_| AccountCodecError::InvalidEncoding)?;
     let config =
-        decode_bridge_config(&config_bytes).map_err(|_| AccountCodecError::InvalidEncoding)?;
-    let minted_supply = cursor.read_u128_le()?;
-    let burned_unpaid_withdrawals = cursor.read_u128_le()?;
-    cursor.finish()?;
+        bridge_config_from_wire(value.config).map_err(|_| AccountCodecError::InvalidEncoding)?;
     validate_config(&config)?;
     Ok(BridgeStateAccount {
-        state,
+        state: program_state_from_u8(value.state)?,
         config,
-        minted_supply,
-        burned_unpaid_withdrawals,
+        minted_supply: value.minted_supply,
+        burned_unpaid_withdrawals: value.burned_unpaid_withdrawals,
     })
 }
 
 pub fn encode_deposit_claim_account(
     record: &DepositClaimRecord,
 ) -> Result<Vec<u8>, AccountCodecError> {
-    let mut out = Vec::with_capacity(DEPOSIT_CLAIM_ACCOUNT_LENGTH);
-    out.extend(DEPOSIT_CLAIM_ACCOUNT_MAGIC);
-    out.push(BRIDGE_ACCOUNT_VERSION);
-    out.extend(record.operation_id);
-    out.extend(record.message_digest);
-    out.extend(record.amount_atomic.to_le_bytes());
-    write_bounded_bytes(&mut out, &record.recipient)?;
-    debug_assert_eq!(out.len(), DEPOSIT_CLAIM_ACCOUNT_LENGTH);
-    Ok(out)
+    borsh::to_vec(&wire::DepositClaimWire {
+        magic: DEPOSIT_CLAIM_ACCOUNT_MAGIC,
+        version: BRIDGE_ACCOUNT_VERSION,
+        operation_id: record.operation_id,
+        message_digest: record.message_digest,
+        amount_atomic: record.amount_atomic,
+        recipient: destination_wire(&record.recipient)?,
+    })
+    .map_err(|_| AccountCodecError::InvalidEncoding)
 }
 
 pub fn decode_deposit_claim_account(data: &[u8]) -> Result<DepositClaimAccount, AccountCodecError> {
-    if data.len() != DEPOSIT_CLAIM_ACCOUNT_LENGTH {
-        return Err(AccountCodecError::InvalidAccountLength {
-            expected: DEPOSIT_CLAIM_ACCOUNT_LENGTH,
-            found: data.len(),
-        });
-    }
-    let mut cursor = AccountCursor::new(data);
-    if cursor.read_array::<8>()? != DEPOSIT_CLAIM_ACCOUNT_MAGIC {
-        return Err(AccountCodecError::InvalidMagic);
-    }
-    if cursor.read_u8()? != BRIDGE_ACCOUNT_VERSION {
-        return Err(AccountCodecError::UnsupportedVersion);
-    }
-    let record = DepositClaimRecord {
-        operation_id: cursor.read_array::<32>()?,
-        message_digest: cursor.read_array::<32>()?,
-        amount_atomic: cursor.read_u64_le()?,
-        recipient: read_bounded_bytes(&mut cursor)?,
-    };
-    cursor.finish()?;
-    Ok(DepositClaimAccount { record })
+    check_account_header(
+        data,
+        DEPOSIT_CLAIM_ACCOUNT_LENGTH,
+        DEPOSIT_CLAIM_ACCOUNT_MAGIC,
+    )?;
+    let value: wire::DepositClaimWire =
+        borsh::from_slice(data).map_err(|_| AccountCodecError::InvalidEncoding)?;
+    Ok(DepositClaimAccount {
+        record: DepositClaimRecord {
+            operation_id: value.operation_id,
+            message_digest: value.message_digest,
+            amount_atomic: value.amount_atomic,
+            recipient: destination_from_wire(value.recipient)?,
+        },
+    })
 }
 
 pub fn encode_withdrawal_record_account(
     record: &WithdrawalRecord,
 ) -> Result<Vec<u8>, AccountCodecError> {
-    let mut out = Vec::with_capacity(WITHDRAWAL_RECORD_ACCOUNT_LENGTH);
-    out.extend(WITHDRAWAL_RECORD_ACCOUNT_MAGIC);
-    out.push(BRIDGE_ACCOUNT_VERSION);
-    out.extend(record.withdrawal_id);
-    out.extend(record.operation_id);
-    out.extend(record.message_digest);
-    out.extend(record.gross_amount_atomic.to_le_bytes());
-    out.extend(record.fee_atomic.to_le_bytes());
-    write_bounded_bytes(&mut out, &record.native_destination)?;
-    out.extend(record.burn_authority);
-    debug_assert_eq!(out.len(), WITHDRAWAL_RECORD_ACCOUNT_LENGTH);
-    Ok(out)
+    borsh::to_vec(&wire::WithdrawalRecordWire {
+        magic: WITHDRAWAL_RECORD_ACCOUNT_MAGIC,
+        version: BRIDGE_ACCOUNT_VERSION,
+        withdrawal_id: record.withdrawal_id,
+        operation_id: record.operation_id,
+        message_digest: record.message_digest,
+        gross_amount_atomic: record.gross_amount_atomic,
+        fee_atomic: record.fee_atomic,
+        native_destination: destination_wire(&record.native_destination)?,
+        burn_authority: record.burn_authority,
+    })
+    .map_err(|_| AccountCodecError::InvalidEncoding)
 }
 
 pub fn decode_withdrawal_record_account(
     data: &[u8],
 ) -> Result<WithdrawalRecordAccount, AccountCodecError> {
-    if data.len() != WITHDRAWAL_RECORD_ACCOUNT_LENGTH {
-        return Err(AccountCodecError::InvalidAccountLength {
-            expected: WITHDRAWAL_RECORD_ACCOUNT_LENGTH,
-            found: data.len(),
-        });
-    }
-    let mut cursor = AccountCursor::new(data);
-    if cursor.read_array::<8>()? != WITHDRAWAL_RECORD_ACCOUNT_MAGIC {
-        return Err(AccountCodecError::InvalidMagic);
-    }
-    if cursor.read_u8()? != BRIDGE_ACCOUNT_VERSION {
-        return Err(AccountCodecError::UnsupportedVersion);
-    }
-    let record = WithdrawalRecord {
-        withdrawal_id: cursor.read_array::<32>()?,
-        operation_id: cursor.read_array::<32>()?,
-        message_digest: cursor.read_array::<32>()?,
-        gross_amount_atomic: cursor.read_u64_le()?,
-        fee_atomic: cursor.read_u64_le()?,
-        native_destination: read_bounded_bytes(&mut cursor)?,
-        burn_authority: cursor.read_array::<32>()?,
-    };
-    cursor.finish()?;
-    Ok(WithdrawalRecordAccount { record })
+    check_account_header(
+        data,
+        WITHDRAWAL_RECORD_ACCOUNT_LENGTH,
+        WITHDRAWAL_RECORD_ACCOUNT_MAGIC,
+    )?;
+    let value: wire::WithdrawalRecordWire =
+        borsh::from_slice(data).map_err(|_| AccountCodecError::InvalidEncoding)?;
+    Ok(WithdrawalRecordAccount {
+        record: WithdrawalRecord {
+            withdrawal_id: value.withdrawal_id,
+            operation_id: value.operation_id,
+            message_digest: value.message_digest,
+            gross_amount_atomic: value.gross_amount_atomic,
+            fee_atomic: value.fee_atomic,
+            native_destination: destination_from_wire(value.native_destination)?,
+            burn_authority: value.burn_authority,
+        },
+    })
 }
 
 fn program_state_to_u8(state: &ProgramState) -> u8 {
@@ -1839,156 +1813,44 @@ fn program_state_from_u8(value: u8) -> Result<ProgramState, AccountCodecError> {
     }
 }
 
-fn write_bounded_bytes(out: &mut Vec<u8>, value: &[u8]) -> Result<(), AccountCodecError> {
+fn destination_wire(value: &[u8]) -> Result<wire::DestinationWire, AccountCodecError> {
     if value.is_empty() || value.len() > MAX_DESTINATION_LENGTH {
         return Err(AccountCodecError::InvalidEncoding);
     }
-    out.extend((value.len() as u16).to_le_bytes());
-    out.extend(value);
-    out.resize(out.len() + (MAX_DESTINATION_LENGTH - value.len()), 0);
-    Ok(())
+    let mut padded = [0; MAX_DESTINATION_LENGTH];
+    padded[..value.len()].copy_from_slice(value);
+    Ok(wire::DestinationWire {
+        length: value.len() as u16,
+        padded,
+    })
 }
 
-fn read_bounded_bytes(cursor: &mut AccountCursor<'_>) -> Result<Vec<u8>, AccountCodecError> {
-    let len = cursor.read_u16_le()? as usize;
-    if len == 0 || len > MAX_DESTINATION_LENGTH {
+fn destination_from_wire(value: wire::DestinationWire) -> Result<Vec<u8>, AccountCodecError> {
+    let len = usize::from(value.length);
+    if len == 0 || len > MAX_DESTINATION_LENGTH || value.padded[len..].iter().any(|byte| *byte != 0)
+    {
         return Err(AccountCodecError::InvalidEncoding);
     }
-    let padded = cursor.read_array::<MAX_DESTINATION_LENGTH>()?;
-    if padded[len..].iter().any(|byte| *byte != 0) {
-        return Err(AccountCodecError::InvalidEncoding);
-    }
-    Ok(padded[..len].to_vec())
+    Ok(value.padded[..len].to_vec())
 }
 
-fn encode_burn_checked(burn: &BurnChecked, out: &mut Vec<u8>) {
-    out.extend(burn.token_program_id);
-    out.extend(burn.mint);
-    out.extend(burn.authority);
-    out.extend(burn.amount_atomic.to_le_bytes());
-    out.push(burn.decimals);
-}
-
-fn decode_burn_checked(data: &[u8]) -> Result<BurnChecked, EntrypointError> {
-    let mut cursor = InstructionCursor::new(data);
-    let burn = BurnChecked {
-        token_program_id: cursor.read_array::<32>()?,
-        mint: cursor.read_array::<32>()?,
-        authority: cursor.read_array::<32>()?,
-        amount_atomic: cursor.read_u64_le()?,
-        decimals: cursor.read_u8()?,
-    };
-    cursor.finish()?;
-    Ok(burn)
-}
-
-struct AccountCursor<'a> {
-    data: &'a [u8],
-    offset: usize,
-}
-
-impl<'a> AccountCursor<'a> {
-    fn new(data: &'a [u8]) -> Self {
-        Self { data, offset: 0 }
-    }
-
-    fn read_array<const N: usize>(&mut self) -> Result<[u8; N], AccountCodecError> {
-        let end = self
-            .offset
-            .checked_add(N)
-            .ok_or(AccountCodecError::InvalidEncoding)?;
-        let bytes = self
-            .data
-            .get(self.offset..end)
-            .ok_or(AccountCodecError::InvalidEncoding)?;
-        self.offset = end;
-        Ok(bytes.try_into().expect("slice length checked"))
-    }
-
-    fn read_u8(&mut self) -> Result<u8, AccountCodecError> {
-        Ok(self.read_array::<1>()?[0])
-    }
-
-    fn read_u16_le(&mut self) -> Result<u16, AccountCodecError> {
-        Ok(u16::from_le_bytes(self.read_array::<2>()?))
-    }
-
-    fn read_u64_le(&mut self) -> Result<u64, AccountCodecError> {
-        Ok(u64::from_le_bytes(self.read_array::<8>()?))
-    }
-
-    fn read_u128_le(&mut self) -> Result<u128, AccountCodecError> {
-        Ok(u128::from_le_bytes(self.read_array::<16>()?))
-    }
-
-    fn finish(&self) -> Result<(), AccountCodecError> {
-        if self.offset == self.data.len() {
-            Ok(())
-        } else {
-            Err(AccountCodecError::InvalidAccountLength {
-                expected: self.offset,
-                found: self.data.len(),
-            })
-        }
+fn burn_wire(value: &BurnChecked) -> wire::BurnCheckedWire {
+    wire::BurnCheckedWire {
+        token_program_id: value.token_program_id,
+        mint: value.mint,
+        authority: value.authority,
+        amount_atomic: value.amount_atomic,
+        decimals: value.decimals,
     }
 }
 
-struct InstructionCursor<'a> {
-    data: &'a [u8],
-    offset: usize,
-}
-
-impl<'a> InstructionCursor<'a> {
-    fn new(data: &'a [u8]) -> Self {
-        Self { data, offset: 0 }
-    }
-
-    fn read_array<const N: usize>(&mut self) -> Result<[u8; N], EntrypointError> {
-        let end = self
-            .offset
-            .checked_add(N)
-            .ok_or(EntrypointError::InvalidInstructionEncoding)?;
-        let bytes = self
-            .data
-            .get(self.offset..end)
-            .ok_or(EntrypointError::InvalidInstructionEncoding)?;
-        self.offset = end;
-        Ok(bytes.try_into().expect("slice length checked"))
-    }
-
-    fn read_u8(&mut self) -> Result<u8, EntrypointError> {
-        Ok(self.read_array::<1>()?[0])
-    }
-
-    fn read_bool(&mut self) -> Result<bool, EntrypointError> {
-        match self.read_u8()? {
-            0 => Ok(false),
-            1 => Ok(true),
-            _ => Err(EntrypointError::InvalidInstructionEncoding),
-        }
-    }
-
-    fn read_u32_le(&mut self) -> Result<u32, EntrypointError> {
-        Ok(u32::from_le_bytes(self.read_array::<4>()?))
-    }
-
-    fn read_u64_le(&mut self) -> Result<u64, EntrypointError> {
-        Ok(u64::from_le_bytes(self.read_array::<8>()?))
-    }
-
-    fn read_u128_le(&mut self) -> Result<u128, EntrypointError> {
-        Ok(u128::from_le_bytes(self.read_array::<16>()?))
-    }
-
-    fn finish(&self) -> Result<(), EntrypointError> {
-        if self.offset == self.data.len() {
-            Ok(())
-        } else {
-            Err(EntrypointError::InvalidInstructionLength {
-                expected: self.offset,
-                found: self.data.len(),
-            })
-        }
+fn burn_from_wire(value: wire::BurnCheckedWire) -> BurnChecked {
+    BurnChecked {
+        token_program_id: value.token_program_id,
+        mint: value.mint,
+        authority: value.authority,
+        amount_atomic: value.amount_atomic,
+        decimals: value.decimals,
     }
 }
 
@@ -2380,7 +2242,7 @@ mod tests {
             );
         }
         let mut legacy = vec![BRIDGE_INSTRUCTION_INITIALIZE];
-        encode_bridge_config(&config, &mut legacy);
+        legacy.extend(borsh::to_vec(&bridge_config_wire(&config)).unwrap());
         assert!(matches!(
             decode_bridge_instruction(&legacy),
             Err(EntrypointError::InvalidInstructionLength { .. })

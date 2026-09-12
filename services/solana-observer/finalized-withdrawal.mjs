@@ -1,6 +1,7 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 // Configured local validating RPC observation, NOT a trustless Solana proof.
-import { createHash } from "node:crypto";
+import { bridgeInputDigest } from "../../shared/protocol/bridge-inputs.mjs";
+import { encodeBridgeAbi, decodeBridgeAbi, paddedDestination } from "../../shared/protocol/solana-bridge-abi.mjs";
 import { base58Decode, base58Encode, base58DecodeInstruction } from "../bridge-validator/solana-deposit-claim-transaction-plan.mjs";
 import { MESSAGE_LENGTH, decodeCanonicalBridgeMessage } from "../../shared/protocol/canonical-message.mjs";
 import { deriveWithdrawalRecordPdaHex } from "./solana-withdrawal-observer.mjs";
@@ -12,7 +13,6 @@ const verified = new WeakSet();
 const check = (ok, code = "WithdrawalObservationRejected") => { if (!ok) throw new Error(code); };
 const hex = bytes => Buffer.from(bytes).toString("hex");
 const u64 = value => { const b = Buffer.alloc(8); b.writeBigUInt64LE(value); return b; };
-const digest = bytes => createHash("sha256").update(bytes).digest("hex");
 export function requireFinalizedWithdrawal(value) {
   check(verified.has(value), "LiveFinalizedWithdrawalRequired"); return value;
 }
@@ -74,7 +74,8 @@ export class FinalizedWithdrawalReader {
     check(typeof ix.data === "string" && ix.data.length <= 1000 && Array.isArray(ix.accounts) && ix.accounts.length === 9);
     const wire = Buffer.from(base58DecodeInstruction(ix.data));
     check(wire.length === 1 + MESSAGE_LENGTH + 105 && wire[0] === 3, "WithdrawalInstructionMalformed");
-    const encoded = wire.subarray(1, 1 + MESSAGE_LENGTH), request = decodeCanonicalBridgeMessage(encoded);
+    const instruction = decodeBridgeAbi("RecordWithdrawal", wire);
+    const encoded = Buffer.from(instruction.message), request = decodeCanonicalBridgeMessage(encoded);
     if (expectedMessageHex !== undefined) check(encoded.toString("hex") === expectedMessageHex, "WithdrawalMessageSubstituted");
     check(request.action === "WithdrawalRequest" && request.direction === "SolanaToNative");
     const d = request.deployment;
@@ -92,7 +93,8 @@ export class FinalizedWithdrawalReader {
       accounts[6] === m.config.transceiverPda && accounts[8] === SYSTEM, "WithdrawalAccountsSubstituted");
     const required = message.header?.numRequiredSignatures;
     check(Number.isInteger(required) && required > 0 && required <= keys.length && keys.indexOf(authority) < required, "WithdrawalUserSignatureRequired");
-    const burnContext = Buffer.concat([base58Decode(TOKEN), base58Decode(m.mint.id), base58Decode(authority), u64(request.amountAtomic), Buffer.from([8])]);
+    const burnContext = encodeBridgeAbi("BurnChecked", { tokenProgramId: base58Decode(TOKEN), mint: base58Decode(m.mint.id),
+      authority: base58Decode(authority), amountAtomic: request.amountAtomic, decimals: 8 });
     check(wire.subarray(1 + MESSAGE_LENGTH).equals(burnContext), "WithdrawalBurnContextMismatch");
     check(Array.isArray(tx.meta.innerInstructions) && tx.meta.innerInstructions.length <= 64);
     const group = tx.meta.innerInstructions.filter(g => g.index === index);
@@ -118,16 +120,17 @@ export class FinalizedWithdrawalReader {
     const a = snapshot.accounts[count];
     check(a?.owner === m.manager.id && a.executable === false && a.data?.[1] === "base64" && typeof a.data[0] === "string" && a.data[0].length === 380, "WithdrawalRecordMissingOrSubstituted");
     const bytes = Buffer.from(a.data[0], "base64"), destination = Buffer.from(request.destinationHex, "hex");
-    const expected = Buffer.concat([Buffer.from("KPBWDR01"), Buffer.from([1]), request.withdrawalId, request.operationId,
-      Buffer.from(request.messageDigestHex, "hex"), u64(request.amountAtomic), u64(request.feeAtomic),
-      Buffer.from([destination.length, 0]), destination, Buffer.alloc(128 - destination.length), base58Decode(authority)]);
+    const expected = encodeBridgeAbi("WithdrawalRecord", { magic: Buffer.from("KPBWDR01"), version: 1,
+      withdrawalId: request.withdrawalId, operationId: request.operationId, messageDigest: Buffer.from(request.messageDigestHex, "hex"),
+      grossAmountAtomic: request.amountAtomic, feeAtomic: request.feeAtomic, nativeDestination: paddedDestination(destination),
+      burnAuthority: base58Decode(authority) });
     check(bytes.equals(expected) && bytes.toString("base64") === a.data[0], "WithdrawalRecordMismatch");
     const receipt = Object.freeze({ protocol: "KINGPEPE_FINALIZED_WITHDRAWAL_V1", trust: "RPC_OBSERVATION", signature,
       encodedMessageHex: encoded.toString("hex"), operationId: request.operationIdHex, withdrawalId: request.withdrawalIdHex,
       messageDigest: request.messageDigestHex, grossAtomic: request.amountAtomic.toString(), feeAtomic: request.feeAtomic.toString(),
       netAtomic: (request.amountAtomic - request.feeAtomic).toString(), destinationHex: request.destinationHex, record,
       transactionSlot: String(tx.slot), observedSlot: deployment.slot, authority,
-      evidenceDigest: digest(Buffer.concat([Buffer.from(signature), encoded, bytes, u64(BigInt(tx.slot))])) });
+      evidenceDigest: bridgeInputDigest("FinalizedWithdrawal", { signature: base58Decode(signature), message: encoded, record: bytes, slot: BigInt(tx.slot) }) });
     verified.add(receipt); return receipt;
   }
 }

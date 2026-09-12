@@ -1,4 +1,5 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
+import { encodeBridgeAbi, decodeBridgeAbi } from "../../shared/protocol/solana-bridge-abi.mjs";
 import { createHash } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { base58Decode, base58Encode, findProgramAddress } from "../bridge-validator/solana-deposit-claim-transaction-plan.mjs";
@@ -19,7 +20,7 @@ function hash(v) { check(typeof v === "string" && HASH.test(v)); return v; }
 function uint(v) { check(typeof v === "string" && /^(0|[1-9][0-9]{0,19})$/u.test(v) && BigInt(v) <= 0xffff_ffff_ffff_ffffn); return BigInt(v); }
 function key(v) { check(typeof v === "string" && v.length >= 32 && v.length <= 44); const bytes = base58Decode(v); check(bytes.length === 32 && base58Encode(bytes) === v); return bytes; }
 function bounded(v, max) { check(Number.isSafeInteger(v) && v >= 0 && v <= max); return v; }
-function u32(v) { const b = Buffer.alloc(4); b.writeUInt32LE(bounded(v, 0xffff_ffff)); return b; }
+
 function immutable(value) { for (const v of Object.values(value)) if (v && typeof v === "object") immutable(v); return Object.freeze(value); }
 function canonical(v) { if (Array.isArray(v)) return v.map(canonical); if (v && typeof v === "object") return Object.fromEntries(Object.keys(v).sort().map(k => [k, canonical(v[k])])); return v; }
 
@@ -61,15 +62,23 @@ export function deploymentAddresses(m) { return [m.manager.id, m.transceiver.id,
 
 function expectedConfig(m) {
   const c = m.config, h = v => Buffer.from(v, "hex");
-  // Exactly the existing Rust account codec, excluding only the two mutable
-  // economic u128 counters in Manager state. Neither counter is an authority.
-  const bridge = Buffer.concat([Buffer.from("KPBSTAT1"), Buffer.from([1, 2, 0]), key(m.manager.id), key(m.transceiver.id),
-    h(m.solanaDeploymentHex), key(m.mint.id), key(TOKEN), key(m.mint.authority), Buffer.from([m.mint.decimals, m.mint.decimals, 0]),
-    Buffer.alloc(32 + 16), u32(c.policyEpoch), u32(c.keyEpoch), Buffer.from([Number(c.depositsPaused), Number(c.withdrawalsPaused), 0, 0])]);
-  const transceiver = Buffer.concat([Buffer.from("KPTCFG02"), Buffer.from([1]), key(m.transceiver.id), key(m.manager.id), key(m.mint.id),
-    h(m.solanaDeploymentHex), u32(c.protocolId), u32(c.nativeNetwork), h(m.nativeGenesisHex), ...c.attesters.map(key),
-    Buffer.from([Number(c.transceiverActive)]), u32(c.keyEpoch)]);
-  check(bridge.length === 266 && transceiver.length === 246); return { bridge, transceiver };
+  // Only the two economic counters are mutable; neither counter is an authority.
+  const bridge = encodeBridgeAbi("BridgeState", {
+    magic: Buffer.from("KPBSTAT1"), version: 1, state: 2,
+    config: { binding: { environment: 0, managerProgramId: key(m.manager.id), transceiverProgramId: key(m.transceiver.id),
+      solanaDeployment: h(m.solanaDeploymentHex), mint: key(m.mint.id), tokenProgramId: key(TOKEN),
+      mintAuthorityPda: key(m.mint.authority), decimals: m.mint.decimals, nativeDecimals: m.mint.decimals },
+      freezeTag: 0, freezeKey: Buffer.alloc(32), initialSupply: 0n,
+      policy: { policyEpoch: c.policyEpoch, keyEpoch: c.keyEpoch, depositsPaused: c.depositsPaused,
+        withdrawalsPaused: c.withdrawalsPaused, hardStop: false, mainnetActivationEnabled: false } },
+    mintedSupply: 0n, burnedUnpaidWithdrawals: 0n,
+  }).subarray(0, 266);
+  const transceiver = encodeBridgeAbi("TransceiverState", { magic: Buffer.from("KPTCFG02"), version: 1,
+    config: { transceiverProgramId: key(m.transceiver.id), managerProgramId: key(m.manager.id), mint: key(m.mint.id),
+      solanaDeployment: h(m.solanaDeploymentHex), protocolId: c.protocolId, nativeNetwork: c.nativeNetwork,
+      nativeGenesis: h(m.nativeGenesisHex), authorizedAttesters: c.attesters.map(key),
+      active: c.transceiverActive, keyEpoch: c.keyEpoch } });
+  return { bridge, transceiver };
 }
 function accountData(a) {
   check(a && typeof a === "object" && typeof a.executable === "boolean", "DeploymentAccountMalformed");
@@ -119,10 +128,10 @@ export function verifyDeploymentSnapshot(manifest, snapshot) {
   const bridgeBytes = accountData(bridge), transceiverBytes = accountData(transceiver), expected = expectedConfig(m);
   if (bridge.owner !== m.manager.id || bridge.executable || bridgeBytes.length !== 298 || !bridgeBytes.subarray(0, 266).equals(expected.bridge)) different("SOLANA_DEPLOYMENT_CHANGED", bridge, "BRIDGE_CONFIGURATION");
   if (transceiver.owner !== m.transceiver.id || transceiver.executable || !transceiverBytes.equals(expected.transceiver)) different("SOLANA_DEPLOYMENT_CHANGED", transceiver, "TRANSCEIVER_CONFIGURATION");
-  const u128 = (b, offset) => (b.readBigUInt64LE(offset) + (b.readBigUInt64LE(offset + 8) << 64n)).toString();
+  const bridgeState = decodeBridgeAbi("BridgeState", bridgeBytes);
   return Object.freeze({ protocol: DEPLOYMENT_MONITOR_PROTOCOL, trust: "RPC_OBSERVATION", slot: String(snapshot.slot),
     genesis: snapshot.genesis, manifestDigest: deploymentManifestDigest(m), snapshotDigest: deploymentDigest(Buffer.from(JSON.stringify(canonical(snapshot)))),
-    mintSupplyAtomic: mintBytes.readBigUInt64LE(36).toString(), managerMintedAtomic: u128(bridgeBytes, 266), burnedUnpaidAtomic: u128(bridgeBytes, 282) });
+    mintSupplyAtomic: mintBytes.readBigUInt64LE(36).toString(), managerMintedAtomic: bridgeState.mintedSupply.toString(), burnedUnpaidAtomic: bridgeState.burnedUnpaidWithdrawals.toString() });
 }
 
 export class LocalDeploymentRpc {

@@ -7,7 +7,8 @@ import {
   nativeSigningIntentDigest,
   validateNativeSigningIntent,
 } from "../../native/frost/index.mjs";
-import { hashJson, isHash32Hex, normalizeHex } from "../../shared/protocol/canonical-message.mjs";
+import { bridgeInputDigest } from "../../shared/protocol/bridge-inputs.mjs";
+import { isHash32Hex, normalizeHex } from "../../shared/protocol/canonical-message.mjs";
 
 export const LOCAL_NATIVE_RESERVE_SWEEP_SIGNING_INTENT_PROTOCOL =
   "KINGPEPE_NATIVE_SOLANA_BRIDGE/LOCAL_NATIVE_RESERVE_SWEEP_SIGNING_INTENT/V1";
@@ -63,7 +64,7 @@ export function prepareLocalNativeReserveSweepSigningIntent(input) {
     throw new Error("LocalReserveSweepSigningIntentReserveScriptMismatch");
   }
 
-  const signingRequestId = hashJson({
+  const signingRequestId = bridgeInputDigest("SweepRequest", {
     protocol: `${LOCAL_NATIVE_RESERVE_SWEEP_SIGNING_INTENT_PROTOCOL}/REQUEST_ID`,
     operationIdHex: operationId,
     depositOutpoint: deposit.depositOutpoint,

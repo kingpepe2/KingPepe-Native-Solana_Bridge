@@ -103,6 +103,7 @@ dependencies = [
 name = "bridge-messages"
 version = "0.1.0"
 dependencies = [
+ "borsh",
  "serde",
  "serde_json",
  "sha2",
@@ -496,6 +497,7 @@ dependencies = [
 name = "kingpepe-bridge"
 version = "0.1.0"
 dependencies = [
+ "borsh",
  "bridge-messages",
  "kingpepe-transceiver",
  "solana-program",
@@ -508,6 +510,7 @@ dependencies = [
 name = "kingpepe-transceiver"
 version = "0.1.0"
 dependencies = [
+ "borsh",
  "bridge-messages",
  "solana-instructions-sysvar",
  "solana-program",

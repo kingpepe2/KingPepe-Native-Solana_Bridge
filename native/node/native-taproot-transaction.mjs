@@ -1,8 +1,8 @@
+import { bridgeInputDigest } from "../../shared/protocol/bridge-inputs.mjs";
 import { createHash } from "node:crypto";
 import { tapLeafHashHex, verifyTaprootControlBlock } from "./native-tapscript.mjs";
 import {
   bytesToHex,
-  hashJson,
   hexToBytes,
 } from "../../shared/protocol/canonical-message.mjs";
 
@@ -86,7 +86,7 @@ export function createLocalTaprootSighashEvidence(input) {
     ...(tapscriptSpend === undefined ? {} : { scriptHex: tapscriptSpend.scriptHex }),
   });
   const outputCommitments = transaction.outputs.map((output, index) =>
-    sha256Hex(Buffer.concat([uint32LE(index), serializeTransactionOutput(output)])),
+    bridgeInputDigest("IndexedOutput", { index, amountAtomic: output.amountAtomic, scriptPubKeyHex: output.scriptPubKeyHex }),
   );
 
   return Object.freeze({
@@ -95,7 +95,7 @@ export function createLocalTaprootSighashEvidence(input) {
     unsignedNativeTransactionFingerprintHex: sha256Hex(transaction.raw),
     nativeSweepTxidHex: transaction.txidHex,
     unsignedNativeTransactionId: transaction.txidHex,
-    transactionCommitment: hashJson({
+    transactionCommitment: bridgeInputDigest("TransactionCommitment", {
       protocol: `${LOCAL_NATIVE_TAPROOT_TRANSACTION_PROTOCOL}/TRANSACTION_COMMITMENT`,
       txidHex: transaction.txidHex,
       inputOutpoints: transaction.inputs.map((entry) => entry.outpoint),
@@ -122,13 +122,7 @@ export function createLocalTaprootSighashEvidence(input) {
     inputOutpoints: Object.freeze(transaction.inputs.map((entry) => entry.outpoint)),
     spentOutputCommitments: Object.freeze(
       spentOutputs.map((output, index) =>
-        sha256Hex(
-          Buffer.concat([
-            uint32LE(index),
-            uint64LE(BigInt(output.amountAtomic)),
-            serializeScript(output.scriptPubKey),
-          ]),
-        ),
+        bridgeInputDigest("IndexedOutput", { index, amountAtomic: output.amountAtomic, scriptPubKeyHex: output.scriptPubKey }),
       ),
     ),
     outputCommitments: Object.freeze(outputCommitments),

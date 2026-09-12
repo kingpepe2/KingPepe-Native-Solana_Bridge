@@ -1,5 +1,6 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 import { createHash } from "node:crypto";
+import { bridgeInputDigest } from "../../../shared/protocol/bridge-inputs.mjs";
 import { schnorr, schnorr_FROST } from "@noble/curves/secp256k1.js";
 import { assertWindowsProtectedStore } from "../../../shared/windows/protected-store.mjs";
 import { requireIntegrityGuard } from "../../../services/supervisor/protected-integrity.mjs";
@@ -25,7 +26,7 @@ function identity(key) {
     key.publicPackage.commitmentsHex.every(p => typeof p === "string" && /^(02|03)[0-9a-f]{64}$/u.test(p)));
   fields(key.publicPackage.verifyingSharesHex, [1, 2].map(n => schnorr_FROST.Identifier.fromNumber(n)));
   check(Object.values(key.publicPackage.verifyingSharesHex).every(p => typeof p === "string" && /^(02|03)[0-9a-f]{64}$/u.test(p)));
-  return digest(canonicalJson([COORDINATOR_JOURNAL_PROTOCOL, key.publicPackage, key.aggregateTweakedXOnlyPublicKey]));
+  return bridgeInputDigest("CoordinatorKey", { protocol: COORDINATOR_JOURNAL_PROTOCOL, publicPackage: key.publicPackage, aggregateTweakedXOnlyPublicKey: key.aggregateTweakedXOnlyPublicKey });
 }
 function validateResult(result, request, key) {
   fields(result, ["state", "requestId", "epoch", "sessionId", "intentDigest", "messageHex", "signatureHex",

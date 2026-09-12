@@ -1,3 +1,4 @@
+import { bridgeInputDigest } from "../shared/protocol/bridge-inputs.mjs";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -1106,7 +1107,7 @@ function buildLocalnetDepositClaimOperation({
     solanaRecipientHex,
   });
   return Object.freeze({
-    messageNonceHex: hashJson({
+    messageNonceHex: bridgeInputDigest("LocalClaimNonce", {
       protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/LOCAL_DEPOSIT_CLAIM_NONCE/V1`,
       depositOutpoint: `${normalizedDeposit.txidHex}:${normalizedDeposit.vout}`,
       reserveAllocationIdHex,
@@ -1146,7 +1147,7 @@ function buildLocalnetDepositClaimOperation({
         withdrawalId: ZERO_HASH,
         proofFingerprint: normalizedDeposit.proofFingerprintHex,
         unsignedNativeTransactionId: normalizeHash32(draft.unsignedNativeTransactionId, "reserveSweepDraft.unsignedNativeTransactionId"),
-        transactionCommitment: hashJson({
+        transactionCommitment: bridgeInputDigest("LocalSweepSummary", {
           protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/LOCAL_RESERVE_SWEEP_TRANSACTION_COMMITMENT/V1`,
           unsignedNativeTransactionFingerprintHex: normalizeHash32(
             draft.unsignedNativeTransactionFingerprintHex,
@@ -1168,7 +1169,7 @@ function buildLocalnetDepositClaimOperation({
         changeAtomic: "0",
         inputOutpoints: Object.freeze([...finalized.inputOutpoints]),
         outputCommitments: Object.freeze([
-          hashJson({
+          bridgeInputDigest("LocalReserveOutput", {
             protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/LOCAL_RESERVE_OUTPUT_COMMITMENT/V1`,
             nativeSweepTxidHex: finalized.nativeSweepTxidHex,
             vout: finalized.reserveOutputVout,
@@ -1273,7 +1274,7 @@ function signLocalProjectDepositAttestation({
     attesterPublicKeyHex: bytesToHex(publicKey),
     messageDigestHex: decoded.messageDigestHex,
     operationIdHex: decoded.operationIdHex,
-    signedBytes: "CANONICAL_BRIDGE_MESSAGE_V1",
+    signedBytes: "CANONICAL_BORSH_BRIDGE_MESSAGE_V2",
     signatureHex: bytesToHex(signature),
     state: ATTESTATION_VERIFIED_READY,
   });
@@ -1321,7 +1322,7 @@ function aggregateTaprootSighashDigestHex(taprootSighashEvidences) {
       nativeSweepTxidHex: normalizeHash32(value.nativeSweepTxidHex, `taprootSighashEvidences[${index}].nativeSweepTxidHex`),
     });
   });
-  return hashJson({
+  return bridgeInputDigest("TaprootEvidenceSet", {
     protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/AGGREGATED_TAPROOT_SIGHASH_EVIDENCE/V1`,
     evidences,
   });
@@ -1338,7 +1339,7 @@ function localReserveAllocationIdHex({
   const normalizedDeposit = normalizeLocalDepositClaimDeposit(deposit);
   const draft = requireObject(reserveSweepDraft, "reserveSweepDraft");
   const finalized = normalizeClaimFinalizedReserveSweep(finalizedReserveSweep);
-  return hashJson({
+  return bridgeInputDigest("LocalReserveAllocation", {
     protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/LOCAL_RESERVE_ALLOCATION_ID/V1`,
     solanaDeploymentHex: config.solanaDeploymentHex,
     mintHex: config.mintHex,

@@ -35,13 +35,20 @@ required third-party notices and historical licensing facts.
 
 ## Current review scope
 
-Phase 10 simple operational service integration and minimal recovery runbook.
-Preserve the completed local bidirectional bridge, the existing journal/inbox and core regression
-coverage. Reuse the verifiers and transaction engines in one service loop.
-Keep this change set scoped to Phase 10. Finish its validation, publication,
-exact-SHA CI verification and report before separate Phase-11 work. No Devnet,
-Mainnet or production integration belongs in this change set.
-Phase 11 is Borsh migration before Devnet. Remove obsolete encoding and bincode
+Phase 11 canonical Borsh migration only. Phase 10 operational service scope is
+complete; do not reopen it. Preserve accounting, lifecycle, replay semantics,
+FROST topology, authorities and the existing journal/inbox. Require identical
+Rust/TypeScript bytes and digests and both local E2E directions using Borsh.
+Keep implementation commits phase-scoped. Commit/push each meaningful,
+self-contained milestone after its tests, scans and review, then verify its
+exact-SHA CI; do not accumulate the entire phase or commit trivial edits.
+Encoding changes and their callers must land together without mixed formats.
+After required validation, scans,
+publication and exact-SHA CI pass, continue automatically to the next approved
+roadmap phase. Stop on a real blocker, concurrent writer, incomplete soak or
+external review, missing Team upgrade-authority decision, or the Phase 19
+activation approval gate. No Devnet before Borsh and fresh-clone validation.
+Remove obsolete encoding and bincode
 paths/dependencies only when no retained code genuinely requires them. Do not
 suppress a remaining upstream advisory or change Native/Solana consensus encoding.
 Recovery uses manual or existing OS-scheduled encrypted snapshots, not a custom

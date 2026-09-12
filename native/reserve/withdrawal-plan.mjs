@@ -1,9 +1,10 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 // Deterministic payout plan, not proof of a Solana burn or signing authority.
+import { bridgeInputDigest } from "../../shared/protocol/bridge-inputs.mjs";
 import { decodeCanonicalBridgeMessage } from "../../shared/protocol/canonical-message.mjs";
 import { REGTEST_GENESIS, verifyRegtestSweepSignatures } from "../node/native-raw-evidence.mjs";
 import { createUnsignedNativePayout, createLocalTaprootSighashEvidences, parseNativeTransactionHex } from "../node/native-taproot-transaction.mjs";
-import { FROST_SIGNING_INTENT_PROTOCOL, FROST_SIGNING_MODE, sha256Canonical, canonicalJson, validateNativeSigningIntent, canonicalUintDecimal } from "../frost/policy/native-signing-policy.mjs";
+import { FROST_SIGNING_INTENT_PROTOCOL, FROST_SIGNING_MODE, canonicalJson, validateNativeSigningIntent, canonicalUintDecimal } from "../frost/policy/native-signing-policy.mjs";
 const check = v => { if (!v) throw new Error("WithdrawalPlanRejected"); };
 const hex = v => Buffer.from(v).toString("hex");
 const hash = v => typeof v === "string" && /^[0-9a-f]{64}$/u.test(v);
@@ -38,13 +39,13 @@ export function validateWithdrawalPlan(value) {
 }
 export function withdrawalSigningIntents(value) {
   const p = validateWithdrawalPlan(value), m = decodeCanonicalBridgeMessage(Buffer.from(p.encodedMessageHex, "hex")), d = m.deployment;
-  const proofFingerprint = sha256Canonical({ withdrawal: p.withdrawalEvidenceDigest, native: p.acceptedCheckpoint.evidenceDigestHex });
+  const proofFingerprint = bridgeInputDigest("WithdrawalProof", { withdrawal: p.withdrawalEvidenceDigest, native: p.acceptedCheckpoint.evidenceDigestHex });
   return createLocalTaprootSighashEvidences({ unsignedNativeTransactionHex: p.unsignedTransactionHex, spentOutputs: p.inputs,
     proofFingerprintHex: proofFingerprint, reserveAmountAtomic: (m.amountAtomic - m.feeAtomic).toString(), nativeMinerFeeAtomic: m.feeAtomic.toString(),
     expectedRecipientScriptPubKeyHex: m.destinationHex, expectedChangeScriptPubKeyHex: p.reserveScriptHex }).map(e => validateNativeSigningIntent({
       protocol: FROST_SIGNING_INTENT_PROTOCOL, mode: FROST_SIGNING_MODE, purpose: "WITHDRAWAL", nativeNetwork: "regtest", nativeGenesisHash: REGTEST_GENESIS,
       solanaDeployment: hex(d.solanaDeployment), bridgeProgramId: hex(d.managerProgramId), transceiverProgramId: hex(d.transceiverProgramId), mint: hex(d.mint), keyEpoch: m.keyEpoch,
-      signingRequestId: sha256Canonical({ purpose: "NATIVE_WITHDRAWAL", operationId: p.operationId, txid: e.unsignedNativeTransactionId, input: e.signingInputIndex, sighash: e.taprootSighashHex }),
+      signingRequestId: bridgeInputDigest("WithdrawalSigningRequest", { purpose: "NATIVE_WITHDRAWAL", operationId: p.operationId, txid: e.unsignedNativeTransactionId, input: e.signingInputIndex, sighash: e.taprootSighashHex }),
       operationId: p.operationId, withdrawalId: p.withdrawalId, proofFingerprint, unsignedNativeTransactionId: e.unsignedNativeTransactionId,
       transactionCommitment: e.transactionCommitment, signingInputIndex: e.signingInputIndex, taprootSighashHex: e.taprootSighashHex,
       recipientScriptPubKeyHex: m.destinationHex, amountAtomic: (m.amountAtomic - m.feeAtomic).toString(), feeAtomic: m.feeAtomic.toString(),

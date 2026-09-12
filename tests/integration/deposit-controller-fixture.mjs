@@ -34,7 +34,7 @@ export async function depositControllerFixture(options) {
   const message = decodeCanonicalBridgeMessage(encoded), credit = { ...f.finalizedCredit, encodedMessageHex: Buffer.from(encoded).toString("hex") };
   const attestations = signers.map((s, i) => ({ protocol: ATTESTATION_PROTOCOL, mode: ATTESTATION_MODE, role: ["ATTESTER_A", "ATTESTER_B"][i],
     keyEpoch: op.keyEpoch, policyEpoch: op.policyEpoch, attesterPublicKeyHex: Buffer.from(s.publicKey).toString("hex"),
-    messageDigestHex: message.messageDigestHex, operationIdHex: message.operationIdHex, signedBytes: "CANONICAL_BRIDGE_MESSAGE_V1",
+    messageDigestHex: message.messageDigestHex, operationIdHex: message.operationIdHex, signedBytes: "CANONICAL_BORSH_BRIDGE_MESSAGE_V2",
     signatureHex: Buffer.from(ed25519.sign(encoded, s["secret" + "Key"])).toString("hex"), state: "VERIFIED_READY" }));
   for (const s of signers) s["secret" + "Key"].fill(0);
   const ready = () => { record.nativeValidationDigest = f.plan.acceptedCheckpoint.evidenceDigestHex; record.creditWindow = { validFrom: now, validUntil: until };

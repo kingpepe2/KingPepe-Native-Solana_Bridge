@@ -2,6 +2,7 @@
 // Derive one exact credit from actual raw Native validation. No callback or
 // serialized proof flag substitutes for the verifier's private capability.
 import { createHash } from "node:crypto";
+import { bridgeInputDigest } from "../../shared/protocol/bridge-inputs.mjs";
 import { LocalNativeEvidenceVerifier, requireVerifiedRegtestReserve, verifiedReserveChain } from "../../native/node/native-raw-evidence.mjs";
 import { parseNativeTransactionHex } from "../../native/node/native-taproot-transaction.mjs";
 import { canonicalJson, canonicalUintDecimal } from "../../native/frost/policy/native-signing-policy.mjs";
@@ -30,17 +31,18 @@ export function createVerifiedNativeReserveCredit({ plan, policy, receipt, valid
   const chain = verifiedReserveChain(receipt), p = validateDepositOperationPolicy(policy), operation = validateDepositOperationPlan(plan, p);
   check(chain.genesis === p.nativeGenesis);
   const d = operation.depositIntent, validity = window(validityWindow), identity = depositOperationPolicyDigest(p);
-  const reserveAllocationIdHex = digest(["KINGPEPE_PROTECTED_RESERVE_ALLOCATION_V1", identity,
-    operation.inputs[0].txid, operation.inputs[0].vout, parseNativeTransactionHex(operation.unsignedTransactionHex).txidHex, 0]);
+  const reserveAllocationIdHex = bridgeInputDigest("ReserveAllocation", { protocol: "KINGPEPE_PROTECTED_RESERVE_ALLOCATION_V1", policyDigest: identity,
+    deposit: { txid: operation.inputs[0].txid, vout: operation.inputs[0].vout },
+    sweep: { txid: parseNativeTransactionHex(operation.unsignedTransactionHex).txidHex, vout: 0 } });
   // The raw proof digest binds the retained acceptance checkpoint. Advancing
   // the live tip does not authorize a different envelope after persistence.
-  const evidenceDigest = digest(["KINGPEPE_RAW_RESERVE_CREDIT_EVIDENCE_V1", identity, reserveAllocationIdHex, receipt.digestHex]);
+  const evidenceDigest = bridgeInputDigest("ReserveCreditEvidence", { protocol: "KINGPEPE_RAW_RESERVE_CREDIT_EVIDENCE_V1", policyDigest: identity, allocationId: reserveAllocationIdHex, proofDigest: receipt.digestHex });
   const encoded = encodeCanonicalBridgeMessage({ action: "DepositClaim", direction: "NativeToSolana",
     deployment: { protocolId: p.protocolId, nativeNetwork: p.nativeNetwork, nativeGenesis: p.nativeGenesis,
       solanaDeployment: p.solanaDeployment, managerProgramId: p.managerProgramId, transceiverProgramId: p.transceiverProgramId, mint: p.mint },
     depositOutpoint: { txid: operation.inputs[0].txid, vout: operation.inputs[0].vout }, withdrawalId: "00".repeat(32),
     amountAtomic: d.amountAtomic, feeAtomic: "0", destination: Buffer.from(d.recipientHex, "hex"), policyEpoch: p.policyEpoch, keyEpoch: p.keyEpoch,
-    nonce: digest(["KINGPEPE_PROTECTED_RESERVE_CREDIT_NONCE_V1", reserveAllocationIdHex, d.nonceHex]), ...validity, evidenceDigest });
+    nonce: bridgeInputDigest("ReserveCreditNonce", { protocol: "KINGPEPE_PROTECTED_RESERVE_CREDIT_NONCE_V1", allocationId: reserveAllocationIdHex, depositNonce: d.nonceHex }), ...validity, evidenceDigest });
   return validateDepositCreditFact(operation, { acceptedCheckpoint: receipt.acceptedCheckpoint, reserveBasis: receipt.reserveBasis,
     encodedMessageHex: Buffer.from(encoded).toString("hex"), reserveAllocationIdHex }, p);
 }

@@ -9,7 +9,30 @@
   "signerTopology": "SINGLE_HOST",
   "commonHostRiskDecision": "ACCEPTED_BY_KINGPEPE_TEAM",
   "lastUpdated": "2026-09-13",
-  "sourceStatus": "PHASE_10_SERVICE_AND_RUNBOOK_COMPLETE_RESTORE_DRILL_REQUIRED_BEFORE_PHASE_15",
+  "sourceStatus": "PHASE_11_BORSH_MIGRATION_IMPLEMENTED_FULL_VALIDATION_AND_EXACT_SHA_CI_PENDING",
+  "phase11": {
+    "status": "IN_PROGRESS",
+    "milestone": "BORSH_SCHEMAS_CALLERS_VECTORS_AND_LEGACY_ENCODING_REMOVAL",
+    "sourceBaseSha": "e60d4d70261114b075049b0bd5076495ce9f7f2e",
+    "validationScope": "Migration working tree; not certification of its parent commit or completion of all Phase 11 gates",
+    "canonicalMessageVersion": 2,
+    "canonicalMagic": "KPEPBRG2",
+    "canonicalVectorsPerPlatform": 53,
+    "nativeEvidencePackets": 2,
+    "rustTypescriptBytesAndDigests": "PASS",
+    "nodeWindows": { "pass": 979, "fail": 0, "skip": 0 },
+    "nodeWsl": { "pass": 979, "fail": 0, "skip": 0 },
+    "rust": { "pass": 100, "lockedCheck": true, "format": true, "clippy": true },
+    "sbf": "PASS",
+    "nativeToSolana": "COMPLETED",
+    "solanaToNative": "COMPLETED",
+    "coreDepositChecks": { "pass": 55, "fail": 0 },
+    "roundTripChecks": { "pass": 25, "fail": 0 },
+    "remainingRetainedChainAndWindowsSecurityChecks": "IN_PROGRESS",
+    "legacyBridgeEncoding": "REMOVED_NO_V1_COMPATIBILITY_READER",
+    "bincode": "STILL_REQUIRED_FOR_NON_BRIDGE_SDK_SERIALIZATION",
+    "exactShaCi": "PENDING_MATCHING_MILESTONE_RUN"
+  },
   "phase10": {
     "status": "PASS_SERVICE_AND_RECOVERY_RUNBOOK",
     "sourceBaseSha": "5926bb1f56e7b7d708a60469af8e51282fe6274f",
@@ -183,5 +206,5 @@
     "status": "VERIFY_MATCHING_GITHUB_ACTIONS_RUN",
     "scope": "Local results do not substitute for the workflow run at this exact commit"
   },
-  "next": "PHASE_11_BORSH_AFTER_PHASE_10_REPORT_NO_DEVNET_BEFORE_MIGRATION"
+  "next": "COMPLETE_PHASE_11_VALIDATION_AND_EXACT_SHA_CI_THEN_PHASE_12"
 }

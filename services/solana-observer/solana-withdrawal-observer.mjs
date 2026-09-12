@@ -1,7 +1,7 @@
+import { bridgeInputDigest } from "../../shared/protocol/bridge-inputs.mjs";
 import {
   bytesToHex,
   decodeCanonicalBridgeMessage,
-  hashJson,
   hexToBytes,
   isHash32Hex,
   normalizeHex,
@@ -159,7 +159,7 @@ export function deriveWithdrawalRecordPdaHex(managerProgramIdHex, withdrawalIdHe
 }
 
 export function withdrawalObservationEvidenceDigestHex(expected, observation, message) {
-  return hashJson({
+  return bridgeInputDigest("WithdrawalObservation", {
     protocol: "KINGPEPE_NATIVE_SOLANA_BRIDGE/SOLANA_WITHDRAWAL_OBSERVATION/V1",
     cluster: expected.cluster,
     solanaDeploymentHex: expected.solanaDeploymentHex,

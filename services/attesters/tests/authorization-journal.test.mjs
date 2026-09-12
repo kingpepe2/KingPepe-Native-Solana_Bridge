@@ -13,7 +13,7 @@ import { normalizeProtectedContext } from "../../../shared/windows/protected-sto
 // Public message vector + in-memory disposable attester. Codec tests are NOT
 // protected storage, Native proof, service isolation or crash-recovery evidence.
 function fixture(t) {
-  const v = JSON.parse(readFileSync(new URL("../../../solana/modules/bridge-messages/vectors/canonical-v1.json", import.meta.url))).vectors.find(x => x.name === "deposit-claim-v1");
+  const v = JSON.parse(readFileSync(new URL("../../../solana/modules/bridge-messages/vectors/canonical-borsh-v2.json", import.meta.url))).vectors.find(x => x.name === "deposit-claim-v2");
   const m = decodeCanonicalBridgeMessage(v.encodedHex), seed = randomBytes(32), d = v.deployment;
   const attester = new ProjectAttester({ role: "ATTESTER_A", secretKey: seed, policy: {
     role: "ATTESTER_A", attesterPublicKeyHex: Buffer.from(ed25519.getPublicKey(seed)).toString("hex"), protocolId: d.protocolId,

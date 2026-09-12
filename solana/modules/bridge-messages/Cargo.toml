@@ -10,6 +10,7 @@ name = "bridge_messages"
 path = "src/lib.rs"
 
 [dependencies]
+borsh = { version = "=1.8.1", features = ["derive"] }
 serde = { version = "1.0.229", features = ["derive"] }
 sha2 = "0.10.9"
 

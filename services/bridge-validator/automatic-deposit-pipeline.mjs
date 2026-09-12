@@ -2,12 +2,12 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import path from "node:path";
 import { preserveOperationHardStop, readOperationHardStop } from "../../shared/operation-hard-stop.mjs";
 import { validateRuntimeFile, validateRuntimeStateRoot as validateStateRootOutsideRepo } from "../../shared/runtime-path-boundary.mjs";
+import { bridgeInputDigest } from "../../shared/protocol/bridge-inputs.mjs";
 import {
   bytesToHex,
   decodeCanonicalBridgeMessage,
   DEPLOYMENT_IDENTITY_LENGTH,
   encodeCanonicalBridgeMessage,
-  hashJson,
   hexToBytes,
   isHash32Hex,
   MESSAGE_LENGTH,
@@ -799,7 +799,7 @@ export function buildDepositClaimMessage(config, operation) {
 
 export function depositReserveEvidenceDigestHex(operation) {
   const normalized = normalizeDepositOperation(operation);
-  return hashJson({
+  return bridgeInputDigest("DepositReserveEvidence", {
     protocol: DEPOSIT_EVIDENCE_PROTOCOL,
     deposit: {
       trust: normalized.deposit.trust,

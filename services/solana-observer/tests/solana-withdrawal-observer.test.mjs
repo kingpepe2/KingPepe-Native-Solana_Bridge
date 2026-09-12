@@ -9,9 +9,9 @@ import {
 } from "../solana-withdrawal-observer.mjs";
 import { decodeCanonicalBridgeMessage } from "../../../shared/protocol/canonical-message.mjs";
 
-const vectorPath = path.resolve(import.meta.dirname, "../../../solana/modules/bridge-messages/vectors/canonical-v1.json");
+const vectorPath = path.resolve(import.meta.dirname, "../../../solana/modules/bridge-messages/vectors/canonical-borsh-v2.json");
 const vectorFile = JSON.parse(readFileSync(vectorPath, "utf8"));
-const withdrawalVector = vectorFile.vectors.find((vector) => vector.name === "withdrawal-request-v1");
+const withdrawalVector = vectorFile.vectors.find((vector) => vector.name === "withdrawal-request-v2");
 const decodedWithdrawal = decodeCanonicalBridgeMessage(withdrawalVector.encodedHex);
 
 function h(label) {

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { encodeBridgeAbi } from "../../shared/protocol/solana-bridge-abi.mjs";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import {
   bytesToHex,
@@ -127,10 +128,9 @@ export function buildLocalnetSolanaDepositClaimTransactionPlan(config) {
   ];
   requireUniqueAccountKeys(accountKeys);
 
-  const instructionData = concatBytes([
-    Uint8Array.of(BRIDGE_INSTRUCTION_ACCEPT_DEPOSIT_CLAIM),
-    normalized.encodedMessageBytes,
-  ]);
+  const instructionData = encodeBridgeAbi("AcceptDepositClaim", {
+    tag: BRIDGE_INSTRUCTION_ACCEPT_DEPOSIT_CLAIM, message: normalized.encodedMessageBytes,
+  });
   const compiledInstruction = Object.freeze({
     programIdIndex: 10,
     accountIndexes: Object.freeze([1, 2, 6, 3, 4, 7, 8, 9, 5, 0, 11]),
@@ -248,12 +248,10 @@ export function buildLocalnetSolanaDepositReceiptTransactionPlan(config) {
       instructionIndex: index,
     }),
   );
-  const transceiverInstructionData = concatBytes([
-    Uint8Array.of(TRANSCEIVER_INSTRUCTION_VERIFY_MESSAGE_FROM_ED25519),
-    normalized.encodedMessageBytes,
-    u16Le(0),
-    u16Le(1),
-  ]);
+  const transceiverInstructionData = encodeBridgeAbi("VerifyMessage", {
+    tag: TRANSCEIVER_INSTRUCTION_VERIFY_MESSAGE_FROM_ED25519,
+    message: normalized.encodedMessageBytes, ed25519InstructionIndexes: [0, 1],
+  });
   const transceiverInstruction = Object.freeze({
     role: "transceiverVerifyMessageFromEd25519",
     programIdIndex: 6,

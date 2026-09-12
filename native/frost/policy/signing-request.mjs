@@ -1,8 +1,9 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 // Project request metadata only. The Native signing message remains the exact
 // independently validated Taproot sighash, not a project/session digest.
+import { bridgeInputDigest } from "../../../shared/protocol/bridge-inputs.mjs";
 import { REQUIRED_FROST_SIGNERS, dataArray, dataRecord, nativeSigningIntentDigest,
-  sha256Canonical, validateNativeSigningIntent } from "./native-signing-policy.mjs";
+  validateNativeSigningIntent } from "./native-signing-policy.mjs";
 
 const REQUEST_PROTOCOL = "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_REQUEST/V1";
 const SESSION_PROTOCOL = "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_SESSION/V1";
@@ -22,7 +23,7 @@ export function createNativeFrostSigningRequest(intent, options = {}) {
     attempt, intentDigest: nativeSigningIntentDigest(snapshot), messageHex: snapshot.taprootSighashHex,
     participantIds: REQUIRED_FROST_SIGNERS });
   return Object.freeze({ protocol: REQUEST_PROTOCOL, ...transcript,
-    sessionId: sha256Canonical({ protocol: SESSION_PROTOCOL, ...transcript }), intent: snapshot });
+    sessionId: bridgeInputDigest("FrostSession", { protocol: SESSION_PROTOCOL, ...transcript }), intent: snapshot });
 }
 
 export function validateNativeFrostSigningRequest(request) {

@@ -8,6 +8,7 @@ import { LocalNativeEvidenceVerifier } from "../../native/node/native-raw-eviden
 import { createWithdrawalPlan, validateWithdrawalPlan, withdrawalSigningIntents, validateSignedWithdrawal } from "../../native/reserve/withdrawal-plan.mjs";
 import { attachKeyPathTaprootWitnesses, parseNativeTransactionHex } from "../../native/node/native-taproot-transaction.mjs";
 import { NativeFrostCoordinator } from "../../native/frost/index.mjs";
+import { bridgeInputDigest } from "../../shared/protocol/bridge-inputs.mjs";
 import { canonicalJson, canonicalUintDecimal, sha256Canonical } from "../../native/frost/policy/native-signing-policy.mjs";
 const check = (v, code) => { if (!v) throw new Error(code); };
 
@@ -21,7 +22,7 @@ export async function verifyWithdrawalSigning({ plan, intent, reader, nativeVeri
   const expected = withdrawalSigningIntents(p)[intent.signingInputIndex];
   check(expected && canonicalJson(intent) === canonicalJson(expected), "WithdrawalSigningIntentChanged");
   const native = await nativeVerifier.verifyInputs({ inputs: p.inputs, minimumConfirmations: p.minimumConfirmations, acceptedCheckpoint: p.acceptedCheckpoint });
-  const digestHex = sha256Canonical({ withdrawal: fresh.evidenceDigest, native: native.digestHex });
+  const digestHex = bridgeInputDigest("WithdrawalProof", { withdrawal: fresh.evidenceDigest, native: native.digestHex });
   check(digestHex === intent.proofFingerprint, "WithdrawalProofChanged");
   return Object.freeze({ digestHex, currentTipHash: native.currentTipHash });
 }

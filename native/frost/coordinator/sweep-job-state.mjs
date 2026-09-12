@@ -1,6 +1,7 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 // Durable work identity, not Native evidence or an economic authorization.
 import { createHash } from "node:crypto";
+import { bridgeInputDigest } from "../../../shared/protocol/bridge-inputs.mjs";
 import { canonicalJson, nativeSigningIntentDigest, validateNativeSigningIntent } from "../policy/native-signing-policy.mjs";
 import { validateDepositOperationPolicy, depositOperationPolicyDigest, MAX_DEPOSIT_INPUTS } from "../../../services/bridge-validator/deposit-operation-state.mjs";
 
@@ -25,7 +26,8 @@ export function validateSweepJobIntent(input, policy) {
 }
 export function sweepJobId(intent, policy) {
   const i = validateSweepJobIntent(intent, policy);
-  return sweepJobDigest([SWEEP_JOB_PROTOCOL, depositOperationPolicyDigest(policy), i.signingRequestId, nativeSigningIntentDigest(i)]);
+  return bridgeInputDigest("SweepJobIdentity", { protocol: SWEEP_JOB_PROTOCOL, policyDigest: depositOperationPolicyDigest(policy),
+    signingRequestId: i.signingRequestId, intentDigest: nativeSigningIntentDigest(i) });
 }
 export function initialSweepJobState(policy) {
   return Buffer.from(JSON.stringify({ protocol: SWEEP_JOB_PROTOCOL, policyDigest: depositOperationPolicyDigest(policy), lastTimeMs: 0, jobs: [] }));

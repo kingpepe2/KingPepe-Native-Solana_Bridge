@@ -1,18 +1,103 @@
 # Canonical Protocol Messages
 
-Phase 03 defines one versioned binary authorization format for bridge economic messages.
+Phase 11 migrates bridge-owned wire formats to canonical Borsh. Accounting,
+state transitions, authority and replay rules remain unchanged. Migration is
+in progress; previous E2E evidence does not certify the new encoding.
 
 ## Encoding
 
-- Magic: `KPEPBRG1`
-- Message version: `1`
+- Serialization: Borsh (https://borsh.io/)
+- Magic: `KPEPBRG2`
+- Message version: `2`
 - Endianness: little-endian for all integer fields
 - Message length: `514` bytes
 - Destination field: 2-byte length plus 128-byte zero-padded payload
 - Hash/public-key fields: fixed 32-byte values
 - Amounts and fees: unsigned 64-bit atomic units
 
-The operation ID is `SHA-256` over the canonical economic fields, excluding the operation ID itself. Message digest is `SHA-256` over the complete encoded message.
+The fixed-size destination is a Borsh struct with a `u16` length and a
+`[u8;128]` array, not a Borsh `Vec`. Its unused tail must be zero. Fixed storage
+preserves the bounded Solana instruction/account sizes. All fields are encoded
+in the order declared by `BorshBridgeMessage` and `CANONICAL_MESSAGE_SCHEMA`:
+magic, version, action, direction, reserved zero, deployment, operation ID,
+deposit outpoint, withdrawal ID, amount, fee, destination length/storage,
+policy epoch, key epoch, nonce, validity start/end, evidence digest.
+
+The operation ID is `SHA-256(Borsh(OperationIdInputs))`, domain `KPEPID02`.
+It retains every previous binding but excludes the operation ID and message
+padding. Here destination is a Borsh `Vec<u8>` with a `u32` length. Message
+digest is `SHA-256` over the complete Borsh message. The attestation payload is
+that same complete message, not a JSON wrapper or its digest. Attester A/B and
+the Solana transceiver must use identical bytes.
+
+Only version 2 is accepted. There is no V1 compatibility reader. Existing
+runtime journals, signatures, funded deposit commitments and keys must not be
+silently rewritten or discarded; validation uses fresh isolated test state.
+
+The TypeScript SDK delegates to the shared runtime codec rather than retaining
+a second encoder. Rust and TypeScript consume `canonical-borsh-v2.json`, which
+pins message bytes, operation-ID preimage bytes, operation IDs and digests.
+
+## Cross-component migration inventory
+
+| Boundary | Bridge-owned schema/input | Scope |
+|---|---|---|
+| Attesters / relayer / Solana | Deposit claim, withdrawal request, complete attestation payload, operation-ID inputs | Fixed canonical message and separate ID preimage |
+| JS Native observer / Rust verifier | Regtest evidence envelope, headers/proof containers, acceptance checkpoint | Bounded envelope; consensus header/transaction bytes unchanged |
+| Validator / attesters | Deposit policy, reserve allocation, credit evidence and nonce inputs | Preserve both initial and finalized acceptance checkpoints |
+| Solana programs / observers / SDK | Initialization, claim/withdrawal/receipt instructions and account records | Preserve tags, account lengths, authority and PDA meaning |
+| Validator / coordinator / FROST | Signing intent/request/session, commitments, share envelopes, DKG context/handoff | Typed application metadata; Native sighash and Noble primitive unchanged |
+| Recovery / reserve / verifier | Deposit commitment, reserve allocation, transaction/evidence fingerprints | Preserve existing consensus-script commitments where already Borsh-compatible |
+
+Native consensus transactions, Script, CompactSize and BIP341/342 hashing, and
+Solana transactions/System/SPL/Ed25519 instructions are external protocol
+formats, not bridge formats to redesign. Local SQLite persistence, diagnostic
+JSON and private protected-store records are not an alternative bridge wire
+codec. Bincode remains required by the retained Solana SDK/System-instruction
+graph; its upstream advisory is not suppressed by this migration.
+
+### Schema and vector locations
+
+- `canonical-message.mjs` / Rust `BorshBridgeMessage` and `OperationIdInputs`:
+  deposit, withdrawal, attester-signed bytes and economic operation identity.
+  `canonical-borsh-v2.json` pins three messages, including maximum-width values.
+- `solana-bridge-abi.mjs` / Rust `abi.rs`: 14 instruction/account schemas,
+  checked by 15 `abi-borsh-v2.json` vectors. Fixed account tags and discriminator
+  values are fields, not implicit Rust enum indexes. The existing fixed
+  freeze-authority tag/padded key remains a struct, not a Borsh `Option`.
+- `bridge-inputs.mjs` / Rust `inputs.rs`: 30 application signing/evidence
+  preimages, checked by 31 `inputs-borsh-v2.json` vectors. Each is
+  `Borsh([u8;8] = KPINPUT2, u16 kind, typed fields)`; kind IDs and field order
+  are explicit in both sources. Strings/collections have bounded `u32` lengths.
+  Amounts/counters are typed integers, byte strings decode to actual bytes,
+  and participant/public-share ordering is fixed. These are application hash
+  bindings; the Native sighash and Noble FROST cryptographic transcript are
+  unchanged. JSON transport envelopes carry these typed values or encoded
+  bytes; they are not a second economic message encoding.
+- `native-inputs.mjs` / Native proof `bridge_inputs.rs`: deposit script intent,
+  Native deposit evidence and reserve allocation hash inputs, pinned by four
+  Native `inputs-borsh-v2.json` vectors. The fixed `KPDINT01` commitment remains
+  byte-identical, as does the fixed Native reserve-allocation preimage. The
+  variable raw transaction in deposit evidence now has a Borsh `u32` length.
+  The Native Rust allocation ID is not the separate policy-bound service credit
+  allocation ID; neither changes reserve accounting.
+- Native evidence `borsh-v2.json`: the bounded `KPNEVD02` request envelope and
+  fixed 80-byte `KPNEVR02` verifier response. Header/transaction contents are
+  opaque consensus bytes; chainwork remains an opaque big-endian 32-byte value.
+
+ABI and application-preimage vectors compare the same logical input, complete
+bytes and SHA-256 in both languages. Native input vectors also pin SHA-256d.
+They are serialization fixtures, not evidence of valid signatures or real-chain
+execution. Actual FROST and both local-chain flows are validated separately.
+
+Local configuration fingerprints, journal integrity/equality checks, outbox
+delivery-attempt IDs, status diagnostics and authenticated IPC framing remain
+their existing local storage/transport formats. They do not replace a bridge
+operation ID, attester payload, Native payment signature or Solana instruction.
+No legacy economic-wire reader remains. Existing operational state is not
+automatically migrated, erased or made safe to restore by this format change.
+
+`BINCODE = STILL_REQUIRED_FOR_NON_BRIDGE_SDK_SERIALIZATION`.
 
 ## Validation
 

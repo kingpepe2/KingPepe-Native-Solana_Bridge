@@ -1,192 +1,127 @@
 import { createHash } from "node:crypto";
+import { serialize, deserialize } from "borsh";
 
-export const PROTOCOL_MAGIC = "KPEPBRG1";
-export const MESSAGE_VERSION = 1;
+export const PROTOCOL_MAGIC = "KPEPBRG2";
+export const MESSAGE_VERSION = 2;
 export const DEPLOYMENT_IDENTITY_LENGTH = 168;
 export const NATIVE_OUTPOINT_LENGTH = 36;
 export const MAX_DESTINATION_LENGTH = 128;
 export const MESSAGE_LENGTH = 514;
 
+// Borsh structs: field insertion order is the wire order. Fixed storage keeps
+// Solana account/transaction sizes bounded; the destination tail MUST be zero.
+// The operation-ID preimage uses Vec<u8> (a Borsh u32 length), not padding.
+const fixedBytes = (len) => ({ array: { type: "u8", len } });
+const hash32 = fixedBytes(32);
+export const DEPLOYMENT_SCHEMA = { struct: {
+  protocolId: "u32", nativeNetwork: "u32", nativeGenesis: hash32,
+  solanaDeployment: hash32, managerProgramId: hash32,
+  transceiverProgramId: hash32, mint: hash32,
+} };
+export const OUTPOINT_SCHEMA = { struct: { txid: hash32, vout: "u32" } };
+export const CANONICAL_MESSAGE_SCHEMA = { struct: {
+  magic: fixedBytes(8), version: "u8", action: "u8", direction: "u8", reserved: "u8",
+  deployment: DEPLOYMENT_SCHEMA, operationId: hash32, depositOutpoint: OUTPOINT_SCHEMA,
+  withdrawalId: hash32, amountAtomic: "u64", feeAtomic: "u64",
+  destinationLength: "u16", destinationPadded: fixedBytes(MAX_DESTINATION_LENGTH),
+  policyEpoch: "u32", keyEpoch: "u32", nonce: hash32,
+  validFrom: "u64", validUntil: "u64", evidenceDigest: hash32,
+} };
+export const OPERATION_ID_SCHEMA = { struct: {
+  domain: fixedBytes(8), version: "u8", action: "u8", direction: "u8",
+  deployment: DEPLOYMENT_SCHEMA, depositOutpoint: OUTPOINT_SCHEMA,
+  withdrawalId: hash32, amountAtomic: "u64", feeAtomic: "u64",
+  destination: { array: { type: "u8" } }, policyEpoch: "u32", keyEpoch: "u32",
+  nonce: hash32, validFrom: "u64", validUntil: "u64", evidenceDigest: hash32,
+} };
+
 export function decodeCanonicalBridgeMessage(input) {
   const bytes = asBytes(input, "canonicalMessage");
-  if (bytes.length !== MESSAGE_LENGTH) {
-    throw new Error(`InvalidLength:${bytes.length}`);
-  }
-
-  let cursor = 0;
-  const magic = readBytes(bytes, cursor, 8);
-  cursor += 8;
-  if (bytesToAscii(magic) !== PROTOCOL_MAGIC) {
-    throw new Error("InvalidMagic");
-  }
-
-  const version = bytes[cursor];
-  cursor += 1;
-  if (version !== MESSAGE_VERSION) {
-    throw new Error("UnsupportedVersion");
-  }
-
-  const action = decodeAction(bytes[cursor]);
-  cursor += 1;
-  const direction = decodeDirection(bytes[cursor]);
-  cursor += 1;
-  const reserved = bytes[cursor];
-  cursor += 1;
-  if (reserved !== 0) {
-    throw new Error("NonZeroReservedByte");
-  }
-
-  const deployment = {
-    protocolId: readU32(bytes, cursor),
-    nativeNetwork: readU32(bytes, cursor + 4),
-    nativeGenesis: readBytes(bytes, cursor + 8, 32),
-    solanaDeployment: readBytes(bytes, cursor + 40, 32),
-    managerProgramId: readBytes(bytes, cursor + 72, 32),
-    transceiverProgramId: readBytes(bytes, cursor + 104, 32),
-    mint: readBytes(bytes, cursor + 136, 32),
-  };
-  cursor += DEPLOYMENT_IDENTITY_LENGTH;
-
-  const operationId = readBytes(bytes, cursor, 32);
-  cursor += 32;
-  const depositOutpoint = {
-    txid: readBytes(bytes, cursor, 32),
-    vout: readU32(bytes, cursor + 32),
-  };
-  cursor += NATIVE_OUTPOINT_LENGTH;
-  const withdrawalId = readBytes(bytes, cursor, 32);
-  cursor += 32;
-  const amountAtomic = readU64(bytes, cursor);
-  cursor += 8;
-  const feeAtomic = readU64(bytes, cursor);
-  cursor += 8;
-  const destinationLength = readU16(bytes, cursor);
-  cursor += 2;
-  if (destinationLength > MAX_DESTINATION_LENGTH) {
-    throw new Error("DestinationTooLong");
-  }
-  const destinationPadded = readBytes(bytes, cursor, MAX_DESTINATION_LENGTH);
-  const destination = destinationPadded.slice(0, destinationLength);
-  const padding = destinationPadded.slice(destinationLength);
-  if (padding.some((byte) => byte !== 0)) {
+  if (bytes.length !== MESSAGE_LENGTH) throw new Error(`InvalidLength:${bytes.length}`);
+  const wire = deserialize(CANONICAL_MESSAGE_SCHEMA, bytes);
+  if (bytesToAscii(wire.magic) !== PROTOCOL_MAGIC) throw new Error("InvalidMagic");
+  if (wire.version !== MESSAGE_VERSION) throw new Error("UnsupportedVersion");
+  if (wire.reserved !== 0) throw new Error("NonZeroReservedByte");
+  if (wire.destinationLength > MAX_DESTINATION_LENGTH) throw new Error("DestinationTooLong");
+  if (wire.destinationPadded.slice(wire.destinationLength).some((byte) => byte !== 0)) {
     throw new Error("NonZeroDestinationPadding");
   }
-  cursor += MAX_DESTINATION_LENGTH;
-  const policyEpoch = readU32(bytes, cursor);
-  cursor += 4;
-  const keyEpoch = readU32(bytes, cursor);
-  cursor += 4;
-  const nonce = readBytes(bytes, cursor, 32);
-  cursor += 32;
-  const validFrom = readU64(bytes, cursor);
-  cursor += 8;
-  const validUntil = readU64(bytes, cursor);
-  cursor += 8;
-  const evidenceDigest = readBytes(bytes, cursor, 32);
-  cursor += 32;
-
-  if (cursor !== MESSAGE_LENGTH) {
-    throw new Error(`InvalidCursor:${cursor}`);
+  const deployment = { ...wire.deployment };
+  for (const key of ["nativeGenesis", "solanaDeployment", "managerProgramId", "transceiverProgramId", "mint"]) {
+    deployment[key] = Uint8Array.from(deployment[key]);
   }
-
   const decoded = {
-    version,
-    action,
-    direction,
-    deployment,
-    operationId,
-    depositOutpoint,
-    withdrawalId,
-    amountAtomic,
-    feeAtomic,
-    destination,
-    policyEpoch,
-    keyEpoch,
-    nonce,
-    validFrom,
-    validUntil,
-    evidenceDigest,
-    encoded: bytes,
+    version: wire.version, action: decodeAction(wire.action), direction: decodeDirection(wire.direction),
+    deployment, operationId: Uint8Array.from(wire.operationId),
+    depositOutpoint: { txid: Uint8Array.from(wire.depositOutpoint.txid), vout: wire.depositOutpoint.vout },
+    withdrawalId: Uint8Array.from(wire.withdrawalId),
+    amountAtomic: wire.amountAtomic, feeAtomic: wire.feeAtomic,
+    destination: Uint8Array.from(wire.destinationPadded.slice(0, wire.destinationLength)),
+    policyEpoch: wire.policyEpoch, keyEpoch: wire.keyEpoch, nonce: Uint8Array.from(wire.nonce),
+    validFrom: wire.validFrom, validUntil: wire.validUntil, evidenceDigest: Uint8Array.from(wire.evidenceDigest),
+    encoded: Uint8Array.from(bytes),
   };
   validateDecodedMessage(decoded);
-
-  const derived = deriveOperationId(decoded);
-  if (!bytesEqual(operationId, derived)) {
-    throw new Error("OperationIdMismatch");
-  }
-
+  if (!bytesEqual(decoded.operationId, deriveOperationId(decoded))) throw new Error("OperationIdMismatch");
+  // borsh-js does not reject trailing bytes itself. Exact size plus re-encoding
+  // enforces full consumption and a single accepted representation.
+  if (!bytesEqual(bytes, encodeCanonicalBridgeMessage(decoded))) throw new Error("NonCanonicalBorsh");
   return {
     ...decoded,
-    operationIdHex: bytesToHex(operationId),
-    messageDigestHex: sha256Hex(bytes),
-    destinationHex: bytesToHex(destination),
-    evidenceDigestHex: bytesToHex(evidenceDigest),
-    withdrawalIdHex: bytesToHex(withdrawalId),
-    depositOutpointText: `${bytesToHex(depositOutpoint.txid)}:${depositOutpoint.vout}`,
+    operationIdHex: bytesToHex(decoded.operationId), messageDigestHex: sha256Hex(bytes),
+    destinationHex: bytesToHex(decoded.destination), evidenceDigestHex: bytesToHex(decoded.evidenceDigest),
+    withdrawalIdHex: bytesToHex(decoded.withdrawalId),
+    depositOutpointText: `${bytesToHex(decoded.depositOutpoint.txid)}:${decoded.depositOutpoint.vout}`,
   };
 }
 
 export function encodeCanonicalBridgeMessage(input) {
   validateInputMessage(input);
-  const destination = asBytes(input.destination, "destination");
-  const operationId = input.operationId ? asHash32(input.operationId, "operationId") : deriveOperationId(input);
+  const fields = operationFields(input);
   const derived = deriveOperationId(input);
-  if (!bytesEqual(operationId, derived)) {
-    throw new Error("OperationIdMismatch");
-  }
-
-  const out = new Uint8Array(MESSAGE_LENGTH);
-  let cursor = 0;
-  cursor = writeBytes(out, cursor, ascii(PROTOCOL_MAGIC));
-  cursor = writeU8(out, cursor, MESSAGE_VERSION);
-  cursor = writeU8(out, cursor, encodeAction(input.action));
-  cursor = writeU8(out, cursor, encodeDirection(input.direction));
-  cursor = writeU8(out, cursor, 0);
-  cursor = writeDeployment(out, cursor, input.deployment);
-  cursor = writeBytes(out, cursor, operationId);
-  cursor = writeOutpoint(out, cursor, input.depositOutpoint);
-  cursor = writeBytes(out, cursor, asHash32(input.withdrawalId, "withdrawalId"));
-  cursor = writeU64(out, cursor, BigInt(input.amountAtomic));
-  cursor = writeU64(out, cursor, BigInt(input.feeAtomic));
-  cursor = writeU16(out, cursor, destination.length);
-  cursor = writeBytes(out, cursor, destination);
-  cursor += MAX_DESTINATION_LENGTH - destination.length;
-  cursor = writeU32(out, cursor, input.policyEpoch);
-  cursor = writeU32(out, cursor, input.keyEpoch);
-  cursor = writeBytes(out, cursor, asHash32(input.nonce, "nonce"));
-  cursor = writeU64(out, cursor, BigInt(input.validFrom));
-  cursor = writeU64(out, cursor, BigInt(input.validUntil));
-  cursor = writeBytes(out, cursor, asHash32(input.evidenceDigest, "evidenceDigest"));
-  if (cursor !== MESSAGE_LENGTH) {
-    throw new Error(`InvalidLength:${cursor}`);
-  }
+  const operationId = input.operationId ? asHash32(input.operationId, "operationId") : derived;
+  if (!bytesEqual(operationId, derived)) throw new Error("OperationIdMismatch");
+  const destinationPadded = new Uint8Array(MAX_DESTINATION_LENGTH);
+  destinationPadded.set(fields.destination);
+  const out = serialize(CANONICAL_MESSAGE_SCHEMA, {
+    ...fields, magic: ascii(PROTOCOL_MAGIC), reserved: 0, operationId,
+    destinationLength: fields.destination.length, destinationPadded,
+  });
+  if (out.length !== MESSAGE_LENGTH) throw new Error(`InvalidLength:${out.length}`);
   return out;
 }
 
+export function encodeOperationIdInputs(input) {
+  return serialize(OPERATION_ID_SCHEMA, { domain: ascii("KPEPID02"), ...operationFields(input) });
+}
+
 export function deriveOperationId(input) {
+  return sha256Bytes(encodeOperationIdInputs(input));
+}
+
+function operationFields(input) {
+  if (input.version !== undefined && input.version !== MESSAGE_VERSION) throw new Error("UnsupportedVersion");
   const destination = asBytes(input.destination, "destination");
   validateDestination(destination);
-  return sha256Bytes(
-    concatBytes([
-      ascii(PROTOCOL_MAGIC),
-      Uint8Array.of(MESSAGE_VERSION),
-      Uint8Array.of(encodeAction(input.action)),
-      Uint8Array.of(encodeDirection(input.direction)),
-      encodeDeployment(input.deployment),
-      encodeOutpoint(input.depositOutpoint),
-      asHash32(input.withdrawalId, "withdrawalId"),
-      encodeU64(BigInt(input.amountAtomic)),
-      encodeU64(BigInt(input.feeAtomic)),
-      encodeU16(destination.length),
-      destination,
-      encodeU32(input.policyEpoch),
-      encodeU32(input.keyEpoch),
-      asHash32(input.nonce, "nonce"),
-      encodeU64(BigInt(input.validFrom)),
-      encodeU64(BigInt(input.validUntil)),
-      asHash32(input.evidenceDigest, "evidenceDigest"),
-    ]),
-  );
+  const d = input.deployment;
+  return {
+    version: MESSAGE_VERSION, action: encodeAction(input.action), direction: encodeDirection(input.direction),
+    deployment: {
+      protocolId: checkedU32(d.protocolId), nativeNetwork: checkedU32(d.nativeNetwork),
+      nativeGenesis: asHash32(d.nativeGenesis, "nativeGenesis"),
+      solanaDeployment: asHash32(d.solanaDeployment, "solanaDeployment"),
+      managerProgramId: asHash32(d.managerProgramId, "managerProgramId"),
+      transceiverProgramId: asHash32(d.transceiverProgramId, "transceiverProgramId"),
+      mint: asHash32(d.mint, "mint"),
+    },
+    depositOutpoint: { txid: asHash32(input.depositOutpoint.txid, "depositOutpoint.txid"),
+      vout: checkedU32(input.depositOutpoint.vout) },
+    withdrawalId: asHash32(input.withdrawalId, "withdrawalId"),
+    amountAtomic: checkedU64(input.amountAtomic), feeAtomic: checkedU64(input.feeAtomic),
+    destination, policyEpoch: checkedU32(input.policyEpoch), keyEpoch: checkedU32(input.keyEpoch),
+    nonce: asHash32(input.nonce, "nonce"), validFrom: checkedU64(input.validFrom),
+    validUntil: checkedU64(input.validUntil), evidenceDigest: asHash32(input.evidenceDigest, "evidenceDigest"),
+  };
 }
 
 export function messageDigestHex(input) {
@@ -300,40 +235,6 @@ function validateDestination(destination) {
   }
 }
 
-function encodeDeployment(deployment) {
-  const out = new Uint8Array(DEPLOYMENT_IDENTITY_LENGTH);
-  const cursor = writeDeployment(out, 0, deployment);
-  if (cursor !== DEPLOYMENT_IDENTITY_LENGTH) {
-    throw new Error("InvalidDeploymentLength");
-  }
-  return out;
-}
-
-function writeDeployment(out, cursor, deployment) {
-  cursor = writeU32(out, cursor, deployment.protocolId);
-  cursor = writeU32(out, cursor, deployment.nativeNetwork);
-  cursor = writeBytes(out, cursor, asHash32(deployment.nativeGenesis, "nativeGenesis"));
-  cursor = writeBytes(out, cursor, asHash32(deployment.solanaDeployment, "solanaDeployment"));
-  cursor = writeBytes(out, cursor, asHash32(deployment.managerProgramId, "managerProgramId"));
-  cursor = writeBytes(out, cursor, asHash32(deployment.transceiverProgramId, "transceiverProgramId"));
-  cursor = writeBytes(out, cursor, asHash32(deployment.mint, "mint"));
-  return cursor;
-}
-
-function encodeOutpoint(outpoint) {
-  const out = new Uint8Array(NATIVE_OUTPOINT_LENGTH);
-  const cursor = writeOutpoint(out, 0, outpoint);
-  if (cursor !== NATIVE_OUTPOINT_LENGTH) {
-    throw new Error("InvalidOutpointLength");
-  }
-  return out;
-}
-
-function writeOutpoint(out, cursor, outpoint) {
-  cursor = writeBytes(out, cursor, asHash32(outpoint.txid, "depositOutpoint.txid"));
-  return writeU32(out, cursor, outpoint.vout);
-}
-
 function encodeAction(action) {
   if (action === "DepositClaim") return 0;
   if (action === "WithdrawalRequest") return 1;
@@ -358,73 +259,18 @@ function decodeDirection(value) {
   throw new Error(`InvalidDirection:${value}`);
 }
 
-function readBytes(bytes, cursor, length) {
-  const end = cursor + length;
-  if (end > bytes.length) {
-    throw new Error("BufferUnderflow");
-  }
-  return bytes.slice(cursor, end);
+function checkedU32(value) {
+  if (!Number.isInteger(value) || value < 0 || value > 0xffffffff) throw new Error("U32OutOfRange");
+  return value;
 }
 
-function readU16(bytes, cursor) {
-  return new DataView(bytes.buffer, bytes.byteOffset + cursor, 2).getUint16(0, true);
-}
-
-function readU32(bytes, cursor) {
-  return new DataView(bytes.buffer, bytes.byteOffset + cursor, 4).getUint32(0, true);
-}
-
-function readU64(bytes, cursor) {
-  return new DataView(bytes.buffer, bytes.byteOffset + cursor, 8).getBigUint64(0, true);
-}
-
-function writeBytes(out, cursor, bytes) {
-  out.set(bytes, cursor);
-  return cursor + bytes.length;
-}
-
-function writeU8(out, cursor, value) {
-  out[cursor] = value;
-  return cursor + 1;
-}
-
-function writeU16(out, cursor, value) {
-  return writeBytes(out, cursor, encodeU16(value));
-}
-
-function writeU32(out, cursor, value) {
-  return writeBytes(out, cursor, encodeU32(value));
-}
-
-function writeU64(out, cursor, value) {
-  return writeBytes(out, cursor, encodeU64(value));
-}
-
-function encodeU16(value) {
-  if (!Number.isInteger(value) || value < 0 || value > 0xffff) {
-    throw new Error("U16OutOfRange");
-  }
-  const out = new Uint8Array(2);
-  new DataView(out.buffer).setUint16(0, value, true);
-  return out;
-}
-
-function encodeU32(value) {
-  if (!Number.isInteger(value) || value < 0 || value > 0xffffffff) {
-    throw new Error("U32OutOfRange");
-  }
-  const out = new Uint8Array(4);
-  new DataView(out.buffer).setUint32(0, value, true);
-  return out;
-}
-
-function encodeU64(value) {
-  if (value < 0n || value > 0xffffffffffffffffn) {
-    throw new Error("U64OutOfRange");
-  }
-  const out = new Uint8Array(8);
-  new DataView(out.buffer).setBigUint64(0, value, true);
-  return out;
+function checkedU64(value) {
+  if (typeof value === "number" && !Number.isSafeInteger(value)) throw new Error("U64OutOfRange");
+  if (!["bigint", "number", "string"].includes(typeof value) ||
+      (typeof value === "string" && !/^(0|[1-9][0-9]*)$/u.test(value))) throw new Error("U64OutOfRange");
+  const number = BigInt(value);
+  if (number < 0n || number > 0xffffffffffffffffn) throw new Error("U64OutOfRange");
+  return number;
 }
 
 function ascii(value) {
@@ -459,17 +305,6 @@ function asBytes(input, label) {
 function isZeroHash(input) {
   const bytes = asHash32(input, "hash");
   return bytes.every((byte) => byte === 0);
-}
-
-function concatBytes(parts) {
-  const total = parts.reduce((sum, part) => sum + part.length, 0);
-  const out = new Uint8Array(total);
-  let cursor = 0;
-  for (const part of parts) {
-    out.set(part, cursor);
-    cursor += part.length;
-  }
-  return out;
 }
 
 function sha256Bytes(bytes) {

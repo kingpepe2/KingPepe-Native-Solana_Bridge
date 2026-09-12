@@ -5,6 +5,7 @@
 
 use std::collections::HashSet;
 
+use borsh::{BorshDeserialize, BorshSerialize};
 use num_bigint::BigUint;
 
 use crate::bytes::sha256;
@@ -14,7 +15,7 @@ use crate::merkle::build_merkle_branch;
 use crate::transaction::{parse_transaction, ParsedTransaction, MAX_NATIVE_TRANSACTION_BYTES};
 use crate::NativeProofError;
 
-pub const EVIDENCE_MAGIC: &[u8; 8] = b"KPNEVD01";
+pub const EVIDENCE_MAGIC: &[u8; 8] = b"KPNEVD02";
 pub const MAX_EVIDENCE_BYTES: usize = 8_000_000;
 pub const MAX_EVIDENCE_HEADERS: usize = 4096;
 pub const MAX_EVIDENCE_TRANSACTIONS: usize = 16;
@@ -36,6 +37,67 @@ pub struct ValidatedRegtestEvidence {
     pub tip_height: u32,
     pub tip_chainwork: BigUint,
     pub transactions: Vec<ValidatedRawTransaction>,
+}
+
+impl ValidatedRegtestEvidence {
+    /// Fixed Borsh response schema: domain [u8;8], digest and tip [u8;32],
+    /// accepted height u32, transaction count u32. No plaintext diagnostic wire.
+    pub fn encode_response(&self) -> std::io::Result<Vec<u8>> {
+        borsh::to_vec(&(
+            *b"KPNEVR02",
+            self.digest,
+            self.tip_hash,
+            self.tip_height,
+            self.transactions.len() as u32,
+        ))
+    }
+}
+
+/// Borsh envelope schema. Consensus headers/transactions and big-endian
+/// chainwork bytes are opaque arrays, not reserialized consensus objects.
+pub struct NativeEvidenceEnvelope {
+    pub genesis: [u8; 32],
+    pub tip: [u8; 32],
+    pub tip_height: u32,
+    pub chainwork: [u8; 32],
+    pub minimum_confirmations: u32,
+    pub headers: Vec<[u8; 80]>,
+    pub proofs: Vec<NativeEvidenceTransaction>,
+}
+
+pub struct NativeEvidenceTransaction {
+    pub transaction: Vec<u8>,
+    pub block_height: u32,
+    pub transaction_index: u32,
+    pub transaction_ids: Vec<[u8; 32]>,
+}
+
+impl BorshSerialize for NativeEvidenceEnvelope {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        (
+            EVIDENCE_MAGIC,
+            &self.genesis,
+            &self.tip,
+            self.tip_height,
+            &self.chainwork,
+            self.minimum_confirmations,
+            &self.headers,
+            &self.proofs,
+        )
+            .serialize(writer)
+    }
+}
+
+impl BorshSerialize for NativeEvidenceTransaction {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        (
+            &self.transaction,
+            self.block_height,
+            self.transaction_index,
+            &self.transaction_ids,
+        )
+            .serialize(writer)
+    }
 }
 
 /// The timestamp is supplied by the verifier's clock, never by the packet.
@@ -158,16 +220,12 @@ impl<'a> EvidenceReader<'a> {
         Ok(value)
     }
     fn hash(&mut self) -> Result<[u8; 32], NativeProofError> {
-        self.take(32)?
-            .try_into()
+        BorshDeserialize::deserialize(&mut self.remaining)
             .map_err(|_| NativeProofError::InvalidEvidence)
     }
     fn u32(&mut self) -> Result<u32, NativeProofError> {
-        Ok(u32::from_le_bytes(
-            self.take(4)?
-                .try_into()
-                .map_err(|_| NativeProofError::InvalidEvidence)?,
-        ))
+        BorshDeserialize::deserialize(&mut self.remaining)
+            .map_err(|_| NativeProofError::InvalidEvidence)
     }
     fn count(&mut self, maximum: usize) -> Result<usize, NativeProofError> {
         let count = self.u32()? as usize;
@@ -182,6 +240,66 @@ impl<'a> EvidenceReader<'a> {
 mod tests {
     use super::*;
     use crate::header::{serialize_header, verify_proof_of_work};
+
+    #[test]
+    fn borsh_envelope_and_response_match_shared_vectors() {
+        let vector: serde_json::Value =
+            serde_json::from_str(include_str!("../vectors/borsh-v2.json")).unwrap();
+        let input = &vector["input"];
+        let bytes = |v: &serde_json::Value| {
+            crate::bytes::parse_hex(v.as_str().unwrap(), None, "vector").unwrap()
+        };
+        let hash = |v: &serde_json::Value| -> [u8; 32] { bytes(v).try_into().unwrap() };
+        let number = |v: &serde_json::Value| -> u32 { v.as_u64().unwrap().try_into().unwrap() };
+        let wire = NativeEvidenceEnvelope {
+            genesis: hash(&input["genesisHash"]),
+            tip: hash(&input["tipHash"]),
+            tip_height: number(&input["tipHeight"]),
+            chainwork: hash(&input["chainworkHex"]),
+            minimum_confirmations: number(&input["minimumConfirmations"]),
+            headers: input["headers"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| bytes(v).try_into().unwrap())
+                .collect(),
+            proofs: input["proofs"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| NativeEvidenceTransaction {
+                    transaction: bytes(&v["rawTransactionHex"]),
+                    block_height: number(&v["blockHeight"]),
+                    transaction_index: number(&v["transactionIndex"]),
+                    transaction_ids: v["transactionIds"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(hash)
+                        .collect(),
+                })
+                .collect(),
+        };
+        let encoded = borsh::to_vec(&wire).unwrap();
+        assert_eq!(encoded, bytes(&vector["encodedHex"]));
+        assert_eq!(sha256(&encoded), hash(&vector["digest"]));
+        // Vector tests do not certify this deliberately invalid header as a chain.
+        assert!(verify_regtest_evidence(&encoded, u64::MAX).is_err());
+        let result = ValidatedRegtestEvidence {
+            digest: sha256(&encoded),
+            tip_hash: wire.tip,
+            tip_height: wire.tip_height,
+            tip_chainwork: BigUint::from(0u8),
+            transactions: vec![ValidatedRawTransaction {
+                transaction: parse_transaction(&wire.proofs[0].transaction).unwrap(),
+                block_height: 1,
+                block_hash: wire.tip,
+            }],
+        };
+        let response = result.encode_response().unwrap();
+        assert_eq!(response, bytes(&vector["responseHex"]));
+        assert_eq!(sha256(&response), hash(&vector["responseDigest"]));
+    }
 
     // Header/Merkle fixture only, NOT a full consensus-valid block fixture.
     fn fixture() -> Vec<u8> {
@@ -216,26 +334,26 @@ mod tests {
                 })
                 .unwrap();
             chain.connect_header(&header).unwrap();
-            headers.extend(header);
+            headers.push(header);
         }
-        let mut out = EVIDENCE_MAGIC.to_vec();
-        out.extend(params.genesis_hash());
-        out.extend(chain.tip().hash);
-        out.extend(3_u32.to_le_bytes());
         let work = chain.tip().chainwork.to_bytes_be();
-        out.extend(vec![0; 32 - work.len()]);
-        out.extend(work);
-        out.extend(3_u32.to_le_bytes());
-        out.extend(3_u32.to_le_bytes());
-        out.extend(headers);
-        out.extend(1_u32.to_le_bytes());
-        out.extend((tx.len() as u32).to_le_bytes());
-        out.extend(tx);
-        out.extend(1_u32.to_le_bytes());
-        out.extend(0_u32.to_le_bytes());
-        out.extend(1_u32.to_le_bytes());
-        out.extend(parsed.txid);
-        out
+        let mut chainwork = [0; 32];
+        chainwork[32 - work.len()..].copy_from_slice(&work);
+        borsh::to_vec(&NativeEvidenceEnvelope {
+            genesis: params.genesis_hash(),
+            tip: chain.tip().hash,
+            tip_height: 3,
+            chainwork,
+            minimum_confirmations: 3,
+            headers,
+            proofs: vec![NativeEvidenceTransaction {
+                transaction: tx,
+                block_height: 1,
+                transaction_index: 0,
+                transaction_ids: vec![parsed.txid],
+            }],
+        })
+        .unwrap()
     }
 
     #[test]
@@ -280,12 +398,28 @@ mod tests {
         let mut extra = packet.clone();
         extra.push(0);
         assert!(verify_regtest_evidence(&extra, u64::MAX).is_err());
-        let mut excessive = packet;
-        excessive[112..116].copy_from_slice(&u32::MAX.to_le_bytes());
-        assert!(matches!(
-            verify_regtest_evidence(&excessive, u64::MAX),
-            Err(NativeProofError::ResourceLimit(_))
-        ));
+        let header_count = u32::from_le_bytes(packet[112..116].try_into().unwrap()) as usize;
+        let proof_count_offset = 116 + header_count * 80;
+        let transaction_length_offset = proof_count_offset + 4;
+        let transaction_length = u32::from_le_bytes(
+            packet[transaction_length_offset..transaction_length_offset + 4]
+                .try_into()
+                .unwrap(),
+        ) as usize;
+        let txid_count_offset = transaction_length_offset + 4 + transaction_length + 8;
+        for offset in [
+            112,
+            proof_count_offset,
+            transaction_length_offset,
+            txid_count_offset,
+        ] {
+            let mut excessive = packet.clone();
+            excessive[offset..offset + 4].copy_from_slice(&u32::MAX.to_le_bytes());
+            assert!(matches!(
+                verify_regtest_evidence(&excessive, u64::MAX),
+                Err(NativeProofError::ResourceLimit(_))
+            ));
+        }
     }
 
     #[test]

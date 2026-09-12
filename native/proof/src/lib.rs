@@ -5,6 +5,7 @@
 //! bounded transaction parsing, UTXO-state observations, and deposit evidence.
 //! It does not broadcast transactions, manage wallets, or authorize Mainnet.
 
+pub mod bridge_inputs;
 pub mod bytes;
 pub mod chain;
 pub mod deposit;

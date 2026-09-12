@@ -2,6 +2,7 @@
 // REGTEST-only raw header/Merkle verification plus separately identified
 // fully-validating-node RPC observations. No keys or broadcasting authority.
 import { createHash } from "node:crypto";
+import { serialize, deserialize } from "borsh";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { schnorr } from "@noble/curves/secp256k1.js";
@@ -34,31 +35,59 @@ function verifiedChain(bundle, verified, observedAt) {
   VERIFIED_CHAINS.add(result); return result;
 }
 
+const hashSchema = { array: { type: "u8", len: 32 } };
+export const NATIVE_EVIDENCE_SCHEMA = { struct: {
+  magic: { array: { type: "u8", len: 8 } },
+  genesisHash: hashSchema, tipHash: hashSchema, tipHeight: "u32",
+  // Big-endian Native chainwork commitment represented as opaque 32 bytes.
+  chainwork: hashSchema, minimumConfirmations: "u32",
+  headers: { array: { type: { array: { type: "u8", len: 80 } } } },
+  proofs: { array: { type: { struct: {
+    transaction: { array: { type: "u8" } }, blockHeight: "u32", transactionIndex: "u32",
+    transactionIds: { array: { type: hashSchema } },
+  } } } },
+} };
+export const NATIVE_VERIFICATION_SCHEMA = { struct: {
+  magic: { array: { type: "u8", len: 8 } }, digest: hashSchema, tipHash: hashSchema,
+  tipHeight: "u32", transactions: "u32",
+} };
+
 export function encodeRegtestEvidence(bundle) {
   if (bundle?.genesisHash !== REGTEST_GENESIS) throw new Error("RAW_NATIVE_WRONG_GENESIS");
   const headers = boundedArray(bundle.headers, MAX_HEADERS);
   const proofs = boundedArray(bundle.proofs, MAX_TRANSACTIONS);
   if (headers.length !== bundle.tipHeight) throw new Error("RAW_NATIVE_HEADER_COUNT_MISMATCH");
-  const parts = [Buffer.from("KPNEVD01"), hex(REGTEST_GENESIS, 32), hex(bundle.tipHash, 32),
-    u32(bundle.tipHeight), hex(bundle.chainworkHex, 32), u32(positive(bundle.minimumConfirmations, MAX_HEADERS)), u32(headers.length)];
-  let byteLength = parts.reduce((sum, part) => sum + part.length, 0);
-  const push = (part) => {
-    byteLength += part.length;
+  let byteLength = 120 + headers.length * 80;
+  const wireProofs = proofs.map((proof) => {
+    const transaction = hex(proof.rawTransactionHex, undefined, 4_000_000);
+    const ids = boundedArray(proof.transactionIds, MAX_BLOCK_TXIDS);
+    const transactionIndex = integer(proof.transactionIndex, MAX_BLOCK_TXIDS - 1);
+    if (transactionIndex >= ids.length) throw new Error("RAW_NATIVE_MERKLE_INDEX_INVALID");
+    byteLength += 16 + transaction.length + ids.length * 32;
     if (byteLength > MAX_RAW_EVIDENCE_BYTES) throw new Error("RAW_NATIVE_EVIDENCE_TOO_LARGE");
-    parts.push(part);
-  };
-  for (const header of headers) push(hex(header, 80));
-  push(u32(proofs.length));
-  for (const proof of proofs) {
-    const raw = hex(proof.rawTransactionHex, undefined, 4_000_000);
-    const txids = boundedArray(proof.transactionIds, MAX_BLOCK_TXIDS);
-    const index = integer(proof.transactionIndex, MAX_BLOCK_TXIDS - 1);
-    if (index >= txids.length) throw new Error("RAW_NATIVE_MERKLE_INDEX_INVALID");
-    push(u32(raw.length)); push(raw); push(u32(positive(proof.blockHeight, MAX_HEADERS)));
-    push(u32(index)); push(u32(txids.length));
-    for (const txid of txids) push(hex(txid, 32));
+    return { transaction, blockHeight: positive(proof.blockHeight, MAX_HEADERS), transactionIndex,
+      transactionIds: ids.map(txid => hex(txid, 32)) };
+  });
+  const packet = Buffer.from(serialize(NATIVE_EVIDENCE_SCHEMA, {
+    magic: Buffer.from("KPNEVD02"), genesisHash: hex(REGTEST_GENESIS, 32), tipHash: hex(bundle.tipHash, 32),
+    tipHeight: integer(bundle.tipHeight, MAX_HEADERS), chainwork: hex(bundle.chainworkHex, 32),
+    minimumConfirmations: positive(bundle.minimumConfirmations, MAX_HEADERS),
+    headers: headers.map(header => hex(header, 80)), proofs: wireProofs,
+  }));
+  if (packet.length !== byteLength) throw new Error("RAW_NATIVE_EVIDENCE_LENGTH");
+  return packet;
+}
+
+export function decodeNativeVerificationResult(packet) {
+  if (!(packet instanceof Uint8Array) || packet.length !== 80) throw new Error("RAW_NATIVE_VERIFICATION_FAILED");
+  const value = deserialize(NATIVE_VERIFICATION_SCHEMA, packet);
+  if (!Buffer.from(value.magic).equals(Buffer.from("KPNEVR02")) ||
+      !Buffer.from(serialize(NATIVE_VERIFICATION_SCHEMA, value)).equals(Buffer.from(packet))) {
+    throw new Error("RAW_NATIVE_VERIFICATION_FAILED");
   }
-  return Buffer.concat(parts, byteLength);
+  return Object.freeze({ digestHex: Buffer.from(value.digest).toString("hex"),
+    tipHash: Buffer.from(value.tipHash).toString("hex"),
+    tipHeight: positive(value.tipHeight, MAX_HEADERS), transactions: positive(value.transactions, MAX_TRANSACTIONS) });
 }
 
 // Re-encode a retained acceptance basis from CURRENT canonical raw data. This
@@ -129,7 +158,7 @@ export function verifyRegtestEvidencePacket({ executable, packet }) {
   const digestHex = createHash("sha256").update(snapshot).digest("hex");
   return new Promise((resolve, reject) => {
     const child = spawn(executable, ["--regtest-verify"], { shell: false, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
-    let output = "";
+    const output = [];
     let captured = 0;
     let settled = false;
     const fail = () => {
@@ -144,18 +173,16 @@ export function verifyRegtestEvidencePacket({ executable, packet }) {
       stream.on("data", (data) => {
         captured += data.length;
         if (captured > 1024) { fail(); return; }
-        if (capture) output += data.toString("utf8");
+        if (capture) output.push(Buffer.from(data));
       });
     }
     child.on("close", (code) => {
       if (settled) return;
-      const match = /^KPNEV_OK_V1 ([0-9a-f]{64}) ([0-9a-f]{64}) ([1-9][0-9]{0,3}) ([1-9][0-9]?)\r?\n$/u.exec(output);
-      if (code !== 0 || !match || match[1] !== digestHex
-        || Number(match[3]) > MAX_HEADERS || Number(match[4]) > MAX_TRANSACTIONS) { fail(); return; }
+      let result;
+      try { result = decodeNativeVerificationResult(Buffer.concat(output)); } catch { fail(); return; }
+      if (code !== 0 || result.digestHex !== digestHex) { fail(); return; }
       settled = true; clearTimeout(timer);
-      resolve(Object.freeze({ status: "RAW_HEADERS_AND_MERKLE_VALIDATED", digestHex,
-        tipHash: match[2], tipHeight: positive(Number(match[3]), MAX_HEADERS),
-        transactions: positive(Number(match[4]), MAX_TRANSACTIONS),
+      resolve(Object.freeze({ status: "RAW_HEADERS_AND_MERKLE_VALIDATED", ...result,
         utxoTrust: "SEPARATE_NODE_RPC_OBSERVATION_REQUIRED" }));
     });
     child.stdin.end(snapshot);
@@ -403,7 +430,6 @@ function boundedArray(value, maximum) {
   if (!Array.isArray(value) || value.length < 1 || value.length > maximum) throw new Error("RAW_NATIVE_COUNT_INVALID");
   return value;
 }
-function u32(value) { const out = Buffer.alloc(4); out.writeUInt32LE(integer(value, 0xffff_ffff)); return out; }
 function atomic(value) {
   if (typeof value !== "string" || !/^(0|[1-9][0-9]{0,19})$/u.test(value) || BigInt(value) > 0xffff_ffff_ffff_ffffn) throw new Error("RAW_NATIVE_ATOMIC_INVALID");
   return BigInt(value);

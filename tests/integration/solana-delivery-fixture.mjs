@@ -26,7 +26,7 @@ export async function solanaDeliveryFixture() {
   const message = decodeCanonicalBridgeMessage(encoded), encodedMessageHex = Buffer.from(encoded).toString("hex");
   const attestations = signers.map((s, i) => ({ protocol: ATTESTATION_PROTOCOL, mode: ATTESTATION_MODE, role: ["ATTESTER_A", "ATTESTER_B"][i],
     keyEpoch: p.keyEpoch, policyEpoch: p.policyEpoch, attesterPublicKeyHex: Buffer.from(s.publicKey).toString("hex"),
-    operationIdHex: message.operationIdHex, messageDigestHex: message.messageDigestHex, signedBytes: "CANONICAL_BRIDGE_MESSAGE_V1",
+    operationIdHex: message.operationIdHex, messageDigestHex: message.messageDigestHex, signedBytes: "CANONICAL_BORSH_BRIDGE_MESSAGE_V2",
     signatureHex: Buffer.from(ed25519.sign(encoded, s["secret" + "Key"])).toString("hex"), state: "VERIFIED_READY" }));
   const policy = { operationPolicy: p, manifest: f.manifest, feePayerPublicKey: base58Encode(k.publicKey) };
   async function delivery(kind = "RECEIPT", generation = 0) {

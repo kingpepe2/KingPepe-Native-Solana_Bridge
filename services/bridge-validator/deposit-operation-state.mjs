@@ -1,6 +1,7 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 // Durable-state validation, not a Native proof or a signing/minting authority.
 import { createHash } from "node:crypto";
+import { bridgeInputDigest } from "../../shared/protocol/bridge-inputs.mjs";
 import { canonicalJson, canonicalUintDecimal, validateNativeSigningIntent } from "../../native/frost/policy/native-signing-policy.mjs";
 import { REGTEST_GENESIS, verifyRegtestSweepSignatures } from "../../native/node/native-raw-evidence.mjs";
 import { parseNativeTransactionHex, createLocalTaprootSighashEvidences } from "../../native/node/native-taproot-transaction.mjs";
@@ -37,7 +38,10 @@ export function validateDepositOperationPolicy(input) {
   check(uint(p.maximumAmountAtomic) > 0n); uint(p.maximumFeeAtomic);
   return immutable(p);
 }
-export function depositOperationPolicyDigest(policy) { return digest(canonicalJson(validateDepositOperationPolicy(policy))); }
+export function depositOperationPolicyDigest(policy) {
+  const value = validateDepositOperationPolicy(policy);
+  return bridgeInputDigest("DepositPolicy", { ...value, solanaGenesis: base58Decode(value.solanaGenesis) });
+}
 function checkpoint(c) {
   fields(c, ["protocol", "genesis", "tipHash", "tipHeight", "chainworkHex", "minimumConfirmations", "evidenceDigestHex"]);
   check(c.protocol === "KINGPEPE_REGTEST_ACCEPTANCE_CHECKPOINT_V1" && c.genesis === REGTEST_GENESIS);
