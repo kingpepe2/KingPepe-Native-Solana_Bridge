@@ -5,18 +5,18 @@ import { schnorr } from "@noble/curves/secp256k1.js";
 import { REGTEST_GENESIS } from "../node/native-raw-evidence.mjs";
 import { bridgeNumsPublicKeyHex, createTwoLeafTaprootOutput } from "../node/native-tapscript.mjs";
 import { parseNativeTransactionHex } from "../node/native-taproot-transaction.mjs";
+import { encodeNativeInput } from "../../shared/protocol/native-inputs.mjs";
 
 export function deriveRegtestDepositCommitment(input) {
   if (input?.nativeGenesisHex !== REGTEST_GENESIS) throw new Error("RecoveryWrongNativeNetwork");
   const domains = ["nativeGenesisHex", "solanaDeploymentHex", "managerProgramIdHex", "transceiverProgramIdHex", "mintHex", "recipientHex", "nonceHex"];
   const amount = atomic(input.amountAtomic);
   if (amount === 0n) throw new Error("RecoveryAmountMustBePositive");
-  const units = Buffer.alloc(8); units.writeBigUInt64LE(amount);
-  const counters = Buffer.alloc(16);
-  for (const [index, field] of ["protocolId", "nativeNetwork", "policyEpoch", "keyEpoch"].entries()) {
-    counters.writeUInt32LE(positive(input[field], 0xffff_ffff), index * 4);
-  }
-  return createHash("sha256").update(Buffer.concat([Buffer.from("KPDINT01"), ...domains.map((key) => hash32(input[key])), units, counters])).digest("hex");
+  const counters = Object.fromEntries(["protocolId", "nativeNetwork", "policyEpoch", "keyEpoch"]
+    .map(field => [field, positive(input[field], 0xffff_ffff)]));
+  const bytes = encodeNativeInput("DepositIntent", { magic: Buffer.from("KPDINT01"),
+    ...Object.fromEntries(domains.map(key => [key, hash32(input[key])])), amountAtomic: amount, ...counters });
+  return createHash("sha256").update(bytes).digest("hex");
 }
 
 export function buildRegtestRecoverableDeposit({ nativeGenesisHex, depositCommitmentHex, frostPublicKeyHex, userRecoveryPublicKeyHex, csvDelayBlocks }) {

@@ -105,7 +105,7 @@ export class ProjectAttester {
       attesterPublicKeyHex: this.publicKeyHex,
       messageDigestHex: decoded.messageDigestHex,
       operationIdHex: decoded.operationIdHex,
-      signedBytes: "CANONICAL_BRIDGE_MESSAGE_V1",
+      signedBytes: "CANONICAL_BORSH_BRIDGE_MESSAGE_V2",
       signatureHex: bytesToHex(signature),
       state: VERIFIED_READY,
     };

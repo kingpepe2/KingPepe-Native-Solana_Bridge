@@ -277,12 +277,13 @@ pub fn reserve_allocation_id(
     reserve_output_index: u32,
     reserve_amount_atomic: u64,
 ) -> [u8; 32] {
-    let mut input = Vec::with_capacity(108);
-    input.extend(temporary_outpoint.txid);
-    input.extend(temporary_outpoint.vout.to_le_bytes());
-    input.extend(sweep_txid);
-    input.extend(reserve_output_index.to_le_bytes());
-    input.extend(reserve_amount_atomic.to_le_bytes());
+    let input = kingpepe_native_proof::bridge_inputs::reserve_allocation(
+        temporary_outpoint.txid,
+        temporary_outpoint.vout,
+        sweep_txid,
+        reserve_output_index,
+        reserve_amount_atomic,
+    );
     sha256d(&input)
 }
 

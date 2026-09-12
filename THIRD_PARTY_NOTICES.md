@@ -60,6 +60,22 @@ docs/security/windows-protected-storage.md.
   - Copyright: Copyright (c) 2022 Paul Miller
   - Use: transitive dependency of `@noble/curves`
 
+- `borsh` JavaScript `2.0.0`
+  - License declared by the pinned npm distribution: Apache-2.0
+  - Upstream: https://github.com/near/borsh-js
+  - Use: schema-driven canonical bridge serialization; no source is vendored.
+    Upstream license/notice files remain in the installed package and must be
+    preserved in any redistributed dependency or bundled artifact.
+
+- Rust `borsh` / `borsh-derive` `1.8.1`
+  - License: MIT OR Apache-2.0
+  - Upstream: https://github.com/near/borsh-rs
+  - Use: canonical bridge message schemas in the Solana workspace. Original
+    KingPepe schemas/API integration do not claim ownership of Borsh itself.
+  - Native proof uses `borsh` `1.5.7` (same format and license), whose Rust
+    compatibility supports the existing pinned Native compiler. Its bounded
+    evidence reader validates container counts before allocating or parsing.
+
 - Rust crates used by the Native proof/reserve/recovery and supporting workspaces:
   - `serde` / `serde_derive` / `serde_core`
     - License: MIT OR Apache-2.0

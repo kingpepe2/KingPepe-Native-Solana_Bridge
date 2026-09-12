@@ -11,11 +11,11 @@ import {
   canonicalUintDecimal,
   hexToBytes,
   nativeSigningIntentDigest,
-  sha256Canonical,
   validateNativeSigningIntent,
   dataRecord,
   dataArray,
 } from "../policy/native-signing-policy.mjs";
+import { bridgeInputDigest } from "../../../shared/protocol/bridge-inputs.mjs";
 import { createNativeFrostAbortReceipt, validateNativeFrostSigningRequest } from "../policy/signing-request.mjs";
 import { createTwoPartyDkgRequest, nativeFrostKeyContext, sameNativeFrostKeyDeployment,
   validateNativeFrostDkgRequest } from "../policy/dkg-request.mjs";
@@ -256,13 +256,13 @@ export class NativeFrostSigner {
           nonceReservationId: commitment.nonceReservationId, reservationCounter: counter,
           requestId: request.requestId, epoch: request.epoch, sessionId: request.sessionId,
           intentDigest: request.intentDigest, messageHex: request.messageHex,
-          participantIds: [...request.participantIds], commitmentSha256: sha256Canonical(commitment), state: "RESERVED",
+          participantIds: [...request.participantIds], commitmentSha256: bridgeInputDigest("FrostCommitment", commitment), state: "RESERVED",
         };
         // Only public reservation metadata reaches the store. Secret nonce bytes
         // stay in this instance and are discarded if persistence is uncertain.
         this.#stateStore.save(state);
         const envelope = commitmentEnvelope(this.signerId, request, commitment);
-        this.#nonces.set(request.sessionId, { nonces: generated.nonces, commitmentHash: sha256Canonical(commitment) });
+        this.#nonces.set(request.sessionId, { nonces: generated.nonces, commitmentHash: bridgeInputDigest("FrostCommitment", commitment) });
         retained = true;
         return envelope;
       } finally { if (!retained) zeroNonce(generated.nonces); }
@@ -280,7 +280,7 @@ export class NativeFrostSigner {
       const tombstone = validateNonceSessionState(state, session, request, this.signerId, this.frostIdentifier());
 
       const commitmentPayloads = validateCommitmentSet(request, commitments);
-      const commitmentSetHash = sha256Canonical(commitmentPayloads);
+      const commitmentSetHash = bridgeInputDigest("FrostCommitmentSet", commitmentPayloads);
       if (session.state === "SIGNED") {
         if (session.commitmentSetHash !== commitmentSetHash || session.shareHex === undefined) {
           throw new Error("signed FROST session transcript changed");
@@ -313,7 +313,7 @@ export class NativeFrostSigner {
           freshSession.commitmentSetHash = commitmentSetHash;
           freshSession.shareHex = bytesToHex(share);
           freshTombstone.outcome = "SHARE_PERSISTED";
-          freshTombstone.shareSha256 = sha256Canonical({ shareHex: freshSession.shareHex });
+          freshTombstone.shareSha256 = bridgeInputDigest("FrostShare", { shareHex: freshSession.shareHex });
           this.#stateStore.save(freshState);
           return shareEnvelope(this.signerId, request, key.secret.identifier, freshSession.shareHex, commitmentSetHash);
         } finally { share.fill(0); }
@@ -523,7 +523,7 @@ export class NativeFrostSigner {
       schnorr_FROST.validateSecret(key.secret, key.public);
     } catch { throw new Error("FrostDkgStoredKeyInvalid"); }
     finally { key?.secret?.signingShare.fill(0); }
-    const publicPackageHash = sha256Canonical(storedKey.public);
+    const publicPackageHash = bridgeInputDigest("FrostPublicPackage", storedKey.public);
     const group = storedKey.public.commitmentsHex[0];
     if (group === undefined || group.length !== 66) throw new Error("invalid FROST group commitment");
     return {
@@ -546,7 +546,7 @@ export class NativeFrostSigner {
 
   #reservedNonce(sessionId, session) {
     const value = this.#nonces.get(sessionId);
-    if (value === undefined || value.commitmentHash !== sha256Canonical(session.commitment)) {
+    if (value === undefined || value.commitmentHash !== bridgeInputDigest("FrostCommitment", session.commitment)) {
       this.#discardNonce(sessionId);
       throw new Error("FROST nonce is not available");
     }
@@ -757,7 +757,7 @@ function deserializeCommitment(value) {
 }
 
 function computeNonceReservationId(signerId, reservationCounter, request, commitment) {
-  return sha256Canonical({
+  return bridgeInputDigest("FrostNonceReservation", {
     domain: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_NONCE_RESERVATION/V1",
     signerId,
     reservationCounter,
@@ -836,7 +836,7 @@ function validateNonceSessionState(state, session, request, signerId, identifier
         tombstone.requestId !== request.requestId || tombstone.epoch !== request.epoch ||
         tombstone.intentDigest !== request.intentDigest || tombstone.messageHex !== request.messageHex ||
         canonicalJson(tombstone.participantIds) !== canonicalJson(request.participantIds) ||
-        tombstone.commitmentSha256 !== sha256Canonical(commitment)) throw new Error();
+        tombstone.commitmentSha256 !== bridgeInputDigest("FrostCommitment", commitment)) throw new Error();
     if (session.state === "RESERVED") {
       if (tombstone.state !== "RESERVED" || session.shareHex !== undefined || session.commitmentSetHash !== undefined ||
           tombstone.outcome !== undefined || tombstone.shareSha256 !== undefined || tombstone.commitmentSetHash !== undefined) throw new Error();
@@ -846,7 +846,7 @@ function validateNonceSessionState(state, session, request, signerId, identifier
           typeof session.commitmentSetHash !== "string" || !/^[0-9a-f]{64}$/u.test(session.commitmentSetHash) ||
           session.commitmentSetHash !== tombstone.commitmentSetHash ||
           tombstone.outcome !== "SHARE_PERSISTED" ||
-          tombstone.shareSha256 !== sha256Canonical({ shareHex: session.shareHex }))) throw new Error();
+          tombstone.shareSha256 !== bridgeInputDigest("FrostShare", { shareHex: session.shareHex }))) throw new Error();
       if (session.state === "ABORTED" && (session.shareHex !== undefined || tombstone.shareSha256 !== undefined ||
           session.commitmentSetHash !== undefined ||
           !["ABORTED", "SHARE_COMPUTATION_STARTED", "RECOVERY_UNCERTAIN_NONCE"].includes(tombstone.outcome))) throw new Error();

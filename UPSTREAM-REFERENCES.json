@@ -52,6 +52,17 @@
   },
   "standardsReferences": [
     {
+      "project": "Borsh specification and implementations",
+      "urls": [
+        "https://borsh.io/",
+        "https://github.com/near/borsh-js/tree/v2.0.0",
+        "https://docs.rs/borsh/1.8.1/borsh/",
+        "https://docs.rs/crate/borsh/1.5.7/source/Cargo.toml"
+      ],
+      "checkedAt": "2026-09-13",
+      "use": "Fixed field ordering, little-endian integer widths, fixed arrays and u32-prefixed vectors. Original bridge schemas use pinned package APIs; no upstream implementation copied. Strict bounds, integer ranges, padding and complete-consumption checks are enforced by the bridge."
+    },
+    {
       "project": "RFC 9591",
       "url": "https://www.rfc-editor.org/rfc/rfc9591.html",
       "checkedAt": "2026-09-10",

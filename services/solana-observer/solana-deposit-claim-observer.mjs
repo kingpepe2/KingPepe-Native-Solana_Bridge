@@ -1,4 +1,5 @@
 import { bytesToHex, isHash32Hex, normalizeHex } from "../../shared/protocol/canonical-message.mjs";
+import { decodeBridgeAbi } from "../../shared/protocol/solana-bridge-abi.mjs";
 import { base58Decode, base58Encode, findProgramAddress, DEPOSIT_CLAIM_PDA_SEED_PREFIX, MINT_AUTHORITY_PDA_SEED_PREFIX } from "../bridge-validator/solana-deposit-claim-transaction-plan.mjs";
 import { verifyDepositMintExecution } from "./deposit-mint-execution.mjs";
 
@@ -263,48 +264,15 @@ export function decodeDepositClaimAccountBase64(base64Data) {
 
 export function decodeDepositClaimAccountBytes(input) {
   const bytes = asUint8Array(input, "depositClaimAccount");
-  if (bytes.length !== DEPOSIT_CLAIM_ACCOUNT_LENGTH) {
-    throw new Error(`DepositClaimAccountInvalidLength:${bytes.length}`);
-  }
-  let cursor = 0;
-  const magic = Buffer.from(bytes.slice(cursor, cursor + 8)).toString("ascii");
-  cursor += 8;
-  if (magic !== DEPOSIT_CLAIM_MAGIC) {
-    throw new Error("DepositClaimAccountInvalidMagic");
-  }
-  const version = bytes[cursor];
-  cursor += 1;
-  if (version !== DEPOSIT_CLAIM_VERSION) {
-    throw new Error("DepositClaimAccountUnsupportedVersion");
-  }
-  const operationIdHex = bytesToHex(bytes.slice(cursor, cursor + 32));
-  cursor += 32;
-  const messageDigestHex = bytesToHex(bytes.slice(cursor, cursor + 32));
-  cursor += 32;
-  const amountAtomic = readU64LE(bytes, cursor).toString();
-  cursor += 8;
-  const destinationLength = readU16LE(bytes, cursor);
-  cursor += 2;
-  if (destinationLength > DEPOSIT_CLAIM_DESTINATION_MAX_LENGTH) {
-    throw new Error("DepositClaimAccountDestinationTooLong");
-  }
-  const destinationPadded = bytes.slice(cursor, cursor + DEPOSIT_CLAIM_DESTINATION_MAX_LENGTH);
-  const destination = destinationPadded.slice(0, destinationLength);
-  const destinationPadding = destinationPadded.slice(destinationLength);
-  if (destinationPadding.some((byte) => byte !== 0)) {
-    throw new Error("DepositClaimAccountNonZeroDestinationPadding");
-  }
-  cursor += DEPOSIT_CLAIM_DESTINATION_MAX_LENGTH;
-  if (cursor !== DEPOSIT_CLAIM_ACCOUNT_LENGTH) {
-    throw new Error(`DepositClaimAccountInvalidCursor:${cursor}`);
-  }
-
-  return Object.freeze({
-    operationIdHex,
-    messageDigestHex,
-    amountAtomic,
-    solanaRecipientHex: bytesToHex(destination),
-  });
+  if (bytes.length !== DEPOSIT_CLAIM_ACCOUNT_LENGTH) throw new Error(`DepositClaimAccountInvalidLength:${bytes.length}`);
+  if (Buffer.from(bytes.subarray(0, 8)).toString("ascii") !== DEPOSIT_CLAIM_MAGIC) throw new Error("DepositClaimAccountInvalidMagic");
+  if (bytes[8] !== DEPOSIT_CLAIM_VERSION) throw new Error("DepositClaimAccountUnsupportedVersion");
+  const value = decodeBridgeAbi("DepositClaim", bytes);
+  const { length, padded } = value.recipient;
+  if (length > DEPOSIT_CLAIM_DESTINATION_MAX_LENGTH) throw new Error("DepositClaimAccountDestinationTooLong");
+  if (padded.slice(length).some(byte => byte !== 0)) throw new Error("DepositClaimAccountNonZeroDestinationPadding");
+  return Object.freeze({ operationIdHex: bytesToHex(Uint8Array.from(value.operationId)), messageDigestHex: bytesToHex(Uint8Array.from(value.messageDigest)),
+    amountAtomic: value.amountAtomic.toString(), solanaRecipientHex: bytesToHex(Uint8Array.from(padded.slice(0, length))) });
 }
 
 export function decodeSplMintAccountBase64(base64Data) {
@@ -467,9 +435,7 @@ function asUint8Array(input, label) {
   throw new Error(`${label}:ExpectedBytes`);
 }
 
-function readU16LE(bytes, offset) {
-  return bytes[offset] + (bytes[offset + 1] << 8);
-}
+
 
 function readU32LE(bytes, offset) {
   return bytes[offset] + (bytes[offset + 1] << 8) + (bytes[offset + 2] << 16) + bytes[offset + 3] * 0x1000000;

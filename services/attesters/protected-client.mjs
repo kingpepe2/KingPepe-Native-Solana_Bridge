@@ -33,7 +33,7 @@ export function validateProtectedAttestationResponse(input, request, policy, rol
     v.keyEpoch === p.operationPolicy.keyEpoch && v.policyEpoch === p.operationPolicy.policyEpoch &&
     v.attesterPublicKeyHex === Buffer.from(base58Decode(p.manifest.config.attesters[ROLES.indexOf(role)])).toString("hex") &&
     v.messageDigestHex === message.messageDigestHex && v.operationIdHex === message.operationIdHex &&
-    v.signedBytes === "CANONICAL_BRIDGE_MESSAGE_V1" && v.state === "VERIFIED_READY" && verifyProjectAttestation(v, request.encodedMessageHex));
+    v.signedBytes === "CANONICAL_BORSH_BRIDGE_MESSAGE_V2" && v.state === "VERIFIED_READY" && verifyProjectAttestation(v, request.encodedMessageHex));
   return Object.freeze(v);
 }
 export class ProtectedDepositAttesterClient {

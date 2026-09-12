@@ -1,8 +1,7 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use kingpepe_native_proof::bytes::to_hex;
 use kingpepe_native_proof::evidence::{verify_regtest_evidence, MAX_EVIDENCE_BYTES};
 
 fn run() -> Result<(), ()> {
@@ -20,14 +19,11 @@ fn run() -> Result<(), ()> {
         .map_err(|_| ())?
         .as_secs();
     let result = verify_regtest_evidence(&packet, now).map_err(|_| ())?;
-    // Fixed-shape public digests/counts only. Never echo raw packets, paths or errors.
-    println!(
-        "KPNEV_OK_V1 {} {} {} {}",
-        to_hex(&result.digest),
-        to_hex(&result.tip_hash),
-        result.tip_height,
-        result.transactions.len()
-    );
+    // Fixed Borsh public digests/counts only. Never echo input, paths or errors.
+    io::stdout()
+        .lock()
+        .write_all(&result.encode_response().map_err(|_| ())?)
+        .map_err(|_| ())?;
     Ok(())
 }
 

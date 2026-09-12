@@ -1,7 +1,8 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 // Original local DKG input binding; not authenticated peer transport.
+import { bridgeInputDigest } from "../../../shared/protocol/bridge-inputs.mjs";
 import { schnorr_FROST } from "@noble/curves/secp256k1.js";
-import { dataArray, dataRecord, sha256Canonical } from "./native-signing-policy.mjs";
+import { dataArray, dataRecord } from "./native-signing-policy.mjs";
 
 function fields(value, names, label) {
   const record = dataRecord(value, label);
@@ -55,6 +56,6 @@ export function validateDkgRound2Set(request, signerId, input) {
 export function dkgFinalizationDigest(request, signerId, round1, incoming) {
   // The incoming scalar is private. This hash is retained locally for exact
   // retry comparison; neither the scalar nor this runtime record is published.
-  return sha256Canonical({ protocol: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_DKG_HANDOFF/V1",
+  return bridgeInputDigest("FrostDkgHandoff", { protocol: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_DKG_HANDOFF/V1",
     request, signerId, round1, incoming });
 }

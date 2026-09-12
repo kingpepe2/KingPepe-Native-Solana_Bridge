@@ -1,8 +1,9 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 // Original project DKG metadata. This does not alter the pinned FROST primitive.
+import { bridgeInputDigest } from "../../../shared/protocol/bridge-inputs.mjs";
 import { REGTEST_GENESIS } from "../../node/native-raw-evidence.mjs";
 import { REQUIRED_FROST_SIGNERS, REQUIRED_FROST_THRESHOLD, assertHashHex,
-  assertNativeFrostRuntimePolicy, canonicalJson, dataArray, dataRecord, sha256Canonical } from "./native-signing-policy.mjs";
+  assertNativeFrostRuntimePolicy, canonicalJson, dataArray, dataRecord } from "./native-signing-policy.mjs";
 
 const CONTEXT_PROTOCOL = "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_KEY_CONTEXT/V2";
 const DKG_PROTOCOL = "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_DKG/V2";
@@ -53,10 +54,10 @@ export function createTwoPartyDkgRequest(options) {
   const value = fields(options, ["epoch", "context"], "FrostDkgOptions");
   const context = normalizeNativeFrostKeyContext(value.context);
   if (epoch(value.epoch) !== context.keyEpoch) throw new Error("FrostDkgEpochMismatch");
-  const contextDigest = sha256Canonical(context);
-  const participantSetHash = sha256Canonical({ protocol: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_PARTICIPANT_SET/V2",
+  const contextDigest = bridgeInputDigest("FrostKeyContext", context);
+  const participantSetHash = bridgeInputDigest("FrostParticipantSet", { protocol: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_PARTICIPANT_SET/V2",
     participants: PARTICIPANTS, threshold: REQUIRED_FROST_THRESHOLD });
-  const sessionId = sha256Canonical({ protocol: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_DKG_SESSION/V2",
+  const sessionId = bridgeInputDigest("FrostDkgSession", { protocol: "KINGPEPE_NATIVE_SOLANA_BRIDGE/FROST_DKG_SESSION/V2",
     epoch: context.keyEpoch, contextDigest, participantSetHash, threshold: REQUIRED_FROST_THRESHOLD });
   return Object.freeze({ protocol: DKG_PROTOCOL, epoch: context.keyEpoch, context, contextDigest, sessionId,
     participantSetHash, threshold: REQUIRED_FROST_THRESHOLD, participants: PARTICIPANTS });

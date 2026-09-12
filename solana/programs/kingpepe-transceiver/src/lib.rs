@@ -9,6 +9,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use bridge_messages::abi as wire;
 use bridge_messages::{
     BridgeAction, BridgeDirection, CanonicalBridgeMessage, Hash32, PubkeyBytes, MESSAGE_LENGTH,
 };
@@ -92,48 +93,42 @@ pub fn process_instruction_accounts(
 }
 
 pub fn decode_transceiver_instruction(
-    instruction_data: &[u8],
+    data: &[u8],
 ) -> Result<TransceiverInstruction, EntrypointError> {
-    let Some(tag) = instruction_data.first().copied() else {
-        return Err(EntrypointError::EmptyInstruction);
+    let tag = *data.first().ok_or(EntrypointError::EmptyInstruction)?;
+    let expected = match tag {
+        TRANSCEIVER_INSTRUCTION_INITIALIZE => 1 + TRANSCEIVER_CONFIG_INSTRUCTION_LENGTH,
+        TRANSCEIVER_INSTRUCTION_VERIFY_MESSAGE_FROM_ED25519 => 1 + MESSAGE_LENGTH + 4,
+        other => return Err(EntrypointError::UnsupportedInstructionTag(other)),
     };
+    if data.len() != expected {
+        return Err(EntrypointError::InvalidInstructionLength {
+            expected,
+            found: data.len(),
+        });
+    }
     match tag {
         TRANSCEIVER_INSTRUCTION_INITIALIZE => {
-            let expected = 1 + TRANSCEIVER_CONFIG_INSTRUCTION_LENGTH;
-            if instruction_data.len() != expected {
-                return Err(EntrypointError::InvalidInstructionLength {
-                    expected,
-                    found: instruction_data.len(),
-                });
-            }
+            let value: wire::TransceiverInitializeWire =
+                borsh::from_slice(data).map_err(|_| EntrypointError::InvalidInstructionEncoding)?;
             Ok(TransceiverInstruction::Initialize(Box::new(
-                decode_transceiver_config(&instruction_data[1..])?,
+                config_from_wire(value.config),
             )))
         }
         TRANSCEIVER_INSTRUCTION_VERIFY_MESSAGE_FROM_ED25519 => {
-            let expected = 1 + MESSAGE_LENGTH + 4;
-            if instruction_data.len() != expected {
-                return Err(EntrypointError::InvalidInstructionLength {
-                    expected,
-                    found: instruction_data.len(),
-                });
-            }
-            let message_end = 1 + MESSAGE_LENGTH;
-            let message = CanonicalBridgeMessage::decode(&instruction_data[1..message_end])
+            let value: wire::VerifyMessageWire =
+                borsh::from_slice(data).map_err(|_| EntrypointError::InvalidInstructionEncoding)?;
+            let message = CanonicalBridgeMessage::decode(&value.message)
                 .map_err(|_| EntrypointError::InvalidCanonicalMessage)?;
-            let mut cursor = InstructionCursor::new(&instruction_data[message_end..]);
-            let first = cursor.read_u16_le()?;
-            let second = cursor.read_u16_le()?;
-            cursor.finish()?;
-            if first == second {
+            if value.ed25519_instruction_indexes[0] == value.ed25519_instruction_indexes[1] {
                 return Err(EntrypointError::InvalidInstructionEncoding);
             }
             Ok(TransceiverInstruction::VerifyMessageFromEd25519 {
                 message: Box::new(message),
-                ed25519_instruction_indexes: [first, second],
+                ed25519_instruction_indexes: value.ed25519_instruction_indexes,
             })
         }
-        other => Err(EntrypointError::UnsupportedInstructionTag(other)),
+        _ => unreachable!("instruction tag checked"),
     }
 }
 
@@ -148,27 +143,25 @@ pub enum TransceiverInstruction {
 
 impl TransceiverInstruction {
     pub fn encode(&self) -> Result<Vec<u8>, EntrypointError> {
-        let mut out = Vec::new();
-        match self {
-            TransceiverInstruction::Initialize(config) => {
-                out.push(TRANSCEIVER_INSTRUCTION_INITIALIZE);
-                encode_transceiver_config(config, &mut out);
-            }
-            TransceiverInstruction::VerifyMessageFromEd25519 {
+        let encoded = match self {
+            Self::Initialize(config) => borsh::to_vec(&wire::TransceiverInitializeWire {
+                tag: TRANSCEIVER_INSTRUCTION_INITIALIZE,
+                config: config_wire(config),
+            }),
+            Self::VerifyMessageFromEd25519 {
                 message,
                 ed25519_instruction_indexes,
-            } => {
-                out.push(TRANSCEIVER_INSTRUCTION_VERIFY_MESSAGE_FROM_ED25519);
-                out.extend(
-                    message
-                        .encode()
-                        .map_err(|_| EntrypointError::InvalidCanonicalMessage)?,
-                );
-                out.extend(ed25519_instruction_indexes[0].to_le_bytes());
-                out.extend(ed25519_instruction_indexes[1].to_le_bytes());
-            }
-        }
-        Ok(out)
+            } => borsh::to_vec(&wire::VerifyMessageWire {
+                tag: TRANSCEIVER_INSTRUCTION_VERIFY_MESSAGE_FROM_ED25519,
+                message: message
+                    .encode()
+                    .map_err(|_| EntrypointError::InvalidCanonicalMessage)?
+                    .try_into()
+                    .map_err(|_| EntrypointError::InvalidCanonicalMessage)?,
+                ed25519_instruction_indexes: *ed25519_instruction_indexes,
+            }),
+        };
+        encoded.map_err(|_| EntrypointError::InvalidInstructionEncoding)
     }
 }
 
@@ -799,132 +792,124 @@ fn write_account_data(account: &AccountInfo, encoded: &[u8]) -> Result<(), Entry
     Ok(())
 }
 
-fn encode_transceiver_config(config: &TransceiverConfig, out: &mut Vec<u8>) {
-    out.extend(config.transceiver_program_id);
-    out.extend(config.manager_program_id);
-    out.extend(config.mint);
-    out.extend(config.solana_deployment);
-    out.extend(config.protocol_id.to_le_bytes());
-    out.extend(config.native_network.to_le_bytes());
-    out.extend(config.native_genesis);
-    out.extend(config.authorized_attesters[0]);
-    out.extend(config.authorized_attesters[1]);
-    out.push(config.active as u8);
-    out.extend(config.key_epoch.to_le_bytes());
+fn config_wire(value: &TransceiverConfig) -> wire::TransceiverConfigWire {
+    wire::TransceiverConfigWire {
+        transceiver_program_id: value.transceiver_program_id,
+        manager_program_id: value.manager_program_id,
+        mint: value.mint,
+        solana_deployment: value.solana_deployment,
+        protocol_id: value.protocol_id,
+        native_network: value.native_network,
+        native_genesis: value.native_genesis,
+        authorized_attesters: value.authorized_attesters,
+        active: value.active,
+        key_epoch: value.key_epoch,
+    }
+}
+
+fn config_from_wire(value: wire::TransceiverConfigWire) -> TransceiverConfig {
+    TransceiverConfig {
+        transceiver_program_id: value.transceiver_program_id,
+        manager_program_id: value.manager_program_id,
+        mint: value.mint,
+        solana_deployment: value.solana_deployment,
+        protocol_id: value.protocol_id,
+        native_network: value.native_network,
+        native_genesis: value.native_genesis,
+        authorized_attesters: value.authorized_attesters,
+        active: value.active,
+        key_epoch: value.key_epoch,
+    }
+}
+
+fn check_account_header(
+    data: &[u8],
+    length: usize,
+    magic: [u8; 8],
+) -> Result<(), AccountCodecError> {
+    if data.len() != length {
+        return Err(AccountCodecError::InvalidAccountLength {
+            expected: length,
+            found: data.len(),
+        });
+    }
+    if data[..8] != magic {
+        return Err(AccountCodecError::InvalidMagic);
+    }
+    if data[8] != TRANSCEIVER_ACCOUNT_VERSION {
+        return Err(AccountCodecError::UnsupportedVersion);
+    }
+    Ok(())
 }
 
 pub fn encode_transceiver_config_account(config: &TransceiverConfig) -> Vec<u8> {
-    let mut out = Vec::with_capacity(TRANSCEIVER_CONFIG_ACCOUNT_LENGTH);
-    out.extend(TRANSCEIVER_CONFIG_ACCOUNT_MAGIC);
-    out.push(TRANSCEIVER_ACCOUNT_VERSION);
-    encode_transceiver_config(config, &mut out);
-    debug_assert_eq!(out.len(), TRANSCEIVER_CONFIG_ACCOUNT_LENGTH);
-    out
+    borsh::to_vec(&wire::TransceiverStateWire {
+        magic: TRANSCEIVER_CONFIG_ACCOUNT_MAGIC,
+        version: TRANSCEIVER_ACCOUNT_VERSION,
+        config: config_wire(config),
+    })
+    .expect("fixed Borsh fields serialize into Vec")
 }
 
 pub fn decode_transceiver_config_account(
     data: &[u8],
 ) -> Result<TransceiverConfigAccount, AccountCodecError> {
-    if data.len() != TRANSCEIVER_CONFIG_ACCOUNT_LENGTH {
-        return Err(AccountCodecError::InvalidAccountLength {
-            expected: TRANSCEIVER_CONFIG_ACCOUNT_LENGTH,
-            found: data.len(),
-        });
-    }
-    let mut cursor = AccountCursor::new(data);
-    if cursor.read_array::<8>()? != TRANSCEIVER_CONFIG_ACCOUNT_MAGIC {
-        return Err(AccountCodecError::InvalidMagic);
-    }
-    if cursor.read_u8()? != TRANSCEIVER_ACCOUNT_VERSION {
-        return Err(AccountCodecError::UnsupportedVersion);
-    }
-    let config = decode_transceiver_config(cursor.remaining())
-        .map_err(|_| AccountCodecError::InvalidEncoding)?;
-    cursor.advance(TRANSCEIVER_CONFIG_INSTRUCTION_LENGTH)?;
-    cursor.finish()?;
+    check_account_header(
+        data,
+        TRANSCEIVER_CONFIG_ACCOUNT_LENGTH,
+        TRANSCEIVER_CONFIG_ACCOUNT_MAGIC,
+    )?;
+    let value: wire::TransceiverStateWire =
+        borsh::from_slice(data).map_err(|_| AccountCodecError::InvalidEncoding)?;
+    let config = config_from_wire(value.config);
     config.validate()?;
     Ok(TransceiverConfigAccount { config })
 }
 
-fn decode_transceiver_config(data: &[u8]) -> Result<TransceiverConfig, EntrypointError> {
-    let mut cursor = InstructionCursor::new(data);
-    let transceiver_program_id = cursor.read_array::<32>()?;
-    let manager_program_id = cursor.read_array::<32>()?;
-    let mint = cursor.read_array::<32>()?;
-    let solana_deployment = cursor.read_array::<32>()?;
-    let protocol_id = cursor.read_u32_le()?;
-    let native_network = cursor.read_u32_le()?;
-    let native_genesis = cursor.read_array::<32>()?;
-    let first_attester = cursor.read_array::<32>()?;
-    let second_attester = cursor.read_array::<32>()?;
-    let active = cursor.read_bool()?;
-    let key_epoch = cursor.read_u32_le()?;
-    cursor.finish()?;
-    Ok(TransceiverConfig {
-        transceiver_program_id,
-        manager_program_id,
-        mint,
-        solana_deployment,
-        protocol_id,
-        native_network,
-        native_genesis,
-        authorized_attesters: [first_attester, second_attester],
-        active,
-        key_epoch,
-    })
-}
-
 pub fn encode_verified_receipt_account(receipt: &VerifiedMessageReceipt) -> Vec<u8> {
-    let mut out = Vec::with_capacity(VERIFIED_RECEIPT_ACCOUNT_LENGTH);
-    out.extend(TRANSCEIVER_RECEIPT_ACCOUNT_MAGIC);
-    out.push(TRANSCEIVER_ACCOUNT_VERSION);
-    out.extend(receipt.message_digest);
-    out.extend(receipt.operation_id);
-    out.extend(receipt.transceiver_program_id);
-    out.extend(receipt.manager_program_id);
-    out.extend(receipt.mint);
-    out.push(u8::from(receipt.direction));
-    out.push(u8::from(receipt.action));
-    out.extend(receipt.key_epoch.to_le_bytes());
-    out.extend(receipt.attesters[0]);
-    out.extend(receipt.attesters[1]);
-    out.push(receipt.consumed as u8);
-    debug_assert_eq!(out.len(), VERIFIED_RECEIPT_ACCOUNT_LENGTH);
-    out
+    borsh::to_vec(&wire::VerifiedReceiptWire {
+        magic: TRANSCEIVER_RECEIPT_ACCOUNT_MAGIC,
+        version: TRANSCEIVER_ACCOUNT_VERSION,
+        message_digest: receipt.message_digest,
+        operation_id: receipt.operation_id,
+        transceiver_program_id: receipt.transceiver_program_id,
+        manager_program_id: receipt.manager_program_id,
+        mint: receipt.mint,
+        direction: u8::from(receipt.direction),
+        action: u8::from(receipt.action),
+        key_epoch: receipt.key_epoch,
+        attesters: receipt.attesters,
+        consumed: receipt.consumed,
+    })
+    .expect("fixed Borsh fields serialize into Vec")
 }
 
 pub fn decode_verified_receipt_account(
     data: &[u8],
 ) -> Result<VerifiedReceiptAccount, AccountCodecError> {
-    if data.len() != VERIFIED_RECEIPT_ACCOUNT_LENGTH {
-        return Err(AccountCodecError::InvalidAccountLength {
-            expected: VERIFIED_RECEIPT_ACCOUNT_LENGTH,
-            found: data.len(),
-        });
-    }
-    let mut cursor = AccountCursor::new(data);
-    if cursor.read_array::<8>()? != TRANSCEIVER_RECEIPT_ACCOUNT_MAGIC {
-        return Err(AccountCodecError::InvalidMagic);
-    }
-    if cursor.read_u8()? != TRANSCEIVER_ACCOUNT_VERSION {
-        return Err(AccountCodecError::UnsupportedVersion);
-    }
-    let receipt = VerifiedMessageReceipt {
-        message_digest: cursor.read_array::<32>()?,
-        operation_id: cursor.read_array::<32>()?,
-        transceiver_program_id: cursor.read_array::<32>()?,
-        manager_program_id: cursor.read_array::<32>()?,
-        mint: cursor.read_array::<32>()?,
-        direction: BridgeDirection::try_from(cursor.read_u8()?)
-            .map_err(|_| AccountCodecError::InvalidEncoding)?,
-        action: BridgeAction::try_from(cursor.read_u8()?)
-            .map_err(|_| AccountCodecError::InvalidEncoding)?,
-        key_epoch: cursor.read_u32_le()?,
-        attesters: [cursor.read_array::<32>()?, cursor.read_array::<32>()?],
-        consumed: cursor.read_bool()?,
-    };
-    cursor.finish()?;
-    Ok(VerifiedReceiptAccount { receipt })
+    check_account_header(
+        data,
+        VERIFIED_RECEIPT_ACCOUNT_LENGTH,
+        TRANSCEIVER_RECEIPT_ACCOUNT_MAGIC,
+    )?;
+    let value: wire::VerifiedReceiptWire =
+        borsh::from_slice(data).map_err(|_| AccountCodecError::InvalidEncoding)?;
+    Ok(VerifiedReceiptAccount {
+        receipt: VerifiedMessageReceipt {
+            message_digest: value.message_digest,
+            operation_id: value.operation_id,
+            transceiver_program_id: value.transceiver_program_id,
+            manager_program_id: value.manager_program_id,
+            mint: value.mint,
+            direction: BridgeDirection::try_from(value.direction)
+                .map_err(|_| AccountCodecError::InvalidEncoding)?,
+            action: BridgeAction::try_from(value.action)
+                .map_err(|_| AccountCodecError::InvalidEncoding)?,
+            key_epoch: value.key_epoch,
+            attesters: value.attesters,
+            consumed: value.consumed,
+        },
+    })
 }
 
 fn parse_ed25519_instruction(
@@ -1066,128 +1051,6 @@ fn read_u16_le(data: &[u8], offset: usize) -> Result<u16, TransceiverError> {
 
 fn ranges_overlap(a_start: usize, a_end: usize, b_start: usize, b_end: usize) -> bool {
     a_start < b_end && b_start < a_end
-}
-
-struct AccountCursor<'a> {
-    data: &'a [u8],
-    offset: usize,
-}
-
-impl<'a> AccountCursor<'a> {
-    fn new(data: &'a [u8]) -> Self {
-        Self { data, offset: 0 }
-    }
-
-    fn read_array<const N: usize>(&mut self) -> Result<[u8; N], AccountCodecError> {
-        let end = self
-            .offset
-            .checked_add(N)
-            .ok_or(AccountCodecError::InvalidEncoding)?;
-        let bytes = self
-            .data
-            .get(self.offset..end)
-            .ok_or(AccountCodecError::InvalidEncoding)?;
-        self.offset = end;
-        Ok(bytes.try_into().expect("slice length checked"))
-    }
-
-    fn read_u8(&mut self) -> Result<u8, AccountCodecError> {
-        Ok(self.read_array::<1>()?[0])
-    }
-
-    fn read_bool(&mut self) -> Result<bool, AccountCodecError> {
-        match self.read_u8()? {
-            0 => Ok(false),
-            1 => Ok(true),
-            _ => Err(AccountCodecError::InvalidEncoding),
-        }
-    }
-
-    fn read_u32_le(&mut self) -> Result<u32, AccountCodecError> {
-        Ok(u32::from_le_bytes(self.read_array::<4>()?))
-    }
-
-    fn advance(&mut self, count: usize) -> Result<(), AccountCodecError> {
-        let end = self
-            .offset
-            .checked_add(count)
-            .ok_or(AccountCodecError::InvalidEncoding)?;
-        if end > self.data.len() {
-            return Err(AccountCodecError::InvalidEncoding);
-        }
-        self.offset = end;
-        Ok(())
-    }
-
-    fn remaining(&self) -> &'a [u8] {
-        &self.data[self.offset..]
-    }
-
-    fn finish(&self) -> Result<(), AccountCodecError> {
-        if self.offset == self.data.len() {
-            Ok(())
-        } else {
-            Err(AccountCodecError::InvalidAccountLength {
-                expected: self.offset,
-                found: self.data.len(),
-            })
-        }
-    }
-}
-
-struct InstructionCursor<'a> {
-    data: &'a [u8],
-    offset: usize,
-}
-
-impl<'a> InstructionCursor<'a> {
-    fn new(data: &'a [u8]) -> Self {
-        Self { data, offset: 0 }
-    }
-
-    fn read_array<const N: usize>(&mut self) -> Result<[u8; N], EntrypointError> {
-        let end = self
-            .offset
-            .checked_add(N)
-            .ok_or(EntrypointError::InvalidInstructionEncoding)?;
-        let bytes = self
-            .data
-            .get(self.offset..end)
-            .ok_or(EntrypointError::InvalidInstructionEncoding)?;
-        self.offset = end;
-        Ok(bytes.try_into().expect("slice length checked"))
-    }
-
-    fn read_u8(&mut self) -> Result<u8, EntrypointError> {
-        Ok(self.read_array::<1>()?[0])
-    }
-
-    fn read_bool(&mut self) -> Result<bool, EntrypointError> {
-        match self.read_u8()? {
-            0 => Ok(false),
-            1 => Ok(true),
-            _ => Err(EntrypointError::InvalidInstructionEncoding),
-        }
-    }
-
-    fn read_u16_le(&mut self) -> Result<u16, EntrypointError> {
-        Ok(u16::from_le_bytes(self.read_array::<2>()?))
-    }
-
-    fn read_u32_le(&mut self) -> Result<u32, EntrypointError> {
-        Ok(u32::from_le_bytes(self.read_array::<4>()?))
-    }
-
-    fn finish(&self) -> Result<(), EntrypointError> {
-        if self.offset == self.data.len() {
-            Ok(())
-        } else {
-            Err(EntrypointError::InvalidInstructionLength {
-                expected: self.offset,
-                found: self.data.len(),
-            })
-        }
-    }
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]

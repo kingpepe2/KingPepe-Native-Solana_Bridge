@@ -74,11 +74,12 @@ pub fn validate_temporary_deposit(
         script_pubkey: input.expected_script_pubkey,
         minimum_confirmations: input.minimum_confirmations,
     })?;
-    let mut digest_input = Vec::new();
-    digest_input.extend(&input.transaction.raw);
-    digest_input.extend(input.containing_block.hash);
-    digest_input.extend(input.output_index.to_le_bytes());
-    digest_input.extend(input.expected_amount_atomic.to_le_bytes());
+    let digest_input = crate::bridge_inputs::deposit_evidence(
+        &input.transaction.raw,
+        input.containing_block.hash,
+        input.output_index,
+        input.expected_amount_atomic,
+    )?;
     Ok(ValidatedTemporaryDeposit {
         network: input.params.network,
         native_genesis_hash: input.params.genesis_hash(),

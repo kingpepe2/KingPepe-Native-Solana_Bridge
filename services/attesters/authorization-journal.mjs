@@ -31,7 +31,7 @@ function message(encoded, policy) {
 function signature(value, encoded, attester) {
   fields(value, ["protocol", "mode", "role", "keyEpoch", "policyEpoch", "attesterPublicKeyHex", "messageDigestHex", "operationIdHex", "signedBytes", "signatureHex", "state"]);
   check(value.role === attester.role && value.attesterPublicKeyHex === attester.publicKeyHex && value.state === "VERIFIED_READY" &&
-    value.signedBytes === "CANONICAL_BRIDGE_MESSAGE_V1" && typeof value.signatureHex === "string" && /^[0-9a-f]{128}$/u.test(value.signatureHex));
+    value.signedBytes === "CANONICAL_BORSH_BRIDGE_MESSAGE_V2" && typeof value.signatureHex === "string" && /^[0-9a-f]{128}$/u.test(value.signatureHex));
   check(verifyProjectAttestation(value, encoded));
 }
 

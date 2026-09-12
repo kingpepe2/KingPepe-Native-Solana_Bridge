@@ -14,6 +14,7 @@ crate-type = ["cdylib", "lib"]
 no-entrypoint = []
 
 [dependencies]
+borsh = "=1.8.1"
 bridge-messages = { path = "../../modules/bridge-messages" }
 kingpepe-transceiver = { path = "../kingpepe-transceiver", features = ["no-entrypoint"] }
 solana-program = "=3.0.0"

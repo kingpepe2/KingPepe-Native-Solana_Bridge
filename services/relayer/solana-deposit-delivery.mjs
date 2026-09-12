@@ -2,6 +2,7 @@
 // Canonical signed-packet and retained transport-state validation. No private
 // fee-payer key, mint authority, Native proof flag or economic balance is held.
 import { createHash } from "node:crypto";
+import { encodeBridgeAbi } from "../../shared/protocol/solana-bridge-abi.mjs";
 import { canonicalJson } from "../../native/frost/policy/native-signing-policy.mjs";
 import { decodeCanonicalBridgeMessage } from "../../shared/protocol/canonical-message.mjs";
 import { validateReconciliationBinding } from "../reconciliation/deposit-reconciliation.mjs";
@@ -51,7 +52,7 @@ export function validateSolanaDepositSigningIntent(input, policy) {
     fields(a, ["protocol", "mode", "role", "keyEpoch", "policyEpoch", "attesterPublicKeyHex", "messageDigestHex", "operationIdHex", "signedBytes", "signatureHex", "state"]);
     check(a.protocol === ATTESTATION_PROTOCOL && a.mode === ATTESTATION_MODE && a.role === ["ATTESTER_A", "ATTESTER_B"][i] &&
       a.keyEpoch === op.keyEpoch && a.policyEpoch === op.policyEpoch && a.attesterPublicKeyHex === key(p.manifest.config.attesters[i]).toString("hex") &&
-      a.messageDigestHex === m.messageDigestHex && a.operationIdHex === m.operationIdHex && a.signedBytes === "CANONICAL_BRIDGE_MESSAGE_V1" &&
+      a.messageDigestHex === m.messageDigestHex && a.operationIdHex === m.operationIdHex && a.signedBytes === "CANONICAL_BORSH_BRIDGE_MESSAGE_V2" &&
       a.state === "VERIFIED_READY" && verifyProjectAttestation(a, v.encodedMessageHex));
   }
   key(v.recentBlockhash); deliveryUint(v.lastValidBlockHeight);
@@ -145,14 +146,15 @@ export function verifySolanaDeliveryAccounts(input, policy, snapshot) {
     check(bytes.length === length && bytes.toString("base64") === account.data[0], "SolanaDeliveryAccountConflict"); return bytes;
   };
   if (receipt !== null) {
-    const b = data(receipt, 240, p.manifest.transceiver.id), epoch = Buffer.alloc(4); epoch.writeUInt32LE(op.keyEpoch);
-    const expected = Buffer.concat([Buffer.from("KPTRCPT1"), Buffer.from([1]), Buffer.from(m.messageDigestHex, "hex"), Buffer.from(m.operationIdHex, "hex"),
-      Buffer.from(op.transceiverProgramId, "hex"), Buffer.from(op.managerProgramId, "hex"), Buffer.from(op.mint, "hex"),
-      // Canonical V1 direction/action discriminants, validated above. The
-      // Rust receipt stores the authorized public keys in byte-sorted order.
-      Buffer.from([Buffer.from(v.delivery.encodedMessageHex, "hex")[10], Buffer.from(v.delivery.encodedMessageHex, "hex")[9]]),
-      epoch, ...p.manifest.config.attesters.map(key).sort(Buffer.compare)]);
-    check(expected.length === 239 && b.subarray(0, 239).equals(expected) && [0, 1].includes(b[239]), "SolanaDeliveryAccountConflict");
+    const b = data(receipt, 240, p.manifest.transceiver.id);
+    check([0, 1].includes(b[239]), "SolanaDeliveryAccountConflict");
+    // The Rust receipt stores authorized public keys in byte-sorted order.
+    const expected = encodeBridgeAbi("VerifiedReceipt", { magic: Buffer.from("KPTRCPT1"), version: 1,
+      messageDigest: Buffer.from(m.messageDigestHex, "hex"), operationId: Buffer.from(m.operationIdHex, "hex"),
+      transceiverProgramId: Buffer.from(op.transceiverProgramId, "hex"), managerProgramId: Buffer.from(op.managerProgramId, "hex"),
+      mint: Buffer.from(op.mint, "hex"), direction: 0, action: 0, keyEpoch: op.keyEpoch,
+      attesters: p.manifest.config.attesters.map(key).sort(Buffer.compare), consumed: b[239] === 1 });
+    check(b.equals(expected), "SolanaDeliveryAccountConflict");
   }
   if (claim !== null) {
     const b = data(claim, 211, p.manifest.manager.id), parsed = decodeDepositClaimAccountBase64(b.toString("base64"));
