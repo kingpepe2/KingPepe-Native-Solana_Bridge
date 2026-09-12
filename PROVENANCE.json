@@ -1880,6 +1880,11 @@
       "path": "tests/windows/local-protected-controller.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original disposable Windows protected-service and actual-chain test orchestration; no upstream source import, production installation or cross-SID certification."
+    },
+    {
+      "path": "tests/windows/signer-startup.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original actual CurrentUser service-startup, protected-state and durable incident-delivery regressions. Synthetic plan never reaches chain RPC; no imported upstream source, operational secrets or cross-SID certification."
     }
   ],
   "phase085ProtectedControllerReview": {

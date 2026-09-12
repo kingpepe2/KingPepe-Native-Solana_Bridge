@@ -39,8 +39,9 @@ export class WindowsProtectedFrostStateStore {
     const result = this.#store.read();
     try {
       let state;
-      try { state = JSON.parse(result.payload.toString("utf8")); } catch { throw new Error("ProtectedFrostStateInvalid"); }
-      assertFrostStateEnvelope(state, this.#role); this.#revisions.set(state, result.revision); return state;
+      try { state = JSON.parse(result.payload.toString("utf8")); assertFrostStateEnvelope(state, this.#role); }
+      catch { throw new Error("ProtectedFrostStateInvalid"); }
+      this.#revisions.set(state, result.revision); return state;
     } finally { result.payload.fill(0); }
   }
   save(state) {

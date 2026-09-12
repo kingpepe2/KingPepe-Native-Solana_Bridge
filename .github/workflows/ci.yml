@@ -380,6 +380,23 @@ jobs:
       - name: Windows DPAPI and protected-state failure regressions (current test identity)
         shell: pwsh
         run: |
+          # Startup tests use the actual service entry point, which requires a
+          # genuine verifier artifact even though rejected startup makes no RPC.
+          rustup toolchain install --profile minimal nightly-2023-10-29
+          if ($LASTEXITCODE -ne 0) { throw 'TEST_NATIVE_TOOLCHAIN_UNAVAILABLE' }
+          $testBuild = Join-Path $env:RUNNER_TEMP ('kingpepe-native-verifier-' + [guid]::NewGuid().ToString('N'))
+          $testArtifact = Join-Path $testBuild 'artifact'
+          New-Item -ItemType Directory -Path $testArtifact -ErrorAction Stop | Out-Null
+          cargo +nightly-2023-10-29 build --locked --manifest-path native/proof/Cargo.toml --bin kingpepe-native-evidence --target-dir $testBuild
+          if ($LASTEXITCODE -ne 0) { throw 'TEST_NATIVE_VERIFIER_BUILD_FAILED' }
+          $builtVerifier = Join-Path $testBuild 'debug/kingpepe-native-evidence.exe'
+          $env:KINGPEPE_TEST_NATIVE_VERIFIER = Join-Path $testArtifact 'kingpepe-native-evidence.exe'
+          # Cargo's hard-linked output is not an approved runtime path.
+          Copy-Item -LiteralPath $builtVerifier -Destination $env:KINGPEPE_TEST_NATIVE_VERIFIER -ErrorAction Stop
+          $env:KINGPEPE_TEST_NATIVE_VERIFIER_SHA256 = (Get-FileHash -LiteralPath $env:KINGPEPE_TEST_NATIVE_VERIFIER -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ((Get-FileHash -LiteralPath $builtVerifier -Algorithm SHA256).Hash.ToLowerInvariant() -ne $env:KINGPEPE_TEST_NATIVE_VERIFIER_SHA256) {
+            throw 'TEST_NATIVE_VERIFIER_COPY_MISMATCH'
+          }
           # Use the runner's installed Git OpenSSL for disposable TEST certificates.
           # Never install from an unreviewed mirror or skip if unavailable.
           $gitRoot = Split-Path (Split-Path (Get-Command git).Source)

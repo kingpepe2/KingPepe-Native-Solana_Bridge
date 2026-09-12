@@ -1,5 +1,60 @@
 # KingPepe Native - Solana Bridge Development Status
 
+## Current startup-integrity correction - validation in progress
+
+Baseline PRIVATE source is fb9f7b6ac7d29a6f1ab7c9072b88f2e11487addc.
+[Exact Actions 34679522812](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34679522812)
+is NOT_RUN_ACCOUNT_BLOCKED: all four jobs have zero steps and no artifacts.
+GitHub reports: The job was not started because recent account payments have
+failed or your spending limit needs to be increased. Please check the
+'Billing & plans' section in your settings.
+
+This correction propagates confirmed protected signer startup rollback or
+authenticated state/fence corruption into the retained global integrity stop,
+even before the signing handler is available. Missing storage/duplicate live
+leases reject startup without inventing an integrity contradiction. An
+unreachable supervisor cannot authorize operation; the existing protected
+incident outbox redelivers after restart.
+
+The original-source probe with a valid standalone verifier FAILED: signer
+startup rejected rollback while the authority stayed PAUSED_POLICY. Fourteen
+corrected actual Windows startup cases and 15 existing fencing cases PASS.
+Earlier hard-linked-verifier probes were invalid for this defect; no linked
+executable boundary was weakened. Candidate and primary runtime: 206 files,
+9053a1ef0e55180c957bd0728d9052ff2711ae748febc4937a55831b9d50c1ad.
+
+Actual candidate DEPOSIT-mode recovery passes seven groups: four real
+controller kills/reopens, automatic Native-to-Solana COMPLETED and independent
+Linux chain rechecks. Fresh Windows Native verifier, actual FROST A+B,
+attestations, claim, mint/finality and reconciliation all execute. Both harness
+exits are zero; runtime hashes unchanged. This is selected controller coverage,
+not the entire all-service restart matrix or distinct service principals.
+
+A remote clean clone of the baseline independently passes locked npm installs,
+Node 935 plus two vectors per platform; Windows security 166 (zero failed,
+skipped or cancelled); Rust 97/check/fmt/Clippy; two independent cold SBF build
+sets with equal hashes; guardrails and 292-file provenance/license coverage.
+Source (3,489,716 bytes) and history (183 commits, 4,103,131 bytes) secret scans
+report no findings. npm has zero vulnerabilities; all five Cargo audits report
+no vulnerabilities but retain RUSTSEC-2025-0141 for unmaintained bincode 1.3.3.
+These are baseline results, not final certification of the startup correction.
+
+Primary Windows/WSL Node reruns pass 935 plus two vectors each, zero failed,
+skipped/cancelled and both exits zero. The integrated runtime matches the tested
+candidate. CI now builds the actual verifier with pinned Native Rust into an
+external runner artifact before startup tests; that new CI setup is NOT_RUN
+while the account restriction persists, not a tested Windows/MSVC build claim.
+
+Remaining: primary fix publication gates, final remote clean clone, remaining
+actual claim/settlement and all-service recovery coverage, full re-audit.
+Cross-service Windows DPAPI/ACL is BLOCKED_ENVIRONMENT: no elevated isolated
+test environment with distinct temporary service principals. Same-principal
+success cannot certify cross-account read/decrypt denial. Mainnet remains
+disabled, productionReady=false, Phase 09 NOT_STARTED.
+
+Everything below records older, source-bound increments and failed attempts;
+it is historical evidence, not the current gate verdict.
+
 ## Selected settlement/reorg candidate and primary continuation
 
 Separate candidate runtime c5b55565dfe2c9a7f8d8be813167f00c32f29a038b891f9afa838a43d694f182

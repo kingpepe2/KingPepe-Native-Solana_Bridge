@@ -1,5 +1,38 @@
 # Phase 08.5 retrospective audit
 
+## Current re-audit: startup correction, not a final PASS
+
+Source baseline: fb9f7b6ac7d29a6f1ab7c9072b88f2e11487addc.
+The startup correction is identified by 206-file runtime
+9053a1ef0e55180c957bd0728d9052ff2711ae748febc4937a55831b9d50c1ad.
+
+A valid original-source test reproduced missing global-stop propagation when a
+restored signer rejected startup before handler creation. The fix reports only
+confirmed rollback/authenticated state contradictions through the retained
+incident outbox. Fourteen actual Windows process/DPAPI regressions and fifteen
+existing fencing regressions pass. Missing storage/live lease contention
+correctly fail closed without falsely declaring a confirmed contradiction.
+
+Actual candidate DEPOSIT recovery passes seven assertion groups, including four
+process kills/reopens, complete protected flow and independent chain rechecks.
+Both harnesses exit zero, runtime hashes unchanged. This does not complete the
+all-service kill matrix, cross-service SID certification or final re-audit.
+
+Remote baseline clean-clone evidence: Node 935 plus two vectors per platform,
+Windows security 166, Rust 97/quality, two reproducible cold SBF sets,
+provenance/license/guardrail and source/183-commit scans. No npm/Cargo reported
+vulnerabilities; bincode unmaintained warning is retained. Newer-source final
+validation remains pending. CI 34679522812 is NOT_RUN_ACCOUNT_BLOCKED.
+
+Primary Node reruns pass 935 plus two vectors per platform on the matching
+206-file runtime, both exits zero. Required Windows CI verifier build setup is
+added, not yet executed due to the account restriction.
+
+Phases 04/07/08 and the Phase 09 entry gate remain FAIL/BLOCKED overall while
+the complete required coverage and final re-audit are unfinished.
+SAFE_TO_BEGIN_PHASE_09=false. Older passes and failures below remain explicitly
+historical; later success does not retroactively certify failed runs.
+
 ## Selected actual settlement/reorg evidence - not final audit
 
 Candidate runtime c5b55565dfe2c9a7f8d8be813167f00c32f29a038b891f9afa838a43d694f182

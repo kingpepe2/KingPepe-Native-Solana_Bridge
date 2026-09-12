@@ -190,6 +190,12 @@ CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc \
   --bin kingpepe-native-evidence --target x86_64-pc-windows-gnu
 ```
 
+Cargo may hard-link a debug executable to its dependency output. The runtime
+correctly rejects a multiply linked executable. Copy the freshly built file to
+a NEW external artifact directory, verify that the copied hash is identical and
+that it is an ordinary non-linked file, then select that standalone artifact.
+Do not relax the runtime link/path check or substitute an older executable.
+
 Verify the generated executable hash before supplying the two Windows verifier
 environment references above. A cold cross-build passed, but building alone is
 not a Windows execution/chain acceptance test or a reproducible-binary claim.

@@ -67,7 +67,15 @@ export class WindowsFencedFrostStateStore {
   }
   static async openLocal({ base, fence, policy }) {
     base.assertPolicy(policy); const store = new WindowsFencedFrostStateStore(base, fence);
-    try { await store.#activate(); return store; } catch { await store.close(); throw new Error("ProtectedSignerFenceActivationRejected"); }
+    try { await store.#activate(); return store; }
+    catch (error) {
+      // Preserve only confirmed, fixed integrity classifications for the
+      // service startup reporter. Lease contention, missing protection and
+      // arbitrary helper errors remain unavailable, not proven rollback.
+      const code = ["ProtectedStateRollbackDetected", "ProtectedSignerFenceRejected", "ProtectedFrostStateInvalid"]
+        .includes(error?.message) ? error.message : "ProtectedSignerFenceActivationRejected";
+      try { await store.close(); } finally { throw new Error(code); }
+    }
   }
   assertPolicy(policy) { this.#base.assertPolicy(policy); }
   assertLifetime() { requireValue(!this.#closed && this.#lease !== undefined); this.#lease.assertHeld(); }

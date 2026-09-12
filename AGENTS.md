@@ -26,84 +26,55 @@
 
 ## Current exact continuation
 
-Latest PRIVATE publication: 27a4fcf647ccb9518d003eff46c9a152ae0b6ba8,
-tree 2c6db89e624a725fc64d5277e1a949cded38a3a6.
-Its 279-file protected-delivery increment passed Windows/WSL Node 879 plus two
-vectors each, Windows security 147, Rust 97/check/fmt/Clippy, two reproducible
-cold SBF build sets, real-chain suites 55/26/18/8/13, raw credit ten and renewed
-Linux/Windows reconciliation ten/eight. Actual Native/Solana outbox kill/reopen
-checks passed eight/nine, each with fourteen chain checks and COMPLETED.
-These are their documented component scopes, not full controller certification.
-Source/staged, 181 preceding commits and its outgoing commit passed scans.
-Exact Actions 34673553925: NOT_RUN_ACCOUNT_BLOCKED, four jobs with zero steps
-and zero artifacts. No CI/security/account policy was bypassed.
+Published baseline: fb9f7b6ac7d29a6f1ab7c9072b88f2e11487addc,
+tree dad6284c59e1ce2ae6331e8c326e356dcc3573f4. Its exact Actions run
+34679522812 is NOT_RUN_ACCOUNT_BLOCKED: four jobs, zero steps/artifacts.
+Repository privacy was rechecked. No account or CI policy was bypassed.
 
-The current primary worktree integrates a separate protected Localnet controller,
-canonical fee payer and authenticated attester clients. The frozen candidate's
-205-file runtime digest is
-eec0c7c8f970345c807515404ba08a18cdb30d330f498091db7e79cc1cdca026.
-Its Windows/WSL Node runs pass 924 plus two vectors each. Its actual separate
-CurrentUser Windows service processes reached COMPLETED through real Native
-FROST, sweep/finality, both attestations, receipt/claim, mint/finality and
-reconciliation; independent Linux chain rechecks and both process exits pass.
-This is NOT cross-service SID certification or the full process-kill matrix.
-The candidate full Windows security suite passed 164, zero failed/skipped/
-cancelled, with exit zero and unchanged runtime hashes (2831192.5148 ms).
-Primary integration/restart tests and final clean-clone validation remain
-required. Primary adds five portable preparation/negative-lookup regressions;
-all five pass. Do not attribute these newer tests to the frozen candidate.
+The next logical increment fixes confirmed signer startup rollback/corruption
+not reaching the durable global stop before the request handler existed.
+Startup now validates role/domain, opens existing protected state and reports
+only confirmed integrity faults through the retained authenticated incident
+outbox. Missing storage/lease contention remains unavailable and fail-closed.
+No FROST algorithm, nonce recovery, protection or authorization gate is relaxed.
 
-A prior actual controller run failed before first claim enqueue: an absent
-protected delivery record was mistaken for a dependency failure indefinitely.
-The correction accepts only an authenticated, exactly bound NOT_ENQUEUED result,
-never treating it as finality, enqueue acceptance or permission. Auth, storage
-and transport failures still reject. Preserve the failed-run record.
+Frozen candidate and integrated primary runtime: 206 files,
+9053a1ef0e55180c957bd0728d9052ff2711ae748febc4937a55831b9d50c1ad.
+Actual CurrentUser Windows startup regressions: 14 PASS, zero failed/skipped/
+cancelled; existing lifetime fencing regressions: 15 PASS. The valid baseline
+probe failed because restored signer state rejected startup without a global
+stop. Earlier probes stopped first at the executable hard-link boundary and
+are INVALID for this defect, not additional reproductions.
 
-Primary Node reruns pass 929 plus two vectors per platform on the frozen
-205-file runtime 907bcf3f6e8168fe8bf0cdf5102cbaebb4142a62b5b5b46ebd830e73b6b401a0.
-Its first actual protected-chain rerun FAILED at repeated claim delivery without
-an observed finalized mint by the bounded deadline; both harnesses exited one.
-The actual cause remains under investigation. Do not substitute candidate
-success or assume an infrastructure failure. Full primary Windows security
-passes 164, zero failed/skipped/cancelled, exit zero in 2893931.3578 ms;
-its runtime digest is unchanged before/after. A separate candidate adds narrowly redacted preflight diagnostics
-and selected actual process-kill/reorg tests; these are not yet chain-certified.
+Actual candidate deposit-mode recovery: seven assertion groups PASS, four
+controller kills/reopens (deposit observed, Native validated, sweep prepared,
+aggregate retained), automatic COMPLETED, independent Linux raw Native and
+finalized Solana checks, both exits zero, unchanged runtime hashes. It used a
+fresh source-built Windows verifier copied to a standalone external artifact
+with its hash unchanged; Cargo's hard-linked output itself remains rejected.
+This is NOT distinct service-SID or the complete all-service kill matrix.
 
-Separate candidate d93c130b98a5e6bafb64c9f72ad3e831b7014f613c8bf24a372b6ec066697e2d
-exercised five real controller broadcast/credit kills and internally COMPLETED,
-but the independent Linux recheck failed before publishing its result. The
-overall run is FAIL, not a replacement for the failed primary run. Both causes
-remain under investigation; do not assume infrastructure, expiry or consensus
-failure without evidence. New host-stage/filtered transaction diagnostics have
-six added portable tests (87-pass targeted subset), not a new full-suite result.
+A separate remote clean clone of fb9f7b6 passed locked installs, Node 935 and two
+vectors per platform, Windows security 166, Rust 97/check/fmt/Clippy, two cold
+reproducible SBF build sets, guardrails/provenance/license checks, source and
+183-commit scans. npm reported zero vulnerabilities. Five Cargo audits retain
+the bincode unmaintained warning. Those results belong to fb9f7b6, not this fix.
+Primary Node reruns now pass 935 plus two vectors per platform, zero failures,
+skips/cancellations and both exits zero on the unchanged 206-file runtime.
+The Windows CI job now builds its genuine verifier using pinned Native Rust
+before startup regressions; that CI step remains NOT_RUN_ACCOUNT_BLOCKED.
+Publication checks, final remote clean-clone and complete retrospective
+validation remain required.
 
-A newer separate candidate, runtime c5b55565dfe2c9a7f8d8be813167f00c32f29a038b891f9afa838a43d694f182,
-passes nine actual-chain assertion groups: controller kills at retained mint,
-pending reconciliation and completed journal; protected flow COMPLETED;
-independent Linux reserve/mint checks; genuine higher-work post-mint Native fork;
-exact incident retention; all protected service processes and authority reopened
-with the stop retained; chain health recovery did not clear the stop or change
-Solana supply. Both harnesses exit zero; runtime hashes are unchanged. This
-does not retroactively certify either failed run above, cross-SID separation,
-host reboot or the complete kill matrix. The two focused concurrent guard-status
-tests pass; the suspected guard collision was not reproduced and no speculative
-guard implementation change was made.
+Preserve two earlier failed real-chain runs in the historical audit record:
+907bcf3f runtime timed out at claim delivery without observed finalized mint;
+d93c130b runtime completed internally but failed the independent Linux recheck.
+Their causes are NOT_ESTABLISHED; later passes do not rewrite these failures.
+The original ENOSPC malformed-journal fixture was rerun and passed after storage
+recovery; its earlier infrastructure failure is neither a code defect nor PASS.
 
-The reviewed changes are now integrated into the primary 205-file runtime
-df5ef0920b5c4a1315384fd43d223dee7f99aea186989d4921828d851e188d6f.
-Fresh primary Node runs pass 935 plus two vectors per platform, zero failed/
-skipped/cancelled, both exits zero. Actual primary broadcast/credit recovery
-passes eleven assertion groups, including all five real kills/reopens, independent
-Linux chain rechecks, protected flow COMPLETED, post-mint higher-work fork and
-retained stop over all protected service process restarts/chain recovery. Both
-harnesses exit zero and runtime hashes remain unchanged.
-Do not attribute older Windows full-security counts to this newer runtime.
-
-Resume with remaining deposit/claim kill groups, fresh primary settlement
-coverage and the final clean-clone/full re-audit. Do not replace
-actual-chain behavior with synthetic test fixtures. The original ENOSPC
-malformed-journal fixture failure was rerun and passed after host recovery;
-the earlier infrastructure failure is neither a code defect nor passing evidence.
+Next: validate/publish this logical startup fix, then remaining actual claim/
+settlement kill groups and full fresh-clone Phases 01-08 re-audit. No Phase 09.
 
 ## Evidence and remaining boundaries
 

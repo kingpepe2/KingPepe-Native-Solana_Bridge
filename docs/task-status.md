@@ -1,5 +1,36 @@
 # KingPepe Native - Solana Bridge Task Status
 
+## Current continuation: protected signer startup incident propagation
+
+PRIVATE baseline fb9f7b6ac7d29a6f1ab7c9072b88f2e11487addc is published.
+Exact CI 34679522812 remains account-blocked with zero executed job steps.
+The logical startup fix is integrated and under publication validation.
+Runtime 9053a1ef0e55180c957bd0728d9052ff2711ae748febc4937a55831b9d50c1ad
+matches the tested separate candidate (206 files).
+
+Corrected Windows startup regressions: 14 PASS; retained fencing: 15 PASS.
+Actual candidate protected DEPOSIT recovery: seven groups PASS, four real
+controller kills/reopens, COMPLETED, independent Native/Solana checks and both
+exit codes zero. The earlier malformed-journal ENOSPC fixture was successfully
+rerun after storage recovery; its infrastructure failure was not a code verdict.
+
+The remote fb9f7b6 clone passes Node 935 plus two vectors on each platform,
+Windows security 166, Rust 97/quality, cold reproducible SBF, provenance/license,
+dependency and source/history scans. Do not attribute baseline totals to a newer
+source tree. See development-status for exact scope and retained warnings.
+
+Primary full Node reruns now pass 935 plus two vectors on Windows and WSL,
+zero failed/skipped/cancelled, both exits zero and matching runtime. Windows CI
+builds the pinned verifier prerequisite instead of omitting startup regressions;
+the step cannot be certified until account execution is available.
+
+Next: primary startup-fix scans/review/commit/private push, then full final
+clean-clone validation and Phases 01-08 re-audit. Missing claim/all-service crash
+coverage, cross-SID certification and prior unexplained real-run failures remain
+visible. Phase 09 NOT_STARTED; no automatic activation or stop clearing.
+
+The following sections are historical increments, not current task state.
+
 ## Selected actual restart/reorg integration
 
 The newer separate candidate passes nine actual-chain groups, three settlement
