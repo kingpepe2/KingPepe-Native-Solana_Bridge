@@ -6,7 +6,7 @@ import { inspectCargoMetadata, inspectNpmPackage } from "../../.github/scripts/d
 
 test("license audit requires original packages to remain proprietary and unpublished", () => {
   const root = path.resolve("test-source");
-  const pkg = { source: null, manifest_path: path.join(root, "native/frost/Cargo.toml"),
+  const pkg = { source: null, manifest_path: path.join(root, "native/proof/Cargo.toml"),
     license: null, license_file: "../../LICENSE", publish: [] };
   assert.equal(inspectCargoMetadata({ packages: [pkg] }, root).originalPackages, 1);
   for (const change of [{ publish: null }, { license: "MIT" }, { license_file: "OTHER" },

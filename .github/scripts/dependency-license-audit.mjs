@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const manifests = ["solana", "native/frost", "native/proof", "native/reserve", "native/recovery"];
+const manifests = ["solana", "native/proof", "native/reserve", "native/recovery"];
 // Exact expressions reviewed in the locked graph. A new expression requires review.
 const reviewedExpressions = new Set([
   "MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause",

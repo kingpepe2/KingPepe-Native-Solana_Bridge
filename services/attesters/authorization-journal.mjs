@@ -79,7 +79,7 @@ export class ProtectedAttesterAuthorizationJournal {
     const self = new ProtectedAttesterAuthorizationJournal();
     self.#attester = attester; self.#guard = integrity; self.#store = store;
     try {
-      self.#lease = await store.acquireLifetimeLease();
+      self.#lease = await store.acquireLease();
       const { value } = self.#read();
       if (value.incident !== null) { self.#stopped = true; await self.#report(value.incident); throw new Error("AttesterJournalStopped"); }
       JOURNALS.add(self); return self;

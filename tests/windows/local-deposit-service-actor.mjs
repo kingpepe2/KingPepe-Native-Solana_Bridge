@@ -44,7 +44,6 @@ function store(options, expectedRole, purpose) {
   assert.equal(options.context.environment, "localnet"); assert.equal(options.context.role, expectedRole); assert.equal(options.context.purpose, purpose);
   const root = path.dirname(path.resolve(options.root));
   assert.equal(path.dirname(root), path.resolve(os.tmpdir())); assert(path.basename(root).startsWith("kingpepe-ipc-test-"));
-  assert.equal(path.dirname(path.resolve(options.anchorRoot)), root);
   const result = new WindowsProtectedStore(options); closers.push(() => result.close()); return result;
 }
 function transport(options, expectedRole) {
@@ -72,7 +71,7 @@ async function start(c) {
       maxAmountAtomic: p.maximumAmountAtomic, maxFeeAtomic: p.maximumFeeAtomic, reserveScriptPubKeyHex: plan.depositPolicy.canonicalReserveScriptPubKeyHex,
       authorizedOperations: plan.signingIntents });
     const base = new WindowsProtectedFrostStateStore(store(c.stateOptions, role, "frost-state"), role);
-    service = await openProtectedNativeSigner({ base, fence: store(c.fenceOptions, role, "signer-fence"), policy, integrity,
+    service = await openProtectedNativeSigner({ base, policy, integrity,
       nativeEvidenceValidator: async intent => {
         assert(plan.signingIntents.some(v => canonicalJson(v) === canonicalJson(intent)));
         return native.verifySweepSigning({ inputs: plan.inputs, minimumConfirmations: p.minimumConfirmations, acceptedCheckpoint: plan.acceptedCheckpoint,

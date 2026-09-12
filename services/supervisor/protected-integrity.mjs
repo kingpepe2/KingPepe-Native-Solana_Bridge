@@ -28,7 +28,7 @@ export class ProtectedIntegrityAuthority {
   static async openLocal(store) {
     const authority = new ProtectedIntegrityAuthority(store);
     try {
-      authority.#lease = await store.acquireLifetimeLease();
+      authority.#lease = await store.acquireLease();
       const { state, revision } = authority.#read(); state.generation = increment(state.generation);
       authority.#write(state, revision); authority.#generation = state.generation;
       authority.#health = new SourceHealthWindow({ generation: state.generation }); return authority;

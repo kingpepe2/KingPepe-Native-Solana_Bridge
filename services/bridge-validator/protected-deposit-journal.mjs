@@ -25,7 +25,7 @@ export class ProtectedDepositOperationJournal {
     integrity.assertDeployment({ environment, nativeGenesis, solanaDeployment, keyEpoch });
     check(Object.entries({ environment, nativeGenesis, solanaDeployment, keyEpoch }).every(([k, v]) => store.context[k] === v));
     self.#store = store; self.#guard = integrity;
-    try { self.#lease = await store.acquireLifetimeLease(); self.#read(); JOURNALS.add(self); return self; }
+    try { self.#lease = await store.acquireLease(); self.#read(); JOURNALS.add(self); return self; }
     catch (error) { try { await self.#report(error); } finally { await self.close(); } throw new Error("DepositJournalUnavailable"); }
   }
   assertBinding(policy, integrity) {
@@ -52,7 +52,7 @@ export class ProtectedDepositOperationJournal {
     } finally { bytes.fill(0); }
   }
   async #report(error) {
-    if (!["ProtectedStateRollbackDetected", "DepositJournalAuthenticatedStateInvalid", "ProtectedLifetimeLeaseLost"].includes(error?.message)) return;
+    if (!["ProtectedStateRollbackDetected", "DepositJournalAuthenticatedStateInvalid", "ProtectedProcessLeaseLost"].includes(error?.message)) return;
     this.#stopped = true;
     await this.#guard.report(depositOperationPolicyDigest(this.#policy), "IMPOSSIBLE_OPERATION_STATE", error.evidenceDigest ?? digest(error.message));
   }

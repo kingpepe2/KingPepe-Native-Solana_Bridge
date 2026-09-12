@@ -24,7 +24,7 @@ async function execute(method, payload) {
   if (method === "INIT") {
     check(process.platform === "win32" && authority === undefined && payload?.context?.environment === "localnet");
     const root = path.dirname(path.resolve(payload.root));
-    check(path.dirname(root) === path.resolve(os.tmpdir()) && path.basename(root).startsWith("kingpepe-ipc-test-") && path.dirname(path.resolve(payload.anchorRoot)) === root);
+    check(path.dirname(root) === path.resolve(os.tmpdir()) && path.basename(root).startsWith("kingpepe-ipc-test-"));
     options = structuredClone(payload); authority = await ProtectedIntegrityAuthority.createLocal(options, "RUNNING"); return authority.status();
   }
   check(authority);

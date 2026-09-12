@@ -113,7 +113,7 @@ export class ProtectedNativeIntegrityMonitor {
     integrity.assertDeployment({ environment, nativeGenesis, solanaDeployment, keyEpoch });
     requireValue(Object.entries({ environment, nativeGenesis, solanaDeployment, keyEpoch }).every(([k, v]) => store.context[k] === v));
     self.#verifier = verifier; self.#guard = integrity; self.#store = store;
-    try { self.#lease = await store.acquireLifetimeLease(); self.#read(); return self; }
+    try { self.#lease = await store.acquireLease(); self.#read(); return self; }
     catch (error) { try { if (error.message === "NativeProgressRejected" || error.message === "ProtectedStateRollbackDetected")
       await integrity.report(digest(self.#policy), "NATIVE_PROGRESS_INTEGRITY", digest({ reason: error.message })); }
     finally { await self.close(); } throw new Error("NativeProtectedProgressUnavailable"); }

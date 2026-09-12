@@ -18,7 +18,7 @@ const send = value => writeSync(1, JSON.stringify(value) + "\n");
 function check(ok) { if (!ok) throw new Error("TestCoordinatorActorRejected"); }
 function store(options) {
   check(process.platform === "win32" && options?.context?.environment === "localnet");
-  for (const leaf of [options.root, options.anchorRoot]) {
+  for (const leaf of [options.root]) {
     const root = path.dirname(path.resolve(leaf));
     check(path.dirname(root) === path.resolve(os.tmpdir()) && path.basename(root).startsWith("kingpepe-ipc-test-"));
   }

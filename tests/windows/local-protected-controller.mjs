@@ -14,7 +14,6 @@ import { validateRuntimeFile, validateRuntimeStateRoot } from "../../shared/runt
 import { NativeFrostSigner, runTwoPartyDkg } from "../../native/frost/index.mjs";
 import { createLocalNativeDkgPolicy, REQUIRED_FROST_SIGNERS } from "../../native/frost/policy/native-signing-policy.mjs";
 import { WindowsProtectedFrostStateStore } from "../../native/frost/state/windows-protected-state-store.mjs";
-import { WindowsFencedFrostStateStore } from "../../native/frost/state/windows-fenced-state-store.mjs";
 import { initialCoordinatorSigningState } from "../../native/frost/coordinator/protected-signing-journal.mjs";
 import { initialSweepJobState } from "../../native/frost/coordinator/sweep-job-state.mjs";
 import { ProjectAttester } from "../../services/attesters/attestation-service.mjs";
@@ -119,11 +118,11 @@ try {
   const signerMaterial = [], setupSigners = [], setupStates = [];
   try {
     for (const [i, role] of REQUIRED_FROST_SIGNERS.entries()) {
-      const stateOptions = fixture.options("frost-" + i, role, "frost-state"), fenceOptions = fixture.options("fence-" + i, role, "signer-fence", stateOptions.context.instanceId);
+      const stateOptions = fixture.options("frost-" + i, role, "frost-state");
       const base = WindowsProtectedFrostStateStore.createLocal(stateOptions, dkgPolicy);
-      const state = await WindowsFencedFrostStateStore.createLocal({ base, fenceOptions, policy: dkgPolicy }); setupStates.push(state);
+      const state = await base.acquireExclusive(); setupStates.push(state);
       setupSigners.push(new NativeFrostSigner({ signerId: role, index: i, policy: dkgPolicy, stateStore: state }));
-      signerMaterial.push({ role, stateOptions, fenceOptions });
+      signerMaterial.push({ role, stateOptions });
     }
     // Explicit TEST ceremony, not the runtime coordinator and no signing intent.
     // Only this public package may cross the inherited setup pipe afterward.

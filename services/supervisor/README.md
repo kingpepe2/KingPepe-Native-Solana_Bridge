@@ -1,3 +1,5 @@
-# Supervisor service (scaffold)
+# Bridge pause authority
 
-Runtime coordinator for phase state, health checks, and service dependency checks.
+One protected local authority retains policy/integrity pause and read-only
+source health. No automatic economic repair or pause clearing. See
+[operation recovery](../../docs/security/deposit-operation-recovery.md).

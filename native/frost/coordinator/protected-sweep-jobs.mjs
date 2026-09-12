@@ -28,7 +28,7 @@ export class ProtectedSweepJobs {
     check(Array.isArray(signers) && signers.length === 2 && signers.every(isProtectedRemoteFrostPeer) &&
       signers[0].signerId === "KINGPEPE_FROST_A" && signers[1].signerId === "KINGPEPE_FROST_B");
     self.#signers = [...signers]; self.#signingJournal = signingJournal; self.#store = store; self.#guard = integrity;
-    try { self.#lease = await store.acquireLifetimeLease(); self.#read(); SERVICES.add(self); return self; }
+    try { self.#lease = await store.acquireLease(); self.#read(); SERVICES.add(self); return self; }
     catch (error) { try { await self.#report(error); } finally { await self.close(); } throw new Error("SweepJobUnavailable"); }
   }
   assertBinding(policy, integrity) {
@@ -54,7 +54,7 @@ export class ProtectedSweepJobs {
     } finally { bytes.fill(0); }
   }
   async #report(error) {
-    if (!["ProtectedStateRollbackDetected", "ProtectedLifetimeLeaseLost", "SweepJobAuthenticatedStateInvalid"].includes(error?.message)) return;
+    if (!["ProtectedStateRollbackDetected", "ProtectedProcessLeaseLost", "SweepJobAuthenticatedStateInvalid"].includes(error?.message)) return;
     this.#stopped = true;
     await this.#guard.report(depositOperationPolicyDigest(this.#policy), "COORDINATOR_JOURNAL_INTEGRITY", error.evidenceDigest ?? hash(error.message));
   }

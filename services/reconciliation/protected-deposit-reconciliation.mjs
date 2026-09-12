@@ -70,7 +70,7 @@ export class ProtectedDepositReconciliationMonitor {
     check(Object.entries({ environment, nativeGenesis, solanaDeployment, keyEpoch }).every(([k, v]) => store.context[k] === v));
     self.#client = journalClient; self.#native = nativeVerifier; self.#solana = solanaRpc; self.#guard = integrity; self.#store = store;
     self.#id = digest([depositOperationPolicyDigest(policy), deploymentManifestDigest(manifest)]);
-    try { self.#lease = await store.acquireLifetimeLease(); self.#read(); return self; }
+    try { self.#lease = await store.acquireLease(); self.#read(); return self; }
     catch (error) { try { await self.#reportStorage(error); } finally { await self.close(); } throw new Error("ReconciliationMonitorUnavailable"); }
   }
   #read() {
@@ -91,7 +91,7 @@ export class ProtectedDepositReconciliationMonitor {
     } finally { bytes.fill(0); }
   }
   async #reportStorage(error) {
-    if (!["ProtectedStateRollbackDetected", "ReconciliationAuthenticatedProgressInvalid", "ProtectedLifetimeLeaseLost", "DepositSnapshotRollbackDetected"].includes(error?.message)) return;
+    if (!["ProtectedStateRollbackDetected", "ReconciliationAuthenticatedProgressInvalid", "ProtectedProcessLeaseLost", "DepositSnapshotRollbackDetected"].includes(error?.message)) return;
     this.#stopped = true;
     await this.#guard.report(this.#id, "JOURNAL_INTEGRITY_FAILURE", error.evidenceDigest ?? digest(error.message));
   }

@@ -11,7 +11,7 @@ Current safe utilities:
   broadcast remains available only for transactions already signed by the
   approved FROST path.
 - `local-e2e-bootstrap.mjs` executes only the local infrastructure bootstrap:
-  version checks, Anchor build, disposable local validator startup, REGTEST
+  version checks, direct SBF builds, disposable local validator startup, REGTEST
   startup, health checks, and cleanup. It does not claim that the full economic
   Native-to-Solana E2E flow has passed.
   It also exports a reusable harness that keeps the disposable services active
@@ -30,7 +30,7 @@ Current safe utilities:
   software FROST A+B runtime, and attaches key-path Taproot witnesses without
   using wallet raw-signing RPC shortcuts. When the local daemons are available,
   it broadcasts the signed reserve sweep with `sendrawtransaction`, mines local
-  finality, and validates the finalized reserve transaction before stopping at
-  the Solana mint boundary. Until Solana mint submission and reconciliation are
-  exercised against real local daemons, it reports the full flow as not run
-  rather than passed.
+  finality, independently validates the finalized reserve transaction, obtains
+  both project attestations, submits the Solana claim, observes finalized minting
+  and reconciles the reserve and pending credit through COMPLETED.
+  Missing tools or failed transitions are reported explicitly, not as a pass.

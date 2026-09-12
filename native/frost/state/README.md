@@ -2,7 +2,7 @@
 
 `windows-protected-state-store.mjs` is a separate, real DPAPI-backed adapter for
 Windows tests. It is never selected as a fallback to or from plaintext storage.
-See [its boundary and remaining service/rollback gaps](../../../docs/security/windows-protected-storage.md).
+See [the protected runtime boundary](../../../docs/security/windows-protected-storage.md).
 The following paragraphs describe the isolated JSON test adapter specifically.
 
 `file-state-store.mjs` provides the V2 localnet JSON signer-state adapter. It rejects
@@ -18,7 +18,7 @@ is not a request for replacement keys. Parse/I/O errors do not expose file conte
 or paths. Public source templates do not contain actual state locations.
 
 Save flushes a new temporary file and renames it after rechecking existing state.
-This is not atomic concurrent-update fencing, an ongoing signer lease, directory
+This is not an atomic concurrent-update lock, an ongoing signer lease, directory
 power-loss durability or authenticated rollback detection. A failed update may
 leave a temporary file in the private external root; it is never published or
 automatically adopted as current state. No automatic migration/repair is provided.
@@ -28,8 +28,9 @@ nonce bytes. Those live only in the signer instance and are discarded on abort,
 close, failure or consumption. Reopening a signer validates all retained sessions
 before burning uncertain RESERVED entries. Completed shares remain idempotent.
 This does not protect against process-memory snapshots or privileged clones.
-Long-term DKG private shares still use external JSON; protected storage,
-authentication, service isolation and full rollback assurance remain incomplete.
+This explicit disposable test adapter stores long-term DKG shares in external
+JSON. It is not selected by the Windows protected service or used with production
+secrets. The Windows adapter uses DPAPI and an exclusive process lock.
 The limitations concern this adapter, not the approved single-host topology.
 
 DKG setup temporarily retains each verified incoming contribution and its

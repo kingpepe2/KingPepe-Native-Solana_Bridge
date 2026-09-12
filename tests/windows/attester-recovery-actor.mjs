@@ -18,7 +18,7 @@ const requireValue = ok => { if (!ok) throw new Error("TEST_ATTESTER_ACTOR_REJEC
 const send = value => writeSync(1, JSON.stringify(value) + "\n");
 function boundStore(options) {
   requireValue(options?.context?.environment === "localnet");
-  for (const leaf of [options.root, options.anchorRoot]) {
+  for (const leaf of [options.root]) {
     const root = path.dirname(path.resolve(leaf));
     requireValue(path.dirname(root) === path.resolve(os.tmpdir()) && path.basename(root).startsWith("kingpepe-ipc-test-"));
   }
@@ -59,7 +59,7 @@ async function init(c) {
     try { const result = await handler(input); boundary("RESULT_READY", c.boundary); return result; }
     catch (error) {
       const safe = ["AttesterJournalInvalid", "AttesterJournalPolicyRejected", "AttesterJournalAuthenticatedStateInvalid",
-        "AttesterJournalConcurrentMutation", "IntegrityAuthorizationStopped", "IpcRequestRejected", "ProtectedLifetimeLeaseLost", "WindowsProtectedStoreRejected"];
+        "AttesterJournalConcurrentMutation", "IntegrityAuthorizationStopped", "IpcRequestRejected", "ProtectedProcessLeaseLost", "WindowsProtectedStoreRejected"];
       handlerFailure = safe.includes(error?.message) ? error.message : "UNCLASSIFIED"; throw error;
     }
   });

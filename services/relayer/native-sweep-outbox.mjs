@@ -62,7 +62,7 @@ export class ProtectedNativeSweepOutbox {
     integrity.assertDeployment({ environment, nativeGenesis, solanaDeployment, keyEpoch });
     check(Object.entries({ environment, nativeGenesis, solanaDeployment, keyEpoch }).every(([k, v]) => store.context[k] === v));
     self.#store = store; self.#guard = integrity; self.#rpc = rpc; self.#verifier = nativeVerifier;
-    try { self.#lease = await store.acquireLifetimeLease(); self.#read(); INSTANCES.add(self); return self; }
+    try { self.#lease = await store.acquireLease(); self.#read(); INSTANCES.add(self); return self; }
     catch (error) { try { await self.#report(error); } finally { await self.close(); } throw new Error("NativeSweepOutboxUnavailable"); }
   }
   assertBinding(policy, integrity) {
@@ -87,7 +87,7 @@ export class ProtectedNativeSweepOutbox {
     } finally { bytes.fill(0); }
   }
   async #report(error) {
-    if (!["ProtectedStateRollbackDetected", "ProtectedLifetimeLeaseLost", "NativeOutboxAuthenticatedStateInvalid", "NativeOutboxBroadcastConflict"].includes(error?.message)) return;
+    if (!["ProtectedStateRollbackDetected", "ProtectedProcessLeaseLost", "NativeOutboxAuthenticatedStateInvalid", "NativeOutboxBroadcastConflict"].includes(error?.message)) return;
     this.#stopped = true;
     await this.#guard.report(depositOperationPolicyDigest(this.#policy), "CONFLICTING_BROADCAST", error.evidenceDigest ?? hash(error.message));
   }

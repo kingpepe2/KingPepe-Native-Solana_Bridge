@@ -11,21 +11,20 @@ import { WindowsProtectedStore, windowsCurrentServiceSid } from "../../shared/wi
 import { ProtectedServiceIpc, encodeIpcEnrollment } from "../../shared/windows/service-ipc.mjs";
 import { RemoteIntegrityGuard } from "../../services/supervisor/protected-integrity.mjs";
 import { validateRuntimeStateRoot } from "../../shared/runtime-path-boundary.mjs";
-import { witnessTestAction } from "./protected-witness-test-helper.mjs";
 import { REGTEST_GENESIS } from "../../native/node/native-raw-evidence.mjs";
 
 export async function createLocalSecurityFixture({ repoRoot, policy }) {
   assert.equal(process.platform, "win32"); assert.equal(policy.environment, "localnet"); assert.equal(policy.nativeGenesis, REGTEST_GENESIS);
   const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-ipc-test-"));
   validateRuntimeStateRoot(root, repoRoot);
-  const sid = windowsCurrentServiceSid(), registrations = [], closers = [], ids = new Set();
+  const sid = windowsCurrentServiceSid(), closers = [], ids = new Set();
   function options(name, role, purpose, instanceId = randomBytes(32).toString("hex")) {
     assert.match(name, /^[a-z0-9-]{1,60}$/u); assert(!ids.has(name)); ids.add(name);
     assert.match(instanceId, /^[0-9a-f]{64}$/u);
-    const value = { root: path.join(root, name), anchorRoot: path.join(root, name + "-anchor"), repoRoot,
+    const value = { root: path.join(root, name), repoRoot,
       context: { role, purpose, serviceSid: sid, environment: "localnet", nativeGenesis: policy.nativeGenesis,
         solanaDeployment: policy.solanaDeployment, keyEpoch: policy.keyEpoch, instanceId } };
-    registrations.push(structuredClone(value)); return value;
+    return value;
   }
   function store(opts, payload) {
     try { const value = WindowsProtectedStore.create(opts, payload); closers.push(() => value.close()); return value; }
@@ -74,7 +73,6 @@ export async function createLocalSecurityFixture({ repoRoot, policy }) {
   async function close() {
     let failed = false;
     for (const fn of [...closers].reverse()) { try { await fn(); } catch { failed = true; } }
-    for (const opts of registrations) { try { witnessTestAction(opts, "DELETE"); } catch { failed = true; } }
     assert(path.dirname(root) === path.resolve(os.tmpdir()) && path.basename(root).startsWith("kingpepe-ipc-test-"));
     validateRuntimeStateRoot(root, repoRoot);
     try { rmSync(root, { recursive: true }); } catch { failed = true; }

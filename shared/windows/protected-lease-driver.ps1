@@ -18,7 +18,7 @@ try {
     }
     $kpRequest = $kpSerializer.DeserializeObject($kpInput.ToString())
     $kpSourceRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
-    $kpLease = [KingPepe.LocalProtection.ProtectedStore]::AcquireLifetimeLease($kpRequest, $kpSourceRoot)
+    $kpLease = [KingPepe.LocalProtection.ProtectedStore]::AcquireLease($kpRequest, $kpSourceRoot)
     [Console]::Out.WriteLine('KINGPEPE_LEASE_READY_V1')
     [Console]::Out.Flush()
     # EOF (including parent termination) releases the handle. Any other input fails.

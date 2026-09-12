@@ -8,19 +8,15 @@ using System.Security.AccessControl;
 using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Text;
-using Microsoft.Win32;
 using Microsoft.Win32.SafeHandles;
 
 namespace KingPepe.LocalProtection {
-  public sealed class ProtectedWitnessRollbackException : InvalidOperationException {
-    public ProtectedWitnessRollbackException() : base("PROTECTED_WITNESS_ROLLBACK") {}
-  }
   public static class ProtectedStore {
     const int MaxPayload = 1048576;
     const int MaxEnvelope = MaxPayload + 16384;
     const string StateName = "state.protected";
     const string PendingName = "candidate.protected";
-    static readonly byte[] Magic = Encoding.ASCII.GetBytes("KPS1");
+    static readonly byte[] Magic = Encoding.ASCII.GetBytes("KPS2");
 
     [StructLayout(LayoutKind.Sequential)] struct SecurityAttributes {
       public int Length; public IntPtr Descriptor; public int Inherit;
@@ -35,9 +31,6 @@ namespace KingPepe.LocalProtection {
     static extern bool CreateDirectory(string path, ref SecurityAttributes attributes);
     [DllImport("kernel32.dll", SetLastError=true)]
     static extern bool GetFileInformationByHandle(SafeFileHandle handle, out FileInformation info);
-    [DllImport("advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
-    static extern int RegCreateKeyEx(SafeRegistryHandle parent,string name,uint reserved,string keyClass,uint options,
-      int desiredAccess,ref SecurityAttributes attributes,out SafeRegistryHandle key,out uint disposition);
 
     static void Require(bool value) { if (!value) throw new InvalidOperationException("PROTECTED_STORE_REJECTED"); }
     static string Text(IDictionary<string, object> r, string key) {
@@ -159,154 +152,69 @@ namespace KingPepe.LocalProtection {
       CheckAcl(source,false,sid);CheckAcl(target,false,sid);File.Replace(source,target,null);
       using(var stream=Open(target,FileMode.Open,sid))stream.Flush(true);
     }
-    static void CheckPair(byte[] state,byte[] anchor,string binding,out ulong revision) {
-      var a=Unseal(anchor,binding,"anchor");
-      try { Require(Equal(a.Payload,Hash(state))); var s=Unseal(state,binding,"state");
-        try {Require(s.Revision==a.Revision);revision=s.Revision;} finally {Array.Clear(s.Payload,0,s.Payload.Length);}
-      } finally {Array.Clear(a.Payload,0,a.Payload.Length);}
-    }
-    // A separately retained service-profile witness survives restoration of the
-    // ordinary state/anchor/fence backup files. It is NOT hardware monotonic:
-    // co-restoring the service profile/registry and files can evade this check.
-    const string WitnessParent = "Software\\KingPepe\\ProtectedWitnessV1\\";
-    static string WitnessName(string binding) {
-      return WitnessParent+BitConverter.ToString(Hash(Encoding.UTF8.GetBytes(binding))).Replace("-", "").ToLowerInvariant();
-    }
-    static void CheckWitnessAcl(RegistryKey key,SecurityIdentifier sid) {
-      Require(key!=null && key.SubKeyCount==0);
-      var acl=key.GetAccessControl();Require(acl.AreAccessRulesProtected && acl.GetOwner(typeof(SecurityIdentifier)).Equals(sid));
-      var rules=acl.GetAccessRules(true,true,typeof(SecurityIdentifier));Require(rules.Count==1);
-      foreach(RegistryAccessRule rule in rules)Require(rule.IdentityReference.Equals(sid) &&
-        rule.AccessControlType==AccessControlType.Allow && rule.RegistryRights==RegistryRights.FullControl);
-    }
-    static RegistryKey OpenWitness(string binding,SecurityIdentifier sid,bool create) {
-      // An impersonating helper must not accidentally use the process's profile.
-      Require(WindowsIdentity.GetCurrent().ImpersonationLevel==TokenImpersonationLevel.None);
-      using(var user=RegistryKey.OpenBaseKey(RegistryHive.CurrentUser,RegistryView.Registry64)) {
-        RegistryKey key;
-        if(create) {
-          var acl=new RegistrySecurity();acl.SetOwner(sid);acl.SetAccessRuleProtection(true,false);
-          acl.AddAccessRule(new RegistryAccessRule(sid,RegistryRights.FullControl,InheritanceFlags.None,PropagationFlags.None,AccessControlType.Allow));
-          var bytes=acl.GetSecurityDescriptorBinaryForm();IntPtr descriptor=Marshal.AllocHGlobal(bytes.Length);
+    // One authenticated file and one atomic replacement. No registry witness,
+    // secondary anchor, clone detector or claimed full-host rollback protection.
+    static byte[] RecoverAndRead(string root,string binding,SecurityIdentifier sid,out ulong revision) {
+      string statePath=Path.Combine(root,StateName), pending=Path.Combine(root,PendingName);
+      byte[] state=Read(statePath,sid); var current=Unseal(state,binding,"state");
+      try {
+        revision=current.Revision;
+        if(File.Exists(pending)) {
+          byte[] candidate=Read(pending,sid);var next=Unseal(candidate,binding,"state");
           try {
-            Marshal.Copy(bytes,0,descriptor,bytes.Length);
-            var attributes=new SecurityAttributes {Length=Marshal.SizeOf(typeof(SecurityAttributes)),Descriptor=descriptor,Inherit=0};
-            SafeRegistryHandle handle;uint disposition;
-            int error=RegCreateKeyEx(user.Handle,WitnessName(binding),0,null,0,0xF003F|0x0100,ref attributes,out handle,out disposition);
-            if(error!=0 || disposition!=1) { if(handle!=null)handle.Dispose();Require(false); }
-            key=RegistryKey.FromHandle(handle,RegistryView.Registry64);
-          } finally {Marshal.FreeHGlobal(descriptor);}
-        } else key=user.OpenSubKey(WitnessName(binding),RegistryKeyPermissionCheck.ReadWriteSubTree,RegistryRights.FullControl);
-        try {CheckWitnessAcl(key,sid);return key;} catch {if(key!=null)key.Dispose();throw;}
-      }
-    }
-    static Envelope ReadWitness(RegistryKey key,string binding) {
-      Require(key.ValueCount==1 && key.GetValueNames()[0]=="state" && key.GetValueKind("state")==RegistryValueKind.Binary);
-      var bytes=key.GetValue("state",null,RegistryValueOptions.DoNotExpandEnvironmentNames) as byte[];
-      Require(bytes!=null && bytes.Length>0 && bytes.Length<=16384);
-      var value=Unseal(bytes,binding,"registry-witness");Require(value.Payload.Length==32);return value;
-    }
-    static void WriteWitness(RegistryKey key,string binding,ulong revision,byte[] stateHash) {
-      var bytes=Seal(stateHash,revision,binding,"registry-witness");
-      key.SetValue("state",bytes,RegistryValueKind.Binary);key.Flush();
-      var check=ReadWitness(key,binding);Require(check.Revision==revision && Equal(check.Payload,stateHash));
-    }
-    static void MatchWitness(RegistryKey key,string binding,ulong revision,byte[] state) {
-      var check=ReadWitness(key,binding);
-      if(check.Revision!=revision || !Equal(check.Payload,Hash(state)))throw new ProtectedWitnessRollbackException();
-    }
-    static void AdvanceWitness(RegistryKey key,string binding,ulong previous,byte[] state,ulong next,byte[] candidate) {
-      Require(previous<ulong.MaxValue && next==previous+1);
-      var check=ReadWitness(key,binding);
-      // Idempotent recovery accepts exactly the already witnessed next image,
-      // never a lower generation, arbitrary new hash or a missing enrollment.
-      if(check.Revision==next) {if(!Equal(check.Payload,Hash(candidate)))throw new ProtectedWitnessRollbackException();return;}
-      if(check.Revision!=previous || !Equal(check.Payload,Hash(state)))throw new ProtectedWitnessRollbackException();
-      WriteWitness(key,binding,next,Hash(candidate));
-    }
-    static byte[] RecoverAndRead(string root,string anchorRoot,string binding,SecurityIdentifier sid,out ulong revision) {
-      using(var witness=OpenWitness(binding,sid,false)) {
-      string statePath=Path.Combine(root,StateName), anchorPath=Path.Combine(anchorRoot,StateName);
-      string pendingState=Path.Combine(root,PendingName), pendingAnchor=Path.Combine(anchorRoot,PendingName);
-      byte[] state=Read(statePath,sid), anchor=Read(anchorPath,sid);
-      if(File.Exists(pendingState)) {
-        byte[] candidate=Read(pendingState,sid);
-        if(File.Exists(pendingAnchor)) {
-          // Complete only a fully authenticated, exact next-revision prepared commit.
-          ulong previous,next; CheckPair(state,anchor,binding,out previous);
-          byte[] nextAnchor=Read(pendingAnchor,sid);CheckPair(candidate,nextAnchor,binding,out next);
-          Require(previous<ulong.MaxValue && next==previous+1);
-          AdvanceWitness(witness,binding,previous,state,next,candidate);
-          Replace(pendingAnchor,anchorPath,sid);anchor=nextAnchor;
+            Require(revision<ulong.MaxValue && next.Revision==revision+1);
+            Replace(pending,statePath,sid);state=candidate;revision=next.Revision;
+          } finally {Array.Clear(next.Payload,0,next.Payload.Length);}
         }
-        ulong selected;CheckPair(candidate,anchor,binding,out selected);
-        var old=Unseal(state,binding,"state");
-        try {Require(old.Revision<ulong.MaxValue && selected==old.Revision+1);} finally {Array.Clear(old.Payload,0,old.Payload.Length);}
-        MatchWitness(witness,binding,selected,candidate);
-        Replace(pendingState,statePath,sid);state=candidate;
-      }
-      Require(!File.Exists(pendingAnchor));CheckPair(state,anchor,binding,out revision);
-      MatchWitness(witness,binding,revision,state);return state;
-      }
+        return state;
+      } finally {Array.Clear(current.Payload,0,current.Payload.Length);}
     }
     public static IDictionary<string,object> Execute(IDictionary<string,object> request,string sourceRoot) {
       string op=Text(request,"operation");
       if(op=="identity") {Require(request.Count==1);return new Dictionary<string,object>{{"sid",Identity()}};}
       Require(op=="create"||op=="read"||op=="write");
-      Require(request.Count==(op=="write"?8:op=="create"?7:6));
-      Require(Text(request,"protocol")=="KINGPEPE_WINDOWS_PROTECTED_STORE_V1");
+      Require(request.Count==(op=="write"?7:op=="create"?6:5));
+      Require(Text(request,"protocol")=="KINGPEPE_WINDOWS_PROTECTED_STORE_V2");
       string identity=Text(request,"serviceSid");Require(identity==Identity());var sid=new SecurityIdentifier(identity);
-      string root=Root(Text(request,"root"),sourceRoot),anchorRoot=Root(Text(request,"anchorRoot"),sourceRoot);
-      Require(!ContainsPath(root,anchorRoot)&&!ContainsPath(anchorRoot,root));
-      string context=Text(request,"contextDigest");Require(context.Length==64);
+      string root=Root(Text(request,"root"),sourceRoot),context=Text(request,"contextDigest");
+      Require(context.Length==64);
       foreach(char c in context)Require((c>='0'&&c<='9')||(c>='a'&&c<='f'));
-      // Copying envelopes to another root/context must not silently preserve authority.
-      string binding=context+"\n"+identity+"\n"+root.ToUpperInvariant()+"\n"+anchorRoot.ToUpperInvariant();
+      string binding=context+"\n"+identity+"\n"+root.ToUpperInvariant();
       byte[] payload=null;
       try {
         if(op!="read") {payload=Convert.FromBase64String(Text(request,"payload"));Require(payload.Length<=MaxPayload);}
         if(op=="create") {
-          Require(!Directory.Exists(root)&&!Directory.Exists(anchorRoot)&&!File.Exists(root)&&!File.Exists(anchorRoot));
-          CreatePrivateDirectory(root,sid);CreatePrivateDirectory(anchorRoot,sid);
-          WriteNew(Path.Combine(anchorRoot,"lock.protected"),new byte[0],sid);
-          WriteNew(Path.Combine(anchorRoot,"lifetime.protected"),new byte[0],sid);
-          using(var gate=Open(Path.Combine(anchorRoot,"lock.protected"),FileMode.Open,sid)) {
-            byte[] state=Seal(payload,1,binding,"state"),anchor=Seal(Hash(state),1,binding,"anchor");
-            WriteNew(Path.Combine(root,StateName),state,sid);WriteNew(Path.Combine(anchorRoot,StateName),anchor,sid);
-            using(var witness=OpenWitness(binding,sid,true))WriteWitness(witness,binding,1,Hash(state));
-          }
+          Require(!Directory.Exists(root)&&!File.Exists(root));
+          CreatePrivateDirectory(root,sid);
+          WriteNew(Path.Combine(root,"lock.protected"),new byte[0],sid);
+          WriteNew(Path.Combine(root,"lease.protected"),new byte[0],sid);
+          using(var gate=Open(Path.Combine(root,"lock.protected"),FileMode.Open,sid))
+            WriteNew(Path.Combine(root,StateName),Seal(payload,1,binding,"state"),sid);
           return new Dictionary<string,object>{{"revision","1"}};
         }
-        CheckAcl(root,true,sid);CheckAcl(anchorRoot,true,sid);
-        using(var gate=Open(Path.Combine(anchorRoot,"lock.protected"),FileMode.Open,sid)) {
-          ulong revision;byte[] current=RecoverAndRead(root,anchorRoot,binding,sid,out revision);
+        CheckAcl(root,true,sid);
+        using(var gate=Open(Path.Combine(root,"lock.protected"),FileMode.Open,sid)) {
+          ulong revision;byte[] current=RecoverAndRead(root,binding,sid,out revision);
           if(op=="read") {
             var value=Unseal(current,binding,"state");
             try {return new Dictionary<string,object>{{"revision",revision.ToString(System.Globalization.CultureInfo.InvariantCulture)},{"payload",Convert.ToBase64String(value.Payload)}};}
             finally {Array.Clear(value.Payload,0,value.Payload.Length);}
           }
-          string expected=Text(request,"expectedRevision");
-          Require(revision.ToString(System.Globalization.CultureInfo.InvariantCulture)==expected && revision<ulong.MaxValue);
+          Require(revision.ToString(System.Globalization.CultureInfo.InvariantCulture)==Text(request,"expectedRevision") && revision<ulong.MaxValue);
           ulong next=revision+1;byte[] nextState=Seal(payload,next,binding,"state");
-          byte[] nextAnchor=Seal(Hash(nextState),next,binding,"anchor");
           WriteNew(Path.Combine(root,PendingName),nextState,sid);
-          WriteNew(Path.Combine(anchorRoot,PendingName),nextAnchor,sid);
-          using(var witness=OpenWitness(binding,sid,false))AdvanceWitness(witness,binding,revision,current,next,nextState);
-          Replace(Path.Combine(anchorRoot,PendingName),Path.Combine(anchorRoot,StateName),sid);
           Replace(Path.Combine(root,PendingName),Path.Combine(root,StateName),sid);
           return new Dictionary<string,object>{{"revision",next.ToString(System.Globalization.CultureInfo.InvariantCulture)}};
         }
       } finally {if(payload!=null)Array.Clear(payload,0,payload.Length);}
     }
-
-    public static IDisposable AcquireLifetimeLease(IDictionary<string,object> request,string sourceRoot) {
-      Require(request.Count==5 && Text(request,"protocol")=="KINGPEPE_WINDOWS_PROTECTED_STORE_V1");
+    // The kernel handle prevents concurrent cooperating processes at this root.
+    // It releases on exit; it is deliberately not a persistent clone/fence epoch.
+    public static IDisposable AcquireLease(IDictionary<string,object> request,string sourceRoot) {
+      Require(request.Count==4 && Text(request,"protocol")=="KINGPEPE_WINDOWS_PROTECTED_STORE_V2");
       string identity=Text(request,"serviceSid");Require(identity==Identity());var sid=new SecurityIdentifier(identity);
-      string root=Root(Text(request,"root"),sourceRoot),anchor=Root(Text(request,"anchorRoot"),sourceRoot);
-      Require(!ContainsPath(root,anchor)&&!ContainsPath(anchor,root));CheckAcl(root,true,sid);CheckAcl(anchor,true,sid);
-      // This file must have been explicitly provisioned with the protected store.
-      // Never create/adopt an absent lease on ordinary open/restart.
-      return Open(Path.Combine(anchor,"lifetime.protected"),FileMode.Open,sid);
+      string root=Root(Text(request,"root"),sourceRoot);CheckAcl(root,true,sid);
+      return Open(Path.Combine(root,"lease.protected"),FileMode.Open,sid);
     }
   }
 }

@@ -6,8 +6,6 @@ import { isProtectedServiceIpc } from "../../../shared/windows/service-ipc.mjs";
 import { requireIntegrityGuard } from "../../../services/supervisor/protected-integrity.mjs";
 import { createHash } from "node:crypto";
 import { WindowsProtectedFrostStateStore } from "../state/windows-protected-state-store.mjs";
-import { WindowsFencedFrostStateStore } from "../state/windows-fenced-state-store.mjs";
-import { assertWindowsProtectedStore } from "../../../shared/windows/protected-store.mjs";
 
 const PEERS = new WeakSet();
 export function isProtectedRemoteFrostPeer(value) { return PEERS.has(value); }
@@ -16,36 +14,35 @@ export function isProtectedRemoteFrostPeer(value) { return PEERS.has(value); }
 // This runtime entry point binds the authenticated role/domain first, opens only
 // existing protected material, then reports confirmed startup integrity faults
 // through the same durable incident outbox used by running signers.
-export async function openProtectedNativeSigner({ base, fence, policy, integrity, nativeEvidenceValidator }) {
+export async function openProtectedNativeSigner({ base, policy, integrity, nativeEvidenceValidator }) {
   if (!(base instanceof WindowsProtectedFrostStateStore) || typeof nativeEvidenceValidator !== "function")
     throw new Error("ProtectedSignerStartupBindingRejected");
   const c = base.context, role = c.role;
-  assertWindowsProtectedStore(fence, role, "signer-fence"); base.assertPolicy(policy);
+  base.assertPolicy(policy);
   requireIntegrityGuard(integrity, role);
   integrity.assertDeployment({ environment: c.environment, nativeGenesis: c.nativeGenesis,
     solanaDeployment: c.solanaDeployment, keyEpoch: c.keyEpoch });
-  if (c.environment !== "localnet" || ["role", "serviceSid", "environment", "nativeGenesis", "solanaDeployment", "instanceId", "keyEpoch"]
-    .some(key => c[key] !== fence.context[key])) throw new Error("ProtectedSignerStartupBindingRejected");
+  if (c.environment !== "localnet") throw new Error("ProtectedSignerStartupBindingRejected");
   // Public domain/instance digest, never secret state or a private filesystem path.
   const operationId = createHash("sha256").update(JSON.stringify(["KINGPEPE_SIGNER_STARTUP_V1", role,
     c.instanceId, c.environment, c.nativeGenesis, c.solanaDeployment, c.keyEpoch])).digest("hex");
   let state, signer;
   try {
-    state = await WindowsFencedFrostStateStore.openLocal({ base, fence, policy });
+    state = await base.acquireExclusive();
     signer = new NativeFrostSigner({ signerId: role, index: role === "KINGPEPE_FROST_A" ? 0 : 1,
       policy, stateStore: state, nativeEvidenceValidator });
     const handler = nativeFrostIpcHandler(signer, integrity);
     return Object.freeze({ signer, handler, async close() { signer.close(); await state.close(); } });
   } catch (error) {
     const rollback = error?.message === "ProtectedStateRollbackDetected";
-    const corrupt = ["ProtectedSignerFenceRejected", "ProtectedFrostStateInvalid",
+    const corrupt = ["ProtectedFrostStateInvalid",
       "FrostStateDeploymentMismatch", "FrostNonceRecoveryStateInvalid"].includes(error?.message);
     try {
       if (rollback || corrupt) await integrity.report(operationId, rollback ? "SIGNER_ROLLBACK" : "SIGNER_STATE_CORRUPT",
         createHash("sha256").update(error.message).digest("hex"));
     } finally {
       signer?.close();
-      try { if (state) await state.close(); else { base.close(); fence.close(); } }
+      try { if (state) await state.close(); else await base.close(); }
       finally { throw new Error("ProtectedSignerStartupRejected"); }
     }
   }
@@ -58,10 +55,10 @@ export function nativeFrostIpcHandler(signer, integrity) {
   const context = signer.dkgContext();
   integrity.assertDeployment({ environment: "localnet", nativeGenesis: context.nativeGenesisHash,
     solanaDeployment: context.solanaDeployment, keyEpoch: context.keyEpoch });
-  if (!signer.hasProtectedLifetimeFence()) throw new Error("IpcFencedSignerRequired");
+  if (!signer.hasExclusiveProtectedState()) throw new Error("IpcProtectedSignerRequired");
   return async ({ method, operationId, payload, peerRole }) => {
     try {
-    if (!signer.hasProtectedLifetimeFence()) throw new Error("IpcFencedSignerRequired");
+    if (!signer.hasExclusiveProtectedState()) throw new Error("IpcProtectedSignerRequired");
     if (peerRole !== "COORDINATOR") throw new Error("IpcCoordinatorRequired");
     // Independent evidence verification is read-only. Authorize immediately
     // after it, before any nonce/share mutation, and again before release.
@@ -88,7 +85,7 @@ export function nativeFrostIpcHandler(signer, integrity) {
     else throw new Error("IpcNativeMethodRejected");
     await integrity.assertRunning(operationId, "FROST_SIGN"); return result;
     } catch (error) {
-      if (["ProtectedSignerStateIntegrityRejected", "ProtectedSignerFenceRejected", "ProtectedStateRollbackDetected", "ProtectedLifetimeLeaseLost"].includes(error?.message)) {
+      if (["ProtectedFrostStateInvalid", "ProtectedStateRollbackDetected", "ProtectedProcessLeaseLost"].includes(error?.message)) {
         // Do not include private state or paths in the incident evidence digest.
         await integrity.report(operationId, "SIGNER_ROLLBACK", createHash("sha256").update(error.message).digest("hex"));
       }

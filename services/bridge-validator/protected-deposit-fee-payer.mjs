@@ -23,7 +23,7 @@ export class ProtectedDepositFeePayer {
     integrity.assertDeployment({ environment, nativeGenesis, solanaDeployment, keyEpoch });
     self.#store = store; self.#guard = integrity;
     self.#chain = new LocalDeploymentRpc({ endpoint }); self.#rpc = new SolanaLocalRpcClient({ endpoint });
-    try { self.#lease = await store.acquireLifetimeLease(); const seed = self.#seed(); seed.fill(0); INSTANCES.add(self); return self; }
+    try { self.#lease = await store.acquireLease(); const seed = self.#seed(); seed.fill(0); INSTANCES.add(self); return self; }
     catch (error) { try { await self.#report(error); } finally { await self.close(); } throw new Error("ProtectedDepositFeePayerUnavailable"); }
   }
   assertBinding(policy, integrity) {
@@ -40,7 +40,7 @@ export class ProtectedDepositFeePayer {
   }
   async #report(error) {
     const reason = error.integrityCode ?? error.message;
-    const keyFailure = ["ProtectedStateRollbackDetected", "ProtectedLifetimeLeaseLost", "FeePayerKeyChanged"].includes(reason);
+    const keyFailure = ["ProtectedStateRollbackDetected", "ProtectedProcessLeaseLost", "FeePayerKeyChanged"].includes(reason);
     const deploymentFailure = ["SOLANA_GENESIS_CHANGED", "SOLANA_DEPLOYMENT_CHANGED", "FINALIZED_SOLANA_CONFLICT"].includes(reason);
     if (!keyFailure && !deploymentFailure) return;
     this.#stopped = true;

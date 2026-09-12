@@ -175,7 +175,7 @@ try {
   assert(accepted, "NativeOutboxDidNotActuallyBroadcast");
   assert.equal(await rpc.getRawTransaction(txid), delivery.signedTransactionHex);
   await stopSources(); stopSources = undefined;
-  // Child death releases only its own lifetime lease, never resets the fence.
+  // Child death releases only its own process lock; retained operations remain.
   await delay(500);
   store = new WindowsProtectedStore(outboxOpts); outbox = await open();
   const before = probe(); assert(before.state.records[0].sendAttempts > 0); assert.equal(before.state.records[0].observed, false);

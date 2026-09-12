@@ -2,7 +2,7 @@
 
 This repository tracks selected upstream references for architectural guidance.
 
-The original lifetime-fence helper calls existing .NET FileStream/FileShare and
+The original process-lock helper calls existing .NET FileStream/FileShare and
 Windows handle APIs. It imports no implementation or sample code; the installed
 OS/runtime's terms remain unchanged. The signer adapter preserves the pinned
 Noble cryptographic implementation rather than replacing its signature scheme.

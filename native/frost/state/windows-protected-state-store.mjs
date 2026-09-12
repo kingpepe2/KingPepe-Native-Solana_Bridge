@@ -9,6 +9,7 @@ export class WindowsProtectedFrostStateStore {
   #store;
   #role;
   #revisions = new WeakMap();
+  #lease;
   constructor(store, role) {
     if (!REQUIRED_FROST_SIGNERS.includes(role)) throw new Error("FrostStateRoleInvalid");
     assertWindowsProtectedStore(store, role, "frost-state");
@@ -30,12 +31,17 @@ export class WindowsProtectedFrostStateStore {
         this.#store.context.solanaDeployment !== bound.solanaDeployment || this.#store.context.keyEpoch !== bound.keyEpoch) throw new Error("ProtectedFrostPolicyMismatch");
   }
   get context() { return this.#store.context; }
-  revisionOf(state) {
-    const revision = this.#revisions.get(state);
-    if (!revision) throw new Error("ProtectedFrostLoadRequired");
-    return revision;
+  async acquireExclusive() {
+    if (this.#lease) throw new Error("ProtectedSignerAlreadyOpen");
+    this.#lease = await this.#store.acquireLease();
+    return this;
+  }
+  assertExclusive() {
+    if (!this.#lease) throw new Error("ProtectedSignerExclusiveAccessRequired");
+    this.#lease.assertHeld();
   }
   load() {
+    this.#lease?.assertHeld();
     const result = this.#store.read();
     try {
       let state;
@@ -45,6 +51,7 @@ export class WindowsProtectedFrostStateStore {
     } finally { result.payload.fill(0); }
   }
   save(state) {
+    this.#lease?.assertHeld();
     assertFrostStateEnvelope(state, this.#role);
     const expected = this.#revisions.get(state);
     if (!expected) throw new Error("ProtectedFrostLoadRequired");
@@ -52,5 +59,5 @@ export class WindowsProtectedFrostStateStore {
     try { this.#revisions.set(state, this.#store.write(payload, expected).revision); }
     finally { payload.fill(0); }
   }
-  close() { this.#store.close(); }
+  async close() { await this.#lease?.close(); this.#store.close(); }
 }

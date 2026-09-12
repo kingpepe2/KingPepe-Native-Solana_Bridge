@@ -28,7 +28,7 @@ export class ProtectedSolanaDepositOutbox {
     // No externally supplied transport callback can return proofVerified=true.
     self.#chain = new LocalDeploymentRpc({ endpoint }); self.#rpc = new SolanaLocalRpcClient({ endpoint });
     self.#store = store; self.#guard = integrity;
-    try { self.#lease = await store.acquireLifetimeLease(); self.#read(); INSTANCES.add(self); return self; }
+    try { self.#lease = await store.acquireLease(); self.#read(); INSTANCES.add(self); return self; }
     catch (error) { try { await self.#report(error); } finally { await self.close(); } throw new Error("SolanaDepositOutboxUnavailable"); }
   }
   assertBinding(policy, integrity) {
@@ -54,7 +54,7 @@ export class ProtectedSolanaDepositOutbox {
   }
   async #report(error) {
     const code = error?.integrityCode ?? error?.message;
-    if (!["ProtectedStateRollbackDetected", "ProtectedLifetimeLeaseLost", "SolanaOutboxAuthenticatedStateInvalid",
+    if (!["ProtectedStateRollbackDetected", "ProtectedProcessLeaseLost", "SolanaOutboxAuthenticatedStateInvalid",
       "SolanaDeliveryAccountConflict", "SolanaOutboxFinalizedConflict", "SOLANA_GENESIS_CHANGED", "SOLANA_DEPLOYMENT_CHANGED", "FINALIZED_SOLANA_CONFLICT"].includes(code)) return;
     this.#stopped = true;
     await this.#guard.report(solanaDeliveryPolicyDigest(this.#policy), "CONFLICTING_BROADCAST", error.evidenceDigest ?? hash(code));
