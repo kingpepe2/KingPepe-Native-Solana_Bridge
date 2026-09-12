@@ -40,6 +40,11 @@ try {
     exit 0
 } catch {
     # Fixed stage only: never exception messages, paths, identities or input.
-    [Console]::Error.Write('WINDOWS_PROTECTED_HELPER_BUILD_REJECTED:' + $kpStage)
+    $kpReason = 'POLICY'
+    for ($kpException = $_.Exception; $null -ne $kpException; $kpException = $kpException.InnerException) {
+        $kpCandidate = $kpException.Data['ProtectedBuildReason']
+        if ($kpCandidate -is [string] -and $kpCandidate -match '^(POLICY|ROOT_CANONICAL|ROOT_FIXED_DRIVE|ROOT_SOURCE_BOUNDARY|ROOT_REPARSE|DIRECTORY_PARENT|DIRECTORY_CREATE_[0-9]{1,6}|ACL_PRINCIPAL|ACL_INHERITANCE|ACL_RULE_COUNT|ACL_ACCESS)$') { $kpReason = $kpCandidate }
+    }
+    [Console]::Error.Write('WINDOWS_PROTECTED_HELPER_BUILD_REJECTED:' + $kpStage + ':' + $kpReason)
     exit 1
 }

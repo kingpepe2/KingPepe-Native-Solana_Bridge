@@ -37,8 +37,8 @@ export function windowsProtectedExecutable() {
         result = spawnSync(path.join(windowsRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
           ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", path.join(import.meta.dirname, "protected-helper-build.ps1")],
           { input, encoding: "buffer", timeout: 30000, maxBuffer: 4096, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
-        const stage = result.stderr?.toString("utf8").replace(/^WINDOWS_PROTECTED_HELPER_BUILD_REJECTED:/u, "");
-        if (BUILD_STAGES.has(stage)) rejectedBuildStage = stage;
+        const [stage, reason] = (result.stderr?.toString("utf8").replace(/^WINDOWS_PROTECTED_HELPER_BUILD_REJECTED:/u, "") ?? "").split(":");
+        if (BUILD_STAGES.has(stage) && /^(POLICY|ROOT_CANONICAL|ROOT_FIXED_DRIVE|ROOT_SOURCE_BOUNDARY|ROOT_REPARSE|DIRECTORY_PARENT|DIRECTORY_CREATE_[0-9]{1,6}|ACL_PRINCIPAL|ACL_INHERITANCE|ACL_RULE_COUNT|ACL_ACCESS)$/u.test(reason ?? "")) rejectedBuildStage = stage + "_" + reason;
         check(!result.error && result.status === 0 && result.stderr.length === 0);
         const built = JSON.parse(result.stdout.toString("utf8"));
         check(Object.keys(built).sort().join() === "compilerVersion,protocol,sha256" && built.protocol === "KINGPEPE_PROTECTED_EXECUTABLE_BUILD_V1" &&
