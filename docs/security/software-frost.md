@@ -55,7 +55,12 @@ Current executed evidence belongs in [development status](../development-status.
 Restart tests do not prove sudden-power-loss durability, memory-snapshot safety,
 or detection of a complete restored host snapshot. Same-account or privileged
 host compromise can affect both participants; one host outage can stop both.
-These results describe the current single-host local test topology. The corrected
-roadmap requires production A/B on genuinely separate hosts, accounts and network
-paths, documented at Phase 13 and verified at Phase 19. That deployment is not
-implemented or certified by these local tests. Exact 2-of-2 remains unchanged.
+`signerTopology = SINGLE_HOST` is the final KingPepe Team deployment decision,
+not a claim of physical independence. A/B remain separate processes/services
+with separate protected shares and nonce state on the same approved host.
+The Team explicitly accepts that host compromise or outage may affect both.
+Record this decision at Phase 13 and present it, together with the unaudited
+Noble FROST integration, to the Phase-18 external reviewer. No second physical
+host, HSM or hardware signer is required. Local tests do not certify production
+deployment or remove the common-host and snapshot limitations. Exact 2-of-2
+remains unchanged.
