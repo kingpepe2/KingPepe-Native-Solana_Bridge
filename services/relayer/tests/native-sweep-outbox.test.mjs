@@ -88,7 +88,7 @@ test("Native outbox protected purpose belongs only to the relayer, never signer 
 const response = state => ({ state, operationId: fixture.plan.operationId, txid: parseNativeTransactionHex(fixture.signedTransactionHex).txidHex });
 test("Native delivery IPC distinguishes durable acceptance from observed transaction, never finality", () => {
   assert.equal(validateNativeSweepResponse(response("ACCEPTED"), delivery(), fixture.policy, "enqueueNativeSweep").state, "ACCEPTED");
-  for (const state of ["WAITING_FOR_DEPENDENCY", "QUEUED_BY_LIMIT", "BROADCAST_OBSERVED"])
+  for (const state of ["NOT_ENQUEUED", "WAITING_FOR_DEPENDENCY", "QUEUED_BY_LIMIT", "BROADCAST_OBSERVED"])
     assert.equal(validateNativeSweepResponse(response(state), delivery(), fixture.policy, "nativeSweepStatus").state, state);
 });
 for (const [name, mutate] of [
@@ -102,4 +102,18 @@ for (const [name, mutate] of [
 });
 test("Native status cannot masquerade as enqueue acknowledgement", () => {
   assert.throws(() => validateNativeSweepResponse(response("BROADCAST_OBSERVED"), delivery(), fixture.policy, "enqueueNativeSweep"));
+});
+
+test("authenticated absent Native delivery is not an enqueue acknowledgement or finality", () => {
+  const value = response("NOT_ENQUEUED");
+  assert.deepEqual(validateNativeSweepResponse(value, delivery(), fixture.policy, "nativeSweepStatus"), value);
+  assert.throws(() => validateNativeSweepResponse(value, delivery(), fixture.policy, "enqueueNativeSweep"));
+  for (const changed of [{ ...value, observedSlot: "1" }, { ...value, finalized: true }, { ...value, state: "FINALIZED" }])
+    assert.throws(() => validateNativeSweepResponse(changed, delivery(), fixture.policy, "nativeSweepStatus"));
+});
+
+test("authenticated absent Native delivery binds both operation and exact transaction", () => {
+  const value = response("NOT_ENQUEUED");
+  for (const changed of [{ ...value, operationId: hash("wrong absent operation") }, { ...value, txid: hash("wrong absent transaction") }])
+    assert.throws(() => validateNativeSweepResponse(changed, delivery(), fixture.policy, "nativeSweepStatus"));
 });

@@ -143,7 +143,9 @@
   "phase08DkgHandoffReview": {
     "filesBefore": 179,
     "filesAfter": 180,
-    "newFiles": ["native/frost/policy/dkg-messages.mjs"],
+    "newFiles": [
+      "native/frost/policy/dkg-messages.mjs"
+    ],
     "filesDeleted": 0,
     "filesMoved": 0,
     "changes": "Original strict DKG inner-message snapshots, announced/private polynomial binding, cryptographically verified durable incoming handoff at both participants before finalization, digest-bound retries and saved-setup resume. Eighteen new regressions. Removed superseded permissive inline round-one parsing.",
@@ -198,7 +200,9 @@
   "phase08DkgBindingReview": {
     "filesBefore": 178,
     "filesAfter": 179,
-    "newFiles": ["native/frost/policy/dkg-request.mjs"],
+    "newFiles": [
+      "native/frost/policy/dkg-request.mjs"
+    ],
     "filesDeleted": 0,
     "filesMoved": 0,
     "changes": "Original immutable V2 DKG deployment/context/session metadata; exact active-key and role selection; coordinator option and all-round request checks; bounded retained epochs and delayed older-epoch finalization rejection; 24 original regressions. Superseded inline request handling and unused imports removed.",
@@ -209,7 +213,9 @@
   "phase08SigningRequestReview": {
     "filesBefore": 177,
     "filesAfter": 178,
-    "newFiles": ["native/frost/policy/signing-request.mjs"],
+    "newFiles": [
+      "native/frost/policy/signing-request.mjs"
+    ],
     "filesDeleted": 0,
     "filesMoved": 0,
     "changes": "Original shared immutable V1 signing-request construction/validation, participant-bound session recomputation before state/key access, removal of superseded inline request validation/construction and 14 original regressions.",
@@ -232,7 +238,9 @@
   "phase08StopCiCorrectionReview": {
     "filesBefore": 176,
     "filesAfter": 177,
-    "newFiles": ["scripts/tests/ci-local-e2e-contract.test.mjs"],
+    "newFiles": [
+      "scripts/tests/ci-local-e2e-contract.test.mjs"
+    ],
     "filesDeleted": 0,
     "filesMoved": 0,
     "changes": "Correct obsolete CI claim-check count without bypassing rejection gates; add original tests executing the actual workflow acceptance contract; record failed-SHA evidence and known unaudited dependency/policy boundaries.",
@@ -244,7 +252,9 @@
     "filesAfter": 176,
     "filesDeleted": 0,
     "filesMoved": 0,
-    "newFiles": ["shared/operation-hard-stop.mjs"],
+    "newFiles": [
+      "shared/operation-hard-stop.mjs"
+    ],
     "changes": "Original common absorbing-stop guard, operation-journal retry/late-write protection, pipeline ledger boundary checks, exact-ledger stop state, race/reopen tests and an isolated stopped-worker probe using a real local claim packet.",
     "sourceImports": "None. Uses the existing Node standard library; no upstream implementation copied or derived. Existing third-party notices and licenses preserved.",
     "dependencyChanges": "None; toolchain and npm/Cargo lockfiles unchanged.",
@@ -256,7 +266,12 @@
     "filesAfter": 175,
     "filesDeleted": 0,
     "filesMoved": 0,
-    "newFiles": [".npmrc", "services/bridge-validator/local-deposit-ledger.mjs", "services/bridge-validator/tests/local-deposit-ledger.test.mjs", "docs/security/local-deposit-accounting.md"],
+    "newFiles": [
+      ".npmrc",
+      "services/bridge-validator/local-deposit-ledger.mjs",
+      "services/bridge-validator/tests/local-deposit-ledger.test.mjs",
+      "docs/security/local-deposit-accounting.md"
+    ],
     "changes": "Original SQLite/HMAC local deposit accounting, existing exact-ledger fork reuse, real pending-credit/finalized-mint integration, bounded replay and auxiliary-file guards, sticky local stops and actual process/filesystem regression tests.",
     "sourceImports": "Node/SQLite API, runtime and security documentation used as reference. No source implementation or vector copied. Existing third-party attributions and licenses retained; runtime binaries remain external.",
     "dependencyChanges": "Node 24.21.0 / npm 11.19.0 / bundled SQLite 3.53.4 pinned after compatibility and upstream security review. No npm or Rust graph change and no SQLite addon. Added strict engine configuration.",
@@ -268,7 +283,11 @@
     "filesAfter": 155,
     "filesDeleted": 0,
     "filesMoved": 0,
-    "newFiles": [".github/scripts/dependency-license-audit.mjs", "scripts/tests/dependency-license-audit.test.mjs", "solana/tests/local-deposit-security.mjs"],
+    "newFiles": [
+      ".github/scripts/dependency-license-audit.mjs",
+      "scripts/tests/dependency-license-audit.test.mjs",
+      "solana/tests/local-deposit-security.mjs"
+    ],
     "consolidation": "Removed duplicate fee-payer signing code and oversized bundle implementation; condensed stale AGENTS/readiness summaries while retaining stage evidence in status documents.",
     "dependencyChanges": "Replaced solana-program 1.18.26 and spl-token 4.0.0 graph with solana-program 3.0.0 / spl-token-interface 2.0.0, added explicit system-interface and sysvar test APIs; removed obsolete zeroize_derive pins.",
     "terminologyReview": "Case-insensitive project-role terminology reviewed. Solana account ownership terms are SOLANA_PROTOCOL_TERM; tar --no-same-owner is THIRD_PARTY_TERM. No project governance role uses that terminology.",
@@ -284,7 +303,13 @@
     "filesAfter": 160,
     "filesDeleted": 0,
     "filesMoved": 0,
-    "newFiles": ["native/proof/src/evidence.rs", "native/proof/src/bin/kingpepe-native-evidence.rs", "native/node/native-raw-evidence.mjs", "native/node/tests/native-raw-evidence.test.mjs", "scripts/local-native-evidence-verifier.mjs"],
+    "newFiles": [
+      "native/proof/src/evidence.rs",
+      "native/proof/src/bin/kingpepe-native-evidence.rs",
+      "native/node/native-raw-evidence.mjs",
+      "native/node/tests/native-raw-evidence.test.mjs",
+      "scripts/local-native-evidence-verifier.mjs"
+    ],
     "sourceImports": "Original implementation against pinned Native consensus/serialization facts. No third-party implementation copied and no legacy Git history imported.",
     "dependencyChanges": "None; executable uses the existing locked Native proof crate and standard library.",
     "cleanup": "Removed unused RPC-object-only deposit fingerprint helper after repository-wide usage review; retained independently implemented Rust and JavaScript transaction parsers.",
@@ -295,7 +320,12 @@
     "filesAfter": 164,
     "filesDeleted": 0,
     "filesMoved": 0,
-    "newFiles": ["native/node/native-tapscript.mjs", "native/recovery/taproot-deposit.mjs", "native/node/tests/native-tapscript.test.mjs", "solana/tests/local-native-recovery.mjs"],
+    "newFiles": [
+      "native/node/native-tapscript.mjs",
+      "native/recovery/taproot-deposit.mjs",
+      "native/node/tests/native-tapscript.test.mjs",
+      "solana/tests/local-native-recovery.mjs"
+    ],
     "sourceImports": "Original bounded implementation against BIP341/BIP342/BIP112 standard facts and the pinned Native interpreter; no upstream implementation copied. Existing third-party vector and dependency notices retained.",
     "dependencyChanges": "None; uses the existing pinned curve dependency and Node standard library.",
     "terminologyReview": "No new project-role terminology requiring replacement; existing Solana protocol and third-party terms preserved."
@@ -316,7 +346,11 @@
     "filesAfter": 167,
     "filesDeleted": 0,
     "filesMoved": 0,
-    "newFiles": ["native/recovery/recovery-psbt.mjs", "native/node/tests/recovery-psbt.test.mjs", "solana/tests/local-recovery-psbt.mjs"],
+    "newFiles": [
+      "native/recovery/recovery-psbt.mjs",
+      "native/node/tests/recovery-psbt.test.mjs",
+      "solana/tests/local-recovery-psbt.mjs"
+    ],
     "changes": "Original bounded offline PSBT encoding/inspection, V2 public-commitment Miniscript-compatible script construction and real isolated Native wallet recovery tests. V1 prefix replaced only for new REGTEST outputs; old external test data preserved.",
     "sourceImports": "No third-party source or vector copied. BIP174/BIP371 field facts and pinned Native Miniscript/PSBT behavior referenced; required existing notices unchanged.",
     "dependencyChanges": "None",
@@ -327,7 +361,9 @@
     "filesAfter": 168,
     "filesDeleted": 0,
     "filesMoved": 0,
-    "newFiles": ["solana/tests/local-recovery-races.mjs"],
+    "newFiles": [
+      "solana/tests/local-recovery-races.mjs"
+    ],
     "changes": "Original real-daemon tests for competing mature FROST sweep and Native-wallet recovery, both winner orders and forced pre-mint alternative forks. REGTEST CLI controls remain unavailable through the ordinary RPC adapter. Explicit unconfirmed classification and bounded legacy HTTP/JSON-RPC error parsing distinguish chain state from infrastructure/parser failures without exposing provider text.",
     "sourceImports": "No code copied; pinned Native generateblock and invalidateblock behavior reviewed. Existing provenance and notices preserved.",
     "dependencyChanges": "None"
@@ -337,7 +373,9 @@
     "filesAfter": 169,
     "filesDeleted": 0,
     "filesMoved": 0,
-    "newFiles": ["solana/tests/local-claim-retry.mjs"],
+    "newFiles": [
+      "solana/tests/local-claim-retry.mjs"
+    ],
     "changes": "Original exact signed-claim packet reconstruction, pre-broadcast transaction identity persistence, status-aware retry and process-crash/real-blockhash-expiry tests. Existing synthetic unit fixtures now use the official SPL Token Program and actual packet signatures.",
     "sourceImports": "Reference-only Solana transaction/RPC definitions; no upstream implementation copied. Required existing vector attribution and third-party notices retained.",
     "dependencyChanges": "None",
@@ -360,7 +398,10 @@
     "filesAfter": 171,
     "filesDeleted": 0,
     "filesMoved": 0,
-    "newFiles": ["shared/runtime-path-boundary.mjs", "scripts/tests/runtime-path-boundary.test.mjs"],
+    "newFiles": [
+      "shared/runtime-path-boundary.mjs",
+      "scripts/tests/runtime-path-boundary.test.mjs"
+    ],
     "changes": "Original common filesystem boundary for FROST state, three journals, Native RPC cookies and local runtime planning. Forty filesystem tests use isolated temporary roots and no operational keys. Actual checkout protection cannot be disabled by a caller-supplied root.",
     "cleanup": "Consolidated repeated lexical containment/resolution checks and removed an unused recursive FROST state deletion method after repository-wide call-site review. No operational data deleted or moved.",
     "sourceImports": "Node 22.23.2 path/fs API definitions consulted as reference only; no upstream code copied. Existing licenses and notices retained.",
@@ -680,12 +721,36 @@
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
       "notes": "Original non-operational fencing design and explicit retained-anchor/full-host assurance limits."
     },
-    { "path": ".gitattributes", "classification": "BUILD_OR_CONFIGURATION_METADATA", "notes": "Original text-only LF checkout policy for reproducible Windows/WSL source inspection; binary files are not normalized." },
-    { "path": "docs/phase-08-5-audit.md", "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION", "notes": "Original retrospective audit, measured local coverage and explicit unresolved security dependencies; not external certification or private deployment data." },
-    { "path": "docs/phase-08-5-blocker-inventory.json", "classification": "GENERATED_FILE", "notes": "Generated source-keyword location inventory with reviewed classifications; no runtime state, live identities or secret content." },
-    { "path": "solana/tests/local-withdrawal-record.mjs", "classification": "ORIGINAL_KINGPEPE_CODE", "notes": "Original isolated real-validator audit regression for atomic burn/withdrawal record lifecycle only; no Phase 09 payout implementation or imported code." },
-    { "path": "scripts/source-audit.mjs", "classification": "ORIGINAL_KINGPEPE_CODE", "notes": "Original exact provenance coverage and non-secret publication-boundary checks." },
-    { "path": "scripts/tests/source-audit.test.mjs", "classification": "ORIGINAL_KINGPEPE_CODE", "notes": "Original executable publication/provenance guard regressions; synthetic non-operational values only." },
+    {
+      "path": ".gitattributes",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Original text-only LF checkout policy for reproducible Windows/WSL source inspection; binary files are not normalized."
+    },
+    {
+      "path": "docs/phase-08-5-audit.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original retrospective audit, measured local coverage and explicit unresolved security dependencies; not external certification or private deployment data."
+    },
+    {
+      "path": "docs/phase-08-5-blocker-inventory.json",
+      "classification": "GENERATED_FILE",
+      "notes": "Generated source-keyword location inventory with reviewed classifications; no runtime state, live identities or secret content."
+    },
+    {
+      "path": "solana/tests/local-withdrawal-record.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated real-validator audit regression for atomic burn/withdrawal record lifecycle only; no Phase 09 payout implementation or imported code."
+    },
+    {
+      "path": "scripts/source-audit.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original exact provenance coverage and non-secret publication-boundary checks."
+    },
+    {
+      "path": "scripts/tests/source-audit.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original executable publication/provenance guard regressions; synthetic non-operational values only."
+    },
     {
       "path": "native/frost/policy/dkg-messages.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
@@ -1750,6 +1815,78 @@
       "path": "tests/windows/local-security-fixture.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original current-principal disposable Windows test enrollment helper, not a production installer or cross-service identity claim."
+    },
+    {
+      "path": "docs/security/deposit-fee-payer.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original constrained transaction-identity boundary, failure evidence and limitations."
+    },
+    {
+      "path": "docs/security/protected-deposit-controller.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original controller boundaries, test scopes, failure record and remaining integration limitations without operational values."
+    },
+    {
+      "path": "services/attesters/protected-client.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original role-bound protected attester client with exact canonical context and Ed25519 response verification; no private key or upstream source."
+    },
+    {
+      "path": "services/bridge-validator/deposit-controller-state.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original bounded immutable orchestration-state validation; economic accounting is reused from the existing operation journal."
+    },
+    {
+      "path": "services/bridge-validator/deposit-fee-payer-ipc.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original exact-role/context signing request and immutable validated response over protected IPC."
+    },
+    {
+      "path": "services/bridge-validator/protected-deposit-controller.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original LOCALNET protected controller composing existing independently verified services and durable journals; no production activation or private key."
+    },
+    {
+      "path": "services/bridge-validator/protected-deposit-fee-payer.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original protected key lifecycle and exact canonical deposit transaction preparation; no arbitrary signer or mint authority."
+    },
+    {
+      "path": "services/bridge-validator/tests/deposit-controller-state.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original controller codec and attester-client adversarial regressions; synthetic chain data clearly separated from actual chain execution."
+    },
+    {
+      "path": "services/bridge-validator/tests/deposit-fee-payer.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original request/response/capability/role tests using ephemeral synthetic evidence."
+    },
+    {
+      "path": "solana/tests/local-windows-protected-controller-host.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original explicit Localnet real-chain host for disposable protected-service tests; no upstream source import, production installation or cross-SID certification."
+    },
+    {
+      "path": "tests/integration/deposit-controller-fixture.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original disposable external FROST and in-memory Ed25519 fixture for controller codec tests; no operational material or raw secret vectors committed."
+    },
+    {
+      "path": "tests/windows/local-deposit-service-actor.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original explicit CurrentUser separate protected-role process fixture; no upstream source import, production installation or cross-SID certification."
+    },
+    {
+      "path": "tests/windows/local-protected-controller.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original disposable Windows protected-service and actual-chain test orchestration; no upstream source import, production installation or cross-SID certification."
     }
-  ]
+  ],
+  "phase085ProtectedControllerReview": {
+    "baseline": "27a4fcf647ccb9518d003eff46c9a152ae0b6ba8",
+    "filesBefore": 279,
+    "filesAfter": 292,
+    "sourceImports": "None. Original Localnet protected controller, separate canonical Solana fee payer, exact attester clients and current-principal real-chain test service composition. Existing reviewed FROST, chain verification, storage and economic journal implementations are reused without importing third-party source or changing dependencies.",
+    "scope": "Separate frozen candidate reached COMPLETED through actual protected Windows services and independent Linux chain rechecks. Primary integration, the complete actual service restart matrix and final clean-clone certification remain under validation. Cross-service SID certification is not claimed."
+  }
 }

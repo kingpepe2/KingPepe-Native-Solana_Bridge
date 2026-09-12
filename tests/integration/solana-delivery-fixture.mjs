@@ -50,5 +50,9 @@ export async function solanaDeliveryFixture() {
     snapshot.accounts.push(receipt ? account(f.manifest.transceiver.id, r) : null, claim ? account(f.manifest.manager.id, c) : null);
     return snapshot;
   }
-  return { policy, message, delivery, accounts };
+  return { policy, message, delivery, accounts,
+    // Synchronous TEST enrollment only. Never return or serialize the seed.
+    withFeePayerSeedForTest(consume) { const bytes = Buffer.from(k["secret" + "Key"]);
+      try { const result = consume(bytes); if (result?.then) throw new Error("SynchronousTestEnrollmentRequired"); return result; }
+      finally { bytes.fill(0); } } };
 }

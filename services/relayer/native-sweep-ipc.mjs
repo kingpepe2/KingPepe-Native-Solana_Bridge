@@ -12,7 +12,13 @@ export function nativeSweepIpcHandler({ outbox, policy, integrity }) {
     check(peerRole === "BRIDGE_VALIDATOR" && ["enqueueNativeSweep", "nativeSweepStatus"].includes(method));
     const delivery = validateNativeSweepDelivery(payload, pinned); check(delivery.plan.operationId === operationId);
     requireNativeSweepOutbox(outbox, pinned, integrity);
-    return method === "enqueueNativeSweep" ? outbox.enqueue(delivery) : outbox.status(operationId);
+    if (method === "enqueueNativeSweep") return outbox.enqueue(delivery);
+    try { return await outbox.status(operationId); }
+    catch (error) {
+      if (error?.message !== "NativeSweepDeliveryMissing") throw error;
+      // An authenticated negative lookup is distinct from transport/auth failure.
+      return { state: "NOT_ENQUEUED", operationId, txid: parseNativeTransactionHex(delivery.signedTransactionHex).txidHex };
+    }
   };
 }
 export function validateNativeSweepResponse(input, delivery, policy, method) {
@@ -21,7 +27,7 @@ export function validateNativeSweepResponse(input, delivery, policy, method) {
   check(["enqueueNativeSweep", "nativeSweepStatus"].includes(method));
   check(value.operationId === expected.plan.operationId && value.txid === parseNativeTransactionHex(expected.signedTransactionHex).txidHex);
   check(method === "enqueueNativeSweep" ? value.state === "ACCEPTED" :
-    ["BROADCAST_OBSERVED", "WAITING_FOR_DEPENDENCY", "QUEUED_BY_LIMIT"].includes(value.state));
+    ["NOT_ENQUEUED", "BROADCAST_OBSERVED", "WAITING_FOR_DEPENDENCY", "QUEUED_BY_LIMIT"].includes(value.state));
   return Object.freeze(value); // OBSERVED is not a finality or credit attestation.
 }
 export class ProtectedNativeSweepClient {

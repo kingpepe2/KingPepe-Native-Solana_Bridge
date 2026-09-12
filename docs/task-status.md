@@ -1,5 +1,69 @@
 # KingPepe Native - Solana Bridge Task Status
 
+## Selected actual restart/reorg integration
+
+The newer separate candidate passes nine actual-chain groups, three settlement
+controller kills/reopens, protected Native-to-Solana COMPLETED and independent
+Linux chain checks. It then creates a genuine higher-work post-mint Native fork,
+retains the exact incident, restarts all protected role processes/authority and
+proves stop admission persists even after chain health recovery. Both harnesses
+exit zero; unchanged 205-file runtime:
+c5b55565dfe2c9a7f8d8be813167f00c32f29a038b891f9afa838a43d694f182.
+These scoped CurrentUser tests do not certify distinct service principals,
+host reboot, the full kill matrix or either earlier failed run.
+
+Reviewed code is integrated into primary runtime
+df5ef0920b5c4a1315384fd43d223dee7f99aea186989d4921828d851e188d6f.
+Primary Node passes 935 plus two vectors per platform, zero failed/skipped/
+cancelled and both exits zero. Actual primary credit mode passes eleven groups,
+all five kill/reopen points, protected flow COMPLETED, independent chain checks,
+post-mint fork/incident and durable stop after all protected service process
+restarts and chain recovery. Both harnesses exit zero; runtime remains unchanged.
+The 292-file provenance/guardrail/license checks and source/182-commit secret
+scans pass. Next: final staged/outgoing scan/review and private publication of the
+logical controller increment; remaining actual kill coverage, then
+final clean-clone regression and full Phases 01-08 re-audit. Phase 09 is NOT_STARTED.
+
+## Current protected controller continuation
+
+Delivery source is published PRIVATE at
+27a4fcf647ccb9518d003eff46c9a152ae0b6ba8. Exact Actions 34673553925 is
+NOT_RUN_ACCOUNT_BLOCKED: four jobs, zero steps, zero artifacts. Source, staged,
+prior history and outgoing scans passed. See development-status for exact
+source-bound evidence; the older sections below are historical increments.
+
+Primary work now integrates the independently tested protected controller,
+canonical fee payer and attester clients. Frozen candidate evidence: Node
+924 plus two vectors on each platform; Windows security 164, zero failed/
+skipped/cancelled with exit zero; actual separate CurrentUser protected service
+flow and independent Linux chain recheck COMPLETED, both processes exit zero.
+Runtime 205 files:
+eec0c7c8f970345c807515404ba08a18cdb30d330f498091db7e79cc1cdca026.
+Five additional primary portable regressions pass. Primary full gates, actual
+process-kill matrix and final clean clone are not yet certified.
+
+Primary Windows/WSL Node now pass 929 plus two vectors each. The primary actual
+protected-chain rerun FAILED its bounded completion deadline after repeated
+claim delivery, without an observed finalized mint. Both harnesses exited one;
+the cause is under investigation. Full primary Windows security passed 164,
+zero failed/skipped/cancelled, exit zero in 2893931.3578 ms.
+Frozen runtime: 907bcf3f6e8168fe8bf0cdf5102cbaebb4142a62b5b5b46ebd830e73b6b401a0.
+Do not attribute the successful separate candidate run to this primary failure.
+
+The subsequent separate candidate exercised all five actual broadcast/credit
+controller kill points and internally reached COMPLETED, but its independent
+Linux recheck failed. Whole run remains FAIL, cause not yet established.
+New precise host stages and filtered transaction diagnostics are being tested;
+the added six redaction cases pass in an 87-test portable subset. No new commit
+or full-audit certification follows from these partial results.
+
+Next: diagnose the independent-recheck and primary claim-delivery failures, validate/publish the logical
+controller increment, finish actual protected
+service restart/reorg coverage, then fresh-clone validation and full Phases 01–08
+re-audit. Keep cross-SID Windows testing BLOCKED_ENVIRONMENT until distinct
+temporary principals and an isolated elevated test environment exist. Never
+infer a pass from current-principal tests. No Phase 09, production or CI bypass.
+
 ## Current protected delivery integration
 
 Reconciliation is published PRIVATE at

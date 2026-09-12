@@ -311,6 +311,7 @@ export async function executeNativeDepositObservationFlow({
   nativeEvidenceVerifierFactory = createLocalNativeEvidenceVerifier,
   solanaSetup = submitLocalnetSolanaSetup,
   solanaDepositClaim = submitLocalnetSolanaDepositClaim,
+  protectedDepositPreparation = undefined,
 }) {
   const config = requireObject(flowConfig, "flowConfig");
   const setupContext = validateLocalSolanaSetupContext(localSolanaSetupContext, config);
@@ -510,6 +511,18 @@ export async function executeNativeDepositObservationFlow({
       canonicalReserveScriptPubKeyHex: custodyScriptPubKeyHex,
     }),
   });
+  if (protectedDepositPreparation !== undefined) {
+    if (typeof protectedDepositPreparation !== "function") throw new Error("ProtectedDepositPreparationCallbackRequired");
+    // TEST orchestration boundary: prepare a real user-funded regtest intent
+    // without creating ANY signature, broadcast, reserve credit or mint here.
+    // The separate protected Windows services must perform the remaining flow;
+    // this result is deliberately NOT called COMPLETED.
+    await protectedDepositPreparation({ plan, flowConfig: config, setupContext, nativeSource, depositIntentContext, depositPolicy,
+      inputs: evidenceInputs, inputEvidence, reserveSweepDraft, taprootSighashEvidences, spentOutputs, tapscriptSpends,
+      operationIdHex: sweepOperationIdHex, miningAddress, canonicalReserveAddress });
+    return Object.freeze({ state: "LOCAL_PROTECTED_DEPOSIT_PREPARED", signed: false, broadcast: false, minted: false,
+      productionReady: false, mainnetActivation: "DISABLED" });
+  }
   const signedReserveSweep = await reserveSweepSigner({
     plan,
     flowConfig: config,

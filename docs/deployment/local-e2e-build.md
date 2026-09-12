@@ -163,6 +163,40 @@ Native verifier is selected by `KINGPEPE_TEST_NATIVE_VERIFIER` and its verified
 source. Current-principal DPAPI/mTLS/live-chain execution is not certification of
 separate service accounts or the complete protected deposit workflow.
 
+The complete protected controller pairs
+`solana/tests/local-windows-protected-controller-host.mjs` on Linux with
+`tests/windows/local-protected-controller.mjs` on Windows. Both use a NEW external
+`KINGPEPE_LOCAL_WINDOWS_CHAIN_ROOT`; the Linux host also needs a NEW external
+`KINGPEPE_LOCAL_E2E_ROOT` and verified external SBF output. Do not copy an old
+ledger, key, protected journal or authority into the new test setup.
+
+Windows `KINGPEPE_TEST_CONTROLLER_RESTART_GROUP` selects `NONE`, `DEPOSIT`,
+`CREDIT`, `CLAIM` or `SETTLEMENT`. Set
+`KINGPEPE_TEST_CONTROLLER_POST_MINT_REORG=1` in BOTH hosts to require the actual
+higher-work regtest fork and protected-service restart/stop test. Every selected
+kill must execute; missing coverage fails. Both hosts must exit zero, including
+independent chain rechecks and cleanup. Internal controller completion alone is
+not a passing test. These are CurrentUser tests, not distinct service principals.
+
+An installed, verified Linux GNU cross-toolchain can build the Windows Native
+verifier without installing Rust into Windows. The exercised build uses
+`nightly-2023-10-29`, installed target `x86_64-pc-windows-gnu` and installed
+`x86_64-w64-mingw32-gcc` reporting `13-posix`. With a NEW external
+`CARGO_TARGET_DIR`, run:
+
+```sh
+CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc \
+  cargo +nightly-2023-10-29 build --locked --manifest-path native/proof/Cargo.toml \
+  --bin kingpepe-native-evidence --target x86_64-pc-windows-gnu
+```
+
+Verify the generated executable hash before supplying the two Windows verifier
+environment references above. A cold cross-build passed, but building alone is
+not a Windows execution/chain acceptance test or a reproducible-binary claim.
+Final clean-clone validation must rebuild from that clone and exercise that
+exact output. The external compiler/runtime retains its third-party terms;
+neither the compiler nor generated debug binaries are published in source.
+
 Tool references: [Agave 4.2.2 release](https://github.com/anza-xyz/agave/releases/tag/v4.2.2),
 [SBF builder](https://github.com/anza-xyz/cargo-build-sbf),
 [Native source pin](https://github.com/kingpepe2/king-pepe-source-code/tree/3f2621820ffefae59cbe48b350f5f8f6ec8a6da5).

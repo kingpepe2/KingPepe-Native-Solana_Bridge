@@ -46,6 +46,13 @@ import { solanaDeliveryFixture } from "../integration/solana-delivery-fixture.mj
 import { initialSolanaDepositOutbox, decodeSolanaDepositOutbox, validateSolanaDepositDelivery, solanaDeliveryId } from "../../services/relayer/solana-deposit-delivery.mjs";
 import { ProtectedSolanaDepositOutbox } from "../../services/relayer/protected-solana-deposit-outbox.mjs";
 import { ProtectedSolanaDepositClient, solanaDepositIpcHandler } from "../../services/relayer/solana-deposit-ipc.mjs";
+import { ProtectedDepositFeePayer } from "../../services/bridge-validator/protected-deposit-fee-payer.mjs";
+import { ProtectedDepositFeePayerClient, depositFeePayerIpcHandler } from "../../services/bridge-validator/deposit-fee-payer-ipc.mjs";
+import { depositControllerFixture } from "../integration/deposit-controller-fixture.mjs";
+import { initialDepositControllerState } from "../../services/bridge-validator/deposit-controller-state.mjs";
+import { ProtectedDepositController } from "../../services/bridge-validator/protected-deposit-controller.mjs";
+import { ProtectedNativeSweepClient } from "../../services/relayer/native-sweep-ipc.mjs";
+import { ProtectedDepositAttesterClient } from "../../services/attesters/protected-client.mjs";
 
 if (process.platform !== "win32") throw new Error("WINDOWS_IPC_TESTS_REQUIRE_WINDOWS");
 const repoRoot = path.resolve(import.meta.dirname, "../.."), serviceSid = windowsCurrentServiceSid();
@@ -110,6 +117,15 @@ async function integrityFixture(t, initialState = "RUNNING") {
       return { ...f, port, guard: new RemoteIntegrityGuard({ ipc: f.client, port }) };
     } };
 }
+
+for (const role of ["COORDINATOR", "BRIDGE_VALIDATOR"]) test("concurrent integrity status requests do not collide inside one service guard: " + role, async t => {
+  // Real CurrentUser DPAPI and mTLS. Read-only status needs no synthetic chain
+  // health and is not proof of transfer authorization or chain finality.
+  const global = await integrityFixture(t), peer = await global.peer(role);
+  const results = await Promise.allSettled([peer.guard.status(h("concurrent-read-a")), peer.guard.status(h("concurrent-read-b"))]);
+  assert.equal(results.filter(r => r.status === "fulfilled").length, 2, "LegitimateGuardReadsCollided");
+  for (const r of results) assert.equal(r.value.state, "PAUSED_POLICY");
+});
 
 async function isolatedIntegrityFixture(t) {
   // Real process separation keeps the synthetic source watchdog independent of
@@ -182,6 +198,172 @@ async function protectedDepositFixture(t) {
   return { ...data, global, peer, opts, store, journal, open };
 }
 
+
+// These controller tests use actual CurrentUser DPAPI, retained witnesses,
+// lifetime leases and mTLS authority. Native is explicitly UNAVAILABLE;
+// no test here claims full protected-chain execution.
+async function protectedControllerFixture(t) {
+  const global = await isolatedIntegrityFixture(t), peer = await global.peer("BRIDGE_VALIDATOR");
+  const data = await depositControllerFixture({ root: path.join(peer.root, "controller-crypto"), repoRoot, solanaDeployment: deployment });
+  t.after(() => data.dispose()); const dp = data.policy.deliveryPolicy, op = dp.operationPolicy;
+  let calls = 0;
+  const clients = [["COORDINATOR", ProtectedSweepJobClient, op], ["RELAYER", ProtectedNativeSweepClient, op],
+    ["RELAYER", ProtectedSolanaDepositClient, dp], ["FEE_PAYER", ProtectedDepositFeePayerClient, dp],
+    ["ATTESTER_A", ProtectedDepositAttesterClient, dp], ["ATTESTER_B", ProtectedDepositAttesterClient, dp]].map(([role, Type, policy]) => {
+    const tr = fixture(t, role, "BRIDGE_VALIDATOR");
+    tr.client.request = async () => { calls++; throw new Error("TEST_REMOTE_OPERATION_FORBIDDEN"); };
+    return new Type({ ipc: tr.client, port: 23456, role, policy });
+  });
+  const bookOptions = options(peer.root, "controller-book", "BRIDGE_VALIDATOR", "deposit-operations"), initialBook = initialDepositOperationState(op);
+  const bookStore = WindowsProtectedStore.create(bookOptions, initialBook); initialBook.fill(0);
+  const book = await ProtectedDepositOperationJournal.open({ store: bookStore, integrity: peer.guard, policy: op });
+  cleanups.get(peer.root).push(() => book.close());
+  const opts = options(peer.root, "controller", "BRIDGE_VALIDATOR", "deposit-controller"), initial = initialDepositControllerState(data.policy);
+  const store = WindowsProtectedStore.create(opts, initial); initial.fill(0);
+  const nativeVerifier = new LocalNativeEvidenceVerifier({ rpc: { async getBlockchainInfo() { throw new Error("TEST_NATIVE_UNAVAILABLE"); } },
+    executable: path.join(peer.root, "unavailable-verifier") });
+  let controller; const config = { integrity: peer.guard, policy: data.policy, journal: book, nativeVerifier, jobs: clients[0], nativeOutbox: clients[1],
+    solanaOutbox: clients[2], feePayer: clients[3], attesters: clients.slice(4), endpoint: "http://127.0.0.1:23457/" };
+  const open = async (next = new WindowsProtectedStore(opts)) => { controller = await ProtectedDepositController.open({ ...config, store: next }); return controller; };
+  await open(store); cleanups.get(peer.root).push(() => controller.close());
+  return { ...data, global, peer, opts, store, config, book, open, get controller() { return controller; }, get calls() { return calls; } };
+}
+test("protected controller retains observed intent and idempotency across actual store reopen", async t => {
+  const f = await protectedControllerFixture(t), id = f.plan.operationId;
+  assert.equal((await f.controller.submit(f.plan)).state, "OBSERVED");
+  const revision = f.store.read(); const expected = revision.revision; revision.payload.fill(0);
+  assert.equal((await f.controller.submit(f.plan)).state, "OBSERVED");
+  const retry = f.store.read(); assert.equal(retry.revision, expected); retry.payload.fill(0);
+  await f.controller.close(); await f.open();
+  assert.deepEqual((await f.controller.inspect(id)).record.plan, f.plan);
+  assert.equal((await f.book.snapshot()).operations.length, 0); assert.equal(f.calls, 0);
+});
+test("protected controller refuses unavailable Native evidence without signing or credit", async t => {
+  const f = await protectedControllerFixture(t); await f.controller.submit(f.plan); await f.global.enableTestSources();
+  await assert.rejects(f.controller.advance(f.plan.operationId));
+  const r = (await f.controller.inspect(f.plan.operationId)).record;
+  assert.equal(r.nativeValidationDigest, null); assert.equal(r.credit, null);
+  assert.equal((await f.book.snapshot()).operations.length, 0); assert.equal(f.calls, 0);
+});
+test("protected controller global stop survives authority and controller reopen without remote economic requests", async t => {
+  const f = await protectedControllerFixture(t); await f.controller.submit(f.plan);
+  const monitor = await f.global.peer("SOLANA_OBSERVER"); await monitor.guard.report(h("controller-stop"), "SOLANA_DEPLOYMENT_CHANGED", h("actual-fixture-incident"));
+  assert.equal((await f.controller.advance(f.plan.operationId)).state, "HARD_STOP");
+  await f.controller.close(); await f.global.restart(); await f.open();
+  assert.equal((await f.controller.advance(f.plan.operationId)).state, "HARD_STOP");
+  assert.equal(f.calls, 0); assert.equal((await f.book.snapshot()).operations.length, 0);
+});
+test("protected controller rejects simultaneous lifetime instance and wrong protected role", async t => {
+  const f = await protectedControllerFixture(t);
+  await assert.rejects(ProtectedDepositController.open({ ...f.config, store: new WindowsProtectedStore(f.opts) }));
+  assert.throws(() => new WindowsProtectedStore({ ...f.opts, context: { ...f.opts.context, role: "COORDINATOR" } }), /ProtectedRolePurposeInvalid/u);
+  assert.equal(f.calls, 0);
+});
+test("protected controller uncertain successful CAS recovers the identical retained observation", async t => {
+  const f = await protectedControllerFixture(t), write = f.store.write.bind(f.store); let lose = true;
+  f.store.write = (...args) => { const out = write(...args); if (lose) { lose = false; throw new Error("TEST_LOST_CAS_ACK"); } return out; };
+  await assert.rejects(f.controller.submit(f.plan), /TEST_LOST_CAS_ACK/u);
+  assert.equal((await f.controller.submit(f.plan)).state, "OBSERVED");
+  assert.deepEqual((await f.controller.inspect(f.plan.operationId)).record.plan, f.plan); assert.equal(f.calls, 0);
+});
+test("protected controller copied old file image cannot revive against the retained profile witness", async t => {
+  const f = await protectedControllerFixture(t), files = [path.join(f.opts.root, "state.protected"), path.join(f.opts.anchorRoot, "state.protected")];
+  const old = files.map(file => readFileSync(file)); await f.controller.submit(f.plan); await f.controller.close();
+  files.forEach((file, i) => { writeFileSync(file, old[i]); old[i].fill(0); });
+  await assert.rejects(f.open()); assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+  await f.global.restart(); assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY"); assert.equal(f.calls, 0);
+});
+test("protected controller authenticated malformed state propagates durable global stop", async t => {
+  const f = await protectedControllerFixture(t), r = f.store.read(); r.payload.fill(0);
+  f.store.write(Buffer.from("malformed-controller-fixture"), r.revision);
+  await assert.rejects(f.controller.submit(f.plan)); assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY"); assert.equal(f.calls, 0);
+});
+
+async function protectedDepositFeeFixture(t) {
+  const global = await isolatedIntegrityFixture(t), peer = await global.peer("FEE_PAYER"), f = await solanaDeliveryFixture();
+  const control = { snapshot: f.accounts(), height: 100, hook: undefined }; let serverFailed = false;
+  const server = http.createServer(async (req, res) => {
+    try {
+      let text = ""; for await (const b of req) { text += b.toString("utf8"); assert(text.length <= 16000); }
+      const request = JSON.parse(text); let result;
+      if (request.method === "getGenesisHash") result = control.snapshot.genesis;
+      else if (request.method === "getBlockHeight") result = control.height;
+      else if (request.method === "getMultipleAccounts") {
+        result = { context: { slot: control.snapshot.slot }, value: control.snapshot.accounts.slice(0, -2) };
+        if (control.hook) { const hook = control.hook; control.hook = undefined; await hook(); }
+      } else throw new Error("UnexpectedFeePayerRpc");
+      res.setHeader("content-type", "application/json"); res.end(JSON.stringify({ jsonrpc: "2.0", id: request.id, result }));
+    } catch { serverFailed = true; res.destroy(); }
+  });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => new Promise((resolve, reject) => { server.closeAllConnections(); server.close(() => serverFailed ? reject(new Error("FeePayerSyntheticRpcFailed")) : resolve()); }));
+  const endpoint = "http://127.0.0.1:" + server.address().port, opts = options(peer.root, "fee-payer", "FEE_PAYER", "fee-payer-seed");
+  let store = f.withFeePayerSeedForTest(bytes => WindowsProtectedStore.create(opts, bytes));
+  const open = () => ProtectedDepositFeePayer.open({ store, integrity: peer.guard, policy: f.policy, endpoint });
+  let feePayer = await open(); cleanups.get(peer.root).push(() => feePayer.close());
+  const transport = fixture(t, "FEE_PAYER", "BRIDGE_VALIDATOR"); let loseAck = false, didLose = false;
+  const port = await transport.server.listen(async input => {
+    const result = await depositFeePayerIpcHandler({ feePayer, policy: f.policy, integrity: peer.guard })(input);
+    if (loseAck) { loseAck = false; didLose = true; throw new Error("TEST_FEE_PAYER_ACK_LOST"); } return result;
+  });
+  const client = new ProtectedDepositFeePayerClient({ ipc: transport.client, port, policy: f.policy });
+  await global.enableTestSources();
+  return { ...f, global, peer, opts, control, endpoint, client, transport, port, open,
+    get feePayer() { return feePayer; }, get store() { return store; }, loseAck() { loseAck = true; }, get didLose() { return didLose; },
+    async reopen() { await feePayer.close(); store = new WindowsProtectedStore(opts); feePayer = await open(); } };
+}
+for (const kind of ["RECEIPT", "CLAIM"]) test("protected fee payer prepares exact canonical " + kind + " through mTLS without sharing its key", async t => {
+  const f = await protectedDepositFeeFixture(t), expected = await f.delivery(kind), { preparedTransactionBase64, ...intent } = expected;
+  const result = await f.client.prepare(intent); assert.equal(result.preparedTransactionBase64, preparedTransactionBase64);
+  const bytes = JSON.stringify(result); assert.equal(Object.keys(result).length, 8); assert(!bytes.includes("privateKey") && !bytes.includes("seed"));
+  await f.reopen(); assert.deepEqual(await f.client.prepare(intent), result);
+});
+test("protected fee payer lost response repeats only the identical signed packet", async t => {
+  const f = await protectedDepositFeeFixture(t), expected = await f.delivery(), { preparedTransactionBase64, ...intent } = expected;
+  f.loseAck(); await assert.rejects(f.client.prepare(intent)); assert(f.didLose);
+  await f.reopen(); assert.equal((await f.client.prepare(intent)).preparedTransactionBase64, preparedTransactionBase64);
+});
+test("protected fee payer rejects invalid evidence before private key access", async t => {
+  const f = await protectedDepositFeeFixture(t), { preparedTransactionBase64, ...intent } = await f.delivery();
+  let reads = 0; const read = f.store.read.bind(f.store); f.store.read = () => { reads++; return read(); };
+  for (const changed of [
+    { ...intent, attestations: [intent.attestations[0], intent.attestations[0]] },
+    { ...intent, encodedMessageHex: intent.encodedMessageHex.slice(0, -2) + "ff" },
+    { ...intent, minimumSlot: "99999999" },
+    { ...intent, lastValidBlockHeight: "1" },
+    { ...intent, unauthorized: true },
+  ]) await assert.rejects(f.client.prepare(changed));
+  await assert.rejects(f.transport.client.request(f.port, { method: "prepareSolanaDeposit", operationId: h("wrong request"), payload: intent }));
+  assert.equal(reads, 0); f.store.read = read;
+});
+test("protected fee payer rechecks global stop after actual RPC transport before key access", async t => {
+  const f = await protectedDepositFeeFixture(t), observer = await f.global.peer("SOLANA_OBSERVER"), { preparedTransactionBase64, ...intent } = await f.delivery();
+  let reads = 0; const read = f.store.read.bind(f.store); f.store.read = () => { reads++; return read(); };
+  f.control.hook = () => observer.guard.report(h("fee payer deployment"), "SOLANA_DEPLOYMENT_CHANGED", h("synthetic confirmed mutation"));
+  await assert.rejects(f.client.prepare(intent)); assert.equal(reads, 0);
+  assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY"); f.store.read = read;
+});
+test("protected fee payer detects actual RPC genesis mismatch and propagates durable stop", async t => {
+  const f = await protectedDepositFeeFixture(t), { preparedTransactionBase64, ...intent } = await f.delivery();
+  f.control.snapshot.genesis = "11111111111111111111111111111111";
+  await assert.rejects(f.client.prepare(intent)); assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+  await f.global.restart(); assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+});
+test("protected fee payer refuses duplicate process state and changed protected seed", async t => {
+  const f = await protectedDepositFeeFixture(t), { preparedTransactionBase64, ...intent } = await f.delivery();
+  await assert.rejects(ProtectedDepositFeePayer.open({ store: new WindowsProtectedStore(f.opts), integrity: f.peer.guard, policy: f.policy, endpoint: f.endpoint }));
+  const read = f.store.read(); const changed = randomBytes(32);
+  try { f.store.write(changed, read.revision); } finally { changed.fill(0); read.payload.fill(0); }
+  await assert.rejects(f.client.prepare(intent)); assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+});
+test("protected fee payer cannot open an attester or bridge-validator key context", async t => {
+  const f = await protectedDepositFeeFixture(t);
+  assert.throws(() => new WindowsProtectedStore({ ...f.opts, context: { ...f.opts.context, role: "BRIDGE_VALIDATOR" } }), /ProtectedRolePurposeInvalid/u);
+  const attester = options(f.peer.root, "not-fee-payer", "ATTESTER_A", "attester-seed"), bytes = randomBytes(32);
+  let store; try { store = WindowsProtectedStore.create(attester, bytes); } finally { bytes.fill(0); }
+  try { await assert.rejects(ProtectedDepositFeePayer.open({ store, integrity: f.peer.guard, policy: f.policy, endpoint: f.endpoint })); } finally { store.close(); }
+});
+
 // Real protected storage/mTLS and HTTP transport, SYNTHETIC Solana accounts.
 // These are failure-boundary tests, not local-validator or chain evidence.
 async function protectedSolanaDeliveryFixture(t) {
@@ -229,6 +411,26 @@ async function protectedSolanaDeliveryFixture(t) {
     loseEnqueue() { loseEnqueue = true; }, get didLoseEnqueue() { return didLoseEnqueue; },
     async reopen() { await outbox.close(); store = new WindowsProtectedStore(opts); outbox = await open(); } };
 }
+
+test("protected Solana delivery authenticates a missing lookup without authorizing or broadcasting", async t => {
+  const f = await protectedSolanaDeliveryFixture(t), before = f.probe();
+  for (const kind of ["RECEIPT", "CLAIM"]) {
+    const packet = await f.makeDelivery(kind), result = await f.client.status(packet);
+    assert.equal(result.state, "NOT_ENQUEUED"); assert.equal(result.operationId, packet.operationId); assert.equal(result.kind, kind);
+    assert(!Object.hasOwn(result, "observedSlot"));
+  }
+  assert.equal(f.probe().revision, before.revision); assert.equal(f.probe().state.records.length, 0); assert.equal(f.control.sends.length, 0);
+  f.loseEnqueue(); await assert.rejects(f.client.status(f.delivery)); assert(f.didLoseEnqueue);
+  assert.equal((await f.client.status(f.delivery)).state, "NOT_ENQUEUED");
+  await f.client.enqueue(f.delivery); assert.equal((await f.client.status(f.delivery)).state, "WAITING_FOR_DEPENDENCY");
+});
+
+test("protected Solana delivery never turns corrupted state into a negative lookup", async t => {
+  const f = await protectedSolanaDeliveryFixture(t), r = f.store.read(); r.payload.fill(0);
+  f.store.write(Buffer.from("corrupt-solana-outbox-fixture"), r.revision);
+  await assert.rejects(f.client.status(f.delivery));
+  assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY"); assert.equal(f.control.sends.length, 0);
+});
 
 test("protected Solana delivery persists before lost mTLS acceptance and rejects substituted operation", async t => {
   const f = await protectedSolanaDeliveryFixture(t); f.loseEnqueue();

@@ -6,7 +6,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { assertWindowsProtectedStore } from "../../shared/windows/protected-store.mjs";
 import { requireIntegrityGuard } from "../supervisor/protected-integrity.mjs";
 import { LocalDeploymentRpc } from "../solana-observer/deployment-integrity.mjs";
-import { SolanaLocalRpcClient } from "../bridge-validator/solana-deposit-claim-submitter.mjs";
+import { SolanaLocalRpcClient, sanitizedRpcDiagnostic } from "../bridge-validator/solana-deposit-claim-submitter.mjs";
 import { canonicalJson } from "../../native/frost/policy/native-signing-policy.mjs";
 import { validateSolanaDeliveryPolicy, solanaDeliveryPolicyDigest, validateSolanaDepositDelivery, solanaDeliveryId,
   decodeSolanaDepositOutbox, newSolanaDeliveryRecord, validateSolanaDeliveryStatus, verifySolanaDeliveryAccounts,
@@ -167,7 +167,8 @@ export class ProtectedSolanaDepositOutbox {
       return Object.freeze({ state: "WAITING_FOR_FINALITY", deliveryId: id });
     } catch (error) {
       await this.#report(error);
-      return Object.freeze({ state: this.#stopped ? "HARD_STOP_INTEGRITY" : "WAITING_FOR_DEPENDENCY", reason: "SOLANA_DEPOSIT_DELIVERY_UNAVAILABLE" });
+      return Object.freeze({ state: this.#stopped ? "HARD_STOP_INTEGRITY" : "WAITING_FOR_DEPENDENCY",
+        reason: "SOLANA_DEPOSIT_DELIVERY_UNAVAILABLE", ...sanitizedRpcDiagnostic(error) });
     } finally { this.#running = false; }
   }
   async run({ signal, intervalMs = 1000, onStatus = () => {} }) {

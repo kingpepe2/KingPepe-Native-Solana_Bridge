@@ -28,15 +28,16 @@ export function validateSolanaDeliveryPolicy(input) {
   const { policy, manifest } = validateReconciliationBinding(input.operationPolicy, input.manifest);
   key(input.feePayerPublicKey);
   check(!deploymentAddresses(manifest).includes(input.feePayerPublicKey));
+  check(!manifest.config.attesters.includes(input.feePayerPublicKey));
   return Object.freeze({ operationPolicy: policy, manifest, feePayerPublicKey: input.feePayerPublicKey });
 }
 export function solanaDeliveryPolicyDigest(input) {
   const p = validateSolanaDeliveryPolicy(input);
   return digest([SOLANA_DELIVERY_PROTOCOL, depositOperationPolicyDigest(p.operationPolicy), deploymentManifestDigest(p.manifest), p.feePayerPublicKey]);
 }
-export function validateSolanaDepositDelivery(input, policy) {
+export function validateSolanaDepositSigningIntent(input, policy) {
   const p = validateSolanaDeliveryPolicy(policy), v = structuredClone(input);
-  fields(v, ["operationId", "kind", "encodedMessageHex", "attestations", "preparedTransactionBase64", "recentBlockhash", "lastValidBlockHeight", "minimumSlot"]);
+  fields(v, ["operationId", "kind", "encodedMessageHex", "attestations", "recentBlockhash", "lastValidBlockHeight", "minimumSlot"]);
   hash(v.operationId); check(["RECEIPT", "CLAIM"].includes(v.kind));
   check(typeof v.encodedMessageHex === "string" && /^[0-9a-f]{1028}$/u.test(v.encodedMessageHex) && Buffer.byteLength(JSON.stringify(v)) <= 12000);
   const m = decodeCanonicalBridgeMessage(Buffer.from(v.encodedMessageHex, "hex")), op = p.operationPolicy, d = m.deployment;
@@ -55,6 +56,14 @@ export function validateSolanaDepositDelivery(input, policy) {
   }
   key(v.recentBlockhash); deliveryUint(v.lastValidBlockHeight);
   check(deliveryUint(v.minimumSlot) >= deliveryUint(op.minimumSolanaSlot));
+  return { intent: v, message: m };
+}
+export function validateSolanaDepositDelivery(input, policy) {
+  fields(input, ["operationId", "kind", "encodedMessageHex", "attestations", "preparedTransactionBase64", "recentBlockhash", "lastValidBlockHeight", "minimumSlot"]);
+  const { preparedTransactionBase64, ...intent } = input;
+  const p = validateSolanaDeliveryPolicy(policy), checked = validateSolanaDepositSigningIntent(intent, p), m = checked.message, op = p.operationPolicy;
+  const v = { ...checked.intent, preparedTransactionBase64 };
+  check(Buffer.byteLength(JSON.stringify(v)) <= 12000);
   const config = { environment: "localnet", cluster: "localnet", managerProgramIdHex: op.managerProgramId, transceiverProgramIdHex: op.transceiverProgramId,
     mintHex: op.mint, recipientTokenAccountHex: m.destinationHex, encodedMessageHex: v.encodedMessageHex, attestations: v.attestations,
     recentBlockhashBase58: v.recentBlockhash, lastValidBlockHeight: v.lastValidBlockHeight, preparedTransactionBase64: v.preparedTransactionBase64 };

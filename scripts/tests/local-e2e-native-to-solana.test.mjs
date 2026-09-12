@@ -902,6 +902,38 @@ test("deposit observation flow rejects raw transaction txid mismatch", async () 
   }
 });
 
+for (const mode of ["prepared", "rejected", "malformed"]) test("protected preparation model never falls through to legacy economic execution: " + mode, async () => {
+  // Explicit orchestration model; actual protected-chain execution is separate.
+  const runRoot = mkdtempSync(path.join(os.tmpdir(), "kingpepe-preparation-boundary-"));
+  const executor = new FakeExecutor(); let calls = 0, legacy = 0;
+  try {
+    const plan = readyPlan(runRoot), setup = fakeFlowConfigWithSetup(plan, "protected-preparation");
+    const forbidden = async () => { legacy++; throw new Error("LegacyEconomicActionForbidden"); };
+    const preparation = mode === "malformed" ? true : async input => {
+      calls++; assert.equal(input.inputEvidence.digestHex, h("model-input-proof"));
+      assert.equal(input.inputs.length, 2); assert.equal(input.taprootSighashEvidences.length, 2);
+      assert.equal(input.depositIntentContext.amountAtomic, "100000000");
+      assert.match(input.operationIdHex, /^[0-9a-f]{64}$/u);
+      if (mode === "rejected") throw new Error("ProtectedPreparationRejected");
+      return { state: "COMPLETED", minted: true }; // Caller cannot fabricate the runner's result.
+    };
+    const action = () => executeNativeDepositObservationFlow({ plan, executor, commandPaths: commandPathMap(),
+      ...setup, custodyFactory: fakeCustodyFactory, nativeEvidenceVerifierFactory: fakeNativeEvidenceVerifierFactory,
+      reserveSweepSigner: forbidden, solanaSetup: forbidden, solanaDepositClaim: forbidden,
+      protectedDepositPreparation: preparation });
+    if (mode === "prepared") {
+      assert.deepEqual(await action(), { state: "LOCAL_PROTECTED_DEPOSIT_PREPARED", signed: false, broadcast: false, minted: false,
+        productionReady: false, mainnetActivation: "DISABLED" });
+    } else await assert.rejects(action, mode === "rejected" ? /ProtectedPreparationRejected/u : /ProtectedDepositPreparationCallbackRequired/u);
+    assert.equal(calls, mode === "malformed" ? 0 : 1); assert.equal(legacy, 0);
+    assert(!executor.calls.some(c => c.step === "LOCAL_E2E_BROADCAST_FROST_SIGNED_RESERVE_SWEEP"));
+  } finally {
+    assert.equal(path.dirname(runRoot), path.resolve(os.tmpdir()));
+    assert(path.basename(runRoot).startsWith("kingpepe-preparation-boundary-"));
+    rmSync(runRoot, { recursive: true });
+  }
+});
+
 function fakeNativeEvidenceVerifierFactory() {
   // Explicit orchestration model only. Real E2E uses the compiled Rust verifier.
   return { verifyInputs: async () => ({ status: "SOURCE_MODEL_ONLY", digestHex: h("model-input-proof") }),

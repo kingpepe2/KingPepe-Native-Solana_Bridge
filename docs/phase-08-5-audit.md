@@ -1,5 +1,39 @@
 # Phase 08.5 retrospective audit
 
+## Selected actual settlement/reorg evidence - not final audit
+
+Candidate runtime c5b55565dfe2c9a7f8d8be813167f00c32f29a038b891f9afa838a43d694f182
+passes nine scoped assertion groups and both harness exits. The protected
+deposit completes after three actual settlement-boundary controller kills;
+independent chain checks pass. A real higher-work Native fork invalidating
+accepted post-mint backing retains the exact incident and global stop. Restarting
+the actual protected role processes/authority preserves the stop, and recovering
+chain health neither clears it nor changes Solana supply. This is not cross-SID,
+host-reboot or complete all-service kill coverage. Primary integration now passes
+Node 935 plus two vectors per platform and eleven actual credit-mode groups,
+including five real controller kills, independent chain checks, protected
+COMPLETED and post-mint fork/incident/whole-service-restart stop persistence.
+Both harnesses exit zero, unchanged runtime
+df5ef0920b5c4a1315384fd43d223dee7f99aea186989d4921828d851e188d6f.
+The final clean clone and remaining kill groups must still pass; older failed
+runs remain recorded below. Phases
+04/07/08 remain FAIL overall and SAFE_TO_BEGIN_PHASE_09=false pending all gates.
+
+## Protected controller continuation - not final re-audit
+
+PRIVATE baseline 27a4fcf647ccb9518d003eff46c9a152ae0b6ba8 remains published;
+exact Actions 34673553925 is account-blocked with no executed steps/artifacts.
+The separate frozen protected controller candidate reached real-chain COMPLETED
+and passed Windows security 164 and Node 924 plus two vectors per platform.
+The newer primary integration passes Node 929 plus two vectors per platform,
+but its actual protected-chain rerun FAILED the bounded completion deadline at
+claim delivery. No finalized mint was observed; the cause remains under review.
+Full primary Windows security passes 164 with exit zero, no failures/skips/
+cancellations and unchanged runtime digest. Preserve the candidate/primary
+distinction and failed-run evidence. Final restart/reorg matrix, clean clone and
+complete retrospective audit are not finished. Phases 04/07/08 remain FAIL and
+SAFE_TO_BEGIN_PHASE_09=false. No Phase 09 work is authorized by these results.
+
 ## Protected delivery primary validation (not final re-audit)
 
 Reconciliation is published PRIVATE at

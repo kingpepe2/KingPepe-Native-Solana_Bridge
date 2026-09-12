@@ -1,6 +1,102 @@
 # KingPepe Native - Solana Bridge Development Status
 
+## Selected settlement/reorg candidate and primary continuation
+
+Separate candidate runtime c5b55565dfe2c9a7f8d8be813167f00c32f29a038b891f9afa838a43d694f182
+passes nine actual-chain assertion groups, both harnesses exit zero and its
+205-file runtime remains unchanged. Actual controller kills after retained mint,
+pending reconciliation and completed journal each resume to COMPLETED. The
+independent Linux Native reserve and finalized Solana mint checks pass. A real
+higher-work post-mint Native fork causes a durable stop with the exact affected
+operation/liability retained. All eight economic role processes, three source
+monitors and the authority restart from existing protected state; stop admission
+still rejects every economic role. Subsequent chain health recovery does not
+clear the stop or alter Solana supply. This uses actual CurrentUser DPAPI/mTLS,
+not distinct Windows service principals, host-reboot or a complete kill matrix.
+
+The prior failed primary flow and failed independent-recheck run remain failures
+with causes not established; this newer pass does not rewrite their evidence.
+Two focused concurrent guard-status tests pass without a guard implementation
+change. Primary integration has runtime
+df5ef0920b5c4a1315384fd43d223dee7f99aea186989d4921828d851e188d6f;
+its new full Node runs pass 935 plus two vectors per platform, zero failed/
+skipped/cancelled and both exits zero. Actual primary broadcast/credit mode passes
+eleven assertion groups: all five real kills/reopens, protected flow COMPLETED,
+independent Linux chain rechecks, real higher-work post-mint fork, exact incident
+retention, all protected service processes/authority reopening the stop, and no
+automatic stop clearing or supply mutation after chain recovery. Both harnesses
+exit zero and the runtime is unchanged before/after. No per-transfer approval.
+Source/provenance coverage is 292 files; guardrails, locked license metadata,
+current source and 182-commit history scans pass. Staged/outgoing scans and private
+publication follow. This is not final Phase 01-08 or clean-clone certification.
+
+## Protected controller integration after delivery publication
+
+Latest PRIVATE source is 27a4fcf647ccb9518d003eff46c9a152ae0b6ba8,
+tree 2c6db89e624a725fc64d5277e1a949cded38a3a6. Its exact
+[Actions run 34673553925](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34673553925)
+is NOT_RUN_ACCOUNT_BLOCKED: four jobs, zero steps, zero artifacts. GitHub reports:
+“The job was not started because recent account payments have failed or your
+spending limit needs to be increased. Please check the 'Billing & plans' section
+in your settings”. No account or CI policy was changed.
+
+The preceding delivery section records that publication's local evidence, not
+the later controller source. Final source/staged scans and the one outgoing
+commit passed; all 181 preceding commits were scanned separately.
+
+Primary integration now adds the separate protected controller, fee payer and
+attester clients (292 intended files). A frozen separate candidate passed Node
+924 plus two vectors per platform and reached COMPLETED using actual regtest,
+validator and separate protected CurrentUser Windows role processes. Independent
+Linux Native reserve and finalized Solana mint checks passed; both processes
+exited zero. Candidate runtime: 205 files,
+eec0c7c8f970345c807515404ba08a18cdb30d330f498091db7e79cc1cdca026.
+The candidate Windows full security suite passes 164, zero failed/skipped/
+cancelled, exit zero in 2831192.5148 ms; runtime hashes remain unchanged.
+Its earlier failed absent-claim lookup remains a failed run, not overwritten.
+
+The successful test covers automatic FROST, sweep/finality, protected A+B
+attestations, receipt/claim, mint/finality and reconciliation with no per-transfer
+approval. Temporary Linux chains used memory-backed test storage; Windows
+protected journals remained on disk. This is not host-reboot, cross-service SID,
+complete process-kill matrix, primary-worktree or final clean-clone certification.
+Five new primary portable preparation/negative-lookup regressions pass.
+Primary restart regressions and the full retrospective audit remain incomplete.
+Phase 09 remains NOT_STARTED; productionReady=false, Mainnet DISABLED.
+
 ## Protected delivery primary integration
+
+The frozen primary integration runtime has 205 files, digest
+907bcf3f6e8168fe8bf0cdf5102cbaebb4142a62b5b5b46ebd830e73b6b401a0.
+Windows and WSL Node pass 929 plus two vectors each, no failures/skips/
+cancellations. Its first actual protected-chain rerun FAILED: FROST, sweep,
+Native finality, credit, both attestations and a finalized receipt were observed,
+but repeated claim delivery did not produce an observed finalized mint before
+the bounded test deadline. Both harnesses exited one. Cause remains under
+investigation; this is not a pass, not proof that no mint occurred, and not
+classified as infrastructure failure without evidence. No deadline, finality,
+authorization or retry policy was relaxed. Candidate success above does not
+certify this failed primary run. Full primary Windows security passed 164,
+zero failed/skipped/cancelled, exit zero in 2893931.3578 ms; the runtime digest
+remained unchanged before/after. This does not certify the failed chain run.
+
+## Earlier protected delivery integration evidence
+
+The separate restart candidate runtime d93c130b98a5e6bafb64c9f72ad3e831b7014f613c8bf24a372b6ec066697e2d
+exercised five actual controller kills/reopens: broadcast intent, outbox
+acceptance, Native acceptance, genuine Native finality before credit persistence,
+and retained finalized credit. Its protected controller subsequently reached
+COMPLETED with matching retained reserve/credit/mint amount. However, the Linux
+host failed before publishing independent verification, so the WHOLE RUN IS FAIL.
+The Windows test was ended through its defined disposable abort channel after
+the host exited; this is not successful cleanup/certification of an E2E result.
+The coarse host error did not establish which read/recheck failed. Do not invent
+a cause. Source hashes remained unchanged. New stage-specific host diagnostics
+and filtered transaction-error diagnostics are under validation. The six new
+portable redaction cases pass in an 87-test delivery/RPC subset; they are not
+real-chain proof or a rerun of the full primary suite.
+
+## Published delivery increment historical evidence
 
 Reconciliation commit 5edcc111feffcb1ced31b236dc3928d19fa9acbd is published
 PRIVATE after source/staged scans, 180 prior commits and its outgoing commit.
