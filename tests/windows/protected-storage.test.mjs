@@ -128,10 +128,23 @@ function committedState(t) {
   const previous = readFileSync(stateFile(options)), next = randomBytes(32);
   store.write(next, "1"); return { options, previous, next, candidate: readFileSync(stateFile(options)) };
 }
-test("authenticated atomic candidate recovers once after a write interruption", t => {
-  const p = committedState(t);
+function interruptedWriteFixture(p) {
   writeFileSync(stateFile(p.options), p.previous);
   writeFileSync(path.join(p.options.root, "candidate.protected"), p.candidate, { flag: "wx" });
+  // The real C# writer creates the candidate with an explicit service-SID ACL.
+  // Node's default creator principal can instead be Administrators on an
+  // elevated runner. Reproduce the real writer's ACL in this disposable fixture
+  // so the tests reach authenticated recovery, not an earlier ACL rejection.
+  const ps = path.join(process.env.SystemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+  const script = '$ErrorActionPreference="Stop";try{$p=[Console]::In.ReadToEnd();$a=[IO.File]::GetAccessControl([IO.Path]::Combine($p,"state.protected"));[IO.File]::SetAccessControl([IO.Path]::Combine($p,"candidate.protected"),$a);[Console]::Out.Write("FIXTURE_READY")}catch{[Console]::Error.Write("TEST_CANDIDATE_FIXTURE_REJECTED");exit 1}';
+  const result = spawnSync(ps, ["-NoProfile", "-NonInteractive", "-Command", script], {
+    input: p.options.root, windowsHide: true, timeout: 10_000, stdio: ["pipe", "pipe", "pipe"],
+  });
+  assert(result.status === 0 && result.stdout.toString("utf8") === "FIXTURE_READY", "ProtectedCandidateFixtureRejected");
+}
+test("authenticated atomic candidate recovers once after a write interruption", t => {
+  const p = committedState(t);
+  interruptedWriteFixture(p);
   const store = new WindowsProtectedStore(p.options);
   assert.equal(store.read().revision, "2"); sameProtectedBytes(store.read().payload, p.next);
   assert.equal(new WindowsProtectedStore(p.options).read().revision, "2");
@@ -144,8 +157,7 @@ for (const invalid of ["CORRUPT", "SKIPPED_REVISION"]) test("ambiguous atomic ca
     new WindowsProtectedStore(p.options).write(randomBytes(32), "2");
     p.candidate = readFileSync(stateFile(p.options));
   }
-  writeFileSync(stateFile(p.options), p.previous);
-  writeFileSync(path.join(p.options.root, "candidate.protected"), p.candidate, { flag: "wx" });
+  interruptedWriteFixture(p);
   assert.throws(() => new WindowsProtectedStore(p.options).read(), { message: "WindowsProtectedStoreRejected" });
 });
 
