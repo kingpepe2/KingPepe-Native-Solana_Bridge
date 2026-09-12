@@ -1,8 +1,9 @@
 # Development status
 
-Simplified bridge cleanup is being validated on baseline
-bdb996e45df33535a78d983afab22aa60a47cf15. Target visibility is PUBLIC after
-publication checks; original code remains All Rights Reserved.
+Cleanup was committed and pushed as e7e7f6f247a18f298cb7d92b247fb2dd43cee609
+after source/staged/outgoing/history and publication review. The repository is
+PUBLIC; original code remains All Rights Reserved. Baseline before cleanup:
+bdb996e45df33535a78d983afab22aa60a47cf15.
 
 ## Cleanup
 
@@ -60,10 +61,18 @@ wallets, backups, source-recovery copies or WSL storage were deleted.
 
 ## Next
 
-Finish retained local-chain checks and publication gates, then commit/push
-cleanup. Change repository visibility only after the safety review.
-Start Phase 09 separately once Phase 08 core is verified.
-Fresh-clone evidence must identify the exact resulting source SHA.
+Exact cleanup clones are validating on Windows and WSL. Begin Phase 09 in a
+separate implementation commit; core local gates passed. Fresh-clone evidence
+must identify the exact resulting source SHA.
+
+Actions execution resumed after the approved visibility change. Run 34688184212
+for cleanup SHA e7e7f6f247a18f298cb7d92b247fb2dd43cee609: history scan and
+Foundation Guardrails PASS; Windows failed during protected-helper startup;
+Linux E2E is still running at this update. The Windows failure happens before
+protected-state tests execute. Fixed-stage-only build diagnostics were added to
+identify the runner-specific cause without printing paths, identities or input.
+Local compiled-helper tamper/missing/hardlink/ACL regressions: 4 PASS.
+The CI failure is not suppressed and is not yet resolved.
 
 CI for baseline bdb996e45df33535a78d983afab22aa60a47cf15:
 NOT_RUN_ACCOUNT_BLOCKED, run 34683149831, zero steps/artifacts.

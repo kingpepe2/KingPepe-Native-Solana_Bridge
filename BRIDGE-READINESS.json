@@ -6,14 +6,14 @@
   "productionSigningAuthorized": false,
   "productionBroadcastAuthorized": false,
   "lastUpdated": "2026-09-12",
-  "sourceStatus": "SIMPLIFICATION_VALIDATED_WORKING_TREE_PUBLICATION_PENDING",
+  "sourceStatus": "CLEANUP_PUBLISHED_CORE_PASS_CI_WINDOWS_HELPER_FAILURE",
   "baselineSha": "bdb996e45df33535a78d983afab22aa60a47cf15",
   "repository": {
-    "visibility": "PRIVATE",
-    "targetVisibility": "PUBLIC",
-    "publicationReview": "FINAL_STAGED_CHECKS_PENDING"
+    "visibility": "PUBLIC",
+    "publicationReview": "PASS_SOURCE_STAGED_OUTGOING_HISTORY_AND_CI_LOGS",
+    "reviewedSha": "e7e7f6f247a18f298cb7d92b247fb2dd43cee609"
   },
-  "phase08Core": "PASS_LOCALLY_PRE_COMMIT",
+  "phase08Core": "PASS_LOCALLY",
   "phase09": "NOT_STARTED",
   "coreValidation": {
     "scope": "PRE_COMMIT_WORKING_TREE_NOT_FUTURE_SHA_CERTIFICATION",
@@ -64,7 +64,7 @@
       "currentCleanFullRun": "NOT_RUN"
     },
     "solanaToNative": "NOT_RUN",
-    "freshClone": "NOT_RUN",
+    "freshClone": "IN_PROGRESS_EXACT_CLEANUP_SHA",
     "provenanceBoundary": {
       "files": 239,
       "status": "PASS"
@@ -90,11 +90,13 @@
     "guardrails": "PASS"
   },
   "ci": {
-    "status": "NOT_RUN_ACCOUNT_BLOCKED",
-    "sourceSha": "bdb996e45df33535a78d983afab22aa60a47cf15",
-    "runId": 34683149831,
-    "executedSteps": 0,
-    "artifacts": 0
+    "status": "EXECUTION_RESTORED_WINDOWS_FAILURE",
+    "sourceSha": "e7e7f6f247a18f298cb7d92b247fb2dd43cee609",
+    "runId": 34688184212,
+    "historyScan": "PASS",
+    "foundationGuardrails": "PASS",
+    "windows": "FAIL_HELPER_STARTUP",
+    "linuxE2e": "IN_PROGRESS"
   },
   "production": {
     "configuration": "NOT_CONFIGURED",
@@ -112,5 +114,5 @@
     "Upgrade authority can change program behavior",
     "Cargo reports bincode 1.3.3 unmaintained: RUSTSEC-2025-0141"
   ],
-  "next": "Complete staged scans and commit cleanup; separate Phase 09 after core verification"
+  "next": "Diagnose Windows runner helper failure and implement Phase 09 separately"
 }

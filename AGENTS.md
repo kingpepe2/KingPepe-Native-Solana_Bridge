@@ -77,8 +77,11 @@ Direct SBF: no Anchor CLI required. Source-built Native REGTEST 31.1.0 only.
 
 Implement → tests → source/staged/outgoing scans → diff review → explicit
 staging → commit → push → exact-SHA CI when available. Cleanup first, Phase 09
-separately. Baseline Actions run 34683149831 is NOT_RUN_ACCOUNT_BLOCKED
-(zero steps/artifacts); do not weaken CI or create meaningless retry commits.
+separately. Cleanup e7e7f6f247a18f298cb7d92b247fb2dd43cee609 is pushed and
+PUBLIC after publication checks. Actions now execute: run 34688184212 has
+Windows protected-helper startup failure; redacted fixed-stage diagnostics are
+being added. Fix the real cause; do not weaken the gate. Exact cleanup clones
+are validating while Phase 09 is prepared separately.
 
 Delete only reviewed obsolete source and proven disposable project test/build
 outputs. Unknown wallets, recovery data, backups, Native source, tools and WSL
