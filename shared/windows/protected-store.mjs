@@ -4,12 +4,13 @@ import { spawn, spawnSync } from "node:child_process";
 import { types } from "node:util";
 import path from "node:path";
 import { validateRuntimeStateRoot, isSameOrInside } from "../runtime-path-boundary.mjs";
+import { windowsProtectedExecutable } from "./protected-executable.mjs";
 
 const PROTOCOL = "KINGPEPE_WINDOWS_PROTECTED_STORE_V1";
 const MAX_PAYLOAD = 1_048_576;
 const ROLES = Object.freeze(["KINGPEPE_FROST_A", "KINGPEPE_FROST_B", "ATTESTER_A", "ATTESTER_B",
   "COORDINATOR", "BRIDGE_VALIDATOR", "SUPERVISOR", "NATIVE_OBSERVER", "SOLANA_OBSERVER", "RELAYER", "RECONCILIATION", "INDEXER"]);
-const PURPOSES = Object.freeze(["frost-state", "attester-seed", "attester-authorizations", "coordinator-signing", "deposit-operations", "reconciliation-progress", "service-auth", "signer-fence", "global-integrity", "chain-progress"]);
+const PURPOSES = Object.freeze(["frost-state", "attester-seed", "attester-authorizations", "coordinator-signing", "coordinator-jobs", "deposit-operations", "reconciliation-progress", "native-sweep-outbox", "solana-deposit-outbox", "service-auth", "signer-fence", "global-integrity", "chain-progress"]);
 const INSTANCES = new WeakSet();
 
 function record(value, fields) {
@@ -31,8 +32,9 @@ export function normalizeProtectedContext(value) {
   if (c.purpose === "frost-state" && !["KINGPEPE_FROST_A", "KINGPEPE_FROST_B"].includes(c.role)) throw new Error("ProtectedRolePurposeInvalid");
   if (["attester-seed", "attester-authorizations"].includes(c.purpose) && !["ATTESTER_A", "ATTESTER_B"].includes(c.role)) throw new Error("ProtectedRolePurposeInvalid");
   if (c.purpose === "global-integrity" && c.role !== "SUPERVISOR") throw new Error("ProtectedRolePurposeInvalid");
-  if (c.purpose === "coordinator-signing" && c.role !== "COORDINATOR") throw new Error("ProtectedRolePurposeInvalid");
+  if (["coordinator-signing", "coordinator-jobs"].includes(c.purpose) && c.role !== "COORDINATOR") throw new Error("ProtectedRolePurposeInvalid");
   if (c.purpose === "deposit-operations" && c.role !== "BRIDGE_VALIDATOR") throw new Error("ProtectedRolePurposeInvalid");
+  if (["native-sweep-outbox", "solana-deposit-outbox"].includes(c.purpose) && c.role !== "RELAYER") throw new Error("ProtectedRolePurposeInvalid");
   if (c.purpose === "reconciliation-progress" && c.role !== "RECONCILIATION") throw new Error("ProtectedRolePurposeInvalid");
   if (c.purpose === "chain-progress" && !["NATIVE_OBSERVER", "SOLANA_OBSERVER"].includes(c.role)) throw new Error("ProtectedRolePurposeInvalid");
   if (typeof c.serviceSid !== "string" || !/^S-1-5-(?:\d{1,10}-){1,14}\d{1,10}$/u.test(c.serviceSid)) throw new Error("ProtectedServiceSidInvalid");
@@ -53,13 +55,11 @@ export function protectedContextDigest(context) {
 
 function invoke(request) {
   if (process.platform !== "win32") throw new Error("WindowsProtectedStorageRequired");
-  const windowsRoot = process.env.SystemRoot;
-  if (typeof windowsRoot !== "string" || !/^[A-Z]:\\[^\r\n\0]+$/iu.test(windowsRoot)) throw new Error("WindowsSystemRootRequired");
-  const executable = path.join(windowsRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+  const helper = windowsProtectedExecutable();
   const input = Buffer.from(JSON.stringify(request));
   let result;
   try {
-    result = spawnSync(executable, ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", path.join(import.meta.dirname, "protected-store-driver.ps1")],
+    result = spawnSync(helper.executable, [helper.sourceRoot],
       { input, encoding: "buffer", maxBuffer: 1_500_000, timeout: 30_000, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
     if (!result.error && result.status === 1 && result.stdout.length === 0 && result.stderr.toString("utf8") === "WINDOWS_PROTECTED_WITNESS_ROLLBACK") throw new Error("ProtectedStateRollbackDetected");
     if (result.error || result.status !== 0 || result.stderr.length !== 0) throw new Error("WindowsProtectedStoreRejected");

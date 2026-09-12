@@ -92,6 +92,24 @@ namespace KingPepe.LocalProtection {
       foreach(FileSystemAccessRule rule in rules) Require(rule.IdentityReference.Equals(sid) &&
         rule.AccessControlType==AccessControlType.Allow && rule.FileSystemRights==FileSystemRights.FullControl);
     }
+    // Source-built executable cache only: never a share, key or state enrollment.
+    // CREATE_NEW and the final single-principal DACL are applied atomically.
+    public static void CreateExecutableDirectory(string root,string source) {
+      var sid=WindowsIdentity.GetCurrent().User;
+      CreatePrivateDirectory(Root(root,Path.GetFullPath(source)),sid);
+    }
+    public static void CheckExecutableDirectory(string executable,string source) {
+      var sid=WindowsIdentity.GetCurrent().User;
+      string root=Root(Path.GetDirectoryName(executable),Path.GetFullPath(source));
+      CheckAcl(root,true,sid);
+      CheckAcl(executable,false,sid);
+      // A loaded executable is read-only, unlike mutable protected state.
+      using(var stream=new FileStream(executable,FileMode.Open,FileAccess.Read,FileShare.Read)) {
+        FileInformation info; Require(GetFileInformationByHandle(stream.SafeFileHandle,out info));
+        Require(info.Links==1 && (info.Attributes&(uint)FileAttributes.ReparsePoint)==0);
+        Require(stream.Length>0 && stream.Length<=1048576);
+      }
+    }
     static FileStream Open(string path, FileMode mode, SecurityIdentifier sid) {
       if(mode==FileMode.Open) CheckAcl(path,false,sid);
       FileStream stream;

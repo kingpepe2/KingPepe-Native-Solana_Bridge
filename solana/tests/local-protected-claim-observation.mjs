@@ -6,31 +6,83 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { withLocalE2eInfrastructure } from "../../scripts/local-e2e-bootstrap.mjs";
-import { createLocalSolanaSetupContext, createNativeToSolanaFlowConfig, executeNativeDepositObservationFlow, submitLocalnetSolanaDepositClaim, createLocalFrostTaprootCustodyContext } from "../../scripts/local-e2e-native-to-solana.mjs";
+import { createLocalSolanaSetupContext, createNativeToSolanaFlowConfig, executeNativeDepositObservationFlow, submitLocalnetSolanaDepositClaim, createLocalFrostTaprootCustodyContext, submitLocalnetSolanaSetup } from "../../scripts/local-e2e-native-to-solana.mjs";
+import { buildRegtestCliArguments } from "../../scripts/local-e2e-orchestrator.mjs";
+import { parseNativeTransactionHex } from "../../native/node/native-taproot-transaction.mjs";
+import { buildRegtestRecoverableDeposit, deriveRegtestDepositCommitment } from "../../native/recovery/taproot-deposit.mjs";
 import { createLocalNativeEvidenceVerifier } from "../../scripts/local-native-evidence-verifier.mjs";
-import { requireVerifiedRegtestReserve } from "../../native/node/native-raw-evidence.mjs";
+import { requireVerifiedRegtestReserve, REGTEST_GENESIS } from "../../native/node/native-raw-evidence.mjs";
+import { NativeRpcClient } from "../../native/node/native-rpc-client.mjs";
 import { initialDepositOperationState, validateDepositOperationPlan, decodeDepositOperationState, depositOperationAccounting } from "../../services/bridge-validator/deposit-operation-state.mjs";
 import { SolanaDepositClaimObserver, requireProtectedClaimObservation } from "../../services/solana-observer/solana-deposit-claim-observer.mjs";
 import { LocalDeploymentRpc } from "../../services/solana-observer/deployment-integrity.mjs";
 import { findProgramAddress, base58Encode, DEPOSIT_CLAIM_PDA_SEED_PREFIX } from "../../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs";
 
-export async function runLocalProtectedClaimObservation(repoRoot, afterObservation = undefined) {
+export async function runLocalProtectedClaimObservation(repoRoot, afterObservation = undefined, beforeNativeBroadcast = undefined, solanaDelivery = undefined) {
   const passed = []; let stage = "BOOTSTRAP", failure;
   const result = await withLocalE2eInfrastructure({ repoRoot }, async context => {
     try {
       const setup = createLocalSolanaSetupContext(), flowConfig = createNativeToSolanaFlowConfig({ plan: context.plan, repoRoot,
         mintHex: setup.mintHex, keyEpoch: setup.keyEpoch, policyEpoch: setup.policyEpoch });
       stage = "FRESH_NATIVE_TO_SOLANA";
-      let inputs, encodedMessageHex, nativeVerifier, testCustody, captureSigning = true;
+      let inputs, inputCheckpoint, recoveryPublicKey, encodedMessageHex, nativeVerifier, testCustody, reserveReceipt, captureSigning = true;
       const verifiedSigningIntents = new Map();
-      const flow = await executeNativeDepositObservationFlow({ ...context, flowConfig, localSolanaSetupContext: setup,
+      const flowOptions = {};
+      if (beforeNativeBroadcast !== undefined) {
+        assert.equal(typeof beforeNativeBroadcast, "function");
+        // Real one-time initialization precedes protected-source admission.
+        // This is test orchestration, not a runtime bypass or fictitious setup.
+        const sourceRpc = new NativeRpcClient({ endpoint: "http://127.0.0.1:" + context.plan.ports.nativeRpcPort,
+          authCookieFile: path.join(context.plan.paths.nativeDatadir, "regtest", ".cookie"), repoRoot });
+        const genesis = (await sourceRpc.call("getblockhash", [0])).result;
+        assert.equal(genesis, REGTEST_GENESIS); // Zero-supply setup, not economic validation.
+        const initialized = await submitLocalnetSolanaSetup({ plan: context.plan, flowConfig, localSolanaSetupContext: setup,
+          nativeSource: { nativeGenesisHash: genesis } });
+        assert.equal(initialized.state, "COMPLETED");
+        flowOptions.solanaSetup = async () => initialized;
+        flowOptions.executor = { runOneShot: async request => {
+          if (request.step === "LOCAL_E2E_BROADCAST_FROST_SIGNED_RESERVE_SWEEP") {
+            const c = flowConfig, solanaGenesis = await new LocalDeploymentRpc({ endpoint: "http://127.0.0.1:" + context.plan.ports.solanaRpcPort }).genesis();
+            const policy = { environment: "localnet", nativeGenesis: genesis, solanaDeployment: c.solanaDeploymentHex, solanaGenesis,
+              minimumSolanaSlot: "1", managerProgramId: c.bridgeProgramIdHex, transceiverProgramId: c.transceiverProgramIdHex, mint: c.mintHex,
+              protocolId: c.protocolId, nativeNetwork: c.nativeNetwork, policyEpoch: c.policyEpoch, keyEpoch: c.keyEpoch,
+              frostPublicKeyHex: testCustody.aggregateTweakedXOnlyPublicKey, csvDelayBlocks: c.recoveryDelayBlocks,
+              minimumConfirmations: c.depositFinalityBlocks, maximumAmountAtomic: c.maxAmountAtomic, maximumFeeAtomic: c.maxFeeAtomic };
+            const depositIntent = { nativeGenesisHex: genesis, solanaDeploymentHex: c.solanaDeploymentHex,
+              managerProgramIdHex: c.bridgeProgramIdHex, transceiverProgramIdHex: c.transceiverProgramIdHex, mintHex: c.mintHex,
+              recipientHex: setup.recipientTokenAccountHex, nonceHex: c.depositNonceHex, amountAtomic: c.amountAtomic,
+              protocolId: c.protocolId, nativeNetwork: c.nativeNetwork, policyEpoch: c.policyEpoch, keyEpoch: c.keyEpoch };
+            const at = request.args.indexOf("sendrawtransaction"); assert(at >= 0 && at + 2 === request.args.length);
+            const signedTransactionHex = request.args[at + 1], parsed = parseNativeTransactionHex(signedTransactionHex);
+            const operationPlan = validateDepositOperationPlan({ operationId: verifiedSigningIntents.get(0).operationId, depositIntent,
+              depositPolicy: buildRegtestRecoverableDeposit({ nativeGenesisHex: genesis,
+                depositCommitmentHex: deriveRegtestDepositCommitment(depositIntent), frostPublicKeyHex: policy.frostPublicKeyHex,
+                userRecoveryPublicKeyHex: recoveryPublicKey, csvDelayBlocks: c.recoveryDelayBlocks }),
+              inputs, acceptedCheckpoint: inputCheckpoint, unsignedTransactionHex: parsed.strippedHex,
+              signingIntents: inputs.map((_, i) => verifiedSigningIntents.get(i)) }, policy);
+            await beforeNativeBroadcast({ context, flowConfig, setup, policy, operationPlan, signedTransactionHex, nativeVerifier });
+            // The callback must actually deliver to the node. Never fabricate
+            // a broadcast response or invoke the legacy CLI broadcaster too.
+            const observed = await context.executor.runOneShot({ ...request, step: "LOCAL_PROTECTED_OUTBOX_VERIFY_DELIVERY",
+              args: buildRegtestCliArguments({ datadir: context.plan.paths.nativeDatadir, rpcPort: context.plan.ports.nativeRpcPort,
+                command: "getrawtransaction", parameters: [parsed.txidHex, "false"] }) });
+            assert.equal(String(observed.output).trim(), signedTransactionHex);
+            return { output: parsed.txidHex };
+          }
+          const result = await context.executor.runOneShot(request);
+          if (request.step === "LOCAL_E2E_GET_USER_RECOVERY_PUBLIC_KEY") recoveryPublicKey = JSON.parse(result.output).pubkey.slice(2);
+          return result;
+        } };
+      }
+      const flow = await executeNativeDepositObservationFlow({ ...context, ...flowOptions, flowConfig, localSolanaSetupContext: setup,
         custodyFactory: async options => { testCustody = await createLocalFrostTaprootCustodyContext(options); return testCustody; },
         nativeEvidenceVerifierFactory: async options => {
           const verifier = await createLocalNativeEvidenceVerifier(options), verify = verifier.verifyInputs.bind(verifier),
-            verifySigning = verifier.verifySweepSigning.bind(verifier);
+            verifySigning = verifier.verifySweepSigning.bind(verifier), verifyReserve = verifier.verifyReserve.bind(verifier);
           nativeVerifier = verifier;
+          verifier.verifyReserve = async request => { const checked = await verifyReserve(request); reserveReceipt = checked; return checked; };
           verifier.verifyInputs = async request => {
-            const checked = await verify(request); inputs ??= structuredClone(request.inputs); return checked;
+            const checked = await verify(request); inputs ??= structuredClone(request.inputs); inputCheckpoint ??= checked.acceptedCheckpoint; return checked;
           };
           verifier.verifySweepSigning = async request => {
             const checked = await verifySigning(request), index = request.intent.signingInputIndex;
@@ -44,6 +96,11 @@ export async function runLocalProtectedClaimObservation(repoRoot, afterObservati
         },
         solanaDepositClaim: async request => {
           encodedMessageHex = request.depositClaimRequest.request.encodedMessageHex;
+          if (solanaDelivery !== undefined) {
+            assert.equal(typeof solanaDelivery, "function"); requireVerifiedRegtestReserve(reserveReceipt);
+            return solanaDelivery({ request, context, flowConfig, setup, inputs, inputCheckpoint, nativeVerifier, testCustody, reserveReceipt,
+              signingIntents: inputs.map((_, i) => structuredClone(verifiedSigningIntents.get(i))) });
+          }
           return submitLocalnetSolanaDepositClaim(request);
         },
       });
