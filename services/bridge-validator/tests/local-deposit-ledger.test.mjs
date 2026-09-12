@@ -91,6 +91,13 @@ if (process.argv[2] === "--ledger-worker") {
     process.exitCode = 1;
   }
 } else {
+  test("withdrawal inbox rejects unverified records and keeps status pagination bounded", t => {
+    const f = fixture(t), store = f.create(), before = store.checkpoint();
+    assert.throws(() => store.enqueueConfirmedWithdrawal({ signature: "1".repeat(64), encodedMessageHex: credit().encodedMessageHex }));
+    assert.deepEqual(store.checkpoint(), before); assert.deepEqual(store.withdrawalRequests(), []);
+    for (const options of [{ offset: -1 }, { limit: 101 }, { pendingOnly: "true" }]) assert.throws(() => store.withdrawalRequests(options));
+    assert.equal(store.bridgeSnapshot().pendingWithdrawalAtomic, "0");
+  });
   test("authenticated ledger explicitly creates and reopens pending and minted credits", t => {
     const f = fixture(t); const store = f.create(); const item = credit();
     assert.equal(store.checkpoint().sequence, "0");

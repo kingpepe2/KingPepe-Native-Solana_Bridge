@@ -6,7 +6,7 @@
   "productionSigningAuthorized": false,
   "productionBroadcastAuthorized": false,
   "lastUpdated": "2026-09-12",
-  "sourceStatus": "PHASE09_LOCAL_ROUND_TRIP_PASS_COMMIT_AND_EXACT_SHA_VALIDATION_PENDING",
+  "sourceStatus": "PHASE09_PUBLISHED_LOCAL_PASS_PHASE10_LOCAL_SERVICE_INCREMENT",
   "baselineSha": "bdb996e45df33535a78d983afab22aa60a47cf15",
   "repository": {
     "visibility": "PUBLIC",
@@ -14,7 +14,7 @@
     "reviewedSha": "e7e7f6f247a18f298cb7d92b247fb2dd43cee609"
   },
   "phase08Core": "PASS_LOCALLY",
-  "phase09": "IMPLEMENTED_AND_TESTED_IN_WORKING_TREE",
+  "phase09": "IMPLEMENTED_AND_TESTED_LOCALLY",
   "coreValidation": {
     "scope": "EXACT_CLEANUP_SHA_e7e7f6f247a18f298cb7d92b247fb2dd43cee609_UNLESS_MARKED_OTHERWISE",
     "windowsNode": {
@@ -83,15 +83,17 @@
     "guardrails": "PASS"
   },
   "ci": {
-    "status": "EXECUTION_RESTORED_FIX_VERIFICATION_IN_PROGRESS",
-    "sourceSha": "5c93ddf24a613a9414c28b28c7e9353758a327da",
-    "runId": 34691122645,
-    "priorRunId": 34690072892,
+    "status": "EXACT_SHA_FIX_VERIFICATION_IN_PROGRESS",
+    "sourceSha": "79e586424c852639d52b55251ac18198ef0c3abe",
+    "runId": 34692481377,
+    "priorRunId": 34691297712,
+    "priorSourceSha": "7f4bb7b3db3a61802b956aba8ee0f76d5e340772",
+    "priorLinux": "PASS",
     "priorWindows": {
       "pass": 137,
       "fail": 1
     },
-    "correction": "CANDIDATE_TEST_FIXTURE_USES_REAL_WRITER_ACL",
+    "correction": "PERSIST_MODIFIED_FIXTURE_SECURITY_DESCRIPTOR_AND_VERIFY",
     "correctedLocalTests": 3
   },
   "production": {
@@ -110,18 +112,22 @@
     "Upgrade authority can change program behavior",
     "Cargo reports bincode 1.3.3 unmaintained: RUSTSEC-2025-0141"
   ],
-  "next": "Commit independently validated Phase 09, verify exact-SHA CI and finish simple operational integration",
+  "next": "Publish the local service increment, verify exact-SHA CI and complete simple operational integration before CLI/UI and Devnet",
   "phase09Validation": {
-    "baseSha": "3428dd7d0f324c113bdf82bdad8d6a199853b8ba",
-    "worktreeDirty": true,
+    "sourceSha": "7f4bb7b3db3a61802b956aba8ee0f76d5e340772",
+    "worktreeDirty": false,
     "windowsNode": 962,
     "wslNode": 962,
     "vectorsPerPlatform": 2,
-    "finalFullSuites": "PASS_WINDOWS_AND_WSL_ZERO_FAILURES_OR_SKIPS",
-    "targetedTests": {
-      "pass": 44,
-      "fail": 0
+    "windowsSecurity": {
+      "pass": 138,
+      "fail": 0,
+      "skip": 0,
+      "scope": "CURRENT_USER_ONLY"
     },
+    "rust": 94,
+    "sbf": "TWO_FRESH_BUILDS_MATCH",
+    "coreChain": 55,
     "roundTrip": {
       "pass": 20,
       "fail": 0,
@@ -130,6 +136,26 @@
       "separateProcessRestart": "PASS",
       "perTransferTeamApproval": false
     },
-    "exactShaFreshClone": "NOT_RUN"
+    "exactShaFreshClone": "PASS"
+  },
+  "phase10": "LOCAL_SERVICE_INCREMENT_TESTED_COMMIT_PENDING",
+  "phase10Validation": {
+    "baseSha": "79e586424c852639d52b55251ac18198ef0c3abe",
+    "worktreeDirty": true,
+    "windowsNode": 963,
+    "wslNode": 963,
+    "vectorsPerPlatform": 2,
+    "coreChain": 55,
+    "roundTrip": {
+      "pass": 24,
+      "fail": 0,
+      "nativeToSolana": "COMPLETED",
+      "solanaToNative": "COMPLETED",
+      "durableInbox": "PASS",
+      "separateProcessServiceRestart": "PASS",
+      "acceptedPayoutReorgPause": "PASS"
+    },
+    "exactShaFreshClone": "NOT_RUN",
+    "productionServiceIntegration": "INCOMPLETE"
   }
 }

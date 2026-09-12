@@ -54,6 +54,12 @@ export class AutomaticSolanaToNativeWithdrawal {
     this.#createCoordinator = createCoordinator; this.#reserve = reserveScriptHex; this.#minimum = minimumConfirmations;
   }
   #active() { check(this.#ledger.status().state !== "HARD_STOP", "WithdrawalBridgePaused"); }
+  assertLedger(ledger) { check(ledger === this.#ledger, "WithdrawalServiceLedgerMismatch"); }
+  async enqueue(signature) {
+    const observation = await this.#reader.read(signature); this.#active();
+    this.#ledger.enqueueConfirmedWithdrawal(observation);
+    return { state: "FINALIZED_ON_SOLANA", operationId: observation.operationId };
+  }
   async #known(raw) {
     const txid = parseNativeTransactionHex(raw).txidHex;
     try {
@@ -65,13 +71,45 @@ export class AutomaticSolanaToNativeWithdrawal {
   async reconcile() {
     const inputs = this.#ledger.accountedReserveInputs();
     const before = await this.#verifier.observeChain();
-    if (inputs.length) await this.#verifier.verifyInputs({ inputs, minimumConfirmations: this.#minimum });
-    const snapshot = verifyDeploymentSnapshot(this.#manifest, await this.#solana.snapshot(this.#manifest));
+    const affected = this.#ledger.acceptedNativeBases().filter(b => b.blocks.some(block => before.headerHashes[block.height] !== block.blockHash));
+    if (affected.length) {
+      if (affected.some(b => BigInt("0x" + before.chainworkHex) <= BigInt("0x" + b.chainworkHex))) return { state: "WAITING_FOR_DEPENDENCY", reason: "NATIVE_CHAIN_CHOICE_UNRESOLVED" };
+      if (this.#ledger.status().state !== "HARD_STOP") this.#ledger.hardStop("ACCEPTED_NATIVE_OPERATION_REORG");
+      // Original accepted facts remain in the journal. No automatic repair,
+      // new credit, remint or second payout after an accepted-chain conflict.
+      return { state: "PAUSED", reason: "ACCEPTED_NATIVE_OPERATION_REORG", affectedOperations: affected.map(b => b.operationId) };
+    }
+    if (inputs.length) {
+      try { await this.#verifier.verifyInputs({ inputs, minimumConfirmations: this.#minimum }); }
+      catch (error) {
+        if (error?.message !== "RAW_NATIVE_INPUT_NOT_AVAILABLE") throw error;
+        // A recorded in-flight payout legitimately spends locked inputs. It
+        // remains an unpaid liability until verified finality, not a deficit.
+        const pending = this.#ledger.pendingSignedWithdrawals();
+        let contradiction = false;
+        for (const input of inputs) {
+          const utxo = await this.#rpc.getUtxoObservation({ txid: input.txid, vout: input.vout, decimals: 8, includeMempool: false });
+          if (utxo.unspent) continue;
+          let explained = false;
+          for (const r of pending) if (r.plan.inputs.some(i => i.txid === input.txid && i.vout === input.vout) && await this.#known(r.signedTransactionHex)) explained = true;
+          if (!explained) contradiction = true;
+        }
+        check((await this.#verifier.observeChain()).tipHash === before.tipHash, "WithdrawalReconciliationSourceChanged");
+        if (contradiction && this.#ledger.status().state !== "HARD_STOP") this.#ledger.hardStop("UNEXPLAINED_CANONICAL_RESERVE_SPEND");
+        return { state: contradiction ? "PAUSED" : "WAITING_FOR_DEPENDENCY", reason: contradiction ? "UNEXPLAINED_CANONICAL_RESERVE_SPEND" : "NATIVE_SETTLEMENT_PENDING" };
+      }
+    }
+    let snapshot;
+    try { snapshot = verifyDeploymentSnapshot(this.#manifest, await this.#solana.snapshot(this.#manifest)); }
+    catch (error) {
+      if (["SOLANA_DEPLOYMENT_CHANGED", "SOLANA_GENESIS_CHANGED", "FINALIZED_SOLANA_CONFLICT"].includes(error?.integrityCode) && this.#ledger.status().state !== "HARD_STOP") this.#ledger.hardStop("WITHDRAWAL_DEPLOYMENT_CHANGED");
+      throw error;
+    }
     const after = await this.#verifier.observeChain();
     check(before.tipHash === after.tipHash, "WithdrawalReconciliationSourceChanged");
     const report = compareWithdrawalAccounting(this.#ledger.bridgeSnapshot(), { reserve: inputs.reduce((n, i) => n + BigInt(i.amountAtomic), 0n).toString(),
       supply: snapshot.mintSupplyAtomic, managerIssued: snapshot.managerMintedAtomic, recordedBurns: snapshot.burnedUnpaidAtomic });
-    if (report.state === "PAUSED") this.#ledger.hardStop("WITHDRAWAL_ACCOUNTING_CONTRADICTION");
+    if (report.state === "PAUSED" && this.#ledger.status().state !== "HARD_STOP") this.#ledger.hardStop("WITHDRAWAL_ACCOUNTING_CONTRADICTION");
     return report;
   }
   async run(signature) {
@@ -82,6 +120,7 @@ export class AutomaticSolanaToNativeWithdrawal {
       let record = this.#ledger.withdrawal(id);
       if (record?.state === "COMPLETED") return { state: "COMPLETED", operationId: id, txid: record.payment.txid, replay: true };
       this.#active();
+      this.#ledger.enqueueConfirmedWithdrawal(observation); // Retain the liability even when no input is presently available.
       if (!record) {
         check(BigInt(observation.grossAtomic) <= this.#maxAmount && BigInt(observation.feeAtomic) <= this.#maxFee, "WithdrawalQueuedByLimit");
         const inputs = []; let total = 0n;

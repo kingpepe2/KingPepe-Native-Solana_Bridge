@@ -35,12 +35,14 @@ for (const [name, change, expected] of [
   const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-ci-gate-test-"));
   try {
     const result = { sourceSha: "0".repeat(40), worktreeDirty: false, state: "COMPLETED", nativeToSolana: "COMPLETED",
-      solanaToNative: "COMPLETED", noPerTransferKingPepeTeamApproval: true, checks: { pass: 20, fail: 0, passed: [
+      solanaToNative: "COMPLETED", noPerTransferKingPepeTeamApproval: true, checks: { pass: 24, fail: 0, passed: [
         "REAL_FINALIZED_BURN_CHECKED_AND_WITHDRAWAL_RECORD", "MISSING_SIGNER_NO_FALLBACK_DURABLE_LIABILITY_AND_INPUT_LOCK",
         "REAL_FROST_A_B_NATIVE_ACCEPTED_PAYOUT", "INVALID_PAYOUT_SIGNATURE_REJECTED_BEFORE_RELAY",
         "SEPARATE_PROCESS_RESUMES_UNFINALIZED_PAYOUT_WITHOUT_REBROADCAST", "NATIVE_FINALITY_RECONCILIATION_COMPLETED",
         "DUPLICATE_OPERATION_NO_DOUBLE_PAYOUT", "REAL_DIRECT_SPL_BURN_NO_PAYOUT_RIGHT", "DIRECT_BURN_NOT_SPENDABLE_SURPLUS",
         "PAUSE_SURVIVES_RESTART_NO_NEW_AUTHORIZATION",
+        "DURABLE_INBOX_RETAINS_FINALIZED_LIABILITY_BEFORE_INPUT_SELECTION", "SERVICE_RESTART_FINDS_DURABLE_REQUEST_WITHOUT_CLIENT_RESUBMISSION",
+        "ACCEPTED_PAYOUT_REORG_PAUSES_WITHOUT_SECOND_PAYMENT_OR_BALANCE_REPAIR", "SERVICE_RESTART_PRESERVES_PAUSE_AND_READ_ONLY_ACCOUNTING",
       ] } };
     change(result);
     writeFileSync(path.join(root, "round-trip-result.json"), JSON.stringify(result), { flag: "wx", mode: 0o600 });

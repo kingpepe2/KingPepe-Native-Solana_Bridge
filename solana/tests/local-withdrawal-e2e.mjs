@@ -19,6 +19,7 @@ import { NativeRpcClient } from "../../native/node/native-rpc-client.mjs";
 import { LocalDeploymentRpc } from "../../services/solana-observer/deployment-integrity.mjs";
 import { FinalizedWithdrawalReader } from "../../services/solana-observer/finalized-withdrawal.mjs";
 import { AutomaticSolanaToNativeWithdrawal, verifyWithdrawalSigning } from "../../services/bridge-validator/automatic-withdrawal.mjs";
+import { LocalWithdrawalService } from "../../services/relayer/withdrawal-service.mjs";
 import { NativeFrostSigner, NativeFrostCoordinator, FileBackedFrostStateStore, REQUIRED_FROST_SIGNERS, createNativeSigningPolicy } from "../../native/frost/index.mjs";
 import { withdrawalSigningIntents, validateSignedWithdrawal } from "../../native/reserve/withdrawal-plan.mjs";
 import { createWithdrawalInstruction } from "../ts/sdk/withdrawal.mjs";
@@ -40,7 +41,11 @@ async function resumeInChild(file) {
       reader: new FinalizedWithdrawalReader({ rpc: solanaRpc, manifest: c.manifest }), nativeVerifier: await createLocalNativeEvidenceVerifier({ plan }),
       nativeRpc, solanaRpc, manifest: c.manifest, reserveScriptHex: c.reserveScriptHex, minimumConfirmations: config.depositFinalityBlocks,
       maxAmountAtomic: config.maxAmountAtomic, maxFeeAtomic: config.maxFeeAtomic, createCoordinator: () => { throw new Error("TEST_RESIGN_FORBIDDEN"); } });
-    const result = await worker.run(c.signature);
+    const service = new LocalWithdrawalService({ ledger, worker });
+    const stop = new AbortController(); let tick;
+    await service.run({ signal: stop.signal, intervalMs: 250, onStatus: value => { tick = value; stop.abort(); } });
+    assert.equal(tick.operations.length, 1);
+    const result = tick.operations[0];
     console.log(JSON.stringify({ state: result.state, accounting: result.accounting }));
   } finally { ledger.close(); }
 }
@@ -53,7 +58,7 @@ export async function runLocalWithdrawalE2e(repoRoot, onCheck = () => {}) {
     try {
       const { plan, executor, commandPaths } = context;
       const cli = async (command, parameters = [], wallet) => {
-        assert(["getnewaddress", "getaddressinfo", "generatetoaddress", "testmempoolaccept"].includes(command));
+        assert(["getnewaddress", "getaddressinfo", "generatetoaddress", "testmempoolaccept", "invalidateblock", "generateblock"].includes(command));
         const r = await executor.runOneShot({ step: "LOCAL_WITHDRAWAL_TEST_" + command.toUpperCase(), executable: commandPaths.get("kingpepe-cli"),
           args: buildRegtestCliArguments({ datadir: plan.paths.nativeDatadir, rpcPort: plan.ports.nativeRpcPort, wallet, command, parameters }), cwd: repoRoot });
         return String(r.output).trim();
@@ -78,7 +83,7 @@ export async function runLocalWithdrawalE2e(repoRoot, onCheck = () => {}) {
       assert.equal(deposit.state, "COMPLETED"); pass("FRESH_NATIVE_TO_SOLANA_COMPLETED");
       ledger = openLocalnetDepositCreditLedger(accounting);
       const depositMessage = decodeCanonicalBridgeMessage(accounting.credit.encodedMessageHex);
-      ledger.recordCanonicalReserve(reserveReceipt, depositMessage.operationIdHex);
+      assert.equal(ledger.availableReserveInputs()[0].txid, reserveReceipt.reserveBasis.sweep.txid);
       const sourceSha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repoRoot, encoding: "utf8" }).trim();
       const manifest = await localDeploymentManifest({ context: claimContext, authority: SYSTEM, sourceSha });
       const solana = new LocalDeploymentRpc({ endpoint: `http://127.0.0.1:${plan.ports.solanaRpcPort}` });
@@ -134,6 +139,13 @@ export async function runLocalWithdrawalE2e(repoRoot, onCheck = () => {}) {
       stage = "MISSING_SIGNER";
       const absent = new AutomaticSolanaToNativeWithdrawal({ ...options(), createCoordinator: () => new NativeFrostCoordinator({ signers: [], publicPackage: custody.publicPackage,
         aggregateTweakedXOnlyPublicKey: custody.aggregateTweakedXOnlyPublicKey }) });
+      const service = new LocalWithdrawalService({ ledger, worker: absent });
+      await service.submit(sent.signature);
+      const queued = ledger.checkpoint(); await service.submit(sent.signature);
+      assert.deepEqual(ledger.checkpoint(), queued); assert.equal(ledger.withdrawal(message.operationIdHex), undefined);
+      assert.equal(service.status().accounting.pendingWithdrawalAtomic, "20000000");
+      assert.equal(service.status().withdrawals[0].operationId, message.operationIdHex);
+      pass("DURABLE_INBOX_RETAINS_FINALIZED_LIABILITY_BEFORE_INPUT_SELECTION");
       await assert.rejects(() => absent.run(sent.signature));
       assert.equal(ledger.withdrawal(message.operationIdHex).state, "FINALIZED_ON_SOLANA"); assert.equal(ledger.availableReserveInputs().length, 0);
       assert.equal(ledger.bridgeSnapshot().pendingWithdrawalAtomic, "20000000"); pass("MISSING_SIGNER_NO_FALLBACK_DURABLE_LIABILITY_AND_INPUT_LOCK");
@@ -161,7 +173,7 @@ export async function runLocalWithdrawalE2e(repoRoot, onCheck = () => {}) {
       // Only test public context and local paths; no share or private key is
       // serialized. The new process loads the durable accounting journal.
       const resumeFile = validateRuntimeFile(path.join(plan.runRoot, "withdrawal-resume-test.json"), repoRoot);
-      writeFileSync(resumeFile, JSON.stringify({ accounting, manifest, reserveScriptHex: custody.taprootScriptPubKeyHex, signature: sent.signature }), { flag: "wx", mode: 0o600, flush: true });
+      writeFileSync(resumeFile, JSON.stringify({ accounting, manifest, reserveScriptHex: custody.taprootScriptPubKeyHex }), { flag: "wx", mode: 0o600, flush: true });
       const resume = () => {
         const child = spawnSync(process.execPath, [fileURLToPath(import.meta.url), "--resume", resumeFile], { cwd: repoRoot,
           env: process.env, timeout: 120000, maxBuffer: 4096, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
@@ -169,6 +181,7 @@ export async function runLocalWithdrawalE2e(repoRoot, onCheck = () => {}) {
         return JSON.parse(child.stdout);
       };
       ledger.close(); assert.equal(resume().state, "BROADCAST"); pass("SEPARATE_PROCESS_RESUMES_UNFINALIZED_PAYOUT_WITHOUT_REBROADCAST");
+      pass("SERVICE_RESTART_FINDS_DURABLE_REQUEST_WITHOUT_CLIENT_RESUBMISSION");
       stage = "NATIVE_FINALITY_AND_RECONCILIATION";
       await cli("generatetoaddress", [String(config.depositFinalityBlocks), destinationAddress]);
       const completed = resume(); assert.equal(completed.state, "COMPLETED"); assert.equal(sends, 1);
@@ -182,8 +195,20 @@ export async function runLocalWithdrawalE2e(repoRoot, onCheck = () => {}) {
         { key: setup.mintBase58, writable: true, signer: false }, { key: user.publicKeyBase58, writable: false, signer: true }], data: direct }]);
       assert.equal(directBurn.error, null); await assert.rejects(() => reader.read(directBurn.signature)); pass("REAL_DIRECT_SPL_BURN_NO_PAYOUT_RIGHT");
       assert.equal((await finalizedWorker.reconcile()).directBurnDifferenceAtomic, "1"); pass("DIRECT_BURN_NOT_SPENDABLE_SURPLUS");
-      ledger.hardStop("TEST_MANUAL_REVIEW_REQUIRED"); const stop = ledger.checkpoint(); ledger.close(); ledger = openLocalnetDepositCreditLedger({ ...accounting, minimumCheckpoint: stop });
+      stage = "ACCEPTED_PAYOUT_REORG";
+      const paid = ledger.withdrawal(message.operationIdHex).payment, beforeReorg = ledger.bridgeSnapshot();
+      await cli("invalidateblock", [paid.blockHash]);
+      // Empty competing blocks do not simply re-include the old payout.
+      for (let n = 0; n <= config.depositFinalityBlocks; n++) await cli("generateblock", [destinationAddress, "[]"]);
+      const incident = await finalizedWorker.reconcile();
+      assert.equal(incident.state, "PAUSED"); assert.equal(incident.reason, "ACCEPTED_NATIVE_OPERATION_REORG");
+      assert(incident.affectedOperations.includes(message.operationIdHex)); assert.deepEqual(ledger.bridgeSnapshot(), beforeReorg); assert.equal(sends, 1);
+      pass("ACCEPTED_PAYOUT_REORG_PAUSES_WITHOUT_SECOND_PAYMENT_OR_BALANCE_REPAIR");
+      const stop = ledger.checkpoint(); ledger.close(); ledger = openLocalnetDepositCreditLedger({ ...accounting, minimumCheckpoint: stop });
       assert.equal(ledger.status().state, "HARD_STOP"); assert.throws(() => ledger.recordCanonicalReserve(reserveReceipt, depositMessage.operationIdHex)); pass("PAUSE_SURVIVES_RESTART_NO_NEW_AUTHORIZATION");
+      const pausedService = new LocalWithdrawalService({ ledger, worker: new AutomaticSolanaToNativeWithdrawal({ ...options(), createCoordinator: () => { throw new Error("TEST_SIGN_WHILE_PAUSED_FORBIDDEN"); } }) });
+      assert.equal((await pausedService.tick()).state, "PAUSED"); assert.deepEqual(pausedService.status().accounting, beforeReorg);
+      pass("SERVICE_RESTART_PRESERVES_PAUSE_AND_READ_ONLY_ACCOUNTING");
       report = { state: "COMPLETED", checks: { pass: checks.length, fail: 0, passed: checks }, nativeToSolana: "COMPLETED", solanaToNative: "COMPLETED",
         noPerTransferKingPepeTeamApproval: true, sourceSha, worktreeDirty: execFileSync("git", ["status", "--porcelain"], { cwd: repoRoot, encoding: "utf8" }).trim().length > 0 };
       return { withdrawalE2e: report };

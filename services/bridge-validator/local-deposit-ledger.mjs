@@ -20,7 +20,7 @@ const MAX_EVENTS = 8192;
 const CREDIT = 1;
 const MINT = 2;
 const STOP = 3;
-const RESERVE = 4, WITHDRAWAL = 5, MAX_OPERATION_BYTES = 6144;
+const RESERVE = 4, WITHDRAWAL = 5, REQUEST = 6, MAX_OPERATION_BYTES = 6144;
 const CREDIT_LENGTH = MESSAGE_LENGTH + 32;
 const TABLES = Object.freeze({
   meta: "CREATE TABLE meta (id INTEGER PRIMARY KEY CHECK (id = 1), context BLOB NOT NULL, head INTEGER NOT NULL, tag BLOB NOT NULL) STRICT",
@@ -43,6 +43,7 @@ export class AuthenticatedLocalDepositLedger {
   #credits = new Map();
   #reserves = new Map();
   #withdrawals = new Map();
+  #requests = new Map();
   #statements = new Map();
 
   static createLocal(options) { return new AuthenticatedLocalDepositLedger(options, true); }
@@ -128,11 +129,26 @@ export class AuthenticatedLocalDepositLedger {
   }
 
   recordValidatedDeposit(input) { this.#record(CREDIT, creditPayload(input)); }
+  enqueueConfirmedWithdrawal(observation) {
+    requireFinalizedWithdrawal(observation);
+    this.#record(REQUEST, Buffer.from(JSON.stringify({ signature: observation.signature, encodedMessageHex: observation.encodedMessageHex })));
+  }
+  withdrawalRequests({ offset = 0, limit = 100, pendingOnly = false } = {}) {
+    this.#assertHead();
+    if (!Number.isSafeInteger(offset) || offset < 0 || offset > MAX_EVENTS || !Number.isInteger(limit) || limit < 1 || limit > 100 || typeof pendingOnly !== "boolean") throw new Error("LocalLedgerPageRejected");
+    const requests = new Map(this.#requests);
+    for (const [id, r] of this.#withdrawals) if (!requests.has(id)) requests.set(id, { signature: r.plan.solanaSignature, encodedMessageHex: r.plan.encodedMessageHex });
+    return [...requests].map(([operationId, r]) => {
+      const m = decodeCanonicalBridgeMessage(Buffer.from(r.encodedMessageHex, "hex"));
+      return { operationId, signature: r.signature, state: this.#withdrawals.get(operationId)?.state ?? "FINALIZED_ON_SOLANA",
+        amountAtomic: m.amountAtomic.toString(), feeAtomic: m.feeAtomic.toString() };
+    }).filter(r => !pendingOnly || r.state !== "COMPLETED").slice(offset, offset + limit);
+  }
   recordCanonicalReserve(receipt, depositOperationId) {
     requireVerifiedRegtestReserve(receipt);
     const b = receipt.reserveBasis;
     this.#record(RESERVE, Buffer.from(JSON.stringify({ depositOperationId, txid: b.sweep.txid, vout: b.sweep.vout,
-      amountAtomic: b.amountAtomic, scriptPubKeyHex: b.reserveScriptHex, depositOutpoint: `${b.deposit.txid}:${b.deposit.vout}` })));
+      amountAtomic: b.amountAtomic, scriptPubKeyHex: b.reserveScriptHex, depositOutpoint: `${b.deposit.txid}:${b.deposit.vout}`, basis: b })));
   }
   reserveWithdrawal(plan, observation) {
     requireFinalizedWithdrawal(observation);
@@ -173,6 +189,9 @@ export class AuthenticatedLocalDepositLedger {
     this.#record(WITHDRAWAL, Buffer.from(JSON.stringify({ ...r, state: "COMPLETED", reconciliation: reconciliationDigest })));
   }
   withdrawal(id) { this.#assertHead(); return structuredClone(this.#withdrawals.get(id)); }
+  pendingSignedWithdrawals() {
+    this.#assertHead(); return structuredClone([...this.#withdrawals.values()].filter(r => r.signedTransactionHex && !r.payment));
+  }
   availableReserveInputs() {
     this.#assertHead(); const locked = new Set([...this.#withdrawals.values()].flatMap(r => r.plan.inputs.map(i => `${i.txid}:${i.vout}`)));
     return [...this.#reserves.values()].filter(i => !locked.has(`${i.txid}:${i.vout}`)).map(i => ({ txid: i.txid, vout: i.vout, amountAtomic: i.amountAtomic, scriptPubKeyHex: i.scriptPubKeyHex }))
@@ -182,10 +201,20 @@ export class AuthenticatedLocalDepositLedger {
     this.#assertHead(); const spent = new Set([...this.#withdrawals.values()].filter(r => ["PAID", "COMPLETED"].includes(r.state)).flatMap(r => r.plan.inputs.map(i => `${i.txid}:${i.vout}`)));
     return [...this.#reserves.values()].filter(i => !spent.has(`${i.txid}:${i.vout}`)).map(i => ({ txid: i.txid, vout: i.vout, amountAtomic: i.amountAtomic, scriptPubKeyHex: i.scriptPubKeyHex }));
   }
+  acceptedNativeBases() {
+    this.#assertHead();
+    const bases = [...this.#reserves.values()].filter(r => r.basis).map(r => ({ operationId: r.depositOperationId, amountAtomic: r.amountAtomic,
+      chainworkHex: r.basis.chainworkHex, blocks: [r.basis.deposit, r.basis.sweep].map(({ height, blockHash }) => ({ height, blockHash })) }));
+    for (const [operationId, r] of this.#withdrawals) if (r.payment) bases.push({ operationId, amountAtomic: r.payment.grossAtomic,
+      chainworkHex: r.payment.chainworkHex, blocks: [{ height: r.payment.blockHeight, blockHash: r.payment.blockHash }] });
+    return structuredClone(bases);
+  }
   bridgeSnapshot() {
     this.#assertHead(); const d = this.#ledger.snapshot(); let burned = 0n, paid = 0n, fees = 0n, broadcast = 0n;
+    for (const r of this.#requests.values()) burned += decodeCanonicalBridgeMessage(Buffer.from(r.encodedMessageHex, "hex")).amountAtomic;
     for (const r of this.#withdrawals.values()) {
-      const m = decodeCanonicalBridgeMessage(Buffer.from(r.plan.encodedMessageHex, "hex")); burned += m.amountAtomic;
+      const m = decodeCanonicalBridgeMessage(Buffer.from(r.plan.encodedMessageHex, "hex"));
+      if (!this.#requests.has(m.operationIdHex)) burned += m.amountAtomic;
       if (["PAID", "COMPLETED"].includes(r.state)) { paid += m.amountAtomic; fees += m.feeAtomic; }
       else if (r.state === "BROADCAST") broadcast += m.amountAtomic;
     }
@@ -249,7 +278,7 @@ export class AuthenticatedLocalDepositLedger {
     this.#head = sequence;
     this.#tag = tag;
     if (kind === STOP) this.#stop = payload.toString("ascii");
-    else if (auxiliary) { this.#reserves = auxiliary.reserves; this.#withdrawals = auxiliary.withdrawals; }
+    else if (auxiliary) { this.#reserves = auxiliary.reserves; this.#withdrawals = auxiliary.withdrawals; this.#requests = auxiliary.requests; }
     else this.#credits.set(credit.operationIdHex, credit);
   }
 
@@ -272,13 +301,32 @@ export class AuthenticatedLocalDepositLedger {
     if (payload.length > MAX_OPERATION_BYTES) throw new Error("LocalLedgerOperationSizeRejected");
     const text = payload.toString("utf8"), value = JSON.parse(text);
     if (JSON.stringify(value) !== text) throw new Error("LocalLedgerOperationEncodingRejected");
-    const reserves = new Map(this.#reserves), withdrawals = new Map(this.#withdrawals);
+    const reserves = new Map(this.#reserves), withdrawals = new Map(this.#withdrawals), requests = new Map(this.#requests);
     const check = v => { if (!v) throw new Error("LocalLedgerWithdrawalTransitionRejected"); };
-    if (kind === RESERVE) {
-      check(Object.keys(value).sort().join() === "amountAtomic,depositOperationId,depositOutpoint,scriptPubKeyHex,txid,vout");
+    if (kind === REQUEST) {
+      check(Object.keys(value).sort().join() === "encodedMessageHex,signature" && typeof value.signature === "string" && /^[1-9A-HJ-NP-Za-km-z]{64,88}$/u.test(value.signature));
+      check(typeof value.encodedMessageHex === "string" && /^[0-9a-f]{1028}$/u.test(value.encodedMessageHex));
+      const bytes = Buffer.from(value.encodedMessageHex, "hex"), m = decodeCanonicalBridgeMessage(bytes);
+      check(bytes.subarray(12, 12 + DEPLOYMENT_IDENTITY_LENGTH).equals(this.#deployment) && m.action === "WithdrawalRequest" && m.direction === "SolanaToNative");
+      const prior = requests.get(m.operationIdHex), operation = withdrawals.get(m.operationIdHex);
+      if (prior) { check(canonicalJson(prior) === canonicalJson(value)); return { unchanged: true }; }
+      check(requests.size < 256 && ![...requests.values()].some(r => r.signature === value.signature));
+      if (operation) check(operation.plan.solanaSignature === value.signature && operation.plan.encodedMessageHex === value.encodedMessageHex);
+      const known = new Map([...withdrawals].map(([id, r]) => [id, r.plan.encodedMessageHex]));
+      for (const [id, r] of requests) known.set(id, r.encodedMessageHex);
+      known.set(m.operationIdHex, value.encodedMessageHex);
+      check([...known.values()].reduce((n, message) => n + decodeCanonicalBridgeMessage(Buffer.from(message, "hex")).amountAtomic, 0n) <= BigInt(this.#ledger.snapshot().mintedSupply));
+      requests.set(m.operationIdHex, value);
+    } else if (kind === RESERVE) {
+      check(Object.keys(value).sort().join() === "amountAtomic,basis,depositOperationId,depositOutpoint,scriptPubKeyHex,txid,vout");
       const credit = this.#credits.get(value.depositOperationId);
       check(credit && value.amountAtomic === credit.amountAtomic && /^[0-9a-f]{64}$/u.test(value.txid) && value.vout === 0 && /^5120[0-9a-f]{64}$/u.test(value.scriptPubKeyHex));
       check(decodeCanonicalBridgeMessage(Buffer.from(credit.encodedMessageHex, "hex")).depositOutpointText === value.depositOutpoint);
+      const b = value.basis;
+      check(b && b.genesis === REGTEST_GENESIS && /^[0-9a-f]{64}$/u.test(b.chainworkHex) && BigInt("0x" + b.chainworkHex) > 0n &&
+        b.amountAtomic === value.amountAtomic && b.reserveScriptHex === value.scriptPubKeyHex && b.sweep.txid === value.txid && b.sweep.vout === value.vout &&
+        `${b.deposit.txid}:${b.deposit.vout}` === value.depositOutpoint);
+      for (const block of [b.deposit, b.sweep]) check(Number.isSafeInteger(block.height) && block.height > 0 && block.height <= 4096 && /^[0-9a-f]{64}$/u.test(block.blockHash));
       const key = `${value.txid}:${value.vout}`, prior = reserves.get(key);
       if (prior) { check(canonicalJson(prior) === canonicalJson(value)); return { unchanged: true }; }
       check(![...reserves.values()].some(i => i.depositOperationId === value.depositOperationId)); reserves.set(key, value);
@@ -286,6 +334,8 @@ export class AuthenticatedLocalDepositLedger {
       check(kind === WITHDRAWAL && Object.keys(value).sort().join() === "attempts,payment,plan,reconciliation,signedTransactionHex,state");
       const p = validateWithdrawalPlan(value.plan), m = decodeCanonicalBridgeMessage(Buffer.from(p.encodedMessageHex, "hex"));
       check(Buffer.from(p.encodedMessageHex, "hex").subarray(12, 12 + DEPLOYMENT_IDENTITY_LENGTH).equals(this.#deployment));
+      const queued = requests.get(p.operationId);
+      if (queued) check(queued.signature === p.solanaSignature && queued.encodedMessageHex === p.encodedMessageHex);
       check(Number.isInteger(value.attempts) && value.attempts >= 0 && value.attempts <= 32);
       const prior = withdrawals.get(p.operationId), states = ["FINALIZED_ON_SOLANA", "SIGNED", "BROADCAST", "PAID", "COMPLETED"], index = states.indexOf(value.state);
       check(index >= 0);
@@ -314,6 +364,8 @@ export class AuthenticatedLocalDepositLedger {
       else {
         const pay = value.payment, tx = parseNativeTransactionHex(value.signedTransactionHex), change = tx.outputs[1];
         check(pay && pay.txid === tx.txidHex && /^[0-9a-f]{64}$/u.test(pay.digestHex) && /^[0-9a-f]{64}$/u.test(pay.tipHash) && Number.isSafeInteger(pay.tipHeight) && pay.tipHeight > 0 &&
+          /^[0-9a-f]{64}$/u.test(pay.blockHash) && /^[0-9a-f]{64}$/u.test(pay.chainworkHex) && BigInt("0x" + pay.chainworkHex) > 0n &&
+          Number.isSafeInteger(pay.blockHeight) && pay.blockHeight > 0 && pay.blockHeight <= pay.tipHeight &&
           pay.grossAtomic === m.amountAtomic.toString() && pay.netAtomic === (m.amountAtomic - m.feeAtomic).toString() && pay.feeAtomic === m.feeAtomic.toString() &&
           pay.changeAtomic === (change?.amountAtomic ?? "0") && pay.reserveScriptHex === p.reserveScriptHex && pay.recipientScriptHex === m.destinationHex);
         if (change) reserves.set(`${tx.txidHex}:1`, { txid: tx.txidHex, vout: 1, amountAtomic: change.amountAtomic, scriptPubKeyHex: p.reserveScriptHex });
@@ -321,7 +373,7 @@ export class AuthenticatedLocalDepositLedger {
       if (index === 4) check(/^[0-9a-f]{64}$/u.test(value.reconciliation)); else check(value.reconciliation === null);
       withdrawals.set(p.operationId, value);
     }
-    return { reserves, withdrawals };
+    return { reserves, withdrawals, requests };
   }
 
   #replay(minimum) {
@@ -337,11 +389,11 @@ export class AuthenticatedLocalDepositLedger {
       minimumMatched = minimumSequence === 0n && timingSafeEqual(minimumTag, this.#tag);
     }
     for (const row of rows) {
-      if (this.#stop !== undefined || row.seq !== this.#head + 1n || row.kind < 1n || row.kind > 5n ||
+      if (this.#stop !== undefined || row.seq !== this.#head + 1n || row.kind < 1n || row.kind > 6n ||
           !(row.payload instanceof Uint8Array) || row.payload.length > (row.kind < 4n ? CREDIT_LENGTH + 8 : MAX_OPERATION_BYTES)) throw new Error("LocalLedgerSequenceRejected");
       if (!equalTag(row.previous, this.#tag)) throw new Error("LocalLedgerAuthenticationFailed");
       const payload = Buffer.from(row.payload);
-      const kind = Number(row.kind); // Five bounded enum values, never an amount.
+      const kind = Number(row.kind); // Six bounded enum values, never an amount.
       const tag = this.#authenticate(row.seq, kind, payload, this.#tag);
       if (!equalTag(row.tag, tag)) throw new Error("LocalLedgerAuthenticationFailed");
       const before = JSON.stringify(this.#ledger.snapshot());
@@ -351,7 +403,7 @@ export class AuthenticatedLocalDepositLedger {
       this.#head = row.seq;
       this.#tag = tag;
       if (kind === STOP) this.#stop = payload.toString("ascii");
-      else if (auxiliary) { this.#reserves = auxiliary.reserves; this.#withdrawals = auxiliary.withdrawals; }
+      else if (auxiliary) { this.#reserves = auxiliary.reserves; this.#withdrawals = auxiliary.withdrawals; this.#requests = auxiliary.requests; }
       else this.#credits.set(credit.operationIdHex, credit);
       if (minimumSequence === this.#head && timingSafeEqual(minimumTag, tag)) minimumMatched = true;
     }

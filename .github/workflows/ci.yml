@@ -227,14 +227,18 @@ jobs:
             console.log(JSON.stringify(r));
             if (r.sourceSha !== process.env.GITHUB_SHA || r.worktreeDirty !== false || r.state !== "COMPLETED" ||
                 r.nativeToSolana !== "COMPLETED" || r.solanaToNative !== "COMPLETED" ||
-                r.noPerTransferKingPepeTeamApproval !== true || r.checks?.pass !== 20 || r.checks?.fail !== 0) process.exit(1);
+                r.noPerTransferKingPepeTeamApproval !== true || r.checks?.pass !== 24 || r.checks?.fail !== 0) process.exit(1);
             for (const check of ["REAL_FINALIZED_BURN_CHECKED_AND_WITHDRAWAL_RECORD",
               "MISSING_SIGNER_NO_FALLBACK_DURABLE_LIABILITY_AND_INPUT_LOCK", "REAL_FROST_A_B_NATIVE_ACCEPTED_PAYOUT",
               "INVALID_PAYOUT_SIGNATURE_REJECTED_BEFORE_RELAY",
               "SEPARATE_PROCESS_RESUMES_UNFINALIZED_PAYOUT_WITHOUT_REBROADCAST",
               "NATIVE_FINALITY_RECONCILIATION_COMPLETED", "DUPLICATE_OPERATION_NO_DOUBLE_PAYOUT",
               "REAL_DIRECT_SPL_BURN_NO_PAYOUT_RIGHT", "DIRECT_BURN_NOT_SPENDABLE_SURPLUS",
-              "PAUSE_SURVIVES_RESTART_NO_NEW_AUTHORIZATION"]) {
+              "PAUSE_SURVIVES_RESTART_NO_NEW_AUTHORIZATION",
+              "DURABLE_INBOX_RETAINS_FINALIZED_LIABILITY_BEFORE_INPUT_SELECTION",
+              "ACCEPTED_PAYOUT_REORG_PAUSES_WITHOUT_SECOND_PAYMENT_OR_BALANCE_REPAIR",
+              "SERVICE_RESTART_PRESERVES_PAUSE_AND_READ_ONLY_ACCOUNTING",
+              "SERVICE_RESTART_FINDS_DURABLE_REQUEST_WITHOUT_CLIENT_RESUBMISSION"]) {
               if (!r.checks.passed.includes(check)) process.exit(1);
             }
           '

@@ -19,7 +19,7 @@ import {
   createLocalFrostTaprootCustodyContext,
   createNativeToSolanaFlowConfig,
   draftLocalReserveSweep,
-  executeNativeDepositObservationFlow,
+  executeNativeDepositObservationFlow as executeOrchestration,
   findDepositOutput,
   p2trScriptPubKeyHex,
   signLocalReserveSweepWithFrost,
@@ -28,7 +28,7 @@ import {
   publicLocalSolanaSetupContext,
   validateLocalNativeSourceSnapshot,
   validateRawDepositTransaction,
-  runLocalNativeToSolanaE2e,
+  runLocalNativeToSolanaE2e as runOrchestration,
   openLocalnetDepositCreditLedger,
   validateDepositUtxo,
 } from "../local-e2e-native-to-solana.mjs";
@@ -43,6 +43,11 @@ import {
 import { base58Encode } from "../../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../..");
+// These are orchestration models, not Native reserve proof. The default real
+// E2E recorder requires the verifier's branded receipt and is chain-tested.
+const modelReserveAccounting = (_ledger, receipt) => assert.equal(receipt.status, "SOURCE_MODEL_ONLY");
+const runLocalNativeToSolanaE2e = options => runOrchestration({ ...options, reserveAccounting: modelReserveAccounting });
+const executeNativeDepositObservationFlow = options => executeOrchestration({ ...options, reserveAccounting: modelReserveAccounting });
 const DEPOSIT_TXID = h("phase08-real-daemon-deposit-txid");
 const FEE_FUNDING_TXID = h("phase08-reserve-sweep-fee-funding-txid");
 // Public generator-point fixtures, not operational signing identities.

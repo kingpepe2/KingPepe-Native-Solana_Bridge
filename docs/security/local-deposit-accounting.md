@@ -98,3 +98,20 @@ Renewal across message expiry and production recovery policy remain unimplemente
 Other claim/sweep and FROST state stores are not authenticated by this journal.
 Plain local test-key storage is not protected production storage or a fallback
 for an unavailable protected-secret adapter. Mainnet remains disabled.
+
+## Local withdrawal service
+
+The same journal now retains canonical reserve inputs, finalized withdrawal
+requests, signed transactions, broadcast attempts and finalized payments. A
+request is durable before UTXO selection, so dependency/limit waits do not lose
+the burned unpaid liability. Service restart reads this inbox without requiring
+the client to resubmit. Status pages expose public operation facts and exact
+decimal counters only; journal status alone is not fresh chain reconciliation.
+
+Reconciliation checks accepted block identities and live reserve UTXOs. A known
+in-flight payout explains a locked input spend until verified finality. Unknown
+or stale data waits; a confirmed unexplained spend or higher-work reorg of an
+accepted operation pauses the bridge. There is no automatic balance correction,
+refund, remint or second payout. The original accepted facts remain in the
+authenticated journal for manual review. Old local test journals without these
+facts are rejected rather than silently reinterpreted or reset.

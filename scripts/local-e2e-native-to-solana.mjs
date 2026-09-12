@@ -138,6 +138,7 @@ export async function runLocalNativeToSolanaE2e(options = {}) {
       custodyFactory: options.custodyFactory,
       reserveSweepSigner: options.reserveSweepSigner,
       nativeEvidenceVerifierFactory: options.nativeEvidenceVerifierFactory,
+      reserveAccounting: options.reserveAccounting,
       flowConfig,
       localSolanaSetupContext,
       solanaSetup: options.solanaSetup,
@@ -309,6 +310,7 @@ export async function executeNativeDepositObservationFlow({
   custodyFactory = createLocalFrostTaprootCustodyContext,
   reserveSweepSigner = signLocalReserveSweepWithFrost,
   nativeEvidenceVerifierFactory = createLocalNativeEvidenceVerifier,
+  reserveAccounting = (ledger, receipt, id) => ledger.recordCanonicalReserve(receipt, id),
   solanaSetup = submitLocalnetSolanaSetup,
   solanaDepositClaim = submitLocalnetSolanaDepositClaim,
   protectedDepositPreparation = undefined,
@@ -584,6 +586,7 @@ export async function executeNativeDepositObservationFlow({
     // A finalized reserve allocation is an owed credit BEFORE Solana setup,
     // attestation or minting can fail. The journal is accounting, not evidence.
     creditLedger.recordValidatedDeposit(credit);
+    reserveAccounting(creditLedger, reserveEvidence, operationIdHex);
     stages.push("LOCAL_E2E_PERSIST_AUTHENTICATED_PENDING_CREDIT");
     const pendingCheckpoint = creditLedger.checkpoint();
     creditLedger.close();

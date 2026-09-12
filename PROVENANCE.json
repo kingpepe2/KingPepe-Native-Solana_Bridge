@@ -25,6 +25,12 @@
   },
   "trackedFiles": [
     {
+      "path": "services/relayer/withdrawal-service.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original small local withdrawal service loop and read-only status over the existing authenticated operation journal and concrete chain-verifying worker; no new secret store or database.",
+      "purpose": "CORE_BRIDGE"
+    },
+    {
       "path": "services/bridge-validator/tests/automatic-withdrawal.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original core deterministic payout-plan, canonical encoding and unpaid withdrawal liability regressions; synthetic public protocol values are test-only, not evidence of chain execution.",

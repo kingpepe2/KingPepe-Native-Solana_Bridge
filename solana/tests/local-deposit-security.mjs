@@ -34,7 +34,7 @@ export async function runLocalDepositSecurityE2e(repoRoot) {
       accountingInput = { plan: input.plan, flowConfig: input.flowConfig, credit: input.depositCredit };
       assert.equal(input.depositAccounting.snapshot.authorizedUnmintedCredits, input.flowConfig.amountAtomic);
       assert.equal(input.depositAccounting.snapshot.mintedSupply, "0");
-      assert.equal(input.depositAccounting.checkpoint.sequence, "1");
+      assert.equal(input.depositAccounting.checkpoint.sequence, "2"); // Credit and its verified canonical reserve input.
       accountingChecks.push("PENDING_CREDIT_REOPENED_BEFORE_SOLANA_SETUP");
       assert.throws(() => openLocalnetDepositCreditLedger(accountingInput), /LocalLedgerLeaseUnavailable/u);
       accountingChecks.push("ACTIVE_CREDIT_LEDGER_EXCLUSIVE");
@@ -238,7 +238,8 @@ export async function runLocalDepositSecurityE2e(repoRoot) {
     const accounting = result.nativeToSolanaE2e.depositAccounting;
     const ledger = openLocalnetDepositCreditLedger({ ...accountingInput, minimumCheckpoint: accounting.checkpoint });
     try {
-      assert.equal(ledger.checkpoint().sequence, "2");
+      assert.equal(ledger.checkpoint().sequence, "3"); // Plus finalized mint.
+      assert.equal(ledger.availableReserveInputs().length, 1);
       assert.equal(ledger.pendingCredits().length, 0);
       assert.deepEqual(ledger.snapshot(), accounting.snapshot);
       accountingChecks.push("FINALIZED_MINT_REPLAYED_AFTER_CLOSE");

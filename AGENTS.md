@@ -38,13 +38,21 @@ reproducible SBF builds and Windows CurrentUser protected-storage tests.
 The source shrank from 293 to 239 files; core tests and pending accounting work
 were retained. Device deletion was denied before execution; no bypass attempted.
 
-Phase 09 now implements local finalized withdrawal observation, canonical Native
+Phase 09 commit 7f4bb7b3db3a61802b956aba8ee0f76d5e340772 implements local finalized withdrawal observation, canonical Native
 payout planning, independent A+B verification/signing and restart-safe payment
 in the existing accounting journal. Real round-trip validation reaches COMPLETED
 in both directions, including lost broadcast response and a separate-process
-restart. Commit this separately from cleanup after validation/publication checks.
-Production service integration and Devnet remain later work, not inferred from
-local test success.
+restart. Exact-SHA fresh Windows/WSL clones passed Node 962 plus 2 vectors each,
+Windows CurrentUser security 138, Rust 94, two matching fresh SBF builds,
+55 deposit-chain checks and the 20-check round trip. Its CI Linux job passed;
+Windows failed one fixture. Corrective fixture commit 79e586424c852639d52b55251ac18198ef0c3abe is under CI verification.
+
+Phase 10 work uses the same local journal for a bounded withdrawal inbox,
+service restart/status and accepted-chain reconciliation. No new database or
+automatic unpause. Retain actual pending liabilities and check legitimate payout
+spends before declaring a reserve deficit. Complete and publish this increment
+before adding the minimal CLI/UI. Production service integration and Devnet
+remain later work, not inferred from local test success.
 
 Status and source-bound evidence: docs/development-status.md and
 BRIDGE-READINESS.json. Never relabel older results as certification of newer code.

@@ -58,7 +58,8 @@ configuration. Each FROST participant independently checks the Solana request
 and Native UTXOs/sighash. Native finality is checked against raw evidence by
 the pinned verifier. Configured Solana RPC observation is not trustless proof.
 
-Working-tree evidence based on 3428dd7d0f324c113bdf82bdad8d6a199853b8ba:
+Published implementation: 7f4bb7b3db3a61802b956aba8ee0f76d5e340772.
+Completely separate fresh Windows and WSL clones of that SHA passed:
 
 - Full Windows and WSL Node: 962 PASS each, zero failures/skips; vectors 2 each.
   Includes the counter-width and exact-source CI-gate regressions.
@@ -66,12 +67,45 @@ Working-tree evidence based on 3428dd7d0f324c113bdf82bdad8d6a199853b8ba:
   Includes actual A+B Native-accepted payout, missing signer, invalid signature,
   lost broadcast response, separate-process restart before/after finality,
   no duplicate payout, direct burn rejection and persistent pause.
-- Current source/provenance: 245 files PASS. npm audit: zero vulnerabilities.
-- Phase 09 exact committed-SHA fresh-clone/CI validation remains due.
+- Windows CurrentUser protected-storage/security: 138 PASS, no failures/skips.
+- Rust 94 PASS; locked check, fmt and Clippy; two fresh SBF builds matched the
+  hashes above. Real deposit-chain checks: 55 PASS.
+- Source/provenance: 245 files PASS. npm audit: zero vulnerabilities.
+- Full history scan: 192 commits, no leaks. Dependency/license gates passed;
+  the bincode maintenance warning below remains visible.
 
-These results explicitly contain worktreeDirty=true; they are not proof that the
-base SHA contains the new withdrawal implementation. No per-transfer Team
-approval was added. Phase 10 operational integration follows a separate commit.
+These fresh-clone results contain worktreeDirty=false and the exact published
+SHA. No per-transfer Team approval was added. Native payout signing in the
+round-trip harness uses isolated local test stores, not production keys or a
+certification of production Windows service integration.
+
+## Phase 10 local service increment
+
+The existing journal now retains finalized withdrawal requests before input
+selection; duplicate submissions cannot add another liability. One bounded
+service loop resumes the journal queue without client resubmission, reports
+read-only paged status and retries dependencies. No second database, approval
+queue or automatic pause-clearing path was introduced.
+
+The deposit flow itself registers verified canonical reserve inputs. Recorded
+deposit/sweep and paid-withdrawal block identities support simple reorg checks.
+A higher-work conflict with an accepted basis pauses the bridge and preserves
+the original accounting evidence. Reconciliation distinguishes a recorded
+pending payout from an unexplained canonical spend. Missing evidence waits;
+confirmed contradiction pauses. It never repairs balances or pays again.
+
+Working-tree round trip based on 79e586424c852639d52b55251ac18198ef0c3abe:
+24 real-chain checks PASS, both directions COMPLETED. Added durable-inbox
+recovery, restart without client resubmission, an actual accepted-payout block
+reorg and pause-preserving service restart. Exact-SHA certification remains due
+until this increment is committed. Full Node regressions passed on Windows and
+WSL: 963 each, zero failures/skips, plus 2 vectors each. The retained real deposit
+suite passed all 55 checks again after reserve registration was integrated.
+
+This remains LOCALNET/REGTEST software. Old disposable journals lacking accepted
+reserve/payout block facts fail closed; no silent migration or reset is offered.
+It is not yet a production launcher, multi-deposit indexer or protected Windows
+withdrawal runtime. Those integration limitations are not hidden by local E2E.
 
 ## CI and remaining work
 
@@ -81,16 +115,18 @@ Windows failed before protected-state tests. Subsequent explicit fixes addressed
 Windows canonical paths, the compiled helper's principal binding and inherited
 PowerShell module discovery. No gate was removed or weakened.
 
-Run 34690072892 for 3428dd7d0f324c113bdf82bdad8d6a199853b8ba has source scan
-and Foundation Guardrails PASS. Windows executed 138 security tests: 137 PASS,
-one interrupted-write fixture failure. The fixture used a default file principal
-instead of the real writer's explicit service-SID ACL. Test-only correction
-5c93ddf24a613a9414c28b28c7e9353758a327da passed all three candidate regressions
-locally and is pushed; run 34691122645 is executing. Runtime ACL enforcement is
-unchanged. Do not certify a later implementation using either earlier run.
+Exact Phase 09 run 34691297712 passed Linux SBF/all real-chain steps, source
+history scanning and Foundation Guardrails. Windows executed 138 security tests:
+137 PASS, one interrupted-write fixture failure. The fixture's first ACL-copy
+attempt did not persist an unchanged .NET FileSecurity object. Correction
+79e586424c852639d52b55251ac18198ef0c3abe constructs a modified descriptor,
+persists it and checks the result. Three local candidate tests PASS; exact run
+34692481377 is executing. Runtime ACL enforcement is unchanged. No older run
+certifies newer source.
 
 Phase 08 core: PASS_LOCALLY.
-Phase 09: IMPLEMENTED_AND_TESTED_IN_WORKING_TREE; publication in progress.
+Phase 09: IMPLEMENTED_AND_TESTED_LOCALLY; exact source is published.
+Phase 10: LOCAL_SERVICE_INCREMENT_TESTED; production integration remains incomplete.
 Simple operational integration, complete CLI/UI, final clean-clone validation,
 Devnet, production configuration/deployment and external review remain incomplete.
 

@@ -283,7 +283,9 @@ export class LocalNativeEvidenceVerifier {
     }
     const changeAtomic = change?.amountAtomic ?? "0", gross = total - BigInt(changeAtomic), net = BigInt(signed.outputs[0].amountAtomic);
     if (gross < net || (await this.#rpc.call("getbestblockhash", [])).result !== verified.tipHash) throw new Error("RAW_NATIVE_PAYOUT_SOURCE_CHANGED");
+    const payoutProof = bundle.proofs.find(p => parseNativeTransactionHex(p.rawTransactionHex).txidHex === signed.txidHex);
     const result = Object.freeze({ txid: signed.txidHex, digestHex: verified.digestHex, tipHash: verified.tipHash, tipHeight: verified.tipHeight,
+      blockHeight: payoutProof.blockHeight, blockHash: headerId(bundle.headers[payoutProof.blockHeight - 1]), chainworkHex: bundle.chainworkHex,
       grossAtomic: gross.toString(), netAtomic: net.toString(), feeAtomic: (gross - net).toString(), changeAtomic,
       reserveScriptHex: expected.reserveScriptHex, recipientScriptHex: signed.outputs[0].scriptPubKeyHex });
     VERIFIED_PAYOUTS.add(result); return result;
