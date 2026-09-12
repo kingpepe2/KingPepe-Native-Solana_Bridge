@@ -33,6 +33,7 @@ const edges = Object.freeze({
   KINGPEPE_FROST_B: { COORDINATOR: ["verifyNativeEvidence", "signingCommitment", "signatureShare", "abortSigningSession"] },
   ATTESTER_A: { BRIDGE_VALIDATOR: ["attestDeposit"] },
   ATTESTER_B: { BRIDGE_VALIDATOR: ["attestDeposit"] },
+  BRIDGE_VALIDATOR: { RECONCILIATION: ["depositSnapshot"] },
 });
 function requireValue(condition, code = "IpcRejected") { if (!condition) throw new Error(code); }
 function digest(bytes) { return createHash("sha256").update(bytes).digest("hex"); }

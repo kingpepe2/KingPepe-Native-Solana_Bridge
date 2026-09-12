@@ -1,5 +1,6 @@
 import { bytesToHex, isHash32Hex, normalizeHex } from "../../shared/protocol/canonical-message.mjs";
-import { base58Encode, findProgramAddress, DEPOSIT_CLAIM_PDA_SEED_PREFIX, MINT_AUTHORITY_PDA_SEED_PREFIX } from "../bridge-validator/solana-deposit-claim-transaction-plan.mjs";
+import { base58Decode, base58Encode, findProgramAddress, DEPOSIT_CLAIM_PDA_SEED_PREFIX, MINT_AUTHORITY_PDA_SEED_PREFIX } from "../bridge-validator/solana-deposit-claim-transaction-plan.mjs";
+import { verifyDepositMintExecution } from "./deposit-mint-execution.mjs";
 
 export const SOLANA_DEPOSIT_CLAIM_OBSERVER_PROTOCOL =
   "KINGPEPE_NATIVE_SOLANA_BRIDGE/SOLANA_DEPOSIT_CLAIM_OBSERVER/V1";
@@ -16,7 +17,11 @@ const DEPOSIT_CLAIM_DESTINATION_MAX_LENGTH = 128;
 const SPL_MINT_ACCOUNT_LENGTH = 82;
 const SPL_FREEZE_AUTHORITY_TAG_OFFSET = 46;
 const SPL_FREEZE_AUTHORITY_VALUE_OFFSET = 50;
-const ALLOWED_RPC_METHODS = new Set(["getTransaction", "getSlot", "getAccountInfo"]);
+const ALLOWED_RPC_METHODS = new Set(["getTransaction", "getSlot", "getAccountInfo", "getGenesisHash"]);
+const RPC_INSTANCES = new WeakSet(), PROTECTED_OBSERVATIONS = new WeakSet();
+export function requireProtectedClaimObservation(value) {
+  if (!PROTECTED_OBSERVATIONS.has(value)) throw new Error("ProtectedClaimObservationRequired");
+}
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 const BASE58_PATTERN = /^[1-9A-HJ-NP-Za-km-z]{32,128}$/u;
 const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
@@ -35,6 +40,30 @@ export class SolanaDepositClaimObserver {
       new SolanaDepositClaimRpcClient({
         endpoint: options.endpoint,
       });
+  }
+
+  async observeProtectedFinalizedDepositClaim(input, expectedGenesis) {
+    input = structuredClone(input);
+    // Protected accounting does not accept the callback adapters used by unit
+    // tests as evidence of a live query. This remains RPC_OBSERVATION, never
+    // independent Solana consensus or a replacement for deployment monitoring.
+    if (!RPC_INSTANCES.has(this.#rpcClient)) throw new Error("ProtectedClaimLiveRpcRequired");
+    if (typeof expectedGenesis !== "string" || base58Decode(expectedGenesis).length !== 32 ||
+        base58Encode(base58Decode(expectedGenesis)) !== expectedGenesis) throw new Error("ProtectedClaimGenesisRequired");
+    const before = await this.#rpcClient.getGenesisHash();
+    if (before !== expectedGenesis) throw integrityError("SOLANA_CLAIM_GENESIS_MISMATCH");
+    const observed = await this.observeFinalizedDepositClaim(input);
+    try { verifyDepositMintExecution(await this.#rpcClient.getSignedTransaction(input.solanaSignature), observed, this.#config); }
+    catch (error) {
+      if (error?.message === "SOLANA_CLAIM_EXECUTION_MISMATCH") throw integrityError(error.message);
+      throw error;
+    }
+    if (await this.#rpcClient.getGenesisHash() !== expectedGenesis) throw integrityError("SOLANA_CLAIM_GENESIS_MISMATCH");
+    if (observed.transaction.err !== null || BigInt(observed.rootSlot) < BigInt(observed.slot) || observed.mint.freezeAuthorityHex !== null) {
+      throw integrityError("SOLANA_CLAIM_NOT_FINALIZED_SUCCESS");
+    }
+    const result = Object.freeze({ ...observed, genesis: expectedGenesis });
+    PROTECTED_OBSERVATIONS.add(result); return result;
   }
 
   async observeFinalizedDepositClaim(input = {}) {
@@ -119,6 +148,14 @@ export class SolanaDepositClaimRpcClient {
     this.#endpoint = normalizeSolanaDepositClaimRpcEndpoint(options.endpoint);
     this.#timeoutMs = boundedLimit(options.timeoutMs ?? 10_000, 10, 30_000);
     this.#maxResponseBytes = boundedLimit(options.maxResponseBytes ?? 2_097_152, 128, 4_194_304);
+    RPC_INSTANCES.add(this);
+  }
+
+  async getGenesisHash() { return this.call("getGenesisHash", []); }
+
+  async getSignedTransaction(solanaSignature) {
+    return this.call("getTransaction", [normalizeBase58(solanaSignature, "solanaSignature"),
+      { commitment: FINALIZED, encoding: "base64", maxSupportedTransactionVersion: 0 }]);
   }
 
   async getTransaction(solanaSignature) {

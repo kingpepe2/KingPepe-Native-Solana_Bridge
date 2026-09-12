@@ -748,6 +748,8 @@ test("unsigned reserve sweep draft preserves credited reserve and requires expli
         { txid: FEE_FUNDING_TXID, vout: 0 },
       ]),
       JSON.stringify({ [FROST_TAPROOT_ADDRESS]: "1.00000000" }),
+      "0",
+      "false",
     ],
   });
 
@@ -765,6 +767,18 @@ test("unsigned reserve sweep draft preserves credited reserve and requires expli
       }),
     /LocalNativeReserveSweepFeeFundingInputRequired/u,
   );
+});
+
+test("unsigned reserve sweep rejects unexpected replacement signaling from Native RPC", async () => {
+  const bytes = Buffer.from(UNSIGNED_SWEEP_HEX, "hex");
+  bytes.writeUInt32LE(0xffff_fffd, 42);
+  assert.equal(parseNativeTransactionHex(bytes.toString("hex")).inputs[0].sequence, 0xffff_fffd);
+  await assert.rejects(draftLocalReserveSweep({
+    cli: async () => bytes.toString("hex"), depositTxidHex: DEPOSIT_TXID, depositVout: 1,
+    depositAmountAtomic: "100000000", nativeMinerFeeAtomic: "1000", nativeDecimals: 8,
+    canonicalReserveAddress: FROST_TAPROOT_ADDRESS,
+    feeFundingInputs: [{ txidHex: FEE_FUNDING_TXID, vout: 0 }], proofFingerprintHex: h("proof-fingerprint"),
+  }), /LocalNativeReserveSweepReplacementDisabled/u);
 });
 
 test("deposit observation flow rejects missing deposit output before claiming E2E completion", async () => {
