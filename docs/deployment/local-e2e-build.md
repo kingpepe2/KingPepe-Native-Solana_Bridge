@@ -58,6 +58,13 @@ Do not relocate or alter an existing WSL virtual disk to work around this.
 Monitor host free space before fresh builds and daemon runs; source checkouts,
 production data and recovery material are not disposable build caches.
 
+A short Linux tmpfs path can host explicitly disposable chain-test instances
+when disk headroom is constrained. Check memory and filesystem capacity first;
+keep build targets and test evidence on a suitable external disk. Such a ledger
+does not survive host/WSL shutdown and cannot prove host-reboot durability.
+Do not place protected signer journals or operational state there. Keep restart
+and persistence claims scoped to the storage and process faults actually tested.
+
 Build output and, by default, Cargo targets are under that external root.
 `KINGPEPE_LOCAL_BUILD_ROOT` may select a separate external Cargo cache to avoid
 recompiling dependencies on each run; every run still invokes both locked builds.

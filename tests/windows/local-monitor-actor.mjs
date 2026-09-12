@@ -14,9 +14,11 @@ import { NativeRpcClient } from "../../native/node/native-rpc-client.mjs";
 import { LocalNativeEvidenceVerifier, REGTEST_GENESIS } from "../../native/node/native-raw-evidence.mjs";
 import { ProtectedNativeIntegrityMonitor } from "../../native/node/native-integrity.mjs";
 import { LocalDeploymentRpc, ProtectedSolanaDeploymentMonitor } from "../../services/solana-observer/deployment-integrity.mjs";
+import { ProtectedDepositSnapshotClient } from "../../services/bridge-validator/protected-deposit-snapshot.mjs";
+import { ProtectedDepositReconciliationMonitor } from "../../services/reconciliation/protected-deposit-reconciliation.mjs";
 import { validateRuntimeFile } from "../../shared/runtime-path-boundary.mjs";
 
-let monitor, ipc, controller, running, ready = false, input = "", closing = false, requestCount = 0;
+let monitor, ipc, journalIpc, controller, running, ready = false, input = "", closing = false, requestCount = 0;
 const safe = value => typeof value === "string" && /^[A-Z_]{1,80}$/u.test(value) ? value : "NONE";
 function send(value) { process.stdout.write(JSON.stringify(value) + "\n"); }
 function options(value, role, purpose) {
@@ -29,19 +31,27 @@ function options(value, role, purpose) {
 }
 async function start(p) {
   assert.equal(process.platform, "win32"); assert(!ready && !monitor && !closing);
-  assert(["NATIVE_OBSERVER", "SOLANA_OBSERVER"].includes(p.role));
+  assert(["NATIVE_OBSERVER", "SOLANA_OBSERVER", "RECONCILIATION"].includes(p.role));
   assert(Number.isInteger(p.port) && p.port > 0 && p.port <= 65535);
   ipc = new ProtectedServiceIpc(new WindowsProtectedStore(options(p.ipcOptions, p.role, "service-auth")));
   const integrity = new RemoteIntegrityGuard({ ipc, port: p.port });
-  const store = new WindowsProtectedStore(options(p.progressOptions, p.role, "chain-progress"));
-  if (p.role === "NATIVE_OBSERVER") {
+  const store = new WindowsProtectedStore(options(p.progressOptions, p.role, p.role === "RECONCILIATION" ? "reconciliation-progress" : "chain-progress"));
+  if (p.role === "NATIVE_OBSERVER" || p.role === "RECONCILIATION") {
     assert.equal(p.policy.nativeGenesis, REGTEST_GENESIS);
     const exe = validateRuntimeFile(p.executable, p.progressOptions.repoRoot);
     assert.match(p.executableSha256, /^[0-9a-f]{64}$/u);
     assert.equal(createHash("sha256").update(readFileSync(exe)).digest("hex"), p.executableSha256);
     const verifier = new LocalNativeEvidenceVerifier({ rpc: new NativeRpcClient(p.rpcOptions), executable: exe });
     assert.equal((await verifier.observeChain()).genesis, REGTEST_GENESIS);
-    monitor = await ProtectedNativeIntegrityMonitor.open({ store, expectedPolicy: p.policy, verifier, integrity });
+    if (p.role === "NATIVE_OBSERVER") monitor = await ProtectedNativeIntegrityMonitor.open({ store, expectedPolicy: p.policy, verifier, integrity });
+    else {
+      journalIpc = new ProtectedServiceIpc(new WindowsProtectedStore(options(p.journalIpcOptions, "RECONCILIATION", "service-auth")));
+      const journalClient = new ProtectedDepositSnapshotClient({ ipc: journalIpc, port: p.journalPort, policy: p.policy });
+      const solanaRpc = new LocalDeploymentRpc(p.solanaRpcOptions);
+      assert.equal(await solanaRpc.genesis(), p.policy.solanaGenesis);
+      monitor = await ProtectedDepositReconciliationMonitor.open({ store, policy: p.policy, manifest: p.manifest,
+        journalClient, nativeVerifier: verifier, solanaRpc, integrity });
+    }
   } else {
     const rpc = new LocalDeploymentRpc(p.rpcOptions);
     assert.equal(await rpc.genesis(), p.manifest.solanaGenesis);
@@ -55,7 +65,7 @@ async function start(p) {
 }
 async function close() {
   if (closing) return; closing = true; controller?.abort(); await running;
-  await monitor?.close(); ipc?.close(); send({ event: "CLOSED" });
+  await monitor?.close(); ipc?.close(); journalIpc?.close(); send({ event: "CLOSED" });
 }
 let queue = Promise.resolve();
 process.stdin.on("data", bytes => {

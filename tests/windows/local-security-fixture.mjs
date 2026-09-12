@@ -127,7 +127,7 @@ async function actualTestAuthority(options) {
 }
 
 export async function startActualLocalMonitor(configuration) {
-  assert(["NATIVE_OBSERVER", "SOLANA_OBSERVER"].includes(configuration.role));
+  assert(["NATIVE_OBSERVER", "SOLANA_OBSERVER", "RECONCILIATION"].includes(configuration.role));
   const child = spawn(process.execPath, [path.join(import.meta.dirname, "local-monitor-actor.mjs")],
     { windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
   let buffer = "", latest, failed = false, closed = false, readyResolve, readyReject;

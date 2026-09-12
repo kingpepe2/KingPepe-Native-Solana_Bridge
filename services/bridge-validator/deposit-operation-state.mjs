@@ -124,6 +124,10 @@ function validateFinalized(plan, fact, policy) {
     managerProgramId: policy.managerProgramId, transceiverProgramId: policy.transceiverProgramId, mint: policy.mint })) check(Buffer.from(m.deployment[field]).toString("hex") === expected);
   check(m.deployment.protocolId === policy.protocolId && m.deployment.nativeNetwork === policy.nativeNetwork);
 }
+export function validateDepositCreditFact(plan, fact, policy) {
+  const p = validateDepositOperationPolicy(policy), operation = validateDepositOperationPlan(plan, p), copy = structuredClone(fact);
+  validateFinalized(operation, copy, p); return immutable(copy);
+}
 function validateMintReceipt(plan, credit, receipt, policy) {
   fields(receipt, ["signature", "slot", "rootSlot", "genesis", "operationId", "messageDigest", "amountAtomic", "recipientHex", "mint"]);
   check(typeof receipt.signature === "string" && base58Decode(receipt.signature).length === 64 && base58Encode(base58Decode(receipt.signature)) === receipt.signature);

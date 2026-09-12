@@ -1,5 +1,34 @@
 # KingPepe Native - Solana Bridge Task Status
 
+## Current protected delivery integration
+
+Reconciliation is published PRIVATE at
+5edcc111feffcb1ced31b236dc3928d19fa9acbd; Actions 34669723105 is
+NOT_RUN_ACCOUNT_BLOCKED, four jobs with zero steps and no artifacts. Its local
+132-pass protected Windows run and other results below are source-bound.
+Primary integration of signing dispatch, Native/Solana outboxes, reserve-credit
+reconstruction and the source-built protection helper has 279 intended files.
+Node passes 879 plus two vectors on each platform; Windows security passes 147,
+zero failures/skips/cancellations and exit zero. Frozen primary runtime:
+194 files, 99b9a8bda86fd220c8eb8518c471e72acf1ae1a9ed3bd85821a30dc3f3bfe446.
+Cold Rust quality/tests pass 97; two separate cold SBF builds match byte-for-byte.
+Actual Native delivery passes eight Windows checks, Solana delivery nine; each
+continues through fourteen chain checks and COMPLETED using explicit test setup.
+Two earlier validator startup failures remain failures, not economic passes.
+Short Linux tmpfs ledgers are disposable tests, not host-reboot evidence.
+Primary real-chain regression now passes 55 deposit/security, 26 record,
+eight reorg, 13 checkpoint and 18 deployment/upgrade checks. Raw credit passes
+ten after fourteen claim checks. All five Cargo audits retain the unmaintained
+bincode warning with zero reported vulnerabilities. Reconciliation passes ten
+Linux and eight protected Windows/live-chain checks, with fourteen actual claim
+checks per run and COMPLETED. Real reorg stop/reopen blocks economic roles but
+permits read-only observation. Imported completed records remain explicit test
+setup, not full controller evidence.
+Next: final staged/outgoing scan/review and
+publication; then finish the full protected controller and crash matrix.
+Separate candidate totals are not primary/final clean-clone certification.
+Phase 09 stays NOT_STARTED. Full retrospective re-audit remains incomplete.
+
 ## Current reconciliation integration
 
 PRIVATE HEAD a2861f8676e20c30c26ec93202f877441a7990f5 publishes the tested RPC

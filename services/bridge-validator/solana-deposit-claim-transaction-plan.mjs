@@ -42,18 +42,28 @@ const SOLANA_PDA_MARKER = Buffer.from("ProgramDerivedAddress", "utf8");
 export const SOLANA_MAX_TRANSACTION_BYTES = 1232;
 
 export function verifySignedLocalnetSolanaDepositClaimTransaction(config) {
+  return verifySignedCanonicalDepositTransaction(config, "CLAIM");
+}
+
+export function verifySignedLocalnetSolanaDepositReceiptTransaction(config) {
+  return verifySignedCanonicalDepositTransaction(config, "RECEIPT");
+}
+
+function verifySignedCanonicalDepositTransaction(config, kind) {
+  const isReceipt = kind === "RECEIPT";
   const encoded = config?.preparedTransactionBase64;
   if (typeof encoded !== "string" || encoded.length > 1644) throw new Error("SolanaClaimPacketInvalid");
   const packet = Buffer.from(encoded, "base64");
-  // Only the current canonical, one-fee-payer legacy claim format is supported.
+  // Only these two current canonical, one-fee-payer legacy formats are supported.
   // Rebuild the whole message below: these fixed offsets are not a permissive
   // general transaction parser or permission to accept arbitrary instructions.
   if (packet.toString("base64") !== encoded || packet.length > SOLANA_MAX_TRANSACTION_BYTES ||
-      packet.length < 101 || !packet.subarray(65, 69).equals(Buffer.from([1, 0, 7, 13])) || packet[0] !== 1) {
+      packet.length < 101 || !packet.subarray(65, 69).equals(Buffer.from(isReceipt ? [1, 0, 6, 8] : [1, 0, 7, 13])) || packet[0] !== 1) {
     throw new Error("SolanaClaimPacketInvalid");
   }
   const feePayer = packet.subarray(69, 101);
-  const plan = buildLocalnetSolanaDepositClaimTransactionPlan({
+  const build = isReceipt ? buildLocalnetSolanaDepositReceiptTransactionPlan : buildLocalnetSolanaDepositClaimTransactionPlan;
+  const plan = build({
     ...config, feePayerBase58: undefined, feePayerHex: feePayer.toString("hex"),
     tokenProgramIdHex: undefined, tokenProgramIdBase58: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
   });
@@ -67,6 +77,7 @@ export function verifySignedLocalnetSolanaDepositClaimTransaction(config) {
     solanaSignature: base58Encode(signature),
     depositClaimAccountBase58: plan.pdas.depositClaim.addressBase58,
     mintAccountBase58: plan.mintBase58,
+    ...(isReceipt ? { verifiedReceiptAccountBase58: plan.pdas.verifiedReceipt.addressBase58 } : {}),
   });
 }
 

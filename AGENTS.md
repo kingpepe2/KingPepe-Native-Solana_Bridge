@@ -23,6 +23,36 @@
 
 ## Current task: Phase 08.5 security remediation
 
+Reconciliation is published PRIVATE at
+5edcc111feffcb1ced31b236dc3928d19fa9acbd, tree
+e2a4fed5ae1dca8e6edf9c4f30e457cde1d7f710. Its local Windows security log reports
+132 PASS, Node 771 plus two vectors per platform, Rust 97/quality, real-chain
+55/26/18/8/13 and reconciliation ten/Windows eight pass in their documented
+scopes. Source/staged and 180 prior commits plus its outgoing commit pass scans.
+Exact Actions 34669723105: NOT_RUN_ACCOUNT_BLOCKED, four jobs with zero steps,
+zero artifacts. No CI/security/account policy was bypassed.
+
+The next integrated 279-file worktree adds protected signing dispatch, exact
+Native/Solana outboxes, raw reserve-credit recovery and the source-built Windows
+protection helper. Primary Node passes 879 plus two vectors per platform;
+Windows security passes 147, zero failures/skips/cancellations, with exit zero.
+The unchanged 194-file runtime digest is
+99b9a8bda86fd220c8eb8518c471e72acf1ae1a9ed3bd85821a30dc3f3bfe446.
+Fresh separate external Rust targets pass 97/check/fmt/Clippy; both programs
+build identically in two cold SBF target sets. Actual primary Native delivery
+eight and Solana delivery nine pass, each with fourteen chain checks and
+COMPLETED. These use explicit chain-derived test setup, not the full protected
+controller. Primary chain regression passes 55 deposit/security, 26 record,
+18 deployment, eight reorg and 13 checkpoint checks; raw credit passes ten plus
+fourteen claim checks. Renewed reconciliation passes ten Linux checks and eight
+CurrentUser Windows/live-chain stop/reopen checks, each with a fourteen-check
+COMPLETED prerequisite. Final publication scans/review and final clean-clone
+validation remain distinct gates.
+Full protected controller, cross-service SID certification and final re-audit
+remain incomplete. Phase 09 is NOT_STARTED.
+
+## Earlier reconciliation integration record
+
 Current PRIVATE published HEAD is a2861f8676e20c30c26ec93202f877441a7990f5,
 the RPC boundary correction. Node 712 per platform, vectors two each, actual
 deposit/claim checks fourteen and post-mint reorg checks eight pass. Exact

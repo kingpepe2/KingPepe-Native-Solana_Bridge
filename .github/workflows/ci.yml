@@ -335,6 +335,8 @@ jobs:
         run: npm run test:bridge-validator
       - name: Run consistent-snapshot reconciliation tests
         run: npm run test:reconciliation
+      - name: Run durable signed-transaction delivery tests
+        run: npm run test:relayer
       - name: Run local E2E readiness gate tests
         run: npm run test:local-e2e-readiness
       - name: Validate native FROST runtime
@@ -412,6 +414,8 @@ jobs:
         run: npm run test:bridge-validator
       - name: Run consistent-snapshot reconciliation tests
         run: npm run test:reconciliation
+      - name: Run durable signed-transaction delivery tests
+        run: npm run test:relayer
       - name: Run local E2E readiness gate tests
         run: npm run test:local-e2e-readiness
       - name: Validate native FROST runtime

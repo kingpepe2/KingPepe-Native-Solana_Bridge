@@ -150,6 +150,13 @@ export class ProtectedCoordinatorSigningJournal {
   retainedResult(intent) {
     const record = this.lookup(intent); check(record?.state === "SIGNED", "CoordinatorJournalResultUnavailable"); return record.result;
   }
+  assertRetainedResults(intents) {
+    check(Array.isArray(intents) && intents.length <= MAX_COORDINATOR_REQUESTS, "CoordinatorJournalInvalid");
+    if (intents.length === 0) return;
+    // One fully validated protected image, not one OS round trip per job.
+    const { value } = this.#read();
+    for (const intent of intents) check(this.#record(value, intent)?.state === "SIGNED", "CoordinatorJournalResultUnavailable");
+  }
   prepare(intent) {
     check(this.#busy, "CoordinatorJournalExclusiveRequired");
     const { value, revision } = this.#read(), previous = this.#record(value, intent);

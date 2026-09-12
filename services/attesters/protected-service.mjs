@@ -31,9 +31,8 @@ export function attesterIpcHandler({ attester, verifyNativeDeposit, integrity, j
   const verify = attesterEvidenceVerifier({ attester, verifyNativeDeposit });
   return async input => {
     input = structuredClone(input);
-    // This verifier only reads chain evidence. The protected journal performs
-    // mandatory current authorization before preparation, before signing and
-    // before release; do not spend another response round trip before the read.
+    // Read-only evidence verification precedes the journal's mandatory checks
+    // before protected key access, preparation, signing and result release.
     const request = await verify(input);
     // The journal checks the authority again before preparation, signing and
     // release. It persists the result before that final check/acknowledgement.

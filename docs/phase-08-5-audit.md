@@ -1,5 +1,31 @@
 # Phase 08.5 retrospective audit
 
+## Protected delivery primary validation (not final re-audit)
+
+Reconciliation is published PRIVATE at
+5edcc111feffcb1ced31b236dc3928d19fa9acbd. Exact Actions 34669723105 is
+NOT_RUN_ACCOUNT_BLOCKED, four jobs with no executed steps or artifacts.
+The next 279-file primary integration passes Node 879 plus two vectors on
+Windows and WSL, Windows security 147 (exit zero, no failures/skips/cancellations),
+97 Rust tests/quality using cold targets, and two reproducible cold SBF builds.
+The unchanged 194-file runtime digest is
+99b9a8bda86fd220c8eb8518c471e72acf1ae1a9ed3bd85821a30dc3f3bfe446.
+Actual protected Native delivery passes eight checks; Solana delivery nine;
+each includes a separate fourteen-check COMPLETED chain continuation. Their
+chain-derived setup is explicit, not the full protected signing controller.
+Primary real-chain regression also passes 55 deposit/security, 26 record,
+eight reorg, 13 checkpoint and 18 deployment/upgrade checks; raw credit passes
+ten after fourteen claim checks. Reconciliation reruns pass ten Linux and eight
+protected Windows/live-chain checks, with fourteen claim checks per run and
+COMPLETED. Actual post-mint reorg stop persists over authority/monitor restart
+and blocks all tested economic roles. This uses explicitly imported completed
+records, not the entire protected signing workflow. Final publication scans are
+still pending. Five Cargo audits retain the existing
+bincode unmaintained warning, with no reported vulnerabilities.
+Full protected-controller/crash-matrix integration, distinct Windows service
+principals and final clean-clone/re-audit remain separate open gates. Phase
+04/07/08 remain FAIL overall; SAFE_TO_BEGIN_PHASE_09=false.
+
 ## Current reconciliation integration (not final re-audit)
 
 PRIVATE RPC HEAD a2861f8676e20c30c26ec93202f877441a7990f5 has exact Actions

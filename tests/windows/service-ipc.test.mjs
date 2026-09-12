@@ -38,6 +38,14 @@ import { initialDepositOperationState } from "../../services/bridge-validator/de
 import { depositSnapshotIpcHandler, ProtectedDepositSnapshotClient } from "../../services/bridge-validator/protected-deposit-snapshot.mjs";
 import { reconciliationFixture } from "../integration/reconciliation-fixture.mjs";
 import { initialReconciliationProgress, ProtectedDepositReconciliationMonitor } from "../../services/reconciliation/protected-deposit-reconciliation.mjs";
+import { initialSweepJobState, decodeSweepJobState } from "../../native/frost/coordinator/sweep-job-state.mjs";
+import { ProtectedSweepJobs } from "../../native/frost/coordinator/protected-sweep-jobs.mjs";
+import { ProtectedSweepJobClient, sweepJobIpcHandler } from "../../native/frost/coordinator/sweep-job-ipc.mjs";
+import { base58Encode } from "../../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs";
+import { solanaDeliveryFixture } from "../integration/solana-delivery-fixture.mjs";
+import { initialSolanaDepositOutbox, decodeSolanaDepositOutbox, validateSolanaDepositDelivery, solanaDeliveryId } from "../../services/relayer/solana-deposit-delivery.mjs";
+import { ProtectedSolanaDepositOutbox } from "../../services/relayer/protected-solana-deposit-outbox.mjs";
+import { ProtectedSolanaDepositClient, solanaDepositIpcHandler } from "../../services/relayer/solana-deposit-ipc.mjs";
 
 if (process.platform !== "win32") throw new Error("WINDOWS_IPC_TESTS_REQUIRE_WINDOWS");
 const repoRoot = path.resolve(import.meta.dirname, "../.."), serviceSid = windowsCurrentServiceSid();
@@ -174,6 +182,116 @@ async function protectedDepositFixture(t) {
   return { ...data, global, peer, opts, store, journal, open };
 }
 
+// Real protected storage/mTLS and HTTP transport, SYNTHETIC Solana accounts.
+// These are failure-boundary tests, not local-validator or chain evidence.
+async function protectedSolanaDeliveryFixture(t) {
+  const global = await isolatedIntegrityFixture(t), peer = await global.peer("RELAYER"), f = await solanaDeliveryFixture();
+  const delivery = await f.delivery(), expected = validateSolanaDepositDelivery(delivery, f.policy);
+  const control = { snapshot: f.accounts(), status: null, height: 100, sends: [], loseSend: false, hook: undefined };
+  let serverFailed = false;
+  const server = http.createServer(async (req, res) => {
+    try {
+      let text = ""; for await (const bytes of req) { text += bytes.toString("utf8"); assert(text.length <= 16000); }
+      const request = JSON.parse(text); let result;
+      if (request.method === "getGenesisHash") result = control.snapshot.genesis;
+      else if (request.method === "getBlockHeight") result = control.height;
+      else if (request.method === "getSignatureStatuses") result = { context: { slot: control.snapshot.slot }, value: [control.status] };
+      else if (request.method === "getMultipleAccounts") {
+        result = { context: { slot: control.snapshot.slot }, value: control.snapshot.accounts };
+        if (control.hook) { const hook = control.hook; control.hook = undefined; await hook(); }
+      } else if (request.method === "sendTransaction") {
+        assert.equal(request.params[0], delivery.preparedTransactionBase64);
+        assert.equal(request.params[1].skipPreflight, false); control.sends.push(request.params[0]);
+        if (control.loseSend) { res.destroy(); return; } result = expected.signature;
+      } else throw new Error("UnexpectedSyntheticSolanaMethod");
+      res.setHeader("content-type", "application/json"); res.end(JSON.stringify({ jsonrpc: "2.0", id: request.id, result }));
+    } catch { serverFailed = true; res.destroy(); }
+  });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => new Promise((resolve, reject) => { server.closeAllConnections(); server.close(() => serverFailed ? reject(new Error("SyntheticSolanaTransportFixtureFailed")) : resolve()); }));
+  const endpoint = "http://127.0.0.1:" + server.address().port, opts = options(peer.root, "solana-delivery", "RELAYER", "solana-deposit-outbox");
+  const bytes = initialSolanaDepositOutbox(f.policy); let store = WindowsProtectedStore.create(opts, bytes); bytes.fill(0);
+  let outbox;
+  const open = () => ProtectedSolanaDepositOutbox.open({ store, integrity: peer.guard, policy: f.policy, endpoint });
+  outbox = await open(); cleanups.get(peer.root).push(() => outbox.close());
+  const transport = fixture(t, "RELAYER", "BRIDGE_VALIDATOR"); let loseEnqueue = false, didLoseEnqueue = false;
+  const port = await transport.server.listen(async input => {
+    const result = await solanaDepositIpcHandler({ outbox, policy: f.policy, integrity: peer.guard })(input);
+    if (loseEnqueue) { loseEnqueue = false; didLoseEnqueue = true; throw new Error("TEST_DURABLE_ENQUEUE_ACK_LOST"); } return result;
+  });
+  const client = new ProtectedSolanaDepositClient({ ipc: transport.client, port, policy: f.policy });
+  await global.enableTestSources();
+  const probe = () => { const s = new WindowsProtectedStore(opts); try { const r = s.read();
+    try { return { revision: r.revision, state: decodeSolanaDepositOutbox(r.payload, f.policy) }; } finally { r.payload.fill(0); }
+  } finally { s.close(); } };
+  return { ...f, makeDelivery: f.delivery, delivery, expected, control, global, peer, opts, endpoint, client, transport, port, probe,
+    get outbox() { return outbox; }, get store() { return store; },
+    loseEnqueue() { loseEnqueue = true; }, get didLoseEnqueue() { return didLoseEnqueue; },
+    async reopen() { await outbox.close(); store = new WindowsProtectedStore(opts); outbox = await open(); } };
+}
+
+test("protected Solana delivery persists before lost mTLS acceptance and rejects substituted operation", async t => {
+  const f = await protectedSolanaDeliveryFixture(t); f.loseEnqueue();
+  await assert.rejects(f.client.enqueue(f.delivery)); assert(f.didLoseEnqueue);
+  const accepted = await f.client.enqueue(f.delivery); assert.equal(accepted.state, "ACCEPTED");
+  const before = f.probe(); await f.reopen(); assert.deepEqual(await f.client.enqueue(f.delivery), accepted);
+  assert.equal(f.probe().revision, before.revision); assert.equal(f.probe().state.records.length, 1); assert.equal(f.control.sends.length, 0);
+  await assert.rejects(f.transport.client.request(f.port, { method: "enqueueSolanaDeposit", operationId: h("wrong"), payload: f.delivery }));
+});
+test("protected Solana delivery retains uncertainty after lost send and observes outcome without resend", async t => {
+  const f = await protectedSolanaDeliveryFixture(t); await f.client.enqueue(f.delivery); f.control.loseSend = true;
+  assert.equal((await f.outbox.runOne()).state, "WAITING_FOR_DEPENDENCY"); assert.equal(f.control.sends.length, 1);
+  assert.equal(f.probe().state.records[0].sendAttempts, 1);
+  f.control.snapshot = f.accounts({ receipt: true }); f.control.status = { err: null, slot: 10, confirmationStatus: "finalized" };
+  await f.reopen();
+  const until = Date.now() + 10000;
+  while ((await f.client.status(f.delivery)).state !== "FINALIZED_ACCOUNT") {
+    assert(Date.now() < until); await f.outbox.runOne(); await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  assert.equal(f.control.sends.length, 1);
+});
+test("protected Solana delivery permits rebuild only after actual expired-status observation", async t => {
+  const f = await protectedSolanaDeliveryFixture(t); await f.client.enqueue(f.delivery);
+  const next = { ...await f.makeDelivery("RECEIPT", 1), minimumSlot: "10" };
+  await assert.rejects(f.client.enqueue(next)); f.control.height = 1001;
+  assert.equal((await f.outbox.runOne()).state, "EXPIRED_UNSEEN"); assert.equal(f.control.sends.length, 0);
+  assert.equal((await f.client.enqueue(next)).state, "ACCEPTED"); assert.equal(f.probe().state.records.length, 2);
+  const changed = { ...next, attestations: [next.attestations[1], next.attestations[0]] };
+  await assert.rejects(f.client.enqueue(changed));
+});
+test("protected Solana delivery missing finalized account causes persistent global stop", async t => {
+  const f = await protectedSolanaDeliveryFixture(t); await f.client.enqueue(f.delivery);
+  f.control.status = { err: null, slot: 10, confirmationStatus: "finalized" };
+  assert.equal((await f.outbox.runOne()).state, "HARD_STOP_INTEGRITY");
+  assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY"); assert.equal(f.control.sends.length, 0);
+  await f.global.restart(); assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+  await assert.rejects(f.client.enqueue(f.delivery));
+});
+test("protected Solana delivery rechecks global stop after observing deployment", async t => {
+  const f = await protectedSolanaDeliveryFixture(t); await f.client.enqueue(f.delivery);
+  const observer = await f.global.peer("SOLANA_OBSERVER");
+  f.control.hook = () => observer.guard.report(h("deployment mutation"), "SOLANA_DEPLOYMENT_CHANGED", h("confirmed component incident"));
+  assert.equal((await f.outbox.runOne()).state, "WAITING_FOR_DEPENDENCY");
+  assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+  assert.equal(f.control.sends.length, 0); assert.equal(f.probe().state.records[0].sendAttempts, 0);
+});
+test("protected Solana delivery recovers committed observation after lost protected write acknowledgement", async t => {
+  const f = await protectedSolanaDeliveryFixture(t); await f.client.enqueue(f.delivery);
+  f.control.snapshot = f.accounts({ receipt: true });
+  const write = f.store.write.bind(f.store); let lost = false;
+  f.store.write = (...args) => { const result = write(...args); if (!lost) { lost = true; throw new Error("TEST_OBSERVED_ACK_LOST"); } return result; };
+  assert.equal((await f.outbox.runOne()).state, "WAITING_FOR_DEPENDENCY"); assert(lost);
+  await f.reopen(); assert.equal((await f.client.status(f.delivery)).state, "FINALIZED_ACCOUNT"); assert.equal(f.control.sends.length, 0);
+});
+test("protected Solana delivery refuses duplicate lifetime and restored stale journal", async t => {
+  const f = await protectedSolanaDeliveryFixture(t);
+  await assert.rejects(ProtectedSolanaDepositOutbox.open({ store: new WindowsProtectedStore(f.opts), integrity: f.peer.guard, policy: f.policy, endpoint: f.endpoint }));
+  const files = [f.opts.root, f.opts.anchorRoot].map(root => path.join(root, "state.protected")), previous = files.map(file => readFileSync(file));
+  await f.client.enqueue(f.delivery); await f.outbox.close();
+  files.forEach((file, i) => writeFileSync(file, previous[i])); previous.forEach(b => b.fill(0));
+  await assert.rejects(f.reopen()); assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+});
+
 for (const method of ["reservePlan", "prepareBroadcast"]) for (const stopped of [false, true]) {
   test(`protected deposit admission leaves reconciliation readable during ${method} and ${stopped ? "rejects intervening stop" : "retains exact action"}`, async t => {
     const f = await protectedDepositFixture(t), id = f.plan.operationId;
@@ -211,6 +329,7 @@ for (const method of ["reservePlan", "prepareBroadcast"]) for (const stopped of 
     }
   });
 }
+
 
 test("protected deposit operations retain exact signed liability across reopen and reject reused inputs", async t => {
   const f = await protectedDepositFixture(t), id = f.plan.operationId;
@@ -624,7 +743,7 @@ test("IPC diagnostics expose fixed codes only and preserve request rejection", a
   assert(!JSON.stringify([f.server.lastRejection, f.client.lastRejection]).includes(privateDiagnostic), "IpcDiagnosticLeakedPrivateContext");
 });
 
-async function protectedCoordinatorFixture(t) {
+async function protectedCoordinatorFixture(t, sweepJobFixture = false) {
   const global = await isolatedIntegrityFixture(t);
   const guards = await Promise.all(REQUIRED_FROST_SIGNERS.map(role => global.peer(role)));
   const coordinatorPeer = await global.peer("COORDINATOR"), coordinatorGuard = coordinatorPeer.guard;
@@ -638,7 +757,7 @@ async function protectedCoordinatorFixture(t) {
   const policy = createNativeSigningPolicy({ environment: "localnet", nativeNetwork: "regtest", nativeGenesisHash: REGTEST_GENESIS,
     solanaDeployment: deployment, bridgeProgramId: intent.bridgeProgramId, transceiverProgramId: intent.transceiverProgramId, mint: intent.mint, keyEpoch: 1,
     maxAmountAtomic: "10000", maxFeeAtomic: "100", reserveScriptPubKeyHex: intent.changeScriptPubKeyHex, authorizedOperations: [intent] });
-  const signers = [], stateStores = [], verificationCounts = [0, 0]; let duringEvidence;
+  const signers = [], verificationCounts = [0, 0], stateStores = []; let duringEvidence;
   for (const [i, v] of f.entries()) {
     const base = WindowsProtectedFrostStateStore.createLocal(options(v.root, "native-state", v.role, "frost-state"), policy);
     const fenceOptions = options(v.root, "native-fence", v.role, "signer-fence", base.context.instanceId);
@@ -650,6 +769,17 @@ async function protectedCoordinatorFixture(t) {
   }
   t.after(() => signers.forEach(s => s.close()));
   const dkg = runTwoPartyDkg(signers, { epoch: 1 });
+  if (sweepJobFixture) {
+    // The job suite uses a single-output/no-change sweep policy. The legacy
+    // crypto fixture above intentionally covers a different economic shape.
+    signers.forEach(s => s.close());
+    intent.withdrawalId = "00".repeat(32); intent.changeAtomic = "0";
+    intent.recipientScriptPubKeyHex = intent.changeScriptPubKeyHex = "5120" + dkg.aggregateTweakedXOnlyPublicKey;
+    const updated = createNativeSigningPolicy({ ...policy, maxAmountAtomic: "10000", maxFeeAtomic: "100",
+      reserveScriptPubKeyHex: intent.changeScriptPubKeyHex, authorizedOperations: [intent] });
+    for (let i = 0; i < 2; i++) signers[i] = new NativeFrostSigner({ signerId: f[i].role, index: i, policy: updated, stateStore: stateStores[i],
+      nativeEvidenceValidator: async value => { verificationCounts[i]++; await duringEvidence?.(i); return { digestHex: value.proofFingerprint }; } });
+  }
   const ports = [], handlerFaults = [];
   for (let i = 0; i < 2; i++) {
     const handler = nativeFrostIpcHandler(signers[i], guards[i].guard);
@@ -685,6 +815,73 @@ test("signer rechecks durable stop after read-only evidence before nonce reserva
     assert.deepEqual(f.stateStores[i].publicFence(), before[i], "StopMustPreventNonceOrStateMutation");
   }
   assert.deepEqual(f.verificationCounts, [1, 1], "OnlyReadOnlyVerificationMayContinue");
+  assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+});
+
+async function protectedSweepJobsFixture(t) {
+  const f = await protectedCoordinatorFixture(t, true);
+  const policy = { environment: "localnet", nativeGenesis: REGTEST_GENESIS, solanaDeployment: deployment,
+    solanaGenesis: base58Encode(Buffer.from(h("synthetic local genesis"), "hex")), minimumSolanaSlot: "1", managerProgramId: f.intent.bridgeProgramId,
+    transceiverProgramId: f.intent.transceiverProgramId, mint: f.intent.mint, protocolId: 1, nativeNetwork: 8000111, policyEpoch: 1, keyEpoch: 1,
+    frostPublicKeyHex: f.dkg.aggregateTweakedXOnlyPublicKey, csvDelayBlocks: 12, minimumConfirmations: 6, maximumAmountAtomic: "10000", maximumFeeAtomic: "100" };
+  const journal = await ProtectedCoordinatorSigningJournal.open({ store: f.journalStore, integrity: f.coordinatorGuard, ...f.dkg });
+  cleanups.get(f.root).push(() => journal.close());
+  const opts = options(f.root, "sweep-jobs", "COORDINATOR", "coordinator-jobs"), bytes = initialSweepJobState(policy);
+  const store = WindowsProtectedStore.create(opts, bytes); bytes.fill(0);
+  let jobs;
+  const open = async current => ProtectedSweepJobs.open({ store: current, integrity: f.coordinatorGuard, policy, ...f.dkg, signers: f.peers, signingJournal: journal });
+  jobs = await open(store); cleanups.get(f.root).push(() => jobs.close());
+  const transport = fixture(t, "COORDINATOR", "BRIDGE_VALIDATOR");
+  const port = await transport.server.listen(input => sweepJobIpcHandler({ jobs, policy, integrity: f.coordinatorGuard })(input));
+  const client = new ProtectedSweepJobClient({ ipc: transport.client, port, policy });
+  await f.global.enableTestSources();
+  return { ...f, policy, opts, store, journal, transport, port, client, get jobs() { return jobs; },
+    async reopen() { await jobs.close(); jobs = await open(new WindowsProtectedStore(opts)); } };
+}
+
+test("durable sweep dispatch retains acceptance before lost IPC response and reopen", async t => {
+  const f = await protectedSweepJobsFixture(t), write = f.store.write.bind(f.store);
+  let lost = false;
+  f.store.write = (...args) => { const result = write(...args); if (!lost) { lost = true; throw new Error("TEST_ACCEPTED_ACK_LOST"); } return result; };
+  await assert.rejects(f.client.enqueue(f.intent), /IpcRequestRejected/u);
+  f.store.write = write;
+  const accepted = await f.client.enqueue(f.intent); assert.equal(accepted.state, "ACCEPTED");
+  assert.equal(f.journal.lookup(f.intent), null); assert.deepEqual(f.verificationCounts, [0, 0], "AcceptanceIsNotSigning");
+  await f.reopen(); assert.deepEqual(await f.client.enqueue(f.intent), accepted);
+  assert.equal((await f.client.status(f.intent)).state, "WAITING_FOR_DEPENDENCY");
+  await assert.rejects(f.client.enqueue({ ...f.intent, amountAtomic: "999" }));
+  await assert.rejects(f.transport.client.request(f.port, { method: "enqueueSweepSignature", operationId: h("wrong operation"), payload: { intent: f.intent } }));
+  await assert.rejects(f.transport.client.request(f.port, { method: "enqueueSweepSignature", operationId: f.intent.operationId, payload: { intent: f.intent, approved: true } }));
+  const probe = new WindowsProtectedStore(f.opts), retained = probe.read();
+  try { assert.equal(decodeSweepJobState(retained.payload, f.policy).jobs.length, 1); } finally { retained.payload.fill(0); probe.close(); }
+});
+
+test("durable sweep dispatch returns real A+B aggregate without synchronous long IPC and survives lost completion", async t => {
+  const f = await protectedSweepJobsFixture(t); await f.client.enqueue(f.intent);
+  const write = f.store.write.bind(f.store); let lost = false;
+  f.store.write = (bytes, revision) => { const result = write(bytes, revision);
+    if (!lost && JSON.parse(bytes.toString("utf8")).jobs[0].completed) { lost = true; throw new Error("TEST_COMPLETED_ACK_LOST"); } return result; };
+  const worked = await f.jobs.runOne(); assert.equal(worked.state, "WAITING_FOR_DEPENDENCY"); assert(lost, "CompletionMustHavePersisted");
+  f.store.write = write;
+  const signed = await f.client.status(f.intent); assert.equal(signed.state, "SIGNED");
+  f.journal.assertRetainedResults([f.intent]);
+  assert.throws(() => f.journal.assertRetainedResults([{ ...f.intent, amountAtomic: "999" }]), /CoordinatorJournalRequestChanged/u);
+  assert(schnorr.verify(Buffer.from(signed.result.signatureHex, "hex"), Buffer.from(f.intent.taprootSighashHex, "hex"), Buffer.from(f.policy.frostPublicKeyHex, "hex")));
+  const counts = [...f.verificationCounts]; await f.reopen();
+  assert.deepEqual(await f.client.status(f.intent), signed); await f.jobs.runOne(); assert.deepEqual(f.verificationCounts, counts);
+  await f.guards[0].guard.report(f.intent.operationId, "SIGNER_ROLLBACK", h("dispatch stop"));
+  await assert.rejects(f.client.status(f.intent)); await assert.rejects(f.client.enqueue(f.intent));
+  assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
+});
+
+test("durable sweep dispatch rejects duplicate lifetime and co-restored accepted state", async t => {
+  const f = await protectedSweepJobsFixture(t);
+  const duplicate = new WindowsProtectedStore(f.opts);
+  await assert.rejects(ProtectedSweepJobs.open({ store: duplicate, integrity: f.coordinatorGuard, policy: f.policy, ...f.dkg, signers: f.peers, signingJournal: f.journal }), /SweepJobUnavailable/u);
+  const files = [f.opts.root, f.opts.anchorRoot].map(root => path.join(root, "state.protected")), old = files.map(file => readFileSync(file));
+  await f.client.enqueue(f.intent); await f.jobs.close();
+  files.forEach((file, i) => writeFileSync(file, old[i])); old.forEach(b => b.fill(0));
+  await assert.rejects(f.reopen(), /SweepJobUnavailable/u);
   assert.equal((await f.global.authority.status()).state, "HARD_STOP_INTEGRITY");
 });
 

@@ -2,6 +2,13 @@
   "schemaVersion": "1.0",
   "generatedAt": "2026-09-12T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
+  "phase085ProtectedDeliveryReview": {
+    "baseline": "5edcc111feffcb1ced31b236dc3928d19fa9acbd",
+    "filesBefore": 248,
+    "filesAfter": 279,
+    "sourceImports": "None. Original durable signing dispatch, Native/Solana delivery, raw reserve-credit reconstruction and a source-built Windows DPAPI helper. Existing reviewed codecs and pinned crypto are unchanged; no upstream code, binary or dependency is imported.",
+    "scope": "Primary Node, CurrentUser Windows security, cold Rust/SBF builds and actual Native/Solana delivery component tests pass. Remaining chain regression and publication review are recorded separately. Not the full protected controller, cross-account certification or final clean-clone audit."
+  },
   "phase085ReconciliationReview": {
     "baseline": "a2861f8676e20c30c26ec93202f877441a7990f5",
     "filesBefore": 236,
@@ -373,6 +380,161 @@
     ]
   },
   "trackedFiles": [
+    {
+      "path": "docs/security/solana-deposit-delivery.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original signed-packet transport, durability and evidence boundaries; no operational identities."
+    },
+    {
+      "path": "services/relayer/solana-deposit-delivery.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original exact receipt/claim packet, deployment-account and retained-outcome codec; no copied upstream implementation."
+    },
+    {
+      "path": "services/relayer/protected-solana-deposit-outbox.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original protected persist-before-send transport and concrete actual-bank observation; not mint authority."
+    },
+    {
+      "path": "services/relayer/solana-deposit-ipc.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original exact-role IPC service/client and immutable response binding."
+    },
+    {
+      "path": "services/relayer/tests/solana-deposit-delivery.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original packet/account/outcome regression tests using synthetic public evidence and ephemeral test identities."
+    },
+    {
+      "path": "tests/integration/solana-delivery-fixture.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original synthetic Solana account fixture and ephemeral genuine signatures; not chain verification."
+    },
+    {
+      "path": "solana/tests/local-windows-solana-outbox-host.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original actual regtest/validator host for Windows delivery failures; disposable state external to checkout."
+    },
+    {
+      "path": "tests/windows/local-solana-outbox.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original actual DPAPI/mTLS and validator receipt/claim crash recovery tests; pending credit is explicit test initialization."
+    },
+    {
+      "path": "tests/windows/local-solana-outbox-actor.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original disposable process-kill test actor; only actual validator acknowledgement reaches the selected boundary."
+    },
+    {
+      "path": "shared/windows/ProtectedStoreExecutable.cs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original bounded/redacted executable entry for the existing reviewed Windows DPAPI/ACL/CAS implementation; no copied upstream implementation."
+    },
+    {
+      "path": "shared/windows/protected-helper-build.ps1",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original one-time per-process compilation of adjacent reviewed source with the installed Windows Framework compiler into an atomic private external directory."
+    },
+    {
+      "path": "shared/windows/protected-executable.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original source/executable hash and path binding with fail-closed cache validation; no generated binaries or operational state are tracked."
+    },
+    {
+      "path": "tests/windows/protected-executable-actor.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated executable-integrity test actor; generated code remains external, with no production identity or secrets."
+    },
+    {
+      "path": "tests/windows/protected-executable.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original actual Windows executable hash, hard-link, ACL, corruption and no-fallback tests under the current test principal."
+    },
+    {
+      "path": "docs/security/windows-protected-executable.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original implementation and evidence boundary for the source-built Windows protection helper, preserving cross-service and privileged-host limitations."
+    },
+    {
+      "path": "docs/security/native-reserve-credit.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original protected reserve-credit derivation, replay and recovery limitations."
+    },
+    {
+      "path": "docs/security/native-sweep-delivery.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original candidate delivery design, evidence scope and remaining integration limitations."
+    },
+    {
+      "path": "docs/security/sweep-job-recovery.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original queue/restart boundary and limitation description."
+    },
+    {
+      "path": "native/frost/coordinator/protected-sweep-jobs.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original Windows-protected dispatch/worker around the existing exact A+B signer and coordinator journal."
+    },
+    {
+      "path": "native/frost/coordinator/sweep-job-ipc.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original mutually authenticated role-specific queue API and independently verified public result."
+    },
+    {
+      "path": "native/frost/coordinator/sweep-job-state.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original bounded immutable signing-job codec; no cryptographic implementation copied."
+    },
+    {
+      "path": "native/frost/tests/sweep-job-state.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original codec/security regressions with ephemeral external test material and explicitly synthetic chain facts."
+    },
+    {
+      "path": "services/bridge-validator/native-reserve-credit.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original concrete raw Native reserve-to-credit recovery and independent attester evidence reconstruction. Existing canonical encoding and economic validators reused."
+    },
+    {
+      "path": "services/bridge-validator/tests/native-reserve-credit.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original credit recovery input/capability boundary tests; no fixture proof flags accepted."
+    },
+    {
+      "path": "services/relayer/native-sweep-ipc.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original pinned-role Native delivery IPC handler/client."
+    },
+    {
+      "path": "services/relayer/native-sweep-outbox.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original protected exact signed Native sweep outbox; existing economic codec and Native verifier reused. No imported upstream code."
+    },
+    {
+      "path": "services/relayer/tests/native-sweep-outbox.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original codec and capability regression tests; synthetic chain facts with ephemeral real FROST signatures."
+    },
+    {
+      "path": "solana/tests/local-native-reserve-credit.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original actual regtest credit derivation and substituted-message regression. No second mint or production state."
+    },
+    {
+      "path": "solana/tests/local-windows-native-outbox-host.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated real-chain test orchestration for protected Windows delivery; no embedded keys."
+    },
+    {
+      "path": "tests/windows/local-native-outbox-actor.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original disposable worker actor for actual post-broadcast process termination."
+    },
+    {
+      "path": "tests/windows/local-native-outbox.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original current-principal protected real-regtest delivery and process-kill test."
+    },
     {
       "path": "native/frost/coordinator/protected-signing-journal.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",

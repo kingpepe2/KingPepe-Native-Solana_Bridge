@@ -94,6 +94,13 @@ certification; the three prior failed attempts remain recorded. The inherited co
 pipes carry only external test configuration references; source-health reports
 cross the actual role-pinned TLS channels. These are not production installers.
 Status files record what actually ran.
+The later integrated primary delivery runtime independently passes ten Linux
+and eight CurrentUser Windows/live-chain reconciliation checks, each after
+fourteen actual claim checks and COMPLETED. Its unchanged 194-file digest is
+99b9a8bda86fd220c8eb8518c471e72acf1ae1a9ed3bd85821a30dc3f3bfe446.
+It includes the source-built protection helper and durable outbox components;
+the completed-record test initialization remains explicit, not a claim of full
+protected-controller or host-reboot certification.
 Cross-service SID/ACL certification and full protected controller/crash recovery
 remain separate gates. None of these tests is an independent external audit.
 

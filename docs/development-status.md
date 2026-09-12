@@ -1,5 +1,76 @@
 # KingPepe Native - Solana Bridge Development Status
 
+## Protected delivery primary integration
+
+Reconciliation commit 5edcc111feffcb1ced31b236dc3928d19fa9acbd is published
+PRIVATE after source/staged scans, 180 prior commits and its outgoing commit.
+Its exact [Actions run 34669723105](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34669723105)
+is NOT_RUN_ACCOUNT_BLOCKED: four jobs, zero steps and zero artifacts. GitHub
+reports failed recent account payments or a spending limit requiring increase.
+KingPepe Team account action remains necessary; CI is not weakened.
+
+The next worktree integrates the separately tested signing dispatch, Native and
+Solana delivery outboxes, exact reserve-credit derivation and reviewed source-
+built Windows protection helper. There are 279 intended source files with exact
+provenance. The complete candidate's 194-file runtime digest is
+1a896a1cc8510011d09d3cade9bdf38d8d5a01d8bc644efcb22fe729f253f3a4.
+Candidate Node 879 plus two vectors per platform, Windows security 147 and
+actual protected Native/Solana delivery eight/nine pass in their documented
+scopes. Primary reruns now pass Node 879 plus two vectors per platform and
+Windows security 147, zero failed/skipped/cancelled, exit zero, in
+2794896.1841 ms. Primary runtime has 194 files (including C#) with unchanged
+pre/post digest 99b9a8bda86fd220c8eb8518c471e72acf1ae1a9ed3bd85821a30dc3f3bfe446.
+Do not substitute the earlier candidate digest for primary evidence.
+
+All five Rust workspaces pass check/fmt/test/Clippy using fresh external target
+directories: 97 tests, zero failures/ignored. Two independent cold SBF builds
+produce identical binaries: transceiver
+58bacbe7119e8793ae93dc0e025ed2ebc96c9a1407b16fdcbbdab2ec4d706eb0 and bridge
+88e2f8413eafbcb800fb8c8e8db2df20e4aa8188304922bf59bd80e2e0eb004c.
+Pinned compilers and download caches were reused, not compiled project targets.
+This is primary dirty-worktree evidence, not a final clean clone or certification
+of the parent commit. Generated identities and logs remain external.
+
+Fresh primary actual protected Native delivery passes eight Windows checks and
+fourteen chain checks through COMPLETED. Solana delivery passes nine Windows
+checks and its own fourteen-check COMPLETED continuation. Both kill actors after
+actual chain acknowledgement but before outcome persistence; reopen observes
+the exact prior effect without a second send. Explicit chain-derived test setup
+precedes protected delivery. These are not the complete protected controller.
+
+Two initial Solana delivery attempts failed at validator startup: first the Unix
+socket path length, then unsupported Unix sockets on a Windows-mounted filesystem.
+Neither reached economic execution. A new short Linux tmpfs test root succeeded
+without changing validator/security settings. Only disposable test chain data
+uses tmpfs; protected Windows journals remain on disk. This does not demonstrate
+host-reboot durability. Build outputs use external data-volume directories to
+avoid exhausting the system volume again; no WSL storage repair was performed.
+
+Locked installation, 279-file provenance, declared license checks, guardrails and
+npm audit (zero vulnerabilities) pass. The initial Windows license command lacked
+the intended Cargo environment; the correctly configured Linux audit passes.
+Pre-publication source export and all 181 existing commits pass Gitleaks;
+final staged/outgoing scans are still required after the final status update.
+All renewed primary chain regressions pass: 55 deposit/security, 26 withdrawal
+record, eight Native reorg, 13 acceptance-checkpoint and 18 deployment-identity
+checks. The last probe uses separately built SBPF v3 binaries for actual local
+upgrade/authority mutation; these are not the normal reproducible v0 binaries.
+The raw-credit suite passes ten checks after fourteen claim checks. A fresh
+Linux reconciliation rerun passes ten checks. Protected Windows/live-chain
+propagation passes eight, each with fourteen actual claim checks and COMPLETED.
+The latter triggers a real post-mint higher-work fork, retains exact impacted
+operation/backing, blocks all tested economic service roles through actual mTLS,
+and preserves the stop over authority/monitor reopen. Read-only observation
+continues. This fixture imports completed chain-derived records explicitly; it
+does not certify the entire protected signing controller. Both processes exit
+zero. All five Cargo advisory scans complete with no vulnerabilities and the
+existing RUSTSEC-2025-0141 bincode 1.3.3 unmaintained warning retained.
+A separate, unpublished
+protected-controller candidate failed before claim enqueue; its missing-record
+status correction is being validated independently and does not certify this
+increment. Full protected-controller and clean-clone certification remain open.
+Phase 09 is NOT_STARTED; Mainnet, production signing and broadcasting stay disabled.
+
 ## Reconciliation primary integration in progress
 
 RPC correction a2861f8676e20c30c26ec93202f877441a7990f5 is published PRIVATE,

@@ -33,6 +33,8 @@ const edges = Object.freeze({
   KINGPEPE_FROST_B: { COORDINATOR: ["verifyNativeEvidence", "signingCommitment", "signatureShare", "abortSigningSession"] },
   ATTESTER_A: { BRIDGE_VALIDATOR: ["attestDeposit"] },
   ATTESTER_B: { BRIDGE_VALIDATOR: ["attestDeposit"] },
+  COORDINATOR: { BRIDGE_VALIDATOR: ["enqueueSweepSignature", "sweepSignatureStatus"] },
+  RELAYER: { BRIDGE_VALIDATOR: ["enqueueNativeSweep", "nativeSweepStatus", "enqueueSolanaDeposit", "solanaDepositStatus"] },
   BRIDGE_VALIDATOR: { RECONCILIATION: ["depositSnapshot"] },
 });
 function requireValue(condition, code = "IpcRejected") { if (!condition) throw new Error(code); }

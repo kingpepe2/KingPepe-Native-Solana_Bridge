@@ -9,6 +9,7 @@ import {
   buildLocalnetSolanaDepositClaimTransactionPlan,
   prepareSignedLocalnetSolanaDepositReceiptTransaction,
   prepareSignedLocalnetSolanaDepositClaimTransaction,
+  verifySignedLocalnetSolanaDepositReceiptTransaction,
   shortvecEncode,
 } from "../solana-deposit-claim-transaction-plan.mjs";
 import {
@@ -187,6 +188,48 @@ function fixture(overrides = {}) {
     },
   };
 }
+
+async function signedReceiptFixture() {
+  const f = fixture({ tokenProgramIdBase58: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" });
+  const config = { ...f.config, attestations: createAttestations(f.config),
+    feePayerSigner: { publicKeyHex: f.feePayer.publicKeyHex, sign: bytes => ed25519.sign(bytes, f.feePayer.signingKey) } };
+  const packet = await prepareSignedLocalnetSolanaDepositReceiptTransaction(config);
+  return { ...f, config: { ...config, preparedTransactionBase64: packet.preparedTransactionBase64 }, packet };
+}
+
+test("canonical receipt verification rebuilds the signed Ed25519/transceiver packet exactly", async () => {
+  const f = await signedReceiptFixture();
+  const result = verifySignedLocalnetSolanaDepositReceiptTransaction(f.config);
+  assert.equal(result.solanaSignature, f.packet.signatures[0].signatureBase58);
+  assert.equal(result.verifiedReceiptAccountBase58, f.packet.pdas.verifiedReceipt.addressBase58);
+  assert.equal(result.mintAccountBase58, f.config.mintBase58);
+});
+
+for (const [label, offset] of [["signature count", 0], ["message header", 65],
+  ["readonly accounts", 67], ["fee payer", 69], ["recent blockhash", 325],
+  ["instruction count", 357], ["verifier offsets", 365], ["compute instruction", -2]]) {
+  test("canonical receipt rejects re-signed mutation: " + label, async () => {
+    const f = await signedReceiptFixture(), raw = Buffer.from(f.packet.preparedTransactionBase64, "base64");
+    raw[offset < 0 ? raw.length + offset : offset] ^= 1;
+    Buffer.from(ed25519.sign(raw.subarray(65), f.feePayer.signingKey)).copy(raw, 1);
+    assert.throws(() => verifySignedLocalnetSolanaDepositReceiptTransaction({ ...f.config, preparedTransactionBase64: raw.toString("base64") }));
+  });
+}
+test("canonical receipt rejects bad signature, trailing packet data and a duplicate attester", async () => {
+  const f = await signedReceiptFixture(), raw = Buffer.from(f.packet.preparedTransactionBase64, "base64");
+  raw[1] ^= 1;
+  assert.throws(() => verifySignedLocalnetSolanaDepositReceiptTransaction({ ...f.config, preparedTransactionBase64: raw.toString("base64") }));
+  assert.throws(() => verifySignedLocalnetSolanaDepositReceiptTransaction({ ...f.config,
+    preparedTransactionBase64: Buffer.concat([Buffer.from(f.packet.preparedTransactionBase64, "base64"), Buffer.from([0])]).toString("base64") }));
+  assert.throws(() => verifySignedLocalnetSolanaDepositReceiptTransaction({ ...f.config, attestations: [f.config.attestations[0], f.config.attestations[0]] }));
+});
+test("receipt verification cannot accept a claim packet or substituted expected deployment", async () => {
+  const f = await signedReceiptFixture();
+  const claim = await prepareSignedLocalnetSolanaDepositClaimTransaction(f.config);
+  assert.throws(() => verifySignedLocalnetSolanaDepositReceiptTransaction({ ...f.config, preparedTransactionBase64: claim.preparedTransactionBase64 }));
+  for (const key of ["managerProgramIdBase58", "transceiverProgramIdBase58", "mintBase58", "recipientTokenAccountBase58"])
+    assert.throws(() => verifySignedLocalnetSolanaDepositReceiptTransaction({ ...f.config, [key]: pubkey("substitute").base58 }));
+});
 
 test("deposit claim transaction plan builds exact localnet instruction data and account metas", () => {
   const { config } = fixture();
