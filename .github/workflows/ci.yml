@@ -244,6 +244,27 @@ jobs:
             }
           '
 
+      - name: Real bidirectional service, response loss and process restarts (regtest only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="${KINGPEPE_CI_TOOL_ROOT}/solana-release/bin:${KINGPEPE_CI_TOOL_ROOT}/native-build/bin:${PATH}"
+          export KINGPEPE_LOCAL_E2E_ROOT="${KINGPEPE_CI_TOOL_ROOT}/service-run"
+          export KINGPEPE_LOCAL_BUILD_ROOT="${KINGPEPE_CI_TOOL_ROOT}/build"
+          node solana/tests/local-bridge-service.mjs > "${KINGPEPE_CI_TOOL_ROOT}/service-result.json"
+          node --input-type=module -e '
+            import {readFileSync} from "node:fs";
+            const r = JSON.parse(readFileSync(process.env.KINGPEPE_CI_TOOL_ROOT + "/service-result.json", "utf8"));
+            console.log(JSON.stringify(r));
+            if (r.sourceSha !== process.env.GITHUB_SHA || r.worktreeDirty !== false || r.state !== "COMPLETED" ||
+                r.nativeToSolana !== "COMPLETED" || r.solanaToNative !== "COMPLETED" ||
+                r.noPerTransferKingPepeTeamApproval !== true || r.checks?.pass !== 22 || r.checks?.fail !== 0) process.exit(1);
+            for (const check of ["CREDIT_APPEND_CRASH_AND_RPC_OUTAGE_WAIT_NOT_FALSE_DEFICIT",
+              "RPC_RECOVERY_RETAINS_EXACT_CREDIT_AND_CANONICAL_RESERVE"]) {
+              if (!r.checks.passed.includes(check)) process.exit(1);
+            }
+          '
+
       - name: Real deployment-integrity and upgrade regression (localnet only)
         shell: bash
         run: |

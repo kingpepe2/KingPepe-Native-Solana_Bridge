@@ -67,3 +67,98 @@ Windows service integration is incomplete; local round trips do not certify
 production operation, sudden power loss or full-host snapshot recovery.
 A released transaction cannot be revoked by an off-chain pause and must still
 be observed and accounted. All production activation remains disabled.
+
+## Minimal scheduled backup and manual restore
+
+Status: `recoveryProcedure = NOT_TESTED`. Process-restart tests are not a
+snapshot/host-loss drill. This procedure must be exercised on isolated test
+state before Phase 15, repeated during the Phase-17 Devnet soak, and recorded
+as TESTED before Phase 19. No production backup job has been installed.
+
+Keep the actual schedule, source/destination inventory, encryption credentials,
+service identities and recovery material in local private configuration. The
+KingPepe Team must select a fixed interval and offline/cold destination; neither
+is inferred from a development path. Use an existing encrypted-backup utility
+and the host scheduler, not another bridge database or replication service.
+Schedule failure leaves the previous good snapshot intact and is reported for
+manual review. A backup stored only on the active host is not host-loss recovery.
+
+### Scheduled capture
+
+1. Stop admission and await the existing service loop, signer and attester work.
+   Close every state writer and the journal cleanly. A timed-out shutdown is
+   not a consistent cut: do not copy a live SQLite file or mixed signer states.
+2. Capture the complete closed journal/state directories and exact deployment
+   configuration together, including retained intents, packets, attempts,
+   attester authorizations and consumed-nonce records. Preserve any existing
+   pause. Do not omit pending liabilities or retain only completed operations.
+3. Encrypt directly into a new versioned backup on the configured destination;
+   do not create a plaintext staging archive. Preserve the previous good backup.
+   Record source SHA, schema/tool versions, environment/genesis/deployment,
+   snapshot time, journal checkpoint and file hashes inside the encrypted set.
+4. Verify the archive can be authenticated and decrypted in a restricted test
+   location and that its inventory/hashes match. Keep decryption/recovery
+   credentials separately from the archive. Detach or otherwise make the
+   verified cold copy unavailable to the running bridge host.
+5. Restart only the unchanged live state, retaining its previous pause status.
+   This is a scheduled stop/start, not a restore or permission to clear a pause.
+
+CurrentUser DPAPI blobs alone are not a portable key backup. Recovering them on
+a replacement machine requires the corresponding approved OS/account recovery
+material and an actually tested restore. Missing decryption capability must
+fail closed; never substitute plaintext or silently create a replacement key.
+Keep participants' secret recovery material separate from the coordinator.
+
+### Manual restore after loss or corruption
+
+1. Isolate the failed host and all its writers. Retain evidence and surviving
+   state; do not overwrite or delete it. No restored signer may run alongside
+   an old signer. Recover into new protected roots outside every checkout.
+2. Authenticate/decrypt the last good, coherent snapshot and verify its entire
+   inventory, versions, environment, genesis, deployment and journal integrity.
+   Open the journal with its original identity/key, never the create-new path.
+   Failure or partial data means remain stopped, not initialize an empty ledger.
+3. Force policy PAUSED before constructing an active service loop. Keep signing,
+   new submissions and automatic startup disabled. Start only read-only chain
+   observation and the retained workers' catch-up paths.
+4. Establish the gap between the snapshot and the last known live activity.
+   Recover any newer public operation/signing/delivery records from surviving
+   storage. Check Native signed transaction IDs/inputs/finality and finalized
+   Solana claim/withdrawal records and transaction history. Replay only retained
+   economic identities; never turn a lost reply into a new payout/credit ID.
+5. Read-only catch-up can settle retained signed sweeps, pending credits, mints
+   and payouts against real chain evidence. Reconcile reserve, supply and all
+   pending liabilities. MATCH is necessary but does not prove that a stale
+   snapshot contains every operation. Unknown history, unaccounted activity,
+   expired credit or any contradiction requires continued pause and review.
+6. Do NOT reopen older FROST nonce state for signing merely because balances
+   reconcile. If any commitments/shares may have been released after the
+   snapshot, recover the newer consumed state and bound sessions first.
+   Without that evidence, remain signing-disabled. A reviewed key/epoch recovery
+   would be a separate explicitly authorized action; it is not implemented by
+   ordinary resume. Likewise, do not reconstruct missing attester authorization
+   state by signing fresh copies of an uncertain allocation.
+7. Only after the gap is accounted, key/state recovery is verified, chain facts
+   are current and reconciliation matches, the KingPepe Team may explicitly
+   review and resume through the existing service API. Never remove an integrity
+   stop, edit balances, reassign inputs or reset replay records to force progress.
+
+A periodic snapshot bounds recoverable data age; it does not guarantee zero
+data loss, full-host rollback detection, or automatic recovery from every old
+snapshot. If complete operation/signing evidence cannot be recovered, safely
+resuming economic actions is BLOCKED. Preserve this limitation in readiness.
+
+### Required isolated drill and evidence
+
+Use only disposable localnet/regtest state and the chosen encrypted-backup tool.
+Capture a quiescent snapshot with signed operations awaiting chain settlement;
+stop the test host/processes, restore to fresh roots, and follow the procedure
+above. Let real chains settle the retained transactions. Require both directions
+COMPLETED with no new sweep, mint or payout, exact liabilities and reconciliation.
+Also reject a corrupt archive and a snapshot with a deliberately missing operation
+or ambiguous consumed-nonce gap; those cases must stay PAUSED/signing-disabled.
+
+Record source SHA, snapshot scope/time, restore duration, manual steps, actual
+chain results and gaps in the existing readiness/status files. Do not publish
+archive contents, keys, private paths or machine identities. The later Devnet
+report must record its own host-loss drill, not reuse local restart evidence.

@@ -35,6 +35,10 @@ export function compareWithdrawalAccounting(journal, observed) {
   // New finalized user requests may not have reached this worker yet. That is
   // incomplete observation, not free reserve and not a fabricated deficit.
   if (burnCounter > n("burnedRecordedAtomic")) return { state: "WAITING_FOR_DEPENDENCY", reason: "UNOBSERVED_WITHDRAWALS" };
+  // A known backed credit can land between service catch-up and this bank
+  // read. Suspend for exact claim observation; never change balances here.
+  if (manager > issued && manager <= issued + pending && amount(observed.reserve) === reserve && supply <= manager &&
+      reserve === issued + pending + unpaid) return { state: "WAITING_FOR_DEPENDENCY", reason: "UNOBSERVED_DEPOSIT_MINT" };
   if (amount(observed.reserve) !== reserve || reserve !== issued + pending + unpaid || manager !== issued ||
       supply > manager || burnCounter !== n("burnedRecordedAtomic")) return { state: "PAUSED", reason: "ACCOUNTING_CONTRADICTION" };
   return { state: "MATCH", reserveAtomic: reserve.toString(), supplyAtomic: supply.toString(), pendingWithdrawalAtomic: unpaid.toString(),
@@ -53,13 +57,15 @@ export class AutomaticSolanaToNativeWithdrawal {
     this.#ledger = ledger; this.#reader = reader; this.#verifier = nativeVerifier; this.#rpc = nativeRpc; this.#solana = solanaRpc;
     this.#createCoordinator = createCoordinator; this.#reserve = reserveScriptHex; this.#minimum = minimumConfirmations;
   }
-  #active() { check(this.#ledger.status().state !== "HARD_STOP", "WithdrawalBridgePaused"); }
+  #active() { check(this.#ledger.status().state === "OPEN_LOCAL_ACCOUNTING_ONLY", "WithdrawalBridgePaused"); }
   assertLedger(ledger) { check(ledger === this.#ledger, "WithdrawalServiceLedgerMismatch"); }
-  async observe() {
-    this.#active();
+  async observe({ readOnly = false } = {}) {
+    check(typeof readOnly === "boolean", "WithdrawalObservationModeRejected");
+    const admitted = () => readOnly ? check(this.#ledger.status().state !== "HARD_STOP", "WithdrawalBridgePaused") : this.#active();
+    admitted();
     try {
       const receipts = await this.#reader.discover(this.#ledger.knownWithdrawalIds());
-      for (const receipt of receipts) { this.#active(); this.#ledger.enqueueConfirmedWithdrawal(receipt); }
+      for (const receipt of receipts) { admitted(); this.#ledger.enqueueConfirmedWithdrawal(receipt); }
       return { state: "OBSERVED", added: receipts.length };
     } catch (error) {
       if (["SOLANA_DEPLOYMENT_CHANGED", "SOLANA_GENESIS_CHANGED", "FINALIZED_SOLANA_CONFLICT"].includes(error?.integrityCode) && this.#ledger.status().state !== "HARD_STOP") this.#ledger.hardStop("WITHDRAWAL_DEPLOYMENT_CHANGED");
@@ -80,6 +86,10 @@ export class AutomaticSolanaToNativeWithdrawal {
     } catch (error) { if (error?.message === "NativeRpcRejected:getrawtransaction:-5") return false; throw error; }
   }
   async reconcile() {
+    // A retained verified operation may still need its credit/reserve/mint
+    // projections replayed after a crash. Unavailable catch-up is UNKNOWN,
+    // not proof that the partially populated reserve map is a real deficit.
+    if (this.#ledger.serviceAccountingPending()) return { state: "WAITING_FOR_DEPENDENCY", reason: "DEPOSIT_ACCOUNTING_CATCHUP_REQUIRED" };
     const inputs = this.#ledger.accountedReserveInputs();
     const before = await this.#verifier.observeChain();
     const affected = this.#ledger.acceptedNativeBases().filter(b => b.blocks.some(block => before.headerHashes[block.height] !== block.blockHash));
@@ -123,14 +133,23 @@ export class AutomaticSolanaToNativeWithdrawal {
     if (report.state === "PAUSED" && this.#ledger.status().state !== "HARD_STOP") this.#ledger.hardStop("WITHDRAWAL_ACCOUNTING_CONTRADICTION");
     return report;
   }
-  async run(signature) {
+  async catchUp() {
+    // Observe settlement of packets already sent. No UTXO selection, signing
+    // or broadcasting is permitted while a policy pause is in effect.
+    for (const r of this.#ledger.pendingSignedWithdrawals()) await this.run(r.plan.solanaSignature, { readOnly: true });
+  }
+  async run(signature, { readOnly = false } = {}) {
+    check(typeof readOnly === "boolean", "WithdrawalObservationModeRejected");
     check(!this.#busy, "WithdrawalWorkerBusy"); this.#busy = true;
     try {
       const observation = await this.#reader.read(signature); requireFinalizedWithdrawal(observation);
       const id = observation.operationId;
       let record = this.#ledger.withdrawal(id);
       if (record?.state === "COMPLETED") return { state: "COMPLETED", operationId: id, txid: record.payment.txid, replay: true };
-      this.#active();
+      if (readOnly) {
+        check(this.#ledger.status().state !== "HARD_STOP", "WithdrawalBridgePaused");
+        if (!record?.signedTransactionHex) return { state: "WAITING_FOR_DEPENDENCY", operationId: id };
+      } else this.#active();
       this.#ledger.enqueueConfirmedWithdrawal(observation); // Retain the liability even when no input is presently available.
       if (!record) {
         check(BigInt(observation.grossAtomic) <= this.#maxAmount && BigInt(observation.feeAtomic) <= this.#maxFee, "WithdrawalQueuedByLimit");
@@ -155,6 +174,7 @@ export class AutomaticSolanaToNativeWithdrawal {
           this.#active(); return verifyWithdrawalSigning({ plan: record.plan, intent, reader: this.#reader, nativeVerifier: this.#verifier });
         } });
         check(coordinator instanceof NativeFrostCoordinator, "WithdrawalFrostCoordinatorRequired");
+        coordinator.useLocalOperationJournal(this.#ledger);
         const signatures = [];
         for (const intent of intents) {
           this.#active(); const result = await coordinator.signAutomaticallyWithNativeEvidence(intent);
@@ -167,6 +187,7 @@ export class AutomaticSolanaToNativeWithdrawal {
       if (["SIGNED", "BROADCAST"].includes(record.state)) {
         let known = await this.#known(record.signedTransactionHex);
         if (!known) {
+          if (readOnly) return { state: "WAITING_FOR_DEPENDENCY", operationId: id };
           // Refresh deployment/withdrawal + exact live UTXOs before any retry.
           const evidence = await verifyWithdrawalSigning({ plan: record.plan, intent: withdrawalSigningIntents(record.plan)[0], reader: this.#reader, nativeVerifier: this.#verifier });
           this.#active(); this.#ledger.recordWithdrawalBroadcast(id); // BEFORE sending, including attempts whose response is lost.
@@ -182,8 +203,9 @@ export class AutomaticSolanaToNativeWithdrawal {
         if (!Number.isSafeInteger(native.confirmations) || native.confirmations < this.#minimum) return { state: "BROADCAST", operationId: id, txid: parseNativeTransactionHex(record.signedTransactionHex).txidHex };
         const receipt = await this.#verifier.verifyFinalizedPayout({ inputs: record.plan.inputs, unsignedTransactionHex: record.plan.unsignedTransactionHex,
           signedTransactionHex: record.signedTransactionHex, minimumConfirmations: this.#minimum, reserveScriptHex: this.#reserve });
-        this.#active(); this.#ledger.recordWithdrawalPaid(id, receipt);
+        if (!readOnly) this.#active(); this.#ledger.recordWithdrawalPaid(id, receipt);
       }
+      if (readOnly) return { state: "PAID", operationId: id };
       const accounting = await this.reconcile();
       if (accounting.state !== "MATCH") return { state: accounting.state, operationId: id, accounting };
       this.#active(); this.#ledger.completeWithdrawal(id, sha256Canonical(accounting));

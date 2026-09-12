@@ -953,6 +953,13 @@ test("coordinator journal codec requires both exact terminal abort receipts", t 
     assert.throws(() => x.decode({ ...x.state, records: [{ ...r, abortReceipts: receipts }] }));
   }
 });
+test("coordinator journal separates sweep and withdrawal with the same public operation label", t => {
+  const x = coordinatorJournalFixture(t);
+  const other = createNativeFrostSigningRequest({ ...x.request.intent,
+    purpose: x.request.intent.purpose === "WITHDRAWAL" ? "RESERVE_SWEEP" : "WITHDRAWAL", signingRequestId: h("other-direction-request") });
+  x.state.records.push({ request: other, state: "PREPARED", abortReceipts: null, result: null });
+  assert.deepEqual(x.decode(x.state), x.state);
+});
 for (const [label, mutate] of [
   ["wrong protocol", v => { v.protocol += "x"; }],
   ["wrong key package", v => { v.identityDigest = h("wrong-key"); }],

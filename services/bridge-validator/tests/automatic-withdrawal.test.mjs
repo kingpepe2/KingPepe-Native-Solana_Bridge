@@ -73,3 +73,11 @@ test("cumulative bridge counters retain u128 precision while SPL supply remains 
   assert.equal(r.state, "MATCH"); assert.equal(r.directBurnDifferenceAtomic, ((1n << 64n) - 1n).toString());
   assert.throws(() => compareWithdrawalAccounting(j, { reserve: issued, supply: issued, managerIssued: issued, recordedBurns: "0" }));
 });
+
+test("known pending credit landing between reads waits for claim catch-up, not balance repair", () => {
+  const j = { canonicalReserveAtomic: "100", bridgeIssuedOutstandingAtomic: "0", pendingMintAtomic: "100",
+    pendingWithdrawalAtomic: "0", burnedRecordedAtomic: "0", finalizedPayoutAtomic: "0" };
+  assert.equal(compareWithdrawalAccounting(j, { reserve: "100", supply: "100", managerIssued: "100", recordedBurns: "0" }).reason, "UNOBSERVED_DEPOSIT_MINT");
+  assert.equal(compareWithdrawalAccounting(j, { reserve: "100", supply: "101", managerIssued: "101", recordedBurns: "0" }).state, "PAUSED");
+  assert.equal(compareWithdrawalAccounting(j, { reserve: "99", supply: "100", managerIssued: "100", recordedBurns: "0" }).state, "PAUSED");
+});

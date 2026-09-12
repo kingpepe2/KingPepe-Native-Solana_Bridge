@@ -11,9 +11,12 @@ import { validateRuntimeFile, validateRuntimeStateRoot } from "../../shared/runt
 import { REGTEST_GENESIS, requireVerifiedRegtestReserve, requireVerifiedRegtestPayout } from "../../native/node/native-raw-evidence.mjs";
 import { requireFinalizedWithdrawal } from "../solana-observer/finalized-withdrawal.mjs";
 import { validateWithdrawalPlan, validateSignedWithdrawal } from "../../native/reserve/withdrawal-plan.mjs";
-import { canonicalJson } from "../../native/frost/policy/native-signing-policy.mjs";
+import { canonicalJson, nativeSigningIntentDigest } from "../../native/frost/policy/native-signing-policy.mjs";
+import { createNativeFrostSigningRequest } from "../../native/frost/policy/signing-request.mjs";
+import { initialCoordinatorSigningState, decodeCoordinatorSigningState } from "../../native/frost/coordinator/protected-signing-journal.mjs";
 import { parseNativeTransactionHex } from "../../native/node/native-taproot-transaction.mjs";
 import { assertWindowsProtectedStore } from "../../shared/windows/protected-store.mjs";
+import { initialServiceState, reduceServiceEvent, restoreDelivery, depositServiceStatus, MAX_SERVICE_EVENT_BYTES } from "./service-journal-state.mjs";
 
 const toolchain = JSON.parse(readFileSync(new URL("../../scripts/local-e2e-toolchain.json", import.meta.url), "utf8"));
 const MAGIC = Buffer.from("KPDECL01", "ascii");
@@ -22,6 +25,7 @@ const CREDIT = 1;
 const MINT = 2;
 const STOP = 3;
 const RESERVE = 4, WITHDRAWAL = 5, REQUEST = 6, MAX_OPERATION_BYTES = 6144;
+const SERVICE = 7;
 const CREDIT_LENGTH = MESSAGE_LENGTH + 32;
 const TABLES = Object.freeze({
   meta: "CREATE TABLE meta (id INTEGER PRIMARY KEY CHECK (id = 1), context BLOB NOT NULL, head INTEGER NOT NULL, tag BLOB NOT NULL) STRICT",
@@ -45,6 +49,8 @@ export class AuthenticatedLocalDepositLedger {
   #reserves = new Map();
   #withdrawals = new Map();
   #requests = new Map();
+  #service = initialServiceState();
+  #signingBusy = false;
   #statements = new Map();
 
   static createLocal(options) { return new AuthenticatedLocalDepositLedger(options, true); }
@@ -95,7 +101,9 @@ export class AuthenticatedLocalDepositLedger {
       this.#db = new DatabaseSync(this.#file, {
         defensive: true, allowExtension: false, enableDoubleQuotedStringLiterals: false,
         enableForeignKeyConstraints: true, readBigInts: true, timeout: 250,
-        limits: { length: 8192, sqlLength: 4096, column: 8, exprDepth: 32, compoundSelect: 3,
+        // A public sweep plan includes every exact per-input signing intent.
+        // Keep the original smaller bounds for existing economic event types.
+        limits: { length: MAX_SERVICE_EVENT_BYTES + 8192, sqlLength: 4096, column: 8, exprDepth: 32, compoundSelect: 3,
           vdbeOp: 25000, functionArg: 8, attach: 0, likePatternLength: 128, variableNumber: 8, triggerDepth: 0 },
       });
       // These fixed statements run before any application/schema query. No
@@ -144,6 +152,84 @@ export class AuthenticatedLocalDepositLedger {
   }
 
   recordValidatedDeposit(input) { this.#record(CREDIT, creditPayload(input)); }
+  watchServiceDeposit(request, policy) { this.#record(SERVICE, Buffer.from(JSON.stringify({ action: "WATCH", request, policy }))); }
+  serviceDepositRequests({ limit = 100 } = {}) {
+    this.#assertHead(); if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error("LocalLedgerPageRejected");
+    return structuredClone([...this.#service.watches.values()].filter(r => !this.#service.deposits.has(r.operationId)).slice(0, limit));
+  }
+  registerServiceDeposit(plan, policy) { this.#record(SERVICE, Buffer.from(JSON.stringify({ action: "REGISTER", plan, policy }))); }
+  updateServiceDeposit(operationId, action, value) {
+    this.#record(SERVICE, Buffer.from(JSON.stringify({ action, operationId, value })));
+  }
+  serviceDeposit(id) { this.#assertHead(); return structuredClone(this.#service.deposits.get(id)); }
+  serviceDeposits({ limit = 100, pendingOnly = false, registeredOnly = false } = {}) {
+    this.#assertHead();
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100 || typeof pendingOnly !== "boolean" || typeof registeredOnly !== "boolean") throw new Error("LocalLedgerPageRejected");
+    const pending = registeredOnly ? [] : this.serviceDepositRequests().map(r => ({ operationId: r.operationId, state: "OBSERVED", amountAtomic: r.depositIntent.amountAtomic }));
+    return [...pending, ...[...this.#service.deposits].map(([operationId, r]) => ({ operationId, state: depositServiceStatus(r),
+      amountAtomic: r.operation.plan.depositIntent.amountAtomic }))].filter(r => !pendingOnly || r.state !== "COMPLETED").slice(0, limit);
+  }
+  servicePolicy() { this.#assertHead(); return structuredClone(this.#service.policy); }
+  serviceAccountingPending() {
+    this.#assertHead();
+    for (const { operation } of this.#service.deposits.values()) if (operation.finalizedCredit) {
+      const id = decodeCanonicalBridgeMessage(operation.finalizedCredit.encodedMessageHex).operationIdHex;
+      const credit = this.#credits.get(id);
+      if (!credit || !this.hasCanonicalDepositReserve(id) || operation.mintReceipt && !credit.minted) return true;
+    }
+    return false;
+  }
+  nativeSigningJournal(key) {
+    key = structuredClone(key); decodeCoordinatorSigningState(initialCoordinatorSigningState(key), key);
+    const lookup = intent => {
+      this.#assertHead();
+      const state = decodeCoordinatorSigningState(Buffer.from(JSON.stringify(this.#service.signing ?? JSON.parse(initialCoordinatorSigningState(key)))), key);
+      const r = state.records.find(v => v.request.requestId === intent.signingRequestId);
+      if (r && r.request.intentDigest !== nativeSigningIntentDigest(intent)) throw new Error("LocalLedgerSigningIntentChanged");
+      return structuredClone(r ?? null);
+    };
+    const append = record => {
+      if (!this.#signingBusy || this.status().state !== "OPEN_LOCAL_ACCOUNTING_ONLY") throw new Error("LocalLedgerSigningPaused");
+      this.#record(SERVICE, Buffer.from(JSON.stringify({ action: "SIGNING", key, record })));
+    };
+    return Object.freeze({ lookup, retainedResult: intent => {
+      const r = lookup(intent); if (r?.state !== "SIGNED") throw new Error("LocalLedgerSignatureUnavailable"); return r.result;
+    }, prepare: intent => {
+      const old = lookup(intent);
+      if (old && old.state !== "ABORTED") throw new Error("LocalLedgerSigningRecoveryRequired");
+      const request = createNativeFrostSigningRequest(intent, { attempt: old ? old.request.attempt + 1 : 1 });
+      append({ request, state: "PREPARED", abortReceipts: null, result: null }); return request;
+    }, markAborted: (request, abortReceipts) => append({ request, state: "ABORTED", abortReceipts, result: null }),
+    markSigned: (request, result) => append({ request, state: "SIGNED", abortReceipts: null, result }),
+    runExclusive: async action => {
+      if (this.#signingBusy) throw new Error("LocalLedgerSigningBusy"); this.#signingBusy = true;
+      try { return await action(); } finally { this.#signingBusy = false; }
+    } });
+  }
+  depositCredit(id) { this.#assertHead(); return structuredClone(this.#credits.get(id)); }
+  pause(reason = "KINGPEPE_TEAM_REVIEW") { this.#record(SERVICE, Buffer.from(JSON.stringify({ action: "PAUSE", reason }))); }
+  // Deliberate administrative call, never invoked by the polling/retry loop.
+  // Integrity HARD_STOP remains sticky and cannot be cleared by this method.
+  resumeAfterReview() {
+    this.#assertHead();
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    for (const { operation } of this.#service.deposits.values()) if (operation.finalizedCredit && !operation.mintReceipt &&
+      decodeCanonicalBridgeMessage(operation.finalizedCredit.encodedMessageHex).validUntil < now) throw new Error("LocalLedgerExpiredCreditPending");
+    this.#record(SERVICE, Buffer.from(JSON.stringify({ action: "RESUME", reason: "KINGPEPE_TEAM_REVIEWED" })));
+  }
+  solanaServiceJournal(stage) {
+    if (!["RECEIPT", "CLAIM"].includes(stage)) throw new Error("LocalLedgerServiceStageRejected");
+    const get = id => { this.#assertHead(); return restoreDelivery(this.#service.deliveries.get(stage + ":" + id)); };
+    const append = (method, args) => {
+      const id = method === "persistPrepared" ? args[0]?.operationIdHex : args[0];
+      this.#record(SERVICE, Buffer.from(JSON.stringify({ action: "DELIVERY", stage, method, args, operationId: id })));
+      return get(id).get(id)?.prepared;
+    };
+    return Object.freeze({ get: id => get(id).get(id), completed: id => get(id).completed(id),
+      replaceExpired: (prepared, expiry) => this.#record(SERVICE, Buffer.from(JSON.stringify({ action: "DELIVERY_REBUILD", stage, prepared, expiry }))),
+      persistPrepared: (...args) => append("persistPrepared", args), recordSubmitted: (...args) => append("recordSubmitted", args),
+      recordCompleted: (...args) => append("recordCompleted", args), recordTerminal: (...args) => append("recordTerminal", args) });
+  }
   enqueueConfirmedWithdrawal(observation) {
     requireFinalizedWithdrawal(observation);
     this.#record(REQUEST, Buffer.from(JSON.stringify({ signature: observation.signature, encodedMessageHex: observation.encodedMessageHex })));
@@ -165,6 +251,7 @@ export class AuthenticatedLocalDepositLedger {
     this.#record(RESERVE, Buffer.from(JSON.stringify({ depositOperationId, txid: b.sweep.txid, vout: b.sweep.vout,
       amountAtomic: b.amountAtomic, scriptPubKeyHex: b.reserveScriptHex, depositOutpoint: `${b.deposit.txid}:${b.deposit.vout}`, basis: b })));
   }
+  hasCanonicalDepositReserve(id) { this.#assertHead(); return [...this.#reserves.values()].some(r => r.depositOperationId === id); }
   reserveWithdrawal(plan, observation) {
     requireFinalizedWithdrawal(observation);
     if (observation.encodedMessageHex !== plan.encodedMessageHex || observation.signature !== plan.solanaSignature ||
@@ -255,7 +342,7 @@ export class AuthenticatedLocalDepositLedger {
   }
   snapshot() { this.#assertHead(); return this.#ledger.snapshot(); }
   checkpoint() { this.#assertHead(); return Object.freeze({ sequence: this.#head.toString(), tagHex: this.#tag.toString("hex") }); }
-  status() { this.#assertHead(); return Object.freeze({ state: this.#stop ? "HARD_STOP" : "OPEN_LOCAL_ACCOUNTING_ONLY", reason: this.#stop }); }
+  status() { this.#assertHead(); return Object.freeze({ state: this.#stop ? "HARD_STOP" : this.#service.paused ? "PAUSED" : "OPEN_LOCAL_ACCOUNTING_ONLY", reason: this.#stop ?? this.#service.paused ?? undefined }); }
   pendingCredits({ offset = 0, limit = 100 } = {}) {
     this.#assertHead();
     if (!Number.isSafeInteger(offset) || offset < 0 || offset > MAX_EVENTS || !Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new Error("LocalLedgerPageRejected");
@@ -294,7 +381,8 @@ export class AuthenticatedLocalDepositLedger {
     this.#head = sequence;
     this.#tag = tag;
     if (kind === STOP) this.#stop = payload.toString("ascii");
-    else if (auxiliary) { this.#reserves = auxiliary.reserves; this.#withdrawals = auxiliary.withdrawals; this.#requests = auxiliary.requests; }
+    else if (auxiliary) { this.#reserves = auxiliary.reserves; this.#withdrawals = auxiliary.withdrawals; this.#requests = auxiliary.requests;
+      if (auxiliary.service) this.#service = auxiliary.service; }
     else this.#credits.set(credit.operationIdHex, credit);
   }
 
@@ -314,12 +402,22 @@ export class AuthenticatedLocalDepositLedger {
   }
 
   #applyOperation(kind, payload) {
-    if (payload.length > MAX_OPERATION_BYTES) throw new Error("LocalLedgerOperationSizeRejected");
+    if (payload.length > (kind === SERVICE ? MAX_SERVICE_EVENT_BYTES : MAX_OPERATION_BYTES)) throw new Error("LocalLedgerOperationSizeRejected");
     const text = payload.toString("utf8"), value = JSON.parse(text);
     if (JSON.stringify(value) !== text) throw new Error("LocalLedgerOperationEncodingRejected");
     const reserves = new Map(this.#reserves), withdrawals = new Map(this.#withdrawals), requests = new Map(this.#requests);
     const check = v => { if (!v) throw new Error("LocalLedgerWithdrawalTransitionRejected"); };
-    if (kind === REQUEST) {
+    if (kind === SERVICE) {
+      if (value.action === "REGISTER") {
+        // Reserve change is bridge backing even before the PAID append. A
+        // separate deposit must never consume it as its miner-fee funding.
+        const bridgeTransactions = new Set([...withdrawals.values()].map(r => parseNativeTransactionHex(r.plan.unsignedTransactionHex).txidHex));
+        for (const r of this.#service.deposits.values()) bridgeTransactions.add(parseNativeTransactionHex(r.operation.plan.unsignedTransactionHex).txidHex);
+        for (const i of value.plan.inputs) check(!reserves.has(`${i.txid}:${i.vout}`) && !bridgeTransactions.has(i.txid));
+      }
+      const projection = reduceServiceEvent(this.#service, value, this.#deployment);
+      return { reserves, withdrawals, requests, service: projection.state, unchanged: projection.unchanged };
+    } else if (kind === REQUEST) {
       check(Object.keys(value).sort().join() === "encodedMessageHex,signature" && typeof value.signature === "string" && /^[1-9A-HJ-NP-Za-km-z]{64,88}$/u.test(value.signature));
       check(typeof value.encodedMessageHex === "string" && /^[0-9a-f]{1028}$/u.test(value.encodedMessageHex));
       const bytes = Buffer.from(value.encodedMessageHex, "hex"), m = decodeCanonicalBridgeMessage(bytes);
@@ -405,11 +503,11 @@ export class AuthenticatedLocalDepositLedger {
       minimumMatched = minimumSequence === 0n && timingSafeEqual(minimumTag, this.#tag);
     }
     for (const row of rows) {
-      if (this.#stop !== undefined || row.seq !== this.#head + 1n || row.kind < 1n || row.kind > 6n ||
-          !(row.payload instanceof Uint8Array) || row.payload.length > (row.kind < 4n ? CREDIT_LENGTH + 8 : MAX_OPERATION_BYTES)) throw new Error("LocalLedgerSequenceRejected");
+      if (this.#stop !== undefined || row.seq !== this.#head + 1n || row.kind < 1n || row.kind > 7n ||
+          !(row.payload instanceof Uint8Array) || row.payload.length > (row.kind === 7n ? MAX_SERVICE_EVENT_BYTES : row.kind < 4n ? CREDIT_LENGTH + 8 : MAX_OPERATION_BYTES)) throw new Error("LocalLedgerSequenceRejected");
       if (!equalTag(row.previous, this.#tag)) throw new Error("LocalLedgerAuthenticationFailed");
       const payload = Buffer.from(row.payload);
-      const kind = Number(row.kind); // Six bounded enum values, never an amount.
+      const kind = Number(row.kind); // Seven bounded enum values, never an amount.
       const tag = this.#authenticate(row.seq, kind, payload, this.#tag);
       if (!equalTag(row.tag, tag)) throw new Error("LocalLedgerAuthenticationFailed");
       const before = JSON.stringify(this.#ledger.snapshot());
@@ -419,7 +517,8 @@ export class AuthenticatedLocalDepositLedger {
       this.#head = row.seq;
       this.#tag = tag;
       if (kind === STOP) this.#stop = payload.toString("ascii");
-      else if (auxiliary) { this.#reserves = auxiliary.reserves; this.#withdrawals = auxiliary.withdrawals; this.#requests = auxiliary.requests; }
+      else if (auxiliary) { this.#reserves = auxiliary.reserves; this.#withdrawals = auxiliary.withdrawals; this.#requests = auxiliary.requests;
+        if (auxiliary.service) this.#service = auxiliary.service; }
       else this.#credits.set(credit.operationIdHex, credit);
       if (minimumSequence === this.#head && timingSafeEqual(minimumTag, tag)) minimumMatched = true;
     }

@@ -5,8 +5,34 @@
   "mainnetActivation": "DISABLED",
   "productionSigningAuthorized": false,
   "productionBroadcastAuthorized": false,
+  "recoveryProcedure": "NOT_TESTED",
   "lastUpdated": "2026-09-12",
-  "sourceStatus": "FINAL_SIMPLIFICATION_CORE_VALIDATED_LOCALLY",
+  "sourceStatus": "PHASE_10_SERVICE_VALIDATED_LOCALLY_RECOVERY_PENDING",
+  "phase10": {
+    "status": "SERVICE_PASS_LOCALLY_RECOVERY_PENDING",
+    "sourceBaseSha": "5926bb1f56e7b7d708a60469af8e51282fe6274f",
+    "scope": "Phase-10 working tree; exact-SHA certification requires the matching GitHub Actions run",
+    "oneServiceLoop": true,
+    "existingJournalReused": true,
+    "newDatabases": 0,
+    "nodeWindows": { "pass": 978, "fail": 0, "skip": 0 },
+    "nodeWsl": { "pass": 978, "fail": 0, "skip": 0 },
+    "canonicalVectorsPerPlatform": 2,
+    "rust": 94,
+    "sbf": "PASS_MATCHES_EXISTING_REPRODUCIBLE_HASHES",
+    "realServiceChecks": { "pass": 22, "fail": 0 },
+    "nativeToSolana": "COMPLETED",
+    "solanaToNative": "COMPLETED",
+    "noPerTransferKingPepeTeamApproval": true,
+    "finalCoreChainRegression": "PASS_LOCALLY",
+    "realChainChecks": { "deposit": 55, "withdrawalRecord": 29, "subsequentDepositAccounting": 5, "roundTrip": 25, "service": 22, "fail": 0 },
+    "guardrails": "PASS",
+    "sourceProvenance": "PASS",
+    "secretScan": "PASS_WORKTREE_AND_HISTORY",
+    "npmAuditVulnerabilities": 0,
+    "creditExpiry": "PAUSE_WITH_LIABILITY_RETAINED_NO_AUTOMATIC_RENEWAL",
+    "recoveryRequirement": "RUNBOOK_DOCUMENTED_SCHEDULE_UNCONFIGURED_RESTORE_NOT_TESTED"
+  },
   "repository": {
     "visibility": "PUBLIC",
     "reviewBaseSha": "ab15b2f38084f024e49d8fae9a13182dfe85721d"
@@ -114,7 +140,13 @@
     "deployment": "NOT_DEPLOYED",
     "devnet": "NOT_RUN",
     "externalReview": "NOT_RUN",
-    "activationApproval": false
+    "activationApproval": false,
+    "backupSchedule": "NOT_CONFIGURED_TEAM_INTERVAL_AND_OFFLINE_DESTINATION_REQUIRED",
+    "recoveryRunbook": "docs/security/deposit-operation-recovery.md",
+    "snapshotRestoreDrillBeforeDevnet": "NOT_TESTED_REQUIRED_BEFORE_PHASE_15",
+    "devnetRecoveryDrill": "NOT_TESTED_REQUIRED_IN_PHASE_17",
+    "signerSeparation": "TWO_DISTINCT_HOSTS_ACCOUNTS_NETWORK_PATHS_REQUIRED_PHASE_13_NOT_VERIFIED",
+    "upgradeAuthorityDecision": "UNDECIDED_TEAM_DECISION_REQUIRED_BEFORE_PHASE_18_REVIEW"
   },
   "limitations": [
     "Single-host compromise/availability affects both FROST participants",
@@ -126,7 +158,8 @@
     "Cargo reports bincode 1.3.3 unmaintained: RUSTSEC-2025-0141"
   ],
   "ci": {
-    "status": "CLEANUP_COMMIT_NOT_YET_CREATED"
+    "status": "VERIFY_MATCHING_GITHUB_ACTIONS_RUN",
+    "scope": "Local results do not substitute for the workflow run at this exact commit"
   },
-  "next": "STOP_AFTER_CLEANUP_VALIDATION_AND_REPORT"
+  "next": "PHASE_11_BORSH_AFTER_PHASE_10_REPORT_NO_DEVNET_BEFORE_MIGRATION"
 }

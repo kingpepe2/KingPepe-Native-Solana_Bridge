@@ -25,9 +25,44 @@
   },
   "trackedFiles": [
     {
+      "path": "services/bridge-validator/service-journal-state.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original Phase-10 deposit and policy-pause projection in the existing authenticated SQLite journal, reusing KingPepe deposit validators and claim delivery rules; no imported source or new database.",
+      "purpose": "CORE_BRIDGE",
+      "reviewDisposition": "KEEP_CORE"
+    },
+    {
+      "path": "services/bridge-validator/native-deposit-observer.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original registered-intent Native observer composing the existing raw verifier, transaction serializer and reserve-sweep signing-intent builder. No copied third-party source.",
+      "purpose": "CORE_BRIDGE",
+      "reviewDisposition": "KEEP_CORE"
+    },
+    {
+      "path": "services/bridge-validator/automatic-native-deposit.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original thin local deposit worker reusing Native FROST, raw reserve validation, project attestations and finalized Solana claim delivery with durable restart state.",
+      "purpose": "CORE_BRIDGE",
+      "reviewDisposition": "KEEP_CORE"
+    },
+    {
+      "path": "services/bridge-validator/tests/service-journal.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original Phase-10 journal restart, duplicate operation, exact signed sweep and policy pause regressions. Synthetic chain fixtures are not claimed as real-chain evidence.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "solana/tests/local-bridge-service.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original real REGTEST/local-validator combined-service harness with actual FROST sweep/payout, mint/burn, separate process restarts, dropped broadcast responses and reconciliation. Disposable test material stays outside source.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
       "path": "services/relayer/withdrawal-service.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original small local withdrawal service loop and read-only status over the existing authenticated operation journal and concrete chain-verifying worker; no new secret store or database.",
+      "notes": "Original single local bridge loop and read-only status over the existing authenticated operation journal and concrete deposit/withdrawal workers; compatibility withdrawal-only API retained; no new secret store or database.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },

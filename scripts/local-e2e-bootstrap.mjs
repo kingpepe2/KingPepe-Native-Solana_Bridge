@@ -25,7 +25,10 @@ export const LOCAL_E2E_FLOW_FAILED = "LOCAL_E2E_FLOW_FAILED";
 
 const MAXIMUM_CAPTURE_BYTES = 16 * 1024;
 const DEFAULT_COMMAND_TIMEOUT_MS = 20_000;
-const DEFAULT_HEALTH_ATTEMPTS = 12;
+// Fresh Native databases on a Windows-mounted WSL volume can need more than three
+// seconds. Keep readiness bounded, but do not mistake database initialization
+// for an economic-flow failure. Every attempt still requires a real RPC reply.
+const DEFAULT_HEALTH_ATTEMPTS = 120;
 const DEFAULT_HEALTH_DELAY_MS = 250;
 
 export async function runLocalE2eBootstrap(options = {}) {

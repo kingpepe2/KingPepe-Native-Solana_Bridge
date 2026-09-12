@@ -5,6 +5,25 @@ Production readiness, signing and broadcasting remain false; Mainnet is disabled
 
 ## Current bridge
 
+Phase 10 composes both retained workers in `LocalBridgeService`, with one
+authenticated SQLite operation journal. Registered public Native deposit intents
+are observed and validated automatically; finalized Solana withdrawal records
+are discovered without client resubmission. The loop catches up landed effects
+and reconciles before new authorization, rotates bounded queues, retains exact
+signed packets/results, and reports ACTIVE/PAUSED status. No new database,
+service tier, verifier or payment-signing algorithm was introduced.
+
+Policy pause and explicit reviewed resume survive restart. Paused catch-up may
+record a burn, finalized reserve, mint or payout which already happened; it never
+signs or sends. Expired transaction packets can be renewed for the same credit
+after live expiry/account/history checks. Expired canonical CREDIT authorization
+is different: the liability stays owed, the bridge pauses, and ordinary resume
+cannot clear it. Automatic credit renewal/refund is not implemented.
+
+The API and shutdown/restart procedure are described in
+`services/bridge-validator/README.md`. User wallets still sign their own actions;
+there is no per-transfer KingPepe Team approval.
+
 Native deposits pass independent raw-evidence and finality checks, exact A+B
 FROST reserve sweep, attestation, finalized Solana claim/mint and reconciliation.
 Finalized BurnChecked withdrawal records drive exact Native payout planning,
@@ -36,7 +55,55 @@ The separately reviewed coordinator correction is
 sweep and withdrawal purposes, preserves exact intent binding and reuses a retained
 aggregate after restart. Worker errors expose fixed public classes, not secrets.
 
-## Executed local validation
+## Phase 10 validation
+
+Source base: 5926bb1f56e7b7d708a60469af8e51282fe6274f. Local results describe the
+Phase-10 working tree, not certification of its parent SHA. Exact publication
+certification is the GitHub Actions run whose head SHA matches the final commit.
+
+- Windows and WSL Node: 978 PASS each, zero failures/skips; two vectors each.
+- Rust: 94 PASS; locked checks, formatting and Clippy in all four workspaces.
+- Both SBF programs build; their hashes match the preceding release evidence.
+- Combined service: 22 real-chain checks PASS, both directions COMPLETED.
+  Includes abrupt process exits after nonce commitment and aggregate persistence,
+  lost Native/Solana responses, real blockhash expiry, no duplicate mint/payout,
+  pause/resume, and catch-up after mint/burn/payout settlement while paused.
+  An interrupted credit/reserve append plus a real RPC outage waits without a
+  false deficit; restored observation completes the exact retained accounting.
+- Retained chain regression: deposit 55, withdrawal-record 29 plus subsequent
+  deposit accounting five, and round-trip 25 PASS. The startup wait now accommodates
+  fresh database initialization without skipping health verification. The payout
+  restart check verifies chain/journal state during preflight settlement WAIT.
+- Exact-SHA CI must be read from the matching GitHub Actions run; no older run
+  or dirty working-tree result certifies the publication commit.
+- Guardrails/provenance: PASS. Gitleaks full history and working tree: no leaks.
+- npm audit: zero vulnerabilities. Locked dependency/license gates: PASS;
+  the existing bincode maintenance warning remains visible.
+
+No production or Phase 11 implementation is included in this Phase-10 change set.
+The updated next step is Phase 11 canonical Borsh migration, not SDK/UI work.
+Devnet deployment must wait for that migration and fresh-clone validation;
+the current wire format is not being represented as the future Devnet format.
+Phase 11 must also remove obsolete bincode paths and the dependency, rather
+than suppress RUSTSEC-2025-0141. No such migration is claimed in Phase 10.
+
+The corrected roadmap adds the minimal scheduled-backup/manual-restore procedure
+in `docs/security/deposit-operation-recovery.md`. `recoveryProcedure` is
+NOT_TESTED; no archive, schedule installation or host-loss drill is claimed.
+The fixed interval and offline/cold destination require local KingPepe Team
+configuration. Test the runbook before Phase 15 and repeat it during the
+Phase-17 Devnet soak. A stale snapshot is not permission to reuse nonce state.
+The service implementation is locally validated; the corrected Phase-10 recovery
+requirement is still pending, not silently included in a blanket phase PASS.
+
+Phase 13 now requires genuinely distinct production signer hosts, accounts and
+network paths. Current tests still use one host and do not certify that future
+deployment. Phase 18 requires a recorded KingPepe Team upgrade-authority decision
+(multisig, single-key with timelock, or explicitly justified single-key without
+timelock). No choice or deployment is made here. These conditions and full-host
+rollback limits remain visible in readiness; none was removed or marked resolved.
+
+## Prior baseline validation
 
 These results cover the combined reviewed working tree based on the baseline
 above, not an exact-SHA clean clone or certification of its parent commit.
@@ -60,7 +127,7 @@ Historical Phase 09 evidence remains bound to
 ## Limits
 
 This remains LOCALNET/REGTEST software, not production Windows service integration
-or deployment approval. No new phase, Devnet or Mainnet work is authorized here.
+or deployment approval. Phase 11, Devnet and Mainnet have not started here.
 Common-host compromise/availability, unaudited Noble FROST, CurrentUser-only Windows
 coverage, no full-host rollback guarantee, configured RPC/attester trust and upgrade
 authority remain explicit limitations. Cargo reports the unsuppressed bincode

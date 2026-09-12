@@ -15,6 +15,7 @@ import { deserializeFrostPublic } from "../signer/native-frost-signer.mjs";
 import { isProtectedRemoteFrostPeer } from "../signer/protected-service.mjs";
 import { requireIntegrityGuard } from "../../../services/supervisor/protected-integrity.mjs";
 import { requireCoordinatorSigningJournal } from "./protected-signing-journal.mjs";
+import { AuthenticatedLocalDepositLedger } from "../../../services/bridge-validator/local-deposit-ledger.mjs";
 
 export { createTwoPartyDkgRequest } from "../policy/dkg-request.mjs";
 
@@ -63,6 +64,7 @@ export class NativeFrostCoordinator {
   #coordinating = false;
   #integrity;
   #signingJournal;
+  #localJournal;
 
   constructor(options) {
     this.#integrity = options.integrity;
@@ -76,6 +78,16 @@ export class NativeFrostCoordinator {
     return REQUIRED_FROST_SIGNERS.map((signerId) => ({ signerId, online: this.#signers.get(signerId)?.isAvailable() === true }));
   }
 
+  useLocalOperationJournal(ledger) {
+    this.#requireReady();
+    if (!(ledger instanceof AuthenticatedLocalDepositLedger)) throw new Error("FrostLocalOperationJournalRequired");
+    // Protected IPC peers keep their existing protected journal. The plain
+    // localnet path retains public attempts in the service's existing SQLite.
+    if ([...this.#signers.values()].some(isProtectedRemoteFrostPeer)) return;
+    this.#localJournal = ledger.nativeSigningJournal({ publicPackage: this.#publicPackage,
+      aggregateTweakedXOnlyPublicKey: this.#aggregateTweakedXOnlyPublicKey });
+  }
+
   async signAutomaticallyWithNativeEvidence(intent) {
     this.#requireReady();
     const remote = [...this.#signers.values()].map(isProtectedRemoteFrostPeer);
@@ -86,12 +98,47 @@ export class NativeFrostCoordinator {
       return this.signAutomaticallyOverIpc(intent);
     }
     const snapshot = validateNativeSigningIntent(intent);
+    if (this.#localJournal) return this.#signLocallyWithJournal(snapshot);
     // Verification executes in each participant's configured boundary; a
     // coordinator assertion cannot populate either participant's private fence.
     for (const signerId of REQUIRED_FROST_SIGNERS) {
       await this.#signers.get(signerId).verifyNativeEvidence(structuredClone(snapshot));
     }
     return this.signAutomatically(snapshot);
+  }
+
+  async #signLocallyWithJournal(snapshot) {
+    const journal = this.#localJournal, signers = REQUIRED_FROST_SIGNERS.map(id => this.#signers.get(id));
+    this.#coordinating = true;
+    try { return await journal.runExclusive(async () => {
+      const abort = async request => {
+        const receipts = [];
+        for (const signer of signers) {
+          try { receipts.push(validateNativeFrostAbortReceipt(await signer.abortSigningSession(request), request, signer.signerId)); }
+          catch { receipts.push(null); }
+        }
+        if (receipts.some(r => r === null)) throw new Error("FrostCoordinatorAbortIncomplete");
+        journal.markAborted(request, receipts);
+      };
+      let request;
+      try {
+        const retained = journal.lookup(snapshot);
+        if (retained?.state === "SIGNED") return journal.retainedResult(snapshot);
+        if (retained?.state === "PREPARED") await abort(retained.request);
+        for (const signer of signers) await signer.verifyNativeEvidence(structuredClone(snapshot));
+        request = journal.prepare(snapshot); // Persist before either nonce is reserved.
+        const commitments = [];
+        for (const signer of signers) commitments.push(await signer.signingCommitment(request));
+        validateCommitmentEnvelopes(request, commitments);
+        const shares = [];
+        for (const signer of signers) shares.push(await signer.signatureShare(request, commitments));
+        const result = this.#aggregate(request, commitments, shares);
+        journal.markSigned(request, result); return journal.retainedResult(snapshot);
+      } catch (error) {
+        if (request && journal.lookup(snapshot)?.state === "PREPARED") await abort(request);
+        throw error;
+      }
+    }); } finally { this.#coordinating = false; }
   }
 
   async signAutomaticallyOverIpc(intent, options = {}) {

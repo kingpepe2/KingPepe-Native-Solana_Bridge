@@ -57,7 +57,7 @@ export function decodeCoordinatorSigningState(bytes, key) {
     fields(r, ["request", "state", "abortReceipts", "result"]);
     const request = validateNativeFrostSigningRequest(r.request);
     check(!ids.has(request.requestId)); ids.add(request.requestId);
-    const input = request.intent.operationId + ":" + request.intent.signingInputIndex;
+    const input = request.intent.purpose + ":" + request.intent.operationId + ":" + request.intent.signingInputIndex;
     check(!inputs.has(input)); inputs.add(input);
     check(["PREPARED", "ABORTED", "SIGNED"].includes(r.state));
     if (r.state === "ABORTED") {
@@ -140,7 +140,7 @@ export class ProtectedCoordinatorSigningJournal {
   }
   #record(value, intent) {
     const snapshot = this.#intent(intent), record = value.records.find(r => r.request.requestId === snapshot.signingRequestId);
-    const reused = value.records.find(r => r.request.intent.operationId === snapshot.operationId && r.request.intent.signingInputIndex === snapshot.signingInputIndex);
+    const reused = value.records.find(r => r.request.intent.purpose === snapshot.purpose && r.request.intent.operationId === snapshot.operationId && r.request.intent.signingInputIndex === snapshot.signingInputIndex);
     check(!reused || reused === record, "CoordinatorJournalInputAlreadyBound");
     if (record) check(record.request.intentDigest === nativeSigningIntentDigest(snapshot), "CoordinatorJournalRequestChanged");
     return record;

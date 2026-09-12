@@ -16,6 +16,7 @@ import { base58Encode } from "../../services/bridge-validator/solana-deposit-cla
 import { SPL_TOKEN_PROGRAM_ID_BASE58 as TOKEN, SYSTEM_PROGRAM_ID_BASE58 as SYSTEM } from "../../services/bridge-validator/localnet-solana-setup-plan.mjs";
 import { decodeCanonicalBridgeMessage, encodeCanonicalBridgeMessage } from "../../shared/protocol/canonical-message.mjs";
 import { NativeRpcClient } from "../../native/node/native-rpc-client.mjs";
+import { parseNativeTransactionHex } from "../../native/node/native-taproot-transaction.mjs";
 import { LocalDeploymentRpc } from "../../services/solana-observer/deployment-integrity.mjs";
 import { FinalizedWithdrawalReader } from "../../services/solana-observer/finalized-withdrawal.mjs";
 import { AutomaticSolanaToNativeWithdrawal, verifyWithdrawalSigning } from "../../services/bridge-validator/automatic-withdrawal.mjs";
@@ -44,6 +45,23 @@ async function resumeInChild(file) {
     const service = new LocalWithdrawalService({ ledger, worker });
     const stop = new AbortController(); let tick;
     await service.run({ signal: stop.signal, intervalMs: 250, onStatus: value => { tick = value; stop.abort(); } });
+    if (tick.state === "WAITING_FOR_DEPENDENCY") {
+      // Phase 10 reconciles BEFORE admitting work. An already broadcast spend
+      // can legitimately wait there until finality instead of returning a
+      // work-item result. Verify the actual retained/chain state, not just WAIT.
+      assert.equal(tick.reconciliation?.reason, "NATIVE_SETTLEMENT_PENDING");
+      assert.equal(tick.operations.length, 0);
+      const requests = service.status().withdrawals; assert.equal(requests.length, 1);
+      const record = ledger.withdrawal(requests[0].operationId); assert.equal(record.state, "BROADCAST");
+      assert.equal(record.attempts, 1); validateSignedWithdrawal(record.plan, record.signedTransactionHex);
+      const txid = parseNativeTransactionHex(record.signedTransactionHex).txidHex;
+      assert.equal(await nativeRpc.getRawTransaction(txid, false), record.signedTransactionHex);
+      const transaction = await nativeRpc.getRawTransaction(txid, true);
+      assert(transaction.confirmations === undefined || transaction.confirmations < config.depositFinalityBlocks);
+      assert.equal(service.status().accounting.pendingWithdrawalAtomic, "20000000");
+      console.log(JSON.stringify({ state: "BROADCAST", accounting: service.status().accounting }));
+      return;
+    }
     assert.equal(tick.operations.length, 1);
     const result = tick.operations[0];
     console.log(JSON.stringify({ state: result.state, accounting: result.accounting }));
@@ -221,7 +239,8 @@ export async function runLocalWithdrawalE2e(repoRoot, onCheck = () => {}) {
   });
   if (result.state !== "LOCAL_E2E_BOOTSTRAP_READY" || !report?.checks) {
     // Bootstrap reports callback failures without exposing private command output.
-    throw new Error("LOCAL_WITHDRAWAL_E2E_FAILED", { cause: failure ?? { stage, code: "INFRASTRUCTURE_NOT_COMPLETED" } });
+    throw new Error("LOCAL_WITHDRAWAL_E2E_FAILED", { cause: failure ?? { stage, code: "INFRASTRUCTURE_NOT_COMPLETED",
+      infrastructureState: result.state, reason: result.reason, failedStep: result.failedStep } });
   }
   return report;
 }

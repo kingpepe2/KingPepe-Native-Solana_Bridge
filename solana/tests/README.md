@@ -10,6 +10,9 @@ Run with the pinned tools and a fresh external test root as specified in
 `docs/deployment/local-e2e-build.md`. No runtime state, keys or logs belong here.
 CI requires the real checks to pass and uploads no runtime directory.
 
-This does not establish full service restart, post-mint deep-reorg handling,
-Solana-to-Native E2E, production observation or activation readiness.
+`local-withdrawal-e2e.mjs` covers the retained bidirectional bridge. The combined
+`local-bridge-service.mjs` exercises automatic observation/settlement through the
+service loop, real process exits, response loss, blockhash expiry and pause/resume.
+Neither harness certifies production services, power-loss recovery, full-host
+rollback resistance or activation readiness.
 Exact current test counts and source-bound evidence are in the status files.

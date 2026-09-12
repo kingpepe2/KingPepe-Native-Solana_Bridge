@@ -55,4 +55,7 @@ Current executed evidence belongs in [development status](../development-status.
 Restart tests do not prove sudden-power-loss durability, memory-snapshot safety,
 or detection of a complete restored host snapshot. Same-account or privileged
 host compromise can affect both participants; one host outage can stop both.
-No second physical signing machine is required by the approved topology.
+These results describe the current single-host local test topology. The corrected
+roadmap requires production A/B on genuinely separate hosts, accounts and network
+paths, documented at Phase 13 and verified at Phase 19. That deployment is not
+implemented or certified by these local tests. Exact 2-of-2 remains unchanged.
