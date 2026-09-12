@@ -78,6 +78,13 @@ export class NativeFrostCoordinator {
 
   async signAutomaticallyWithNativeEvidence(intent) {
     this.#requireReady();
+    const remote = [...this.#signers.values()].map(isProtectedRemoteFrostPeer);
+    if (remote.some(Boolean)) {
+      if (!remote.every(Boolean)) throw new Error("FrostMixedTransportRejected");
+      // The same bridge API supports authenticated peers. A transport failure
+      // must never fall through to local signing or discard its durable journal.
+      return this.signAutomaticallyOverIpc(intent);
+    }
     const snapshot = validateNativeSigningIntent(intent);
     // Verification executes in each participant's configured boundary; a
     // coordinator assertion cannot populate either participant's private fence.

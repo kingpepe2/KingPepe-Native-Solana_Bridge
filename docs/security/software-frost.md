@@ -45,6 +45,12 @@ and [authenticated TLS](service-ipc.md). The explicit Linux local-chain fixture
 uses external disposable JSON test shares; it is not a plaintext fallback for
 the protected runtime or approval to use that adapter with production secrets.
 
+The bridge's `signAutomaticallyWithNativeEvidence` entry point selects the
+existing authenticated path when both peers are protected remote signers. It
+rejects a mixture of remote and in-process participants. Authentication or
+transport failure never falls back to local signing; the protected path retains
+its journal, nonce and pause checks.
+
 Current executed evidence belongs in [development status](../development-status.md).
 Restart tests do not prove sudden-power-loss durability, memory-snapshot safety,
 or detection of a complete restored host snapshot. Same-account or privileged
