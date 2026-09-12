@@ -27,6 +27,32 @@ export class FinalizedWithdrawalReader {
     check(this.#manifest.environment === "localnet" && this.#manifest.nativeGenesisHex === REGTEST_GENESIS && this.#manifest.mint.decimals === 8);
     this.#rpc = rpc;
   }
+  async discover(knownOperationIds, limit = 16) {
+    check(Array.isArray(knownOperationIds) && knownOperationIds.length <= 8192 && knownOperationIds.every(id => /^[0-9a-f]{64}$/u.test(id)) &&
+      Number.isInteger(limit) && limit >= 1 && limit <= 100, "WithdrawalDiscoveryRequestRejected");
+    const m = this.#manifest, known = new Set(knownOperationIds), found = [];
+    verifyDeploymentSnapshot(m, await this.#rpc.snapshot(m));
+    // Records remain on chain. Re-scan the bounded local deployment rather
+    // than introduce another database/cursor that could lose an owed request.
+    for (const account of await this.#rpc.withdrawalRecordAccounts(m)) {
+      const id = account.data.subarray(41, 73).toString("hex"), withdrawalId = account.data.subarray(9, 41).toString("hex");
+      check(account.address === base58Encode(Buffer.from(deriveWithdrawalRecordPdaHex(hex(base58Decode(m.manager.id)), withdrawalId), "hex")), "WithdrawalDiscoveryPdaMismatch");
+      if (known.has(id)) continue;
+      let receipt;
+      for (const signature of await this.#rpc.finalizedSignatures(account.address)) {
+        try { receipt = await this.read(signature); }
+        catch (error) {
+          if (["WithdrawalManagerInstructionRequired", "WithdrawalInstructionMalformed"].includes(error.message)) continue;
+          throw error;
+        }
+        check(receipt.operationId === id && receipt.record === account.address, "WithdrawalDiscoveryRecordMismatch");
+        break;
+      }
+      check(receipt, "WithdrawalDiscoveryHistoryIncomplete"); found.push(receipt);
+      if (found.length === limit) break;
+    }
+    return found;
+  }
   async read(signature, expectedMessageHex) {
     const m = this.#manifest;
     check(!m.config.withdrawalsPaused && m.config.transceiverActive, "WithdrawalBridgePaused");

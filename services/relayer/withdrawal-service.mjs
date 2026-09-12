@@ -12,6 +12,7 @@ export class LocalWithdrawalService {
     worker.assertLedger(ledger); this.#ledger = ledger; this.#worker = worker;
   }
   submit(signature) { return this.#worker.enqueue(signature); }
+  observe() { return this.#worker.observe(); }
   status(page = {}) {
     return { state: this.#ledger.status().state === "HARD_STOP" ? "PAUSED" : "ACTIVE", trust: "LOCAL_JOURNAL_NOT_FRESH_CHAIN_RECONCILIATION",
       accounting: this.#ledger.bridgeSnapshot(), withdrawals: this.#ledger.withdrawalRequests(page) };
@@ -21,6 +22,7 @@ export class LocalWithdrawalService {
     if (this.#busy) throw new Error("WithdrawalServiceBusy"); this.#busy = true;
     try {
       if (this.status({ limit: 1 }).state === "PAUSED") return { state: "PAUSED", operations: [] };
+      try { await this.observe(); } catch { return { state: this.status({ limit: 1 }).state === "PAUSED" ? "PAUSED" : "WAITING_FOR_DEPENDENCY", operations: [] }; }
       const operations = [];
       for (const request of this.#ledger.withdrawalRequests({ limit, pendingOnly: true })) {
         try { operations.push(await this.#worker.run(request.signature)); }

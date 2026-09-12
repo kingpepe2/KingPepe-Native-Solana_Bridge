@@ -84,17 +84,17 @@
   },
   "ci": {
     "status": "EXACT_SHA_FIX_VERIFICATION_IN_PROGRESS",
-    "sourceSha": "79e586424c852639d52b55251ac18198ef0c3abe",
-    "runId": 34692481377,
-    "priorRunId": 34691297712,
-    "priorSourceSha": "7f4bb7b3db3a61802b956aba8ee0f76d5e340772",
+    "sourceSha": "e9485ad0cd9a33d185cd45d590fbc2b946fc050c",
+    "runId": 34694101465,
+    "priorRunId": 34692481377,
+    "priorSourceSha": "79e586424c852639d52b55251ac18198ef0c3abe",
     "priorLinux": "PASS",
     "priorWindows": {
-      "pass": 137,
-      "fail": 1
+      "protectedStorage": "PASS_138",
+      "readiness": "FAIL_3_WINDOWS_PATH_ALIAS_ASSERTIONS"
     },
-    "correction": "PERSIST_MODIFIED_FIXTURE_SECURITY_DESCRIPTOR_AND_VERIFY",
-    "correctedLocalTests": 3
+    "correction": "COMPARE_INDEPENDENTLY_RESOLVED_PHYSICAL_PATHS",
+    "correctedLocalTestsPerPlatform": 72
   },
   "production": {
     "configuration": "NOT_CONFIGURED",
@@ -138,20 +138,21 @@
     },
     "exactShaFreshClone": "PASS"
   },
-  "phase10": "LOCAL_SERVICE_INCREMENT_TESTED_COMMIT_PENDING",
+  "phase10": "LOCAL_SERVICE_PUBLISHED_DISCOVERY_FOLLOWUP_TESTED",
   "phase10Validation": {
-    "baseSha": "79e586424c852639d52b55251ac18198ef0c3abe",
+    "baseSha": "d8ff95d06e0df6c5a54bc351a6b87dedbfb06ea9",
     "worktreeDirty": true,
     "windowsNode": 963,
     "wslNode": 963,
     "vectorsPerPlatform": 2,
     "coreChain": 55,
     "roundTrip": {
-      "pass": 24,
+      "pass": 25,
       "fail": 0,
       "nativeToSolana": "COMPLETED",
       "solanaToNative": "COMPLETED",
       "durableInbox": "PASS",
+      "automaticOnChainDiscovery": "PASS",
       "separateProcessServiceRestart": "PASS",
       "acceptedPayoutReorgPause": "PASS"
     },

@@ -140,7 +140,8 @@ export async function runLocalWithdrawalE2e(repoRoot, onCheck = () => {}) {
       const absent = new AutomaticSolanaToNativeWithdrawal({ ...options(), createCoordinator: () => new NativeFrostCoordinator({ signers: [], publicPackage: custody.publicPackage,
         aggregateTweakedXOnlyPublicKey: custody.aggregateTweakedXOnlyPublicKey }) });
       const service = new LocalWithdrawalService({ ledger, worker: absent });
-      await service.submit(sent.signature);
+      assert.equal((await service.observe()).added, 1);
+      pass("AUTOMATIC_ON_CHAIN_WITHDRAWAL_DISCOVERY_WITHOUT_CLIENT_SUBMISSION");
       const queued = ledger.checkpoint(); await service.submit(sent.signature);
       assert.deepEqual(ledger.checkpoint(), queued); assert.equal(ledger.withdrawal(message.operationIdHex), undefined);
       assert.equal(service.status().accounting.pendingWithdrawalAtomic, "20000000");

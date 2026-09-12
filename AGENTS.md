@@ -45,13 +45,20 @@ in both directions, including lost broadcast response and a separate-process
 restart. Exact-SHA fresh Windows/WSL clones passed Node 962 plus 2 vectors each,
 Windows CurrentUser security 138, Rust 94, two matching fresh SBF builds,
 55 deposit-chain checks and the 20-check round trip. Its CI Linux job passed;
-Windows failed one fixture. Corrective fixture commit 79e586424c852639d52b55251ac18198ef0c3abe is under CI verification.
+Windows failed one fixture. Correction 79e586424c852639d52b55251ac18198ef0c3abe passed all Windows protected-storage checks in CI.
+Three readiness assertions then exposed Windows short-path aliases; corrective
+commit e9485ad0cd9a33d185cd45d590fbc2b946fc050c passed 72 relevant tests on
+Windows and WSL and is under exact-SHA CI verification.
 
-Phase 10 work uses the same local journal for a bounded withdrawal inbox,
+Phase 10 commits efd8595ed1a23e49511ea958bd68ec13cf22b36d and
+d8ff95d06e0df6c5a54bc351a6b87dedbfb06ea9 use the same local journal for a bounded withdrawal inbox,
 service restart/status and accepted-chain reconciliation. No new database or
 automatic unpause. Retain actual pending liabilities and check legitimate payout
-spends before declaring a reserve deficit. Complete and publish this increment
-before adding the minimal CLI/UI. Production service integration and Devnet
+spends before declaring a reserve deficit. Automatic on-chain withdrawal
+discovery passed the 25-check local round trip, with 963 Node tests and two
+vectors on each platform. Missing creation history waits, not approval.
+Complete simple operational integration before adding the minimal CLI/UI.
+Production service integration and Devnet
 remain later work, not inferred from local test success.
 
 Status and source-bound evidence: docs/development-status.md and

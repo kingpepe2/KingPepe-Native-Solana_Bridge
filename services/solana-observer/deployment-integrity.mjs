@@ -152,6 +152,26 @@ export class LocalDeploymentRpc {
     check(typeof signature === "string" && signature.length <= 88 && base58Decode(signature).length === 64, "DeploymentTransactionSignatureRejected");
     return this.#call("getTransaction", [signature, { commitment: "finalized", encoding: "json", maxSupportedTransactionVersion: 0 }]);
   }
+  async withdrawalRecordAccounts(manifest) {
+    const m = validateDeploymentManifest(manifest);
+    const v = await this.#call("getProgramAccounts", [m.manager.id, { commitment: "finalized", encoding: "base64", withContext: true,
+      filters: [{ dataSize: 283 }, { memcmp: { offset: 0, bytes: base58Encode(Buffer.from("KPBWDR01")) } }] }]);
+    check(Number.isSafeInteger(v?.context?.slot) && BigInt(v.context.slot) >= uint(m.minimumSlot) && Array.isArray(v.value) && v.value.length <= 256, "WithdrawalDiscoveryUnavailable");
+    check(new Set(v.value.map(a => a?.pubkey)).size === v.value.length, "WithdrawalDiscoveryMalformed");
+    return v.value.map(v => {
+      key(v.pubkey); const bytes = accountData(v.account);
+      check(v.account.owner === m.manager.id && !v.account.executable && bytes.length === 283 && bytes.subarray(0, 8).toString() === "KPBWDR01" && bytes[8] === 1, "WithdrawalDiscoveryMalformed");
+      return { address: v.pubkey, data: bytes };
+    });
+  }
+  async finalizedSignatures(address) {
+    key(address);
+    const v = await this.#call("getSignaturesForAddress", [address, { commitment: "finalized", limit: 64 }]);
+    check(Array.isArray(v) && v.length <= 64, "WithdrawalDiscoveryUnavailable");
+    for (const r of v) check(typeof r?.signature === "string" && r.signature.length <= 88 && base58Decode(r.signature).length === 64 &&
+      Number.isSafeInteger(r.slot) && r.slot >= 0 && Object.hasOwn(r, "err"), "WithdrawalDiscoveryMalformed");
+    return v.filter(r => r.err === null).map(r => r.signature);
+  }
   async snapshot(manifest, minimumSlot = manifest.minimumSlot) {
     return this.snapshotWithAdditionalAccounts(manifest, [], minimumSlot);
   }

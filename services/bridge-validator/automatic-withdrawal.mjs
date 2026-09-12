@@ -55,6 +55,17 @@ export class AutomaticSolanaToNativeWithdrawal {
   }
   #active() { check(this.#ledger.status().state !== "HARD_STOP", "WithdrawalBridgePaused"); }
   assertLedger(ledger) { check(ledger === this.#ledger, "WithdrawalServiceLedgerMismatch"); }
+  async observe() {
+    this.#active();
+    try {
+      const receipts = await this.#reader.discover(this.#ledger.knownWithdrawalIds());
+      for (const receipt of receipts) { this.#active(); this.#ledger.enqueueConfirmedWithdrawal(receipt); }
+      return { state: "OBSERVED", added: receipts.length };
+    } catch (error) {
+      if (["SOLANA_DEPLOYMENT_CHANGED", "SOLANA_GENESIS_CHANGED", "FINALIZED_SOLANA_CONFLICT"].includes(error?.integrityCode) && this.#ledger.status().state !== "HARD_STOP") this.#ledger.hardStop("WITHDRAWAL_DEPLOYMENT_CHANGED");
+      throw error;
+    }
+  }
   async enqueue(signature) {
     const observation = await this.#reader.read(signature); this.#active();
     this.#ledger.enqueueConfirmedWithdrawal(observation);

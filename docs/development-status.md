@@ -94,13 +94,22 @@ the original accounting evidence. Reconciliation distinguishes a recorded
 pending payout from an unexplained canonical spend. Missing evidence waits;
 confirmed contradiction pauses. It never repairs balances or pays again.
 
-Working-tree round trip based on 79e586424c852639d52b55251ac18198ef0c3abe:
-24 real-chain checks PASS, both directions COMPLETED. Added durable-inbox
+Published service increments: efd8595ed1a23e49511ea958bd68ec13cf22b36d and
+d8ff95d06e0df6c5a54bc351a6b87dedbfb06ea9. Their working-tree validation passed
+24 real-chain checks, both directions COMPLETED. Added durable-inbox
 recovery, restart without client resubmission, an actual accepted-payout block
-reorg and pause-preserving service restart. Exact-SHA certification remains due
-until this increment is committed. Full Node regressions passed on Windows and
+reorg and pause-preserving service restart. Full Node regressions passed on Windows and
 WSL: 963 each, zero failures/skips, plus 2 vectors each. The retained real deposit
 suite passed all 55 checks again after reserve registration was integrated.
+
+The discovery follow-up, tested with worktreeDirty=true on base
+d8ff95d06e0df6c5a54bc351a6b87dedbfb06ea9, passed 25 real-chain checks and the
+same 963 Node tests plus two vectors per platform. It discovers finalized
+withdrawal PDAs and verifies each creation transaction without a client
+callback. The same durable journal suppresses duplicate operations; no new
+index database. Local bounds are 256 records, 64 signatures per record and 16
+new requests per scan. Missing creation history or malformed RPC evidence
+waits safely. General production history indexing remains incomplete.
 
 This remains LOCALNET/REGTEST software. Old disposable journals lacking accepted
 reserve/payout block facts fail closed; no silent migration or reset is offered.
@@ -124,9 +133,14 @@ history scanning and Foundation Guardrails. Windows executed 138 security tests:
 137 PASS, one interrupted-write fixture failure. The fixture's first ACL-copy
 attempt did not persist an unchanged .NET FileSecurity object. Correction
 79e586424c852639d52b55251ac18198ef0c3abe constructs a modified descriptor,
-persists it and checks the result. Three local candidate tests PASS; exact run
-34692481377 is executing. Runtime ACL enforcement is unchanged. No older run
-certifies newer source.
+persists it and checks the result. Exact run 34692481377 passed all Windows
+protected-storage checks, Linux real-chain checks, history and guardrails.
+Three Windows readiness tests then failed because TEMP used an 8.3 alias while
+the runtime correctly returned its expanded physical path. Correction
+e9485ad0cd9a33d185cd45d590fbc2b946fc050c compares independently resolved physical
+paths: 72 local tests PASS on Windows and WSL. Run 34694101465 is queued for
+that exact SHA. Runtime ACL/path enforcement is unchanged. No older run
+certifies newer source; complete exact-SHA CI is still pending.
 
 Phase 08 core: PASS_LOCALLY.
 Phase 09: IMPLEMENTED_AND_TESTED_LOCALLY; exact source is published.
