@@ -46,6 +46,15 @@ transaction identity and rooted slot; it is not a boolean settlement flag.
 This remains RPC_OBSERVATION. Signed transaction verification does not prove the
 RPC's execution metadata honest or replace deployment-integrity monitoring.
 
+The Native observation/broadcast client and local Solana submission client reject
+HTTP redirects; a local endpoint cannot silently forward the request elsewhere.
+The latter now binds each response ID, bounds requests to 64 KiB and streamed
+responses to 2 MiB, rejects malformed UTF-8/missing results/error codes, and
+aborts stalled headers or bodies after ten seconds. Arbitrary provider error
+fields are not used as diagnostics. Actual isolated HTTP failure regressions
+exercise these boundaries separately from actual-chain execution. These localnet
+limits do not establish RPC honesty or approve a production observation source.
+
 Reopen checks the complete authenticated image and policy. An uncertain write
 can be recovered only at the exact expected next revision with matching bytes.
 Detected rollback or authenticated journal corruption is reported through the

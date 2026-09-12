@@ -68,6 +68,7 @@ export class NativeRpcClient {
     try {
       const response = await this.#fetchFn(this.#endpoint, {
         method: "POST",
+        redirect: "error", // Never forward RPC credentials, observations or signed bytes to another endpoint.
         headers: {
           "content-type": "application/json",
           ...(this.#authHeader === undefined ? {} : { authorization: this.#authHeader }),
