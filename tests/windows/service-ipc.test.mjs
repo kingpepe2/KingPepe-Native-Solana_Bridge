@@ -1071,7 +1071,7 @@ test("actual protected A+B FROST signing through authenticated endpoints", async
   const coordinator = createCoordinator();
   await global.enableTestSources();
   let signed;
-  try { signed = await coordinator.signAutomaticallyOverIpc(intent); }
+  try { signed = await coordinator.signAutomaticallyWithNativeEvidence(intent); }
   catch { throw new Error("ProtectedFrostIpcFailure:" + f.map(v => v.server.lastRejection ?? "UNREPORTED").join(",") + ":" + handlerFaults.join(",")); }
   assert(schnorr.verify(Buffer.from(signed.signatureHex, "hex"), Buffer.from(intent.taprootSighashHex, "hex"), Buffer.from(dkg.aggregateTweakedXOnlyPublicKey, "hex")), "IpcFrostSignatureRejected");
   assert(verificationCounts.every(count => count >= 3), "FreshEvidenceRequiredAtEverySigningBoundary");
@@ -1079,7 +1079,9 @@ test("actual protected A+B FROST signing through authenticated endpoints", async
   await signingJournal.close();
   signingJournal = await ProtectedCoordinatorSigningJournal.open({ store: new WindowsProtectedStore(journalOptions), integrity: coordinatorGuard, ...dkg });
   const recoveredCoordinator = createCoordinator();
-  assert.deepEqual(await recoveredCoordinator.signAutomaticallyOverIpc(intent), signed, "ExactAggregateMustSurviveCoordinatorReopen");
+  assert.deepEqual(await recoveredCoordinator.signAutomaticallyWithNativeEvidence(intent), signed, "ExactAggregateMustSurviveCoordinatorReopen");
+  const mixed = new NativeFrostCoordinator({ signers: [peers[0], { signerId: "KINGPEPE_FROST_B" }], ...dkg });
+  await assert.rejects(mixed.signAutomaticallyWithNativeEvidence(intent), /FrostMixedTransportRejected/u);
   assert.deepEqual(verificationCounts, countsBefore, "RetainedResultMustNotCreateNewSigningContexts");
   await assert.rejects(recoveredCoordinator.signAutomaticallyOverIpc(intent, { attempt: 1 }), /ProtectedFrostAttemptManagedDurably/u);
   await assert.rejects(f[0].client.request(ports[0], { method: "verifyNativeEvidence", operationId: h("wrong-operation"), payload: intent }));
@@ -1090,7 +1092,7 @@ test("actual protected A+B FROST signing through authenticated endpoints", async
   await global.restart();
   await assert.rejects(f[0].client.request(ports[0], { method: "signingCommitment", operationId: intent.operationId, payload: { request: createNativeFrostSigningRequest(intent) } }));
   const restartedCoordinator = createCoordinator();
-  await assert.rejects(restartedCoordinator.signAutomaticallyOverIpc(intent));
+  await assert.rejects(restartedCoordinator.signAutomaticallyWithNativeEvidence(intent));
   assert.equal((await guards[1].guard.status(intent.operationId)).state, "HARD_STOP_INTEGRITY");
 });
 

@@ -115,3 +115,9 @@ accepted operation pauses the bridge. There is no automatic balance correction,
 refund, remint or second payout. The original accepted facts remain in the
 authenticated journal for manual review. Old local test journals without these
 facts are rejected rather than silently reinterpreted or reset.
+
+Windows callers can use `fromProtectedLocalKey` with an existing DPAPI
+`bridge-journal-key` bound to the bridge role, deployment and journal identity.
+It does not generate a missing key or accept a plaintext fallback. The adapter
+protects the MAC key; it does not claim that SQLite economic records are
+encrypted or that a full-host rollback is detectable. It remains localnet-only.

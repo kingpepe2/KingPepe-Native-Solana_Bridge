@@ -104,8 +104,12 @@ suite passed all 55 checks again after reserve registration was integrated.
 
 This remains LOCALNET/REGTEST software. Old disposable journals lacking accepted
 reserve/payout block facts fail closed; no silent migration or reset is offered.
-It is not yet a production launcher, multi-deposit indexer or protected Windows
-withdrawal runtime. Those integration limitations are not hidden by local E2E.
+It is not yet a production launcher or multi-deposit indexer. Those integration
+limitations are not hidden by local E2E. A follow-up adapter connects the common
+signing API to existing protected FROST peers (mixed transports reject), and
+opens the local journal with an existing DPAPI MAC key instead of a plaintext
+test key. Real Windows protected A+B signing and key/reopen tests passed;
+this is not yet a complete protected Windows round-trip service deployment.
 
 ## CI and remaining work
 

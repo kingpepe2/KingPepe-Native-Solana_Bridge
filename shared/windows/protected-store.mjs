@@ -10,7 +10,7 @@ const PROTOCOL = "KINGPEPE_WINDOWS_PROTECTED_STORE_V2";
 const MAX_PAYLOAD = 1_048_576;
 const ROLES = Object.freeze(["KINGPEPE_FROST_A", "KINGPEPE_FROST_B", "ATTESTER_A", "ATTESTER_B",
   "COORDINATOR", "BRIDGE_VALIDATOR", "SUPERVISOR", "NATIVE_OBSERVER", "SOLANA_OBSERVER", "RELAYER", "RECONCILIATION", "INDEXER", "FEE_PAYER"]);
-const PURPOSES = Object.freeze(["frost-state", "attester-seed", "attester-authorizations", "fee-payer-seed", "coordinator-signing", "coordinator-jobs", "deposit-operations", "deposit-controller", "reconciliation-progress", "native-sweep-outbox", "solana-deposit-outbox", "service-auth", "global-integrity", "chain-progress"]);
+const PURPOSES = Object.freeze(["frost-state", "attester-seed", "attester-authorizations", "fee-payer-seed", "coordinator-signing", "coordinator-jobs", "deposit-operations", "deposit-controller", "bridge-journal-key", "reconciliation-progress", "native-sweep-outbox", "solana-deposit-outbox", "service-auth", "global-integrity", "chain-progress"]);
 const INSTANCES = new WeakSet();
 
 function record(value, fields) {
@@ -34,7 +34,7 @@ export function normalizeProtectedContext(value) {
   if (["attester-seed", "attester-authorizations"].includes(c.purpose) && !["ATTESTER_A", "ATTESTER_B"].includes(c.role)) throw new Error("ProtectedRolePurposeInvalid");
   if (c.purpose === "global-integrity" && c.role !== "SUPERVISOR") throw new Error("ProtectedRolePurposeInvalid");
   if (["coordinator-signing", "coordinator-jobs"].includes(c.purpose) && c.role !== "COORDINATOR") throw new Error("ProtectedRolePurposeInvalid");
-  if (["deposit-operations", "deposit-controller"].includes(c.purpose) && c.role !== "BRIDGE_VALIDATOR") throw new Error("ProtectedRolePurposeInvalid");
+  if (["deposit-operations", "deposit-controller", "bridge-journal-key"].includes(c.purpose) && c.role !== "BRIDGE_VALIDATOR") throw new Error("ProtectedRolePurposeInvalid");
   if (["native-sweep-outbox", "solana-deposit-outbox"].includes(c.purpose) && c.role !== "RELAYER") throw new Error("ProtectedRolePurposeInvalid");
   if (c.purpose === "reconciliation-progress" && c.role !== "RECONCILIATION") throw new Error("ProtectedRolePurposeInvalid");
   if (c.purpose === "chain-progress" && !["NATIVE_OBSERVER", "SOLANA_OBSERVER"].includes(c.role)) throw new Error("ProtectedRolePurposeInvalid");

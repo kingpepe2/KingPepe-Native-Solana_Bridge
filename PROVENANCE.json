@@ -195,7 +195,7 @@
     {
       "path": "native/frost/coordinator/native-frost-coordinator.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original exact A+B coordination, both-recipient durable DKG handoff before finalization, explicit saved-setup resume and synchronous signing abort. No coordinator private signing share; confidential peer transport remains incomplete.",
+      "notes": "Original exact A+B coordination, durable DKG handoff, saved-setup resume and signing abort. Supports existing protected authenticated peers without local fallback; no coordinator private share or upstream implementation copied.",
       "purpose": "CORE_SECURITY"
     },
     {
@@ -765,7 +765,7 @@
     {
       "path": "services/bridge-validator/local-deposit-ledger.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original local-only authenticated SQLite accounting journal and replay. Uses existing exact accounting and Node APIs; no upstream implementation copied or operational state included.",
+      "notes": "Original local-only authenticated SQLite operation accounting and replay, with an optional existing Windows-protected MAC key. Uses exact accounting and standard Node/Windows APIs; no upstream code or operational state included.",
       "purpose": "CORE_BRIDGE"
     },
     {

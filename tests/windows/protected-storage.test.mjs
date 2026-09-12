@@ -17,6 +17,7 @@ import { schnorr } from "@noble/curves/secp256k1.js";
 import { ProjectAttester, verifyProjectAttestation } from "../../services/attesters/attestation-service.mjs";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { decodeCanonicalBridgeMessage } from "../../shared/protocol/canonical-message.mjs";
+import { AuthenticatedLocalDepositLedger } from "../../services/bridge-validator/local-deposit-ledger.mjs";
 
 if (process.platform !== "win32") throw new Error("WINDOWS_PROTECTED_STORAGE_TESTS_REQUIRE_WINDOWS");
 const repoRoot = path.resolve(import.meta.dirname, "../..");
@@ -61,6 +62,23 @@ test("protected storage never initializes missing state on read or write", t => 
   assert.throws(() => store.read(), /WindowsProtectedStoreRejected/u);
   assert.throws(() => store.write(randomBytes(32), "1"), /WindowsProtectedStoreRejected/u);
   assert.equal(existsSync(options.root), false);
+});
+test("local economic journal uses an existing DPAPI key without plaintext fallback", t => {
+  const vector = JSON.parse(readFileSync(path.join(repoRoot, "solana/modules/bridge-messages/vectors/canonical-v1.json"))).vectors[0];
+  const deployment = Buffer.from(vector.encodedHex.slice(24, 360), "hex");
+  Buffer.from(REGTEST_GENESIS, "hex").copy(deployment, 8);
+  const deploymentHex = deployment.toString("hex"), id = h("protected-journal-test");
+  const { parent, options } = fixture(t, "BRIDGE_VALIDATOR", "bridge-journal-key", { instanceId: id,
+    nativeGenesis: deploymentHex.slice(16, 80), solanaDeployment: deploymentHex.slice(80, 144) });
+  const settings = { environment: "localnet", repoRoot, root: path.join(parent, "accounting"), deploymentHex, journalIdHex: id };
+  const key = randomBytes(32), store = WindowsProtectedStore.create(options, key); key.fill(0);
+  const ledger = AuthenticatedLocalDepositLedger.fromProtectedLocalKey(settings, store, true);
+  ledger.hardStop("TEST_REVIEW_REQUIRED"); ledger.close();
+  const reopened = AuthenticatedLocalDepositLedger.fromProtectedLocalKey(settings, store);
+  assert.equal(reopened.status().state, "HARD_STOP"); reopened.close();
+  assert.throws(() => AuthenticatedLocalDepositLedger.fromProtectedLocalKey({ ...settings, journalIdHex: h("wrong-journal") }, store));
+  assert.throws(() => AuthenticatedLocalDepositLedger.fromProtectedLocalKey({ ...settings, authenticationKey: randomBytes(32) }, store));
+  store.close(); assert.throws(() => AuthenticatedLocalDepositLedger.fromProtectedLocalKey(settings, store));
 });
 test("created protected files have explicit private DACLs on a fixed local volume", t => {
   const { options } = fixture(t); WindowsProtectedStore.create(options, randomBytes(32));

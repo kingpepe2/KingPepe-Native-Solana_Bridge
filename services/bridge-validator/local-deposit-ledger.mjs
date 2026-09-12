@@ -13,6 +13,7 @@ import { requireFinalizedWithdrawal } from "../solana-observer/finalized-withdra
 import { validateWithdrawalPlan, validateSignedWithdrawal } from "../../native/reserve/withdrawal-plan.mjs";
 import { canonicalJson } from "../../native/frost/policy/native-signing-policy.mjs";
 import { parseNativeTransactionHex } from "../../native/node/native-taproot-transaction.mjs";
+import { assertWindowsProtectedStore } from "../../shared/windows/protected-store.mjs";
 
 const toolchain = JSON.parse(readFileSync(new URL("../../scripts/local-e2e-toolchain.json", import.meta.url), "utf8"));
 const MAGIC = Buffer.from("KPDECL01", "ascii");
@@ -48,6 +49,20 @@ export class AuthenticatedLocalDepositLedger {
 
   static createLocal(options) { return new AuthenticatedLocalDepositLedger(options, true); }
   static openLocal(options) { return new AuthenticatedLocalDepositLedger(options, false); }
+  static fromProtectedLocalKey(options, keyStore, create = false) {
+    assertWindowsProtectedStore(keyStore, "BRIDGE_VALIDATOR", "bridge-journal-key");
+    const c = keyStore.context, deployment = exactHex(options.deploymentHex, DEPLOYMENT_IDENTITY_LENGTH, "Deployment");
+    if (Object.hasOwn(options, "authenticationKey") || c.environment !== "localnet" || options.environment !== "localnet" ||
+        c.instanceId !== options.journalIdHex || c.nativeGenesis !== deployment.subarray(8, 40).toString("hex") ||
+        c.solanaDeployment !== deployment.subarray(40, 72).toString("hex")) throw new Error("LocalLedgerProtectedKeyBindingRejected");
+    // Only an existing OS-protected key is read. Never create a missing key,
+    // fall back to a plaintext file, or persist key bytes with journal data.
+    const secret = keyStore.read();
+    try {
+      if (secret.payload.length !== 32) throw new Error("LocalLedgerProtectedKeyRejected");
+      return new AuthenticatedLocalDepositLedger({ ...options, authenticationKey: secret.payload }, create);
+    } finally { secret.payload.fill(0); }
+  }
 
   constructor(options, create) {
     if (typeof create !== "boolean") throw new Error("LocalLedgerExplicitCreateOrOpenRequired");
