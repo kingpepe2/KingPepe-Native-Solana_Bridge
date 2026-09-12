@@ -17,7 +17,7 @@ export function resolveExistingParents(value) {
   const missing = [];
   while (true) {
     try {
-      return path.join(realpathSync(current), ...missing.reverse());
+      return path.join((process.platform === "win32" ? realpathSync.native : realpathSync)(current), ...missing.reverse());
     } catch (error) {
       if (error.code !== "ENOENT") throw new Error("RuntimePathResolutionFailed");
       // A dangling link must not be mistaken for a new directory.
@@ -46,9 +46,13 @@ export function validateRuntimeStateRoot(root, repoRoot = undefined, label = "Ru
     throw new Error(`${label}:DedicatedDirectoryRequired`);
   }
   rejectLinkedComponents(candidate);
+  rejectLinkedComponents(resolved);
   const entry = statEntry(candidate);
   if (entry !== undefined && !entry.isDirectory()) throw new Error(`${label}:DirectoryRequired`);
-  return candidate;
+  // Use the checked physical spelling, including expanded Windows 8.3 names.
+  // .NET canonicalizes those names too; accepting two spellings at the JS/OS
+  // boundary otherwise rejects a valid private root before any DPAPI access.
+  return resolved;
 }
 
 export function validateRuntimeFile(file, repoRoot = undefined, label = "Runtime state file") {

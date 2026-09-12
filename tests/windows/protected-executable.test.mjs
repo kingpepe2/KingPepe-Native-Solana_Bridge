@@ -8,7 +8,7 @@ import os from "node:os";
 import { validateRuntimeStateRoot } from "../../shared/runtime-path-boundary.mjs";
 if (process.platform !== "win32") throw new Error("WINDOWS_PROTECTED_EXECUTABLE_TESTS_REQUIRE_WINDOWS");
 const repoRoot = path.resolve(import.meta.dirname, "../..");
-for (const mode of ["TAMPER", "MISSING", "HARDLINK", "WRONG_ACL"]) {
+for (const mode of ["TAMPER", "MISSING", "HARDLINK", "WRONG_ACL", "CANONICAL_PATH"]) {
   test("source-built protected executable " + mode.toLowerCase(), t => {
     const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-helper-test-"));
     validateRuntimeStateRoot(root, repoRoot);
@@ -22,8 +22,19 @@ for (const mode of ["TAMPER", "MISSING", "HARDLINK", "WRONG_ACL"]) {
       }
       rmSync(root, { recursive: true });
     });
+    let runtimeRoot = root;
+    if (mode === "CANONICAL_PATH") {
+      // Exercise the OS-provided short spelling when 8.3 aliases are enabled,
+      // and the canonical spelling on volumes that do not create aliases.
+      const ps = path.join(process.env.SystemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+      const short = spawnSync(ps, ["-NoProfile", "-NonInteractive", "-Command", '$ErrorActionPreference="Stop";$f=New-Object -ComObject Scripting.FileSystemObject;[Console]::Out.Write($f.GetFolder([Console]::In.ReadToEnd()).ShortPath)'],
+        { input: root, encoding: "utf8", timeout: 30000, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
+      assert(short.status === 0 && short.stderr.length === 0 && short.stdout.length > 0, "TestShortPathUnavailable");
+      runtimeRoot = short.stdout;
+      assert.equal(validateRuntimeStateRoot(runtimeRoot, repoRoot), validateRuntimeStateRoot(root, repoRoot));
+    }
     const result = spawnSync(process.execPath, [path.join(import.meta.dirname, "protected-executable-actor.mjs"), mode],
-      { env: { ...process.env, TEMP: root, TMP: root }, timeout: 60000, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
+      { env: { ...process.env, TEMP: runtimeRoot, TMP: runtimeRoot }, timeout: 60000, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
     assert(result.status === 0 && result.stderr.length === 0 &&
       result.stdout.toString("utf8").trim() === "PROTECTED_EXECUTABLE_TEST_PASS", "ProtectedExecutableActorRejected");
   });
