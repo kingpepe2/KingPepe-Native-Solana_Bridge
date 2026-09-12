@@ -136,7 +136,9 @@ function interruptedWriteFixture(p) {
   // elevated runner. Reproduce the real writer's ACL in this disposable fixture
   // so the tests reach authenticated recovery, not an earlier ACL rejection.
   const ps = path.join(process.env.SystemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
-  const script = '$ErrorActionPreference="Stop";try{$p=[Console]::In.ReadToEnd();$a=[IO.File]::GetAccessControl([IO.Path]::Combine($p,"state.protected"));[IO.File]::SetAccessControl([IO.Path]::Combine($p,"candidate.protected"),$a);[Console]::Out.Write("FIXTURE_READY")}catch{[Console]::Error.Write("TEST_CANDIDATE_FIXTURE_REJECTED");exit 1}';
+  // SetAccessControl does not persist an unmodified GetAccessControl object.
+  // Copy its descriptor into a new, modified FileSecurity and verify the result.
+  const script = '$ErrorActionPreference="Stop";try{$p=[Console]::In.ReadToEnd();$a=[IO.File]::GetAccessControl([IO.Path]::Combine($p,"state.protected"));$c=[IO.Path]::Combine($p,"candidate.protected");$s=[Security.AccessControl.AccessControlSections]::Access -bor [Security.AccessControl.AccessControlSections]::Owner;$b=New-Object Security.AccessControl.FileSecurity;$b.SetSecurityDescriptorBinaryForm($a.GetSecurityDescriptorBinaryForm(),$s);[IO.File]::SetAccessControl($c,$b);$v=[IO.File]::GetAccessControl($c);if($v.GetSecurityDescriptorSddlForm($s) -ne $a.GetSecurityDescriptorSddlForm($s)){throw "ACL"};[Console]::Out.Write("FIXTURE_READY")}catch{[Console]::Error.Write("TEST_CANDIDATE_FIXTURE_REJECTED");exit 1}';
   const result = spawnSync(ps, ["-NoProfile", "-NonInteractive", "-Command", script], {
     input: p.options.root, windowsHide: true, timeout: 10_000, stdio: ["pipe", "pipe", "pipe"],
   });
