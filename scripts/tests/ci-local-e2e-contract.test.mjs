@@ -22,6 +22,16 @@ const acceptanceCode = gateFor("acceptance-checkpoint-result.json");
 assert(acceptanceCode.includes("acceptanceCheckpoint"), "AcceptanceCheckpointWorkflowGateRequired");
 const roundTripCode = gateFor("round-trip-result.json");
 
+test("CI builds the pinned Native proof verifier before starting the real flow", () => {
+  const build = workflow.indexOf("- name: Build pinned Native proof verifier before starting test chains");
+  const flow = workflow.indexOf("- name: Real automatic Native to Solana local flow");
+  assert(build > 0 && build < flow);
+  const setup = workflow.slice(build, flow);
+  assert(setup.includes("--target wasm32-unknown-unknown nightly-2023-10-29"));
+  assert(setup.includes("cargo +nightly-2023-10-29 build --locked --manifest-path native/proof/Cargo.toml"));
+  assert(setup.includes("--target-dir \"${KINGPEPE_CI_TOOL_ROOT}/build/native-evidence\""));
+});
+
 // Report fixtures exercise the exact CI gate; actual chain execution is a
 // separate mandatory job step and cannot be replaced by this contract test.
 for (const [name, change, expected] of [
@@ -154,6 +164,30 @@ for (const [name, change, expected] of [
 
 // Executes the actual checked-in workflow gate against non-economic report
 // fixtures. This tests CI's acceptance contract, not a blockchain or signer.
+test("CI failed flow preserves the runner's sanitized source location without printing raw errors", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-ci-gate-test-"));
+  try {
+    const result = completeResult();
+    result.state = "LOCAL_NATIVE_TO_SOLANA_E2E_FAILED";
+    result.fullNativeToSolanaE2e = "FAILED";
+    result.infrastructure = { failureSource: "scripts/local-native-evidence-verifier.mjs:16",
+      error: "DO_NOT_PUBLISH_RAW_SUBPROCESS_ERROR" };
+    writeFileSync(path.join(root, "result.json"), JSON.stringify(result), { flag: "wx", mode: 0o600 });
+    const child = spawnSync(process.execPath, ["--input-type=module", "-e", code], {
+      cwd: REPO_ROOT, env: { ...process.env, KINGPEPE_CI_TOOL_ROOT: root, GITHUB_SHA: "0".repeat(40) },
+      encoding: "utf8", timeout: 10_000, maxBuffer: 8192, windowsHide: true,
+    });
+    assert.equal(child.status, 1);
+    assert.equal(JSON.parse(child.stdout).failureSource, result.infrastructure.failureSource);
+    assert(!child.stdout.includes(result.infrastructure.error));
+  } finally {
+    assert.equal(path.dirname(root), path.resolve(os.tmpdir()));
+    assert(path.basename(root).startsWith("kingpepe-ci-gate-test-"));
+    assert(lstatSync(root).isDirectory() && !lstatSync(root).isSymbolicLink());
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 for (const [name, change, expected] of [
   ["accepts all seven claim-worker checks", () => {}, 0],
   ["rejects the obsolete five-check result", r => { r.localClaimRetry.pass = 5; }, 1],

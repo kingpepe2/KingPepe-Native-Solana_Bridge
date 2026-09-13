@@ -97,6 +97,14 @@ jobs:
             -DENABLE_IPC=OFF -DWITH_ZMQ=OFF -DBUILD_BITCOIN_BIN=OFF -DENABLE_WALLET=ON \
             -DENABLE_EXTERNAL_SIGNER=OFF
           cmake --build "${KINGPEPE_CI_TOOL_ROOT}/native-build" --target kingpeped kingpepe-cli -j 2
+      - name: Build pinned Native proof verifier before starting test chains
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install --profile minimal --component clippy --component rustfmt --component rust-src \
+            --target wasm32-unknown-unknown nightly-2023-10-29
+          cargo +nightly-2023-10-29 build --locked --manifest-path native/proof/Cargo.toml \
+            --bin kingpepe-native-evidence --target-dir "${KINGPEPE_CI_TOOL_ROOT}/build/native-evidence"
       - name: Real automatic Native to Solana local flow
         shell: bash
         run: |
@@ -113,6 +121,7 @@ jobs:
             const f = r.nativeToSolanaE2e;
             console.log(JSON.stringify({sourceSha: process.env.GITHUB_SHA, state: r.state, reason: r.reason,
               failedStep: r.infrastructure?.failedStep,
+              failureSource: r.infrastructure?.failureSource,
               localSecurity: r.localSecurity,
               localRecovery: r.localRecovery,
               localRecoveryPsbt: r.localRecoveryPsbt,
