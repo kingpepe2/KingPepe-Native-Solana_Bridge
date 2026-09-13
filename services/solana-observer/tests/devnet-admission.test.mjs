@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { DEVNET_SOLANA_GENESIS, isTestSolanaCluster, devnetRpcEndpoint } from "../../../shared/solana-test-network.mjs";
-import { SolanaLocalRpcClient } from "../../bridge-validator/solana-deposit-claim-submitter.mjs";
+import { SolanaLocalRpcClient, sanitizedRpcDiagnostic } from "../../bridge-validator/solana-deposit-claim-submitter.mjs";
 import { SolanaDepositClaimRpcClient } from "../solana-deposit-claim-observer.mjs";
 import { LocalDeploymentRpc, devnetTestManifest, validateDeploymentManifest, verifyDeploymentSnapshot } from "../deployment-integrity.mjs";
 import { deploymentFixture } from "../../../tests/integration/deployment-fixture.mjs";
@@ -52,6 +52,25 @@ test("Devnet provider exceptions and error bodies never escape through RPC diagn
   const rejected = new SolanaLocalRpcClient({ ...options, fetchImpl: async (_url, init) => Response.json({ jsonrpc: "2.0",
     id: JSON.parse(init.body).id, error: { code: -32000, message: "private-provider-detail" } }) });
   await assert.rejects(rejected.getBlockHeight(), e => e.kind === "SolanaRpcRejected" && e.code === -32000 && !String(e.stack).includes("private-provider-detail"));
+});
+
+test("withdrawal discovery reports a denied RPC method using numbers only and never treats it as no withdrawals", async t => {
+  const manifest = devnetTestManifest(JSON.parse(readFileSync(new URL("../../../docs/deployment/devnet.json", import.meta.url))));
+  let status = 400; const methods = [];
+  t.mock.method(globalThis, "fetch", async (_url, init) => {
+    const input = JSON.parse(init.body); methods.push(input.method);
+    if (input.method === "getGenesisHash") return Response.json({ jsonrpc: "2.0", id: input.id, result: DEVNET_SOLANA_GENESIS });
+    assert.equal(input.method, "getProgramAccounts");
+    return Response.json({ jsonrpc: "2.0", id: input.id, error: { code: -32600, message: "private-provider-detail", data: endpoint } }, { status });
+  });
+  const rpc = new LocalDeploymentRpc(options);
+  for (status of [400, 200]) await assert.rejects(rpc.withdrawalRecordAccounts(manifest), error => {
+    assert.equal(error.message, "DeploymentSourceUnavailable");
+    assert.deepEqual(sanitizedRpcDiagnostic(error), { httpStatus: status, rpcCode: -32600 });
+    assert(!String(error.stack).includes(endpoint) && !String(error.stack).includes("private-provider-detail"));
+    assert.equal(error.cause, undefined); return true;
+  });
+  assert.deepEqual(methods, ["getGenesisHash", "getProgramAccounts", "getGenesisHash", "getProgramAccounts"]);
 });
 
 test("Devnet snapshot binds the existing Borsh DevnetTesting state and rejects local/wrong-network substitution", () => {

@@ -13,7 +13,7 @@ import { RemoteIntegrityGuard } from "../../services/supervisor/protected-integr
 import { validateRuntimeStateRoot } from "../../shared/runtime-path-boundary.mjs";
 import { REGTEST_GENESIS } from "../../native/node/native-raw-evidence.mjs";
 
-export async function createLocalSecurityFixture({ repoRoot, policy }) {
+export async function createLocalSecurityFixture({ repoRoot, policy, authorityOptions: retainedAuthority }) {
   assert.equal(process.platform, "win32"); assert.equal(policy.environment, "localnet"); assert.equal(policy.nativeGenesis, REGTEST_GENESIS);
   const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-ipc-test-"));
   validateRuntimeStateRoot(root, repoRoot);
@@ -65,21 +65,27 @@ export async function createLocalSecurityFixture({ repoRoot, policy }) {
     closers.push(() => server.close(), () => client.close());
     return { server, client, port: await server.listen(handler), clientOptions };
   }
-  const authorityOptions = options("authority", "SUPERVISOR", "global-integrity");
+  const authorityOptions = retainedAuthority ?? options("authority", "SUPERVISOR", "global-integrity");
+  assert.equal(authorityOptions.context.nativeGenesis, policy.nativeGenesis);
+  assert.equal(authorityOptions.context.solanaDeployment, policy.solanaDeployment);
+  assert.equal(authorityOptions.context.keyEpoch, policy.keyEpoch);
   let authority;
-  try { authority = await actualTestAuthority(authorityOptions); }
+  try { authority = await actualTestAuthority(authorityOptions, retainedAuthority !== undefined); }
   catch { await close(); throw new Error("LocalSecurityFixtureUnavailable"); }
   closers.push(() => authority.close());
-  async function close() {
+  async function close({ retainState = false } = {}) {
+    assert.equal(typeof retainState, "boolean");
     let failed = false;
     for (const fn of [...closers].reverse()) { try { await fn(); } catch { failed = true; } }
     assert(path.dirname(root) === path.resolve(os.tmpdir()) && path.basename(root).startsWith("kingpepe-ipc-test-"));
     validateRuntimeStateRoot(root, repoRoot);
-    try { rmSync(root, { recursive: true }); } catch { failed = true; }
+    // A real Devnet drill retains its TEST-only protected state for recovery.
+    // Ordinary disposable unit/integration fixtures keep their existing cleanup.
+    if (!retainState) try { rmSync(root, { recursive: true }); } catch { failed = true; }
     if (failed) throw new Error("LocalSecurityFixtureCleanupFailed");
   }
   return {
-    root, options, store, pair, deferredPair: (serverRole, clientRole) => pair(serverRole, clientRole, undefined, true),
+    root, authorityOptions, options, store, pair, deferredPair: (serverRole, clientRole) => pair(serverRole, clientRole, undefined, true),
     close, onClose(fn) { closers.push(fn); }, get authority() { return authority; },
     async diagnostics() { return [...await authority.diagnostics(), ...transports.map(v => ({ serverRole: v.serverRole, clientRole: v.clientRole,
       server: v.server?.lastRejection ?? "NONE", client: v.client.lastRejection ?? "NONE" }))]; },

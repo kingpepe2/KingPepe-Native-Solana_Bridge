@@ -53,6 +53,16 @@ invent a root cause. The safe-diagnostic/pinned-verifier setup fixes are retaine
 The funded test fee payer needs no further airdrops. Preserve its prepared
 protected credentials. Read SOLANA_DEVNET_RPC_URL from local process configuration
 without exposing it in source, logs, CLI diagnostics or public evidence.
+Service integration d747e0bea0925079d88ffe08b164df30d35264bb passed exact-SHA
+CI 34769417206, four required jobs and every step, none skipped. Phase 16 is
+blocked by the configured RPC tier denying getProgramAccounts (HTTP 400,
+JSON-RPC -32600). Do not bypass account permissions or treat the denial as
+an empty withdrawal list. The prepared protected Devnet test run retains an
+OBSERVED Native deposit, its original wallet, fee funding and journal outside
+Git. No sweep, mint or payout occurred. After RPC method access is enabled,
+resume that exact test state; do not redeploy or regenerate its signing state.
+The test runner checks discovery capability before opening signing state or
+spending test fees. Both real Devnet directions and the soak remain incomplete.
 The pinned compiler's supported --arch v3 builds reproduce the deployed bytes;
 do not confuse them with default v0 local-test binaries or enable experimental ABI.
 Devnet test state must not enable Mainnet. Existing local callers stay local-only.

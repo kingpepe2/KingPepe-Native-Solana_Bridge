@@ -25,6 +25,13 @@
   },
   "trackedFiles": [
     {
+      "path": "solana/tests/devnet-bridge-service.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original explicit regtest/Devnet E2E harness over retained bridge workers and protected A/B test processes. No production, deployment or airdrops; credentials and retained recovery state stay outside source.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
       "path": "shared/solana-test-network.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original explicit test-cluster and HTTPS endpoint admission shared by retained Solana clients; compares actual Devnet genesis without exposing provider credentials.",

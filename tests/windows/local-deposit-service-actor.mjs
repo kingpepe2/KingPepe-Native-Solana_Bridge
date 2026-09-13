@@ -12,6 +12,10 @@ import { ProtectedServiceIpc } from "../../shared/windows/service-ipc.mjs";
 import { RemoteIntegrityGuard } from "../../services/supervisor/protected-integrity.mjs";
 import { NativeRpcClient } from "../../native/node/native-rpc-client.mjs";
 import { LocalNativeEvidenceVerifier } from "../../native/node/native-raw-evidence.mjs";
+import { FinalizedWithdrawalReader } from "../../services/solana-observer/finalized-withdrawal.mjs";
+import { LocalDeploymentRpc } from "../../services/solana-observer/deployment-integrity.mjs";
+import { validateWithdrawalPlan, withdrawalSigningIntents } from "../../native/reserve/withdrawal-plan.mjs";
+import { verifyWithdrawalSigning } from "../../services/bridge-validator/automatic-withdrawal.mjs";
 import { createNativeSigningPolicy } from "../../native/frost/index.mjs";
 import { WindowsProtectedFrostStateStore } from "../../native/frost/state/windows-protected-state-store.mjs";
 import { openProtectedNativeSigner, ProtectedRemoteFrostPeer } from "../../native/frost/signer/protected-service.mjs";
@@ -65,15 +69,24 @@ async function start(c) {
   const integrity = new RemoteIntegrityGuard({ ipc: transport(c.supervisorOptions, role), port: c.supervisorPort }), p = c.policy;
   taskController = new AbortController(); const signal = taskController.signal, ports = {}, workers = [];
   if (["KINGPEPE_FROST_A", "KINGPEPE_FROST_B"].includes(role)) {
-    const plan = validateDepositOperationPlan(c.operationPlan, p), native = verifier(c);
+    const withdrawal = c.withdrawalPlan !== undefined;
+    const plan = withdrawal ? validateWithdrawalPlan(c.withdrawalPlan) : validateDepositOperationPlan(c.operationPlan, p), native = verifier(c);
+    const intents = withdrawal ? withdrawalSigningIntents(plan) : plan.signingIntents;
+    // Reuse the retained reader; each A/B process checks the real finalized
+    // withdrawal independently, not a coordinator-provided validity boolean.
+    const reader = withdrawal ? new FinalizedWithdrawalReader({ manifest: c.manifest,
+      rpc: new LocalDeploymentRpc({ endpoint: process.env.SOLANA_DEVNET_RPC_URL,
+        environment: "devnet", expectedGenesis: c.manifest.solanaGenesis }) }) : undefined;
     const policy = createNativeSigningPolicy({ environment: "localnet", nativeNetwork: "regtest", nativeGenesisHash: p.nativeGenesis, solanaDeployment: p.solanaDeployment,
       bridgeProgramId: p.managerProgramId, transceiverProgramId: p.transceiverProgramId, mint: p.mint, keyEpoch: p.keyEpoch,
-      maxAmountAtomic: p.maximumAmountAtomic, maxFeeAtomic: p.maximumFeeAtomic, reserveScriptPubKeyHex: plan.depositPolicy.canonicalReserveScriptPubKeyHex,
-      authorizedOperations: plan.signingIntents });
+      maxAmountAtomic: p.maximumAmountAtomic, maxFeeAtomic: p.maximumFeeAtomic,
+      reserveScriptPubKeyHex: withdrawal ? plan.reserveScriptHex : plan.depositPolicy.canonicalReserveScriptPubKeyHex,
+      authorizedOperations: intents });
     const base = new WindowsProtectedFrostStateStore(store(c.stateOptions, role, "frost-state"), role);
     service = await openProtectedNativeSigner({ base, policy, integrity,
       nativeEvidenceValidator: async intent => {
-        assert(plan.signingIntents.some(v => canonicalJson(v) === canonicalJson(intent)));
+        assert(intents.some(v => canonicalJson(v) === canonicalJson(intent)));
+        if (withdrawal) return verifyWithdrawalSigning({ plan, intent, reader, nativeVerifier: native });
         return native.verifySweepSigning({ inputs: plan.inputs, minimumConfirmations: p.minimumConfirmations, acceptedCheckpoint: plan.acceptedCheckpoint,
           unsignedTransactionHex: plan.unsignedTransactionHex, reserveAmountAtomic: plan.depositIntent.amountAtomic, feeAtomic: intent.feeAtomic,
           reserveScriptHex: plan.depositPolicy.canonicalReserveScriptPubKeyHex, intent, tapscriptSpends: [plan.depositPolicy.sweep, ...plan.inputs.slice(1).map(() => undefined)] });

@@ -97,3 +97,13 @@ HTTPS endpoint. It queries actual genesis before requests/sends, refuses automat
 airdrops, and sanitizes provider failures. Local defaults still reject remote
 endpoints. `devnetTestManifest` consumes the reviewed public record for read-only
 deployment checks. This client milestone alone does not enable the transfer workers.
+
+The Phase 16 Windows protected test runner is
+`node solana/tests/devnet-bridge-service.mjs`. Supply the existing local-only
+`KINGPEPE_DEVNET_TEST_CONTEXT` and, for recovery, `KINGPEPE_DEVNET_TEST_RUN`;
+do not recreate a funded test run. It also requires the configured development
+storage profile, pinned Native test binaries/verifier and test OpenSSL tool.
+All private values stay outside Git. The runner checks `getProgramAccounts`
+availability on the configured Devnet RPC before opening signer state or
+spending fees. That method is currently denied by the RPC tier, so Phase 16
+is BLOCKED. A denied method must never be treated as an empty withdrawal list.

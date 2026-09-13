@@ -127,13 +127,41 @@ Borsh bytes, FROST and on-chain authorities are unchanged. The existing journal
 uses a Devnet context discriminator; relabeling a copied journal as localnet is
 rejected. Existing localnet journals remain compatible. Attesters and journal
 keys load from existing DPAPI stores only after exact test-domain checks.
-No new transfer engine, database or service layer was added. Both real Devnet
-directions remain NOT_RUN pending the protected test-runtime milestone.
+No new transfer engine, database or service layer was added.
 Service integration validation: 1,005 Node tests passed on Windows and WSL,
 plus three focused real CurrentUser DPAPI checks. The existing lost-response
 and journal-reopen regression now exercises explicit localnet and Devnet
 configurations. Full-tree secret scan, exact 275-file provenance coverage and
 guardrails passed. These are not live Devnet transfer results.
+
+Service integration `d747e0bea0925079d88ffe08b164df30d35264bb` passed exact-SHA
+CI `34769417206`: all four required jobs and every step, none skipped.
+
+The protected Devnet test runtime is prepared, reusing the existing A/B
+processes, journal, attesters and transfer workers. It verifies the deployed
+identities and uses separate test runtime fees, not the upgrade authority as
+the relayer. Test credentials, Native wallet, operation records and signed
+packets remain outside Git for safe resume. Signed user packets are retained
+before submission; retries check their chain status and reuse the same packet.
+
+Phase 16 is **BLOCKED**: the configured RPC returns HTTP 400 / JSON-RPC -32600
+for `getProgramAccounts` because its current tier does not permit that method.
+The existing finalized withdrawal observer requires it. A denied method is
+never interpreted as zero withdrawals. The Native test deposit is retained as
+`OBSERVED`; no reserve sweep, KPEPE mint or Native payout has been authorized.
+Mint supply remains zero. No airdrop or program redeployment was performed.
+The test runner now checks this capability before opening signer state or
+spending test fees. Diagnostics expose numeric status only, never provider
+messages or credentials. Enable this method on the locally configured RPC
+before resuming the retained test run. Neither real Devnet direction is yet
+certified, and the soak period has not started.
+
+The prepared-runtime milestone passes 1,006 retained Node tests on Windows and
+WSL, including the denied-method regression. Full-tree secret scanning,
+276-file provenance coverage and guardrails pass. A read-only enrollment
+recheck at finalized slot 497822241 still matches the deployed program hashes,
+Borsh configuration, PDA Mint authority and absent freeze authority, with zero
+supply. These checks do not certify either blocked real Devnet transfer.
 
 ## Final simplification
 

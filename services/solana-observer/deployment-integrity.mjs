@@ -169,16 +169,25 @@ export class LocalDeploymentRpc {
     this.#endpoint = u.href;
   }
   async #call(method, params) {
-    const id = ++this.#id;
+    const id = ++this.#id; let httpStatus, rpcCode;
     try {
       const response = await fetch(this.#endpoint, { method: "POST", redirect: "error", signal: AbortSignal.timeout(10_000), headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id, method, params }) });
-      check(response.ok && response.body, "DeploymentSourceUnavailable");
+      httpStatus = response.status;
+      check(response.body, "DeploymentSourceUnavailable");
       const reader = response.body.getReader(); let size = 0; const parts = [];
       try { for (;;) { const { done, value } = await reader.read(); if (done) break; size += value.length; check(size <= MAX_RESPONSE_BYTES, "DeploymentResponseLimit"); parts.push(value); } }
       finally { await reader.cancel(); }
       const v = JSON.parse(Buffer.concat(parts).toString("utf8"));
-      check(v?.jsonrpc === "2.0" && v.id === id && Object.hasOwn(v, "result") && !Object.hasOwn(v, "error"), "DeploymentSourceUnavailable"); return v.result;
-    } catch { fail("DeploymentSourceUnavailable"); }
+      if (v?.jsonrpc === "2.0" && v.id === id && Number.isSafeInteger(v.error?.code)) rpcCode = v.error.code;
+      check(response.ok && v?.jsonrpc === "2.0" && v.id === id && Object.hasOwn(v, "result") && !Object.hasOwn(v, "error"), "DeploymentSourceUnavailable"); return v.result;
+    } catch {
+      // Retain only bounded numeric diagnostics, never the endpoint, provider
+      // message/body or original exception (which may contain credentials).
+      const error = new Error("DeploymentSourceUnavailable");
+      if (Number.isInteger(httpStatus) && httpStatus >= 100 && httpStatus <= 599) error.httpStatus = httpStatus;
+      if (Number.isSafeInteger(rpcCode)) error.code = rpcCode;
+      throw error;
+    }
   }
   async genesis() {
     const result = await this.#call("getGenesisHash", []); key(result);

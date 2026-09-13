@@ -9,17 +9,28 @@
   "signerTopology": "SINGLE_HOST",
   "commonHostRiskDecision": "ACCEPTED_BY_KINGPEPE_TEAM",
   "lastUpdated": "2026-09-13",
-  "sourceStatus": "PHASE_16_RETAINED_SERVICE_DEVNET_INTEGRATION_IN_PROGRESS",
+  "sourceStatus": "PHASE_16_BLOCKED_CONFIGURED_RPC_METHOD_ACCESS",
   "phase16": {
-    "status": "IN_PROGRESS",
-    "milestone": "GENESIS_BOUND_DEVNET_RETAINED_SERVICE_INTEGRATION",
+    "status": "BLOCKED",
+    "milestone": "PROTECTED_DEVNET_TEST_RUNTIME_AND_RPC_CAPABILITY_PREFLIGHT",
+    "serviceIntegrationExactShaCi": { "sourceSha": "d747e0bea0925079d88ffe08b164df30d35264bb", "runId": "34769417206", "requiredJobsPassed": 4, "skippedSteps": 0, "status": "PASS" },
     "admissionValidation": { "focusedNodeTests": "97_PASS", "liveDevnetSnapshotSlot": "497796861", "liveConfigMatch": true,
       "transactionsSubmitted": 0, "secretScan": "PASS", "provenance": "275_FILES_PASS", "guardrails": "PASS" },
     "serviceIntegrationValidation": { "windowsNode": "1005_PASS", "wslNode": "1005_PASS", "focusedWindowsDpapi": "3_PASS",
       "restartAndLostResponse": "LOCALNET_AND_DEVNET_UNIT_REGRESSIONS_PASS", "secretScan": "PASS", "provenance": "275_FILES_PASS", "guardrails": "PASS",
       "scope": "RETAINED_SERVICE_UNIT_AND_PROTECTED_STORAGE_CHECKS_NOT_LIVE_DEVNET_E2E" },
-    "nativeToSolanaDevnet": "NOT_RUN",
+    "nativeToSolanaDevnet": "BLOCKED_BEFORE_SWEEP",
     "solanaDevnetToNative": "NOT_RUN",
+    "testRuntime": {
+      "validation": { "windowsNode": "1006_PASS", "wslNode": "1006_PASS", "deniedRpcRegression": "PASS", "secretScan": "PASS", "provenance": "276_FILES_PASS", "guardrails": "PASS" },
+      "enrollmentReadOnlyRecheck": { "status": "PASS", "finalizedSlot": "497822241", "deployedBytecodeAndConfigMatch": true, "transactionsSubmitted": 0 },
+      "blocker": "Configured RPC tier does not permit getProgramAccounts, which the retained finalized withdrawal observer requires. Enable method access before resuming; do not treat a denied request as an empty withdrawal list.",
+      "method": "getProgramAccounts", "httpStatus": 400, "rpcCode": -32600,
+      "operationState": "OBSERVED", "nativeSweepBroadcast": false, "mintSupplyAtomic": "0", "nativePayoutBroadcast": false,
+      "newAirdropsRequested": 0, "programsRedeployed": false,
+      "protectedTestState": "RETAINED_LOCAL_ONLY_FOR_SAFE_RESUME",
+      "preflight": "READ_ONLY_RPC_CAPABILITY_CHECK_BEFORE_OPENING_SIGNERS_OR_SPENDING_TEST_FEES"
+    },
     "scope": "Retained deposit, withdrawal, reconciliation and journal paths accept explicit Devnet/regtest policy. Local defaults stay local; protected secrets and journal context remain deployment-bound. Real Devnet transfers are not yet certified. No program redeployment or Mainnet authorization."
   },
   "phase15": {
