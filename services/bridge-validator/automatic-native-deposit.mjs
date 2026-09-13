@@ -1,5 +1,5 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
-// Thin LOCALNET service composition of the retained Phase-08 primitives.
+// Thin REGTEST -> explicitly configured Solana test-network composition.
 // It does not create wallets, keys, blocks or deployments. No private FROST
 // share enters this worker or the relayer; the configured A+B clients sign.
 import { AuthenticatedLocalDepositLedger } from "./local-deposit-ledger.mjs";
@@ -35,10 +35,11 @@ export async function verifyServiceDepositSigning({ plan, policy, nativeVerifier
 export class AutomaticNativeToSolanaDeposit {
   #ledger; #native; #rpc; #solana; #manifest; #policy; #observer; #coordinator; #attesters; #claim; #claimObserver; #claimRpc; #deliveryPolicy; #busy = false; #observationCursor = 0;
   constructor({ environment, ledger, policy, manifest, nativeVerifier, nativeRpc, solanaRpc, solanaEndpoint, createCoordinator, attesters, feePayerSigner }) {
-    check(environment === "localnet" && ledger instanceof AuthenticatedLocalDepositLedger && nativeVerifier instanceof LocalNativeEvidenceVerifier &&
+    check(["localnet", "devnet"].includes(environment) && ledger instanceof AuthenticatedLocalDepositLedger && nativeVerifier instanceof LocalNativeEvidenceVerifier &&
       nativeRpc instanceof NativeRpcClient && solanaRpc instanceof LocalDeploymentRpc && typeof createCoordinator === "function");
     const p = validateDepositOperationPolicy(policy), m = validateDeploymentManifest(manifest);
-    check(p.nativeGenesis === m.nativeGenesisHex && p.solanaGenesis === m.solanaGenesis && p.solanaDeployment === m.solanaDeploymentHex &&
+    check(environment === p.environment && environment === m.environment && ledger.environment === environment &&
+      p.nativeGenesis === m.nativeGenesisHex && p.solanaGenesis === m.solanaGenesis && p.solanaDeployment === m.solanaDeploymentHex &&
       p.managerProgramId === keyHex(m.manager.id) && p.transceiverProgramId === keyHex(m.transceiver.id) &&
       p.mint === keyHex(m.mint.id) && p.policyEpoch === m.config.policyEpoch && p.keyEpoch === m.config.keyEpoch &&
       p.protocolId === m.config.protocolId && p.nativeNetwork === m.config.nativeNetwork && m.mint.decimals === 8 &&
@@ -49,12 +50,12 @@ export class AutomaticNativeToSolanaDeposit {
     this.#ledger = ledger; this.#policy = p; this.#manifest = m; this.#native = nativeVerifier; this.#rpc = nativeRpc; this.#solana = solanaRpc;
     this.#coordinator = createCoordinator; this.#attesters = [...attesters];
     this.#observer = new NativeDepositObserver({ nativeRpc, nativeVerifier, policy: p });
-    const rpc = new SolanaLocalRpcClient({ endpoint: solanaEndpoint });
+    const rpc = new SolanaLocalRpcClient({ endpoint: solanaEndpoint, environment, expectedGenesis: p.solanaGenesis });
     this.#claimRpc = rpc;
     this.#deliveryPolicy = validateSolanaDeliveryPolicy({ operationPolicy: p, manifest: m, feePayerPublicKey: feePayerSigner.publicKeyBase58 });
-    this.#claimObserver = new SolanaDepositClaimObserver({ endpoint: solanaEndpoint, config: { environment, cluster: "localnet",
+    this.#claimObserver = new SolanaDepositClaimObserver({ endpoint: solanaEndpoint, config: { environment, cluster: environment, solanaGenesis: p.solanaGenesis,
       managerProgramIdHex: p.managerProgramId, transceiverProgramIdHex: p.transceiverProgramId, mintHex: p.mint, nativeDecimals: 8 } });
-    this.#claim = new LocalnetSolanaDepositClaimBridge({ config: { environment, cluster: "localnet", solanaDeploymentHex: p.solanaDeployment,
+    this.#claim = new LocalnetSolanaDepositClaimBridge({ config: { environment, cluster: environment, solanaGenesis: p.solanaGenesis, solanaDeploymentHex: p.solanaDeployment,
       managerProgramIdHex: p.managerProgramId, transceiverProgramIdHex: p.transceiverProgramId, mintHex: p.mint,
       tokenProgramIdHex: keyHex(m.mint.tokenProgram), feePayerHex: feePayerSigner.publicKeyHex,
       feePayerBase58: feePayerSigner.publicKeyBase58, policyEpoch: p.policyEpoch, keyEpoch: p.keyEpoch, acceptedObservationTrust: ["RPC_OBSERVATION"],

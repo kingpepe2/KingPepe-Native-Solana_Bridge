@@ -1,4 +1,6 @@
 import { ed25519 } from "@noble/curves/ed25519.js";
+import { isTestSolanaCluster } from "../../shared/solana-test-network.mjs";
+import { REGTEST_GENESIS } from "../../native/node/native-raw-evidence.mjs";
 import { assertWindowsProtectedStore } from "../../shared/windows/protected-store.mjs";
 import { timingSafeEqual } from "node:crypto";
 import {
@@ -23,12 +25,14 @@ export class ProjectAttester {
   #policy;
   #closed = false;
   #protectedStore;
-  static fromWindowsProtectedStore({ store, role, policy }) {
+  static fromWindowsProtectedStore({ store, role, policy, environment = "localnet", solanaGenesis }) {
     // Snapshot before the storage binding checks; never check one policy and
     // construct the attester from a second read of mutable/accessor input.
     policy = normalizePolicy(structuredClone(policy));
     assertWindowsProtectedStore(store, role, "attester-seed");
-    if (store.context.environment !== "localnet") throw new Error("ProtectedAttesterLocalOnly");
+    if (store.context.environment !== environment || !isTestSolanaCluster({ environment, cluster: environment, solanaGenesis }) ||
+        (environment === "devnet" && (policy.nativeGenesisHex !== REGTEST_GENESIS || policy.nativeNetwork !== 8_000_111)))
+      throw new Error("ProtectedAttesterLocalOnly");
     if (store.context.nativeGenesis !== policy.nativeGenesisHex ||
         store.context.solanaDeployment !== policy.solanaDeploymentHex ||
         store.context.keyEpoch !== policy.keyEpoch) throw new Error("ProtectedAttesterContextMismatch");

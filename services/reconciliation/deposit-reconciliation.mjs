@@ -43,7 +43,7 @@ export function compareDepositAccounting(journal, observed) {
 export function validateReconciliationBinding(policy, manifest) {
   const p = validateDepositOperationPolicy(policy), m = validateDeploymentManifest(manifest);
   const h = value => Buffer.from(base58Decode(value)).toString("hex");
-  check(p.nativeGenesis === m.nativeGenesisHex && p.solanaDeployment === m.solanaDeploymentHex && p.solanaGenesis === m.solanaGenesis &&
+  check(p.environment === m.environment && p.nativeGenesis === m.nativeGenesisHex && p.solanaDeployment === m.solanaDeploymentHex && p.solanaGenesis === m.solanaGenesis &&
     p.managerProgramId === h(m.manager.id) && p.transceiverProgramId === h(m.transceiver.id) && p.mint === h(m.mint.id) &&
     p.policyEpoch === m.config.policyEpoch && p.keyEpoch === m.config.keyEpoch && p.protocolId === m.config.protocolId && p.nativeNetwork === m.config.nativeNetwork &&
     BigInt(p.minimumSolanaSlot) >= BigInt(m.minimumSlot) && m.mint.decimals === 8, "ReconciliationDeploymentBindingRejected");

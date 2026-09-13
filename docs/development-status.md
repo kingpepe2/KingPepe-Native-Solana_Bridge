@@ -109,8 +109,8 @@ configuration, never in public evidence. Publication
 `36f9e3a4d5af8495d8abb7fde6871894e3fec195` passed exact-SHA CI `34766210723`:
 all four required jobs and every step, none skipped. Phase 15 is PASS.
 
-The operational workers remain local-only until Phase 16 integrates and validates
-Native regtest against this real Devnet deployment. No Devnet transfer, soak,
+Phase 16 integrates and validates Native regtest against this real Devnet
+deployment. No Devnet transfer, soak,
 external review or production readiness is certified by Phase 15. See
 [Devnet deployment](deployment/devnet.md).
 
@@ -121,8 +121,19 @@ with the pinned genesis. Default local callers remain local-only; Mainnet and
 automatic Devnet airdrops are rejected. The same deployment verifier understands
 the existing Borsh DevnetTesting config and constructs its runtime manifest from
 the reviewed public enrollment record, not from arbitrary RPC account values.
-No transfer engine, journal, wire format or on-chain authority changed in this
-milestone. Service integration and both real Devnet directions remain NOT_RUN.
+The retained transfer workers, observers, delivery checks and SDK now carry the
+explicit Devnet policy through the existing flow. Accounting, finality, replay,
+Borsh bytes, FROST and on-chain authorities are unchanged. The existing journal
+uses a Devnet context discriminator; relabeling a copied journal as localnet is
+rejected. Existing localnet journals remain compatible. Attesters and journal
+keys load from existing DPAPI stores only after exact test-domain checks.
+No new transfer engine, database or service layer was added. Both real Devnet
+directions remain NOT_RUN pending the protected test-runtime milestone.
+Service integration validation: 1,005 Node tests passed on Windows and WSL,
+plus three focused real CurrentUser DPAPI checks. The existing lost-response
+and journal-reopen regression now exercises explicit localnet and Devnet
+configurations. Full-tree secret scan, exact 275-file provenance coverage and
+guardrails passed. These are not live Devnet transfer results.
 
 ## Final simplification
 

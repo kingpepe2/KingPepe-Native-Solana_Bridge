@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { DEVNET_SOLANA_GENESIS } from "../../../shared/solana-test-network.mjs";
 import { createHash } from "node:crypto";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { test } from "node:test";
@@ -196,6 +197,21 @@ async function signedReceiptFixture() {
   const packet = await prepareSignedLocalnetSolanaDepositReceiptTransaction(config);
   return { ...f, config: { ...config, preparedTransactionBase64: packet.preparedTransactionBase64 }, packet };
 }
+
+test("explicit Devnet uses identical canonical claim/receipt bytes and truthful network labels", async () => {
+  const f = fixture({ tokenProgramIdBase58: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" });
+  const config = { ...f.config, attestations: createAttestations(f.config),
+    feePayerSigner: { publicKeyHex: f.feePayer.publicKeyHex, sign: bytes => ed25519.sign(bytes, f.feePayer.signingKey) } };
+  const devnet = { ...config, environment: "devnet", cluster: "devnet", solanaGenesis: DEVNET_SOLANA_GENESIS };
+  for (const prepare of [prepareSignedLocalnetSolanaDepositClaimTransaction, prepareSignedLocalnetSolanaDepositReceiptTransaction]) {
+    const local = await prepare(config), remote = await prepare(devnet);
+    assert.equal(remote.environment, "devnet"); assert.equal(remote.cluster, "devnet");
+    assert.equal(remote.preparedTransactionBase64, local.preparedTransactionBase64);
+    assert.equal(remote.operationIdHex, local.operationIdHex);
+    await assert.rejects(prepare({ ...devnet, solanaGenesis: undefined }));
+    await assert.rejects(prepare({ ...devnet, environment: "mainnet", cluster: "mainnet" }));
+  }
+});
 
 test("canonical receipt verification rebuilds the signed Ed25519/transceiver packet exactly", async () => {
   const f = await signedReceiptFixture();

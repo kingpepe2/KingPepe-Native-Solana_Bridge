@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { isTestSolanaCluster } from "../../shared/solana-test-network.mjs";
 import { encodeBridgeAbi } from "../../shared/protocol/solana-bridge-abi.mjs";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import {
@@ -145,8 +146,8 @@ export function buildLocalnetSolanaDepositClaimTransactionPlan(config) {
 
   return Object.freeze({
     protocol: SOLANA_DEPOSIT_CLAIM_TRANSACTION_PLAN_PROTOCOL,
-    environment: LOCALNET,
-    cluster: LOCALNET,
+    environment: normalized.environment,
+    cluster: normalized.cluster,
     operationIdHex: decodedMessage.operationIdHex,
     messageDigestHex: decodedMessage.messageDigestHex,
     amountAtomic: decodedMessage.amountAtomic.toString(),
@@ -273,8 +274,8 @@ export function buildLocalnetSolanaDepositReceiptTransactionPlan(config) {
 
   return Object.freeze({
     protocol: SOLANA_DEPOSIT_CLAIM_TRANSACTION_PLAN_PROTOCOL,
-    environment: LOCALNET,
-    cluster: LOCALNET,
+    environment: normalized.environment,
+    cluster: normalized.cluster,
     bundle: "ED25519_ATTESTATIONS_TRANSCEIVER_RECEIPT",
     operationIdHex: decodedMessage.operationIdHex,
     messageDigestHex: decodedMessage.messageDigestHex,
@@ -456,7 +457,7 @@ function normalizePlanConfig(config) {
   if (!config || typeof config !== "object") {
     throw new Error("MissingSolanaDepositClaimTransactionPlanConfig");
   }
-  if ((config.environment ?? LOCALNET) !== LOCALNET || (config.cluster ?? LOCALNET) !== LOCALNET) {
+  if (!isTestSolanaCluster(config)) {
     throw new Error("SolanaDepositClaimTransactionPlanLocalnetOnly");
   }
   const managerProgram = normalizePubkeyPair(config, "managerProgramIdBase58", "managerProgramIdHex");
@@ -471,6 +472,8 @@ function normalizePlanConfig(config) {
   );
   const recentBlockhash = normalizePubkeyPair(config, "recentBlockhashBase58", "recentBlockhashHex");
   return Object.freeze({
+    environment: config.environment ?? LOCALNET,
+    cluster: config.cluster ?? LOCALNET,
     managerProgram,
     transceiverProgram,
     mint,

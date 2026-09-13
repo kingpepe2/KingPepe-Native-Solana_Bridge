@@ -49,9 +49,10 @@ export function compareWithdrawalAccounting(journal, observed) {
 export class AutomaticSolanaToNativeWithdrawal {
   #ledger; #reader; #verifier; #rpc; #solana; #manifest; #createCoordinator; #reserve; #minimum; #maxFee; #maxAmount; #busy = false;
   constructor({ environment, ledger, reader, nativeVerifier, nativeRpc, solanaRpc, manifest, createCoordinator, reserveScriptHex, minimumConfirmations, maxFeeAtomic, maxAmountAtomic }) {
-    check(environment === "localnet" && ledger instanceof AuthenticatedLocalDepositLedger && reader instanceof FinalizedWithdrawalReader &&
+    check(["localnet", "devnet"].includes(environment) && ledger instanceof AuthenticatedLocalDepositLedger && reader instanceof FinalizedWithdrawalReader &&
       nativeVerifier instanceof LocalNativeEvidenceVerifier && nativeRpc instanceof NativeRpcClient && solanaRpc instanceof LocalDeploymentRpc && typeof createCoordinator === "function", "LocalWithdrawalRuntimeRequired");
     this.#manifest = validateDeploymentManifest(manifest);
+    check(environment === this.#manifest.environment && ledger.environment === environment, "WithdrawalEnvironmentMismatch");
     normalizeEndpoint(nativeRpc.endpointForReport(), { localOnly: true });
     check(/^5120[0-9a-f]{64}$/u.test(reserveScriptHex) && Number.isInteger(minimumConfirmations) && minimumConfirmations >= 1 && minimumConfirmations <= 1000, "WithdrawalPolicyRejected");
     this.#maxFee = BigInt(canonicalUintDecimal(maxFeeAtomic, "max fee")); this.#maxAmount = BigInt(canonicalUintDecimal(maxAmountAtomic, "max amount"));

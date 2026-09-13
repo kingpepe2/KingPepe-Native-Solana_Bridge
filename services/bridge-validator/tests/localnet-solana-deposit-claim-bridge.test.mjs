@@ -23,6 +23,7 @@ import { FileBackedSolanaDepositClaimJournal, InMemorySolanaDepositClaimJournal,
 import { base58Decode, base58Encode, findProgramAddress } from "../solana-deposit-claim-transaction-plan.mjs";
 import { bytesToHex, hexToBytes } from "../../../shared/protocol/canonical-message.mjs";
 import { SolanaDepositClaimObserver } from "../../solana-observer/solana-deposit-claim-observer.mjs";
+import { DEVNET_SOLANA_GENESIS } from "../../../shared/solana-test-network.mjs";
 
 const ZERO_HASH = "00".repeat(32);
 
@@ -281,7 +282,7 @@ class FakeDepositClaimObserver {
     this.calls.push(input);
     return {
       trust: "LOCAL_VALIDATION",
-      cluster: "localnet",
+      cluster: this.config.cluster,
       slot: 88,
       rootSlot: 88,
       commitment: "finalized",
@@ -536,11 +537,11 @@ test("localnet Solana deposit bridge fails closed for missing blockhash dependen
   assert.equal(result.reason, "SOLANA_LATEST_BLOCKHASH_UNAVAILABLE");
 });
 
-test("pending receipt and lost response survive journal reopen without duplicate broadcast", async () => {
+for (const environment of ["localnet", "devnet"]) test(`${environment}: pending receipt and lost response survive journal reopen without duplicate broadcast`, async () => {
   const fixture = createRequest();
   const feePayer = feePayerKeypair();
   const rpc = new FakeLocalnetSolanaRpc({ status: { slot: 88, confirmationStatus: "confirmed", err: null } });
-  const config = bridgeConfig(fixture.config, feePayer);
+  const config = bridgeConfig(fixture.config, feePayer, { environment, cluster: environment, solanaGenesis: DEVNET_SOLANA_GENESIS });
   const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-solana-stage-retry-"));
   const journals = () => ({
     journal: new FileBackedSolanaDepositClaimJournal({ root: path.join(root, "claim"), repoRoot: process.cwd() }),
@@ -576,7 +577,7 @@ test("pending receipt and lost response survive journal reopen without duplicate
     rpc.status.err = null;
     rpc.latestBlockhash = pubkey("later-blockhash-for-claim-only").base58;
     const completed = await construct(journals()).submitDepositClaim(fixture.request);
-    assert.equal(completed.state, DEPOSIT_STATES.COMPLETED);
+    assert.equal(completed.state, DEPOSIT_STATES.COMPLETED, completed.reason);
     assert.equal(rpc.sendCalls.length, 2);
     const restarted = await construct(journals()).submitDepositClaim(fixture.request);
     assert.deepEqual(restarted, completed);

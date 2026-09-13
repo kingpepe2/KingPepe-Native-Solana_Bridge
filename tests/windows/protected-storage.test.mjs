@@ -18,6 +18,7 @@ import { ProjectAttester, verifyProjectAttestation } from "../../services/attest
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { decodeCanonicalBridgeMessage } from "../../shared/protocol/canonical-message.mjs";
 import { AuthenticatedLocalDepositLedger } from "../../services/bridge-validator/local-deposit-ledger.mjs";
+import { DEVNET_SOLANA_GENESIS } from "../../shared/solana-test-network.mjs";
 
 if (process.platform !== "win32") throw new Error("WINDOWS_PROTECTED_STORAGE_TESTS_REQUIRE_WINDOWS");
 const repoRoot = path.resolve(import.meta.dirname, "../..");
@@ -77,14 +78,14 @@ test("Devnet deployment test material uses real DPAPI without a plaintext fallba
   assert.throws(() => new WindowsProtectedStore({ ...options, context: { ...options.context,
     solanaDeployment: h("different-devnet-deployment") } }).read(), /WindowsProtectedStoreRejected/u);
 });
-test("local economic journal uses an existing DPAPI key without plaintext fallback", t => {
+for (const environment of ["localnet", "devnet"]) test(`${environment} economic journal uses an existing DPAPI key without plaintext fallback`, t => {
   const vector = JSON.parse(readFileSync(path.join(repoRoot, "solana/modules/bridge-messages/vectors/canonical-borsh-v2.json"))).vectors[0];
   const deployment = Buffer.from(vector.encodedHex.slice(24, 360), "hex");
   Buffer.from(REGTEST_GENESIS, "hex").copy(deployment, 8);
   const deploymentHex = deployment.toString("hex"), id = h("protected-journal-test");
-  const { parent, options } = fixture(t, "BRIDGE_VALIDATOR", "bridge-journal-key", { instanceId: id,
+  const { parent, options } = fixture(t, "BRIDGE_VALIDATOR", "bridge-journal-key", { environment, instanceId: id,
     nativeGenesis: deploymentHex.slice(16, 80), solanaDeployment: deploymentHex.slice(80, 144) });
-  const settings = { environment: "localnet", repoRoot, root: path.join(parent, "accounting"), deploymentHex, journalIdHex: id };
+  const settings = { environment, solanaGenesis: DEVNET_SOLANA_GENESIS, repoRoot, root: path.join(parent, "accounting"), deploymentHex, journalIdHex: id };
   const key = randomBytes(32), store = WindowsProtectedStore.create(options, key); key.fill(0);
   const ledger = AuthenticatedLocalDepositLedger.fromProtectedLocalKey(settings, store, true);
   ledger.hardStop("TEST_REVIEW_REQUIRED"); ledger.close();
@@ -92,6 +93,8 @@ test("local economic journal uses an existing DPAPI key without plaintext fallba
   assert.equal(reopened.status().state, "HARD_STOP"); reopened.close();
   assert.throws(() => AuthenticatedLocalDepositLedger.fromProtectedLocalKey({ ...settings, journalIdHex: h("wrong-journal") }, store));
   assert.throws(() => AuthenticatedLocalDepositLedger.fromProtectedLocalKey({ ...settings, authenticationKey: randomBytes(32) }, store));
+  assert.throws(() => AuthenticatedLocalDepositLedger.fromProtectedLocalKey({ ...settings, environment: environment === "devnet" ? "localnet" : "devnet" }, store));
+  if (environment === "devnet") assert.throws(() => AuthenticatedLocalDepositLedger.fromProtectedLocalKey({ ...settings, solanaGenesis: "wrong-network" }, store));
   store.close(); assert.throws(() => AuthenticatedLocalDepositLedger.fromProtectedLocalKey(settings, store));
 });
 test("created protected files have explicit private DACLs on a fixed local volume", t => {
@@ -273,4 +276,21 @@ test("attester loads a distinct DPAPI-protected seed with deployment binding", t
     sweepFinalized: true, utxoUnspentAtDeposit: true, noPriorConsumption: true } };
   const attestation = attester.signDepositCredit(request, decoded.validFrom);
   assert.equal(verifyProjectAttestation(attestation, vector.encodedHex), true); attester.close();
+});
+
+test("Devnet attester requires explicit test-network admission before reading protected credentials", t => {
+  const seed = randomBytes(32), publicKeyHex = Buffer.from(ed25519.getPublicKey(seed)).toString("hex");
+  const { options } = fixture(t, "ATTESTER_A", "attester-seed", { environment: "devnet" });
+  const policy = { role: "ATTESTER_A", attesterPublicKeyHex: publicKeyHex, protocolId: 1,
+    nativeNetwork: 8_000_111, nativeGenesisHex: REGTEST_GENESIS, solanaDeploymentHex: options.context.solanaDeployment,
+    managerProgramIdHex: h("manager"), transceiverProgramIdHex: h("transceiver"), mintHex: h("mint"),
+    keyEpoch: 1, policyEpoch: 1, acceptedNativeTrust: ["LOCALLY_VALIDATED_CHAIN_STATE"], depositsPaused: false, hardStop: false };
+  const store = WindowsProtectedStore.create(options, seed); seed.fill(0);
+  const request = { store, role: "ATTESTER_A", policy, environment: "devnet", solanaGenesis: DEVNET_SOLANA_GENESIS };
+  for (const overrides of [{ environment: "localnet" }, { environment: "mainnet" }, { solanaGenesis: "wrong-network" },
+    { policy: { ...policy, nativeGenesisHex: h("wrong-native-network") } }]) {
+    assert.throws(() => ProjectAttester.fromWindowsProtectedStore({ ...request, ...overrides }), /ProtectedAttesterLocalOnly/u);
+  }
+  const attester = ProjectAttester.fromWindowsProtectedStore(request);
+  assert.equal(attester.publicKeyHex, publicKeyHex); attester.close();
 });

@@ -9,15 +9,18 @@
   "signerTopology": "SINGLE_HOST",
   "commonHostRiskDecision": "ACCEPTED_BY_KINGPEPE_TEAM",
   "lastUpdated": "2026-09-13",
-  "sourceStatus": "PHASE_16_EXPLICIT_DEVNET_RUNTIME_ADMISSION_IN_PROGRESS",
+  "sourceStatus": "PHASE_16_RETAINED_SERVICE_DEVNET_INTEGRATION_IN_PROGRESS",
   "phase16": {
     "status": "IN_PROGRESS",
-    "milestone": "GENESIS_BOUND_DEVNET_RPC_AND_DEPLOYMENT_OBSERVATION",
+    "milestone": "GENESIS_BOUND_DEVNET_RETAINED_SERVICE_INTEGRATION",
     "admissionValidation": { "focusedNodeTests": "97_PASS", "liveDevnetSnapshotSlot": "497796861", "liveConfigMatch": true,
       "transactionsSubmitted": 0, "secretScan": "PASS", "provenance": "275_FILES_PASS", "guardrails": "PASS" },
+    "serviceIntegrationValidation": { "windowsNode": "1005_PASS", "wslNode": "1005_PASS", "focusedWindowsDpapi": "3_PASS",
+      "restartAndLostResponse": "LOCALNET_AND_DEVNET_UNIT_REGRESSIONS_PASS", "secretScan": "PASS", "provenance": "275_FILES_PASS", "guardrails": "PASS",
+      "scope": "RETAINED_SERVICE_UNIT_AND_PROTECTED_STORAGE_CHECKS_NOT_LIVE_DEVNET_E2E" },
     "nativeToSolanaDevnet": "NOT_RUN",
     "solanaDevnetToNative": "NOT_RUN",
-    "scope": "Retained clients gain explicit test-network admission; transfer engines remain local-only until the next integration milestone. No program redeployment or Mainnet authorization."
+    "scope": "Retained deposit, withdrawal, reconciliation and journal paths accept explicit Devnet/regtest policy. Local defaults stay local; protected secrets and journal context remain deployment-bound. Real Devnet transfers are not yet certified. No program redeployment or Mainnet authorization."
   },
   "phase15": {
     "status": "PASS",

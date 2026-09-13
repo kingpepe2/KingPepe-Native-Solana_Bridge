@@ -1,6 +1,7 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 // Durable-state validation, not a Native proof or a signing/minting authority.
 import { createHash } from "node:crypto";
+import { DEVNET_SOLANA_GENESIS } from "../../shared/solana-test-network.mjs";
 import { bridgeInputDigest } from "../../shared/protocol/bridge-inputs.mjs";
 import { canonicalJson, canonicalUintDecimal, validateNativeSigningIntent } from "../../native/frost/policy/native-signing-policy.mjs";
 import { REGTEST_GENESIS, verifyRegtestSweepSignatures } from "../../native/node/native-raw-evidence.mjs";
@@ -29,7 +30,8 @@ export function validateDepositOperationPolicy(input) {
   const p = structuredClone(input);
   fields(p, ["environment", "nativeGenesis", "solanaDeployment", "solanaGenesis", "minimumSolanaSlot", "managerProgramId", "transceiverProgramId", "mint", "protocolId",
     "nativeNetwork", "policyEpoch", "keyEpoch", "frostPublicKeyHex", "csvDelayBlocks", "minimumConfirmations", "maximumAmountAtomic", "maximumFeeAtomic"]);
-  check(p.environment === "localnet" && p.nativeGenesis === REGTEST_GENESIS, "DepositOperationLocalnetOnly");
+  check((p.environment === "localnet" || (p.environment === "devnet" && p.solanaGenesis === DEVNET_SOLANA_GENESIS &&
+    p.nativeNetwork === 8_000_111)) && p.nativeGenesis === REGTEST_GENESIS, "DepositOperationLocalnetOnly");
   check(typeof p.solanaGenesis === "string" && base58Decode(p.solanaGenesis).length === 32 && base58Encode(base58Decode(p.solanaGenesis)) === p.solanaGenesis);
   uint(p.minimumSolanaSlot);
   for (const k of ["solanaDeployment", "managerProgramId", "transceiverProgramId", "mint", "frostPublicKeyHex"]) hash(p[k]);

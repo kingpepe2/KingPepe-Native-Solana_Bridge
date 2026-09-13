@@ -1,5 +1,6 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 import assert from "node:assert/strict";
+import { DEVNET_SOLANA_GENESIS } from "../../../shared/solana-test-network.mjs";
 import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { copyFileSync, existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, truncateSync, writeFileSync } from "node:fs";
@@ -53,6 +54,7 @@ function mutate(file, statement, ...parameters) {
   try { db.prepare(statement).run(...parameters); }
   finally { db.close(); }
 }
+
 function child(f, mode) {
   const keyFile = path.join(f.root, "ephemeral-authentication.bin");
   if (!existsSync(keyFile)) writeFileSync(keyFile, f.options.authenticationKey, { mode: 0o600, flag: "wx" });
@@ -91,6 +93,15 @@ if (process.argv[2] === "--ledger-worker") {
     process.exitCode = 1;
   }
 } else {
+  test("Devnet journal reopens with its exact test context and rejects a localnet re-label", t => {
+    const f = fixture(t, { environment: "devnet", solanaGenesis: DEVNET_SOLANA_GENESIS });
+    const created = f.create(); assert.equal(created.environment, "devnet");
+    created.pause(); const checkpoint = created.checkpoint(); created.close();
+    assert.throws(() => f.reopen({ environment: "localnet" }));
+    assert.throws(() => f.reopen({ solanaGenesis: undefined }), /LocalLedgerEnvironmentRejected/u);
+    const reopened = f.reopen({}); assert.deepEqual(reopened.checkpoint(), checkpoint);
+    assert.equal(reopened.status().state, "PAUSED");
+  });
   test("withdrawal inbox rejects unverified records and keeps status pagination bounded", t => {
     const f = fixture(t), store = f.create(), before = store.checkpoint();
     assert.throws(() => store.enqueueConfirmedWithdrawal({ signature: "1".repeat(64), encodedMessageHex: credit().encodedMessageHex }));

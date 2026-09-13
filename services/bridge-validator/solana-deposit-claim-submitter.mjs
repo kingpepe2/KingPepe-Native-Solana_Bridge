@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { devnetRpcEndpoint, assertDevnetGenesis } from "../../shared/solana-test-network.mjs";
+import { devnetRpcEndpoint, assertDevnetGenesis, isTestSolanaCluster } from "../../shared/solana-test-network.mjs";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { validateRuntimeFile, validateRuntimeStateRoot as validateStateRootOutsideRepo } from "../../shared/runtime-path-boundary.mjs";
@@ -80,7 +80,7 @@ export class SolanaDepositClaimSubmitter {
 
   async submitDepositClaim(request) {
     const normalized = normalizeDepositClaimRequest(this.#config, request);
-    if (this.#config.environment !== "localnet") {
+    if (!isTestSolanaCluster(this.#config)) {
       return submitterDecision(DEPOSIT_STATES.HARD_STOP, "SOLANA_DEPOSIT_SUBMITTER_LOCALNET_ONLY", normalized);
     }
 
@@ -693,6 +693,7 @@ function normalizeSubmitterConfig(config) {
   return Object.freeze({
     environment: value.environment ?? "localnet",
     cluster: value.cluster ?? "localnet",
+    solanaGenesis: value.solanaGenesis,
     solanaDeploymentHex: normalizeHash32(value.solanaDeploymentHex, "solanaDeploymentHex"),
     managerProgramIdHex: normalizeHash32(value.managerProgramIdHex, "managerProgramIdHex"),
     transceiverProgramIdHex: normalizeHash32(value.transceiverProgramIdHex, "transceiverProgramIdHex"),

@@ -24,7 +24,7 @@ export class FinalizedWithdrawalReader {
   constructor({ rpc, manifest }) {
     check(rpc instanceof LocalDeploymentRpc, "WithdrawalLocalRpcRequired");
     this.#manifest = validateDeploymentManifest(manifest);
-    check(this.#manifest.environment === "localnet" && this.#manifest.nativeGenesisHex === REGTEST_GENESIS && this.#manifest.mint.decimals === 8);
+    check(this.#manifest.nativeGenesisHex === REGTEST_GENESIS && this.#manifest.mint.decimals === 8);
     this.#rpc = rpc;
   }
   async discover(knownOperationIds, limit = 16) {

@@ -24,7 +24,7 @@ export class BridgeUserApi {
   #active() { check(this.#service.status({ limit: 1 }).state === "ACTIVE"); }
   getBridgeStatus() {
     const s = this.#service.status({ limit: 100 });
-    return { state: s.state, trust: s.trust, environment: "localnet", productionReady: false, mainnetActivation: "DISABLED",
+    return { state: s.state, trust: s.trust, environment: this.#policy.environment, productionReady: false, mainnetActivation: "DISABLED",
       decimals: 8, symbol: "KPEPE", accounting: s.accounting, deposits: s.deposits ?? [], withdrawals: s.withdrawals };
   }
   async createNativeDepositRequest(input) {

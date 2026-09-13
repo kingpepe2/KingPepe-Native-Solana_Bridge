@@ -68,7 +68,7 @@ export function createSolanaWithdrawalRequest({ policy, ...input }) {
     encodedMessageHex, messageDigestHex: message.messageDigestHex, validUntil: input.validUntil,
     instruction: { ...instructionAccounts, dataBase64: Buffer.from(data).toString("base64") },
     transactionBase64: unsignedWithdrawalPacket(instruction, input.userAuthority, input.recentBlockhash),
-    walletAction: "SIGN_AND_SEND_WITH_YOUR_SOLANA_WALLET", chain: "solana:localnet" };
+    walletAction: "SIGN_AND_SEND_WITH_YOUR_SOLANA_WALLET", chain: "solana:" + p.environment };
 }
 
 // Fixed bridge + compute-budget, single-user-signer packet; not an arbitrary

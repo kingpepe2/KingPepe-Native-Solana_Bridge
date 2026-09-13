@@ -1,6 +1,7 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 // Codec/HTTP/CLI boundary tests. Stub statuses below are NOT chain evidence.
 import assert from "node:assert/strict";
+import { DEVNET_SOLANA_GENESIS } from "../../../shared/solana-test-network.mjs";
 import { test } from "node:test";
 import { randomBytes } from "node:crypto";
 import { bech32, bech32m } from "@scure/base";
@@ -78,6 +79,17 @@ test("withdrawal refuses wrong amount, fee, destination, signer and unsupported 
     { validUntil: "10" }, { validUntil: "100000" }, { withdrawalIdHex: h(0) }, { nonceHex: h(0) }, { mint: key(99) }]) {
     assert.throws(() => createSolanaWithdrawalRequest({ policy, ...withdrawal, ...changes }));
   }
+});
+
+test("Devnet SDK preserves canonical operation bytes while requesting the correct wallet chain", () => {
+  const devnet = { ...policy, environment: "devnet", solanaGenesis: DEVNET_SOLANA_GENESIS };
+  const local = createSolanaWithdrawalRequest({ policy, ...withdrawal });
+  const remote = createSolanaWithdrawalRequest({ policy: devnet, ...withdrawal });
+  assert.equal(remote.chain, "solana:devnet"); assert.equal(local.chain, "solana:localnet");
+  assert.equal(remote.transactionBase64, local.transactionBase64);
+  assert.equal(remote.operationId, local.operationId);
+  assert.throws(() => createSolanaWithdrawalRequest({ policy: { ...devnet, solanaGenesis: policy.solanaGenesis }, ...withdrawal }));
+  assert.throws(() => createSolanaWithdrawalRequest({ policy: { ...devnet, nativeGenesis: "00".repeat(32) }, ...withdrawal }));
 });
 
 async function httpFixture(t) {

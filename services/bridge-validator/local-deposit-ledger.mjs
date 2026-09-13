@@ -1,7 +1,8 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
-// Local-only authenticated accounting journal. It is NOT signing authority,
+// Local authenticated REGTEST accounting journal for Solana test networks. It is NOT signing authority,
 // a chain proof, protected production storage or a rollback-proof nonce store.
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { DEVNET_SOLANA_GENESIS } from "../../shared/solana-test-network.mjs";
 import { closeSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync, constants as sql } from "node:sqlite";
@@ -40,6 +41,7 @@ export class AuthenticatedLocalDepositLedger {
   #key;
   #context;
   #deployment;
+  #environment;
   #ledger = new ExactDepositLedger();
   #head = 0n;
   #tag;
@@ -55,10 +57,11 @@ export class AuthenticatedLocalDepositLedger {
 
   static createLocal(options) { return new AuthenticatedLocalDepositLedger(options, true); }
   static openLocal(options) { return new AuthenticatedLocalDepositLedger(options, false); }
+  get environment() { return this.#environment; }
   static fromProtectedLocalKey(options, keyStore, create = false) {
     assertWindowsProtectedStore(keyStore, "BRIDGE_VALIDATOR", "bridge-journal-key");
     const c = keyStore.context, deployment = exactHex(options.deploymentHex, DEPLOYMENT_IDENTITY_LENGTH, "Deployment");
-    if (Object.hasOwn(options, "authenticationKey") || c.environment !== "localnet" || options.environment !== "localnet" ||
+    if (Object.hasOwn(options, "authenticationKey") || !["localnet", "devnet"].includes(c.environment) || options.environment !== c.environment ||
         c.instanceId !== options.journalIdHex || c.nativeGenesis !== deployment.subarray(8, 40).toString("hex") ||
         c.solanaDeployment !== deployment.subarray(40, 72).toString("hex")) throw new Error("LocalLedgerProtectedKeyBindingRejected");
     // Only an existing OS-protected key is read. Never create a missing key,
@@ -72,7 +75,9 @@ export class AuthenticatedLocalDepositLedger {
 
   constructor(options, create) {
     if (typeof create !== "boolean") throw new Error("LocalLedgerExplicitCreateOrOpenRequired");
-    if (options?.environment !== "localnet") throw new Error("LocalLedgerEnvironmentRejected");
+    if (!(options?.environment === "localnet" || (options?.environment === "devnet" && options.solanaGenesis === DEVNET_SOLANA_GENESIS)))
+      throw new Error("LocalLedgerEnvironmentRejected");
+    this.#environment = options.environment;
     if (process.versions.node !== toolchain.node.version) throw new Error("LocalLedgerPinnedRuntimeRequired");
     this.#deployment = exactHex(options.deploymentHex, DEPLOYMENT_IDENTITY_LENGTH, "Deployment");
     if (this.#deployment.subarray(8, 40).toString("hex") !== REGTEST_GENESIS) throw new Error("LocalLedgerRegtestRequired");
@@ -82,7 +87,10 @@ export class AuthenticatedLocalDepositLedger {
     if (!Number.isSafeInteger(maxPages) || maxPages < 8 || maxPages > 16384) throw new Error("LocalLedgerPageLimitRejected");
     if (!(options.authenticationKey instanceof Uint8Array) || options.authenticationKey.length !== 32) throw new Error("LocalLedgerAuthenticationKeyRequired");
     this.#key = Buffer.from(options.authenticationKey);
-    this.#context = Buffer.concat([MAGIC, Buffer.from([1]), id, this.#deployment]);
+    // Keep existing local journals byte-for-byte compatible. The explicit
+    // Devnet context discriminator prevents opening one as the other even if
+    // the caller copies the journal ID, deployment identity and authentication key.
+    this.#context = Buffer.concat([MAGIC, Buffer.from([this.#environment === "devnet" ? 2 : 1]), id, this.#deployment]);
     this.#tag = this.#authenticate(0n, 0, Buffer.alloc(0), Buffer.alloc(32));
     this.#repoRoot = options.repoRoot;
     try {
