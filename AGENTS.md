@@ -40,8 +40,12 @@ at 1f8ce111f10f31e6984c25d02903071d2f893076 with exact-SHA CI 34732975925.
 Its publication ddd234e0be44587b44a5d8f9b3ad4ade215b2b97 also passed matching
 CI 34735282747 (four required jobs passed, none skipped).
 Current phase: 15, first TEST-only Devnet deployment using canonical Borsh V2.
-Finish and publish the focused test-enrollment milestone, verify matching CI,
-then deploy with fresh protected TEST credentials and record public identities.
+Test enrollment is published at 9e339122748848a4bc762e3a09bcaecded478d50.
+Devnet deployment is BLOCKED by test funding: the standard public airdrop
+returned RPC -32603 and then HTTP 429; the fresh protected test fee payer has
+zero balance. Do not bypass faucet limits or use production funds. Preserve
+the prepared local-only test credentials. Once funded, verify matching CI and
+resume deployment with those same identities; do not generate replacement keys.
 Devnet test state must not enable Mainnet. Existing local callers stay local-only.
 No production configuration, keys, funds or deployment.
 Preserve the completed transfer engines, accounting, lifecycle, replay semantics,
