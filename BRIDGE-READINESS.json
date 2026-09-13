@@ -9,9 +9,43 @@
   "signerTopology": "SINGLE_HOST",
   "commonHostRiskDecision": "ACCEPTED_BY_KINGPEPE_TEAM",
   "lastUpdated": "2026-09-13",
-  "sourceStatus": "PHASE_12_USER_ACCESS_LOCALLY_VALIDATED_MATCHING_PUBLICATION_CI_REQUIRED",
-  "phase12": {
+  "sourceStatus": "PHASE_13_LOCALLY_VALIDATED_MATCHING_PUBLICATION_CI_REQUIRED",
+  "phase13": {
     "status": "PASS_LOCAL_VALIDATION_CI_PENDING",
+    "sourceBaseSha": "71c68af9e8ec01737a52b6ab48a54e32263d0554",
+    "scope": "RETAINED_CORE_FAILURE_PATHS_AND_BOUNDED_CANONICAL_MESSAGE_CORRUPTION_TESTS",
+    "runtimeArchitectureChanged": false,
+    "signerTopology": "SINGLE_HOST",
+    "signerRequirements": "SEPARATE_PARTICIPANTS_PROCESSES_PROTECTED_SHARES_AND_NONCE_STATE_EXACT_2_OF_2_NO_FALLBACK_COORDINATOR_NO_PRIVATE_SHARE",
+    "commonHostRiskDecision": "EXPLICITLY_ACCEPTED_BY_KINGPEPE_TEAM",
+    "externalReviewDisclosure": "COMMON_HOST_COMPROMISE_OR_OUTAGE_MAY_AFFECT_BOTH_PARTICIPANTS_NOBLE_FROST_REMAINS_UNAUDITED",
+    "validation": {
+      "scope": "REVIEWED_MILESTONE_WORKTREE_BASED_ON_SOURCE_BASE_SHA_NO_RUNTIME_CODE_CHANGE_MATCHING_COMMIT_CI_REQUIRED",
+      "nodeWindows": { "pass": 991, "fail": 0, "skip": 0 },
+      "nodeWsl": { "pass": 991, "fail": 0, "skip": 0 },
+      "rust": { "pass": 101, "lockedCheck": true, "format": true, "clippy": true },
+      "canonicalVectorsPerPlatform": 53,
+      "singleBitCorruptionsRejectedPerPlatform": 12336,
+      "browserUiTests": { "pass": 4, "fail": 0, "skip": 0, "scope": "UI_ONLY_NOT_CHAIN_PROOF" },
+      "sbf": "PASS_PINNED_INCREMENTAL_BUILDS_IN_FRESH_LOCAL_CHAIN_RUNS_HASHES_MATCH_PHASE_11",
+      "realServiceChecks": { "pass": 25, "fail": 0 },
+      "realReconciliationChecks": { "pass": 10, "fail": 0, "claimChecks": 14 },
+      "realNativeReorgChecks": { "pass": 8, "fail": 0 },
+      "nativeToSolana": "COMPLETED",
+      "solanaToNative": "COMPLETED",
+      "reconciliation": "MATCH",
+      "reconciliationStartupRetry": "INITIAL_INVOCATION_OMITTED_REQUIRED_SOURCE_SHA_REJECTED_BEFORE_CHAIN_START_CORRECTED_INVOCATION_PASSED_FAILURE_LOG_RETAINED",
+      "secretScan": "PASS_WORKTREE_AND_HISTORY_FINAL_STAGED_GATE_REQUIRED_BEFORE_COMMIT",
+      "sourceProvenance": { "status": "PASS", "files": 269 },
+      "guardrails": "PASS",
+      "dependencyLicenseAudit": "PASS",
+      "npmAuditVulnerabilities": 0,
+      "testLedgerDatabases": "REMOVED_AFTER_SHUTDOWN_KEYS_AND_EVIDENCE_PRESERVED"
+    },
+    "exactShaCi": "VERIFY_MATCHING_GITHUB_ACTIONS_RUN"
+  },
+  "phase12": {
+    "status": "PASS",
     "milestone": "SIMPLE_USER_INTERFACE",
     "sourceBaseSha": "6e8230ae67671dec9e373c012590af0751f3f394",
     "sdkMilestoneSourceSha": "6e8230ae67671dec9e373c012590af0751f3f394",
@@ -42,7 +76,7 @@
       "npmAuditVulnerabilities": 0,
       "testLedgerDatabase": "REMOVED_AFTER_SHUTDOWN_KEYS_PRESERVED"
     },
-    "exactShaCi": "VERIFY_MATCHING_GITHUB_ACTIONS_RUN"
+    "exactShaCi": { "sourceSha": "71c68af9e8ec01737a52b6ab48a54e32263d0554", "runId": "34728490291", "requiredJobsPassed": 4, "skippedJobs": 0, "status": "PASS" }
   },
   "phase11": {
     "status": "PASS",
@@ -262,5 +296,5 @@
     "status": "VERIFY_MATCHING_GITHUB_ACTIONS_RUN",
     "scope": "Local results do not substitute for the workflow run at this exact commit"
   },
-  "next": "COMPLETE_PHASE_11_VALIDATION_AND_EXACT_SHA_CI_THEN_PHASE_12"
+  "next": "COMPLETE_PHASE_13_CORE_HARDENING_THEN_PHASE_14_FRESH_CLONE"
 }

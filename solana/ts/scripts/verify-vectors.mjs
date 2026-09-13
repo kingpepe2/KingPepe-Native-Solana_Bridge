@@ -10,6 +10,14 @@ import { encodeNativeInput } from "../../../shared/protocol/native-inputs.mjs";
 const file = JSON.parse(readFileSync(new URL("../../modules/bridge-messages/vectors/canonical-borsh-v2.json", import.meta.url), "utf8"));
 assert.equal(file.messageVersion, protocol.MESSAGE_VERSION);
 assert.equal(file.messageLength, protocol.MESSAGE_LENGTH);
+let corruptedMessagesRejected = 0;
+const canonicalRejections = new Set([
+  "InvalidMagic", "UnsupportedVersion", "NonZeroReservedByte", "InvalidAction", "InvalidDirection",
+  "DestinationTooLong", "DestinationEmpty", "NonZeroDestinationPadding", "AmountZero", "FeeExceedsAmount",
+  "EpochZero", "InvalidValidityWindow", "NonceZero", "EvidenceDigestZero", "MissingDepositOutpoint",
+  "UnexpectedWithdrawalId", "UnexpectedDepositOutpoint", "MissingWithdrawalId", "ActionDirectionMismatch",
+  "OperationIdMismatch", "NonCanonicalBorsh",
+]);
 for (const vector of file.vectors) {
   const input = {
     ...vector, version: protocol.MESSAGE_VERSION,
@@ -27,6 +35,18 @@ for (const vector of file.vectors) {
   assert.equal(protocol.bytesToHex(protocol.encodeOperationIdInputs(input)), vector.operationIdInputsHex, vector.name);
   assert.equal(protocol.bytesToHex(protocol.messageDigest(input)), vector.messageDigest, vector.name);
   assert.deepEqual(protocol.encodeCanonicalBridgeMessage(protocol.decodeCanonicalBridgeMessage(encoded)), encoded);
+  // Bounded, deterministic corruption coverage of every bit in each golden
+  // message. This does not replace attestation or chain verification: someone
+  // can construct a different internally consistent message with a NEW ID.
+  for (let index = 0; index < encoded.length; index++) {
+    for (let bit = 0; bit < 8; bit++) {
+      const corrupted = Uint8Array.from(encoded); corrupted[index] ^= 1 << bit;
+      assert.throws(() => protocol.decodeCanonicalBridgeMessage(corrupted),
+        error => error.name === "Error" && canonicalRejections.has(error.message.split(":")[0]),
+        `${vector.name}: byte ${index}, bit ${bit}`);
+      corruptedMessagesRejected++;
+    }
+  }
   for (let length = 0; length < encoded.length; length++) {
     assert.throws(() => protocol.decodeCanonicalBridgeMessage(encoded.subarray(0, length)), /InvalidLength/);
   }
@@ -49,6 +69,8 @@ for (const vector of file.vectors) {
   }
 }
 console.log(`Verified ${file.vectors.length} canonical Borsh protocol vector(s), operation preimages, digests and strict rejection checks.`);
+assert.equal(corruptedMessagesRejected, file.vectors.length * protocol.MESSAGE_LENGTH * 8);
+console.log(`Rejected ${corruptedMessagesRejected} single-bit canonical-message corruptions without parser crashes.`);
 
 const abiFile = JSON.parse(readFileSync(new URL("../../modules/bridge-messages/vectors/abi-borsh-v2.json", import.meta.url), "utf8"));
 function abiValue(schema, input) {

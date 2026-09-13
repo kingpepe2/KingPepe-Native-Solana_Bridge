@@ -235,6 +235,35 @@ fn shared_golden_vectors_match_rust_encoding() {
 }
 
 #[test]
+fn canonical_vectors_reject_every_single_bit_corruption() {
+    let file: VectorFile =
+        serde_json::from_str(include_str!("../vectors/canonical-borsh-v2.json")).unwrap();
+    assert!(!file.vectors.is_empty());
+    for case in file.vectors {
+        let encoded = hex_to_bytes(&case.encoded_hex);
+        assert_eq!(encoded.len(), MESSAGE_LENGTH);
+        assert_eq!(
+            CanonicalBridgeMessage::decode(&encoded).unwrap(),
+            vector_message(&case)
+        );
+        // Corruption without recomputing the operation ID must be rejected.
+        // A valid NEW message still needs independent authorization/evidence.
+        // A decoder panic fails this test; only an explicit error is accepted.
+        for index in 0..encoded.len() {
+            for bit in 0..8 {
+                let mut corrupted = encoded.clone();
+                corrupted[index] ^= 1 << bit;
+                assert!(
+                    CanonicalBridgeMessage::decode(&corrupted).is_err(),
+                    "{}: byte {index}, bit {bit}",
+                    case.name
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn withdrawal_encoding_round_trip() {
     let message = withdrawal_message();
     let encoded = message.encode().expect("canonical encoding");

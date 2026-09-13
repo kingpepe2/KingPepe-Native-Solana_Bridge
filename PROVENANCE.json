@@ -1532,7 +1532,7 @@
     {
       "path": "solana/modules/bridge-messages/tests/messages_smoke.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Message module tests.",
+      "notes": "Original canonical message/accounting tests, shared Borsh vectors and bounded single-bit corruption rejection.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
@@ -1728,8 +1728,8 @@
     {
       "path": "solana/ts/scripts/verify-vectors.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Node-based vector verifier used by CI without production secrets.",
-      "purpose": "CORE_BRIDGE",
+      "notes": "Original Node canonical Borsh vector, strict decoding and bounded single-bit corruption checks used by CI without production secrets.",
+      "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {

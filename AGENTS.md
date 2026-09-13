@@ -35,12 +35,15 @@ required third-party notices and historical licensing facts.
 
 ## Current review scope
 
-Phase 12 minimal SDK, CLI and user interface. Phase 11 canonical Borsh migration
-passed at 2a37d0d0dc093a3ad545014bd45b2760ec6fd3db with exact-SHA CI
-34723965490 (four required jobs passed). Preserve the completed transfer engines,
-accounting, lifecycle, replay semantics, FROST topology, authorities and existing
-journal/inbox. Expose unsigned user requests and public status; user wallets sign
-their own transactions. No user-facing signing, minting or administrative API.
+Phase 13 practical core failure coverage and the accepted SINGLE_HOST decision.
+Phase 12 SDK, CLI and interface passed at
+71c68af9e8ec01737a52b6ab48a54e32263d0554 with exact-SHA CI 34728490291
+(four required jobs passed, none skipped). Preserve the completed transfer
+engines, canonical Borsh, accounting, lifecycle, replay semantics, FROST topology,
+authorities and existing journal/inbox. Reuse existing failure tests, add only
+bounded exposed-parser checks, and fix actual defects. No new security platform.
+User wallets sign their own transactions; no user-facing signing, minting or
+administrative API.
 Keep implementation commits phase-scoped. Commit/push each meaningful,
 self-contained milestone after its tests, scans and review, then verify its
 exact-SHA CI; do not accumulate the entire phase or commit trivial edits.

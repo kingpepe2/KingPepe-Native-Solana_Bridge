@@ -93,15 +93,60 @@ evidence, not an executed browser-wallet or Devnet certification.
 Provenance covers 269 files; guardrails, source/history secret scans and the
 dependency/license audit passed. The latter ran in WSL with pinned Cargo metadata;
 the Windows shell without that metadata could not run that particular audit.
-The npm audit has zero vulnerabilities. Exact-SHA publication CI is still required
-for the interface milestone. Its fresh real-chain service rerun passed all 25
-checks: both directions COMPLETED, reserve/supply 80,000,000 atomic units, no
+The npm audit has zero vulnerabilities. The interface milestone is published as
+71c68af9e8ec01737a52b6ab48a54e32263d0554; exact-SHA CI run 34728490291 passed
+all four required jobs, with none skipped. Its fresh real-chain service rerun
+passed all 25 checks: both directions COMPLETED, reserve/supply 80,000,000 atomic units, no
 pending mint/withdrawal liabilities and reconciliation MATCH. Temporary validator
 databases were removed after shutdown; test key files and diagnostic evidence
 remain external to Git. RecoveryProcedure remains NOT_TESTED; the actual encrypted
 snapshot/chain-resume drill is still required before Phase 15.
 
 See [user access](user-access.md) for the local-only API and CLI contract.
+
+## Phase 13 core hardening
+
+Locally validated, based on the completed Phase-12 source above; matching
+publication CI is required. The retained suites cover
+replay, duplicate-action, wrong identity/amount/recipient, signature/participant,
+RPC, restart, pause, reorg and exact reconciliation regressions. A bounded
+deterministic test flips every bit of the three canonical Borsh message vectors
+in Rust and TypeScript, including the maximum-amount withdrawal. This tests
+strict decoding and operation-ID binding, not authentication of a newly
+constructed self-consistent message. No new service, database, codec, security
+framework or economic behavior is introduced.
+
+`signerTopology = SINGLE_HOST` records the final KingPepe Team accepted-risk
+decision. The approved deployment requires both software participants, separate
+processes, protected shares and nonce state; the coordinator has no private share and
+there is no fallback. Common-host compromise or outage may affect both at once.
+This limitation, unaudited Noble FROST and the lack of a full-host snapshot
+rollback guarantee remain explicit disclosures for the Phase-18 reviewer.
+Local tests do not certify production service-account isolation or recovery.
+
+Windows and WSL each pass 991 retained Node tests and 53 canonical vectors,
+with 12,336 single-bit corruptions rejected in each language. Rust passes 101
+tests with locked checks, formatting and Clippy; all four browser regressions
+pass. Both pinned SBF builds execute in the fresh local-chain runs using retained
+compiler intermediates; their hashes match the Phase-11 release evidence. A
+fresh-target build remains part of Phase 14.
+
+The real service run passes 25 checks with both directions COMPLETED and exact
+80,000,000-atomic-unit reserve/outstanding supply, zero pending liabilities and
+reconciliation MATCH. The reconciliation run passes ten checks plus fourteen
+finalized-claim checks. The independent regtest reorg run passes eight checks,
+including incident persistence after restart and no automatic clear after chain
+recovery. Existing replay, invalid-identity/signature, amount/recipient, timeout,
+duplicate-action and pause coverage remains intact. No runtime defect was found
+in these exercised paths; this is not an external security audit.
+
+The first reconciliation invocation omitted its required source-SHA variable
+and was rejected before chain startup; the corrected invocation passed, with the
+failed command's evidence retained. Source/history secret scans, provenance for
+269 files, guardrails and dependency/license checks pass; npm reports zero
+vulnerabilities. Final staging/outgoing scans remain publication gates. Each
+test's validator database was removed after shutdown, while test keys and useful
+evidence remain outside Git. No validator ledger is retained for debugging.
 
 ## Phase 11 canonical Borsh validation
 
