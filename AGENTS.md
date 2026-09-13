@@ -35,10 +35,12 @@ required third-party notices and historical licensing facts.
 
 ## Current review scope
 
-Phase 11 canonical Borsh migration only. Phase 10 operational service scope is
-complete; do not reopen it. Preserve accounting, lifecycle, replay semantics,
-FROST topology, authorities and the existing journal/inbox. Require identical
-Rust/TypeScript bytes and digests and both local E2E directions using Borsh.
+Phase 12 minimal SDK, CLI and user interface. Phase 11 canonical Borsh migration
+passed at 2a37d0d0dc093a3ad545014bd45b2760ec6fd3db with exact-SHA CI
+34723965490 (four required jobs passed). Preserve the completed transfer engines,
+accounting, lifecycle, replay semantics, FROST topology, authorities and existing
+journal/inbox. Expose unsigned user requests and public status; user wallets sign
+their own transactions. No user-facing signing, minting or administrative API.
 Keep implementation commits phase-scoped. Commit/push each meaningful,
 self-contained milestone after its tests, scans and review, then verify its
 exact-SHA CI; do not accumulate the entire phase or commit trivial edits.

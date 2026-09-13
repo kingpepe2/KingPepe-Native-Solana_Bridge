@@ -52,6 +52,12 @@
   },
   "standardsReferences": [
     {
+      "project": "Native witness addresses and scure-base",
+      "urls": ["https://bips.dev/173/", "https://bips.dev/350/", "https://github.com/paulmillr/scure-base"],
+      "checkedAt": "2026-09-13",
+      "use": "Pinned @scure/base 2.4.0 MIT package API for checksum and bit conversion. Original adapter restricts supported scripts and expected HRP. No upstream implementation or vectors copied. REGTEST rkpepe is verified in the pinned Native source src/kernel/chainparams.cpp, not assumed from Bitcoin. No external audit claim for current package or integration."
+    },
+    {
       "project": "Borsh specification and implementations",
       "urls": [
         "https://borsh.io/",
