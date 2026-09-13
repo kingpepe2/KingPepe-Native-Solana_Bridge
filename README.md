@@ -126,9 +126,13 @@ The bridge is designed to enforce several basic rules:
 
 Development / Pre-Activation
 
+Both directions have completed end-to-end testing between KingPepe Native
+regtest and Solana Devnet. Devnet edge-case testing, a recovery drill and
+a sustained soak period remain required before production readiness.
+
 Mainnet bridge activation is currently disabled.
 
-Local development and validation do not imply production activation.
+Local and Devnet validation do not imply production readiness or activation.
 
 Production deployment information will be published only when the
 KingPepe Team formally activates the bridge.

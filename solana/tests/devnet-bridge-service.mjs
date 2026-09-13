@@ -44,8 +44,8 @@ const json = v => JSON.stringify(v, (_, value) => typeof value === "bigint" ? va
 const required = name => { assert(process.env[name], "DevnetTestSettingMissing:" + name); return process.env[name]; };
 let interrupted = false;
 for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => { interrupted = true; });
-function diskGuard() {
-  assert(!interrupted, "TestInterrupted");
+function diskGuard({ allowInterrupted = false } = {}) {
+  assert(allowInterrupted || !interrupted, "TestInterrupted");
   assert.equal(process.platform, "win32", "DevnetProtectedTestRequiresWindows");
   const free = drive => { const v = statfsSync(drive, { bigint: true }); return v.bavail * v.bsize; };
   const space = { cFree: free("C:/").toString(), dFree: free("D:/").toString() };
@@ -113,6 +113,7 @@ function retain(name, value) {
 }
 function event(name, data = {}) {
   const value = { name, time: new Date().toISOString(), ...data }; evidence.events.push(value);
+  if (evidence.events.length > 512) evidence.events.shift();
   console.log(json(value));
 }
 async function closeSigning() {
@@ -123,6 +124,11 @@ async function closeSigning() {
 try {
   evidence.diskBefore = diskGuard();
   assert(!process.env.KINGPEPE_PRODUCTION_ACTIVATION, "ProductionForbiddenInTestHarness");
+  const soakOption = process.env.KINGPEPE_DEVNET_SOAK_SECONDS;
+  const soakSeconds = soakOption === undefined ? 0 : Number(soakOption);
+  assert(soakOption === undefined || /^[1-9][0-9]*$/u.test(soakOption) && Number.isSafeInteger(soakSeconds) &&
+    soakSeconds >= 60 && soakSeconds <= 28 * 86400 && process.env.KINGPEPE_DEVNET_TEST_RUN, "TestSoakConfigurationRejected");
+  if (soakSeconds) evidence.phase = 17;
   const record = JSON.parse(readFileSync(path.join(repoRoot, "docs/deployment/devnet.json")));
   const manifest = devnetTestManifest(record), endpoint = required("SOLANA_DEVNET_RPC_URL");
   const rpc = new SolanaLocalRpcClient({ endpoint, environment: "devnet", expectedGenesis: DEVNET_SOLANA_GENESIS });
@@ -159,7 +165,8 @@ try {
 
   const partial = { environment: "localnet", nativeGenesis: REGTEST_GENESIS, solanaDeployment: manifest.solanaDeploymentHex,
     managerProgramId: keyHex(manifest.manager.id), transceiverProgramId: keyHex(manifest.transceiver.id), mint: keyHex(manifest.mint.id), keyEpoch: manifest.config.keyEpoch };
-  fixture = await createLocalSecurityFixture({ repoRoot, policy: partial, authorityOptions: retainedRuntime?.authorityOptions });
+  fixture = await createLocalSecurityFixture({ repoRoot, policy: partial, authorityOptions: retainedRuntime?.authorityOptions,
+    testCertificateDays: Math.ceil(soakSeconds / 86400) + 1 });
   if (!retainedRuntime) retain("local-runtime-context.json", { authorityOptions: fixture.authorityOptions });
   // Only the test ceremony initializes private shares. Runtime receives the
   // public package and references to separate OS-protected A/B stores.
@@ -353,7 +360,7 @@ try {
   let feeFundingInputs;
   const api = new BridgeUserApi({ service, ledger, depositFeeInputs: async () => feeFundingInputs });
   await health();
-  healthTask = (async () => { while (!stopHealth) { await delay(5000); if (!stopHealth) try { await health(); } catch { /* Next check must obtain fresh evidence; no synthetic health. */ } } })();
+  healthTask = (async () => { while (!stopHealth) { await delay(stage === "DEVNET_SOAK" ? 60000 : 5000); if (!stopHealth) try { await health(); } catch { /* Next check must obtain fresh evidence; no synthetic health. */ } } })();
 
   stage = "NATIVE_DEPOSIT";
   const oldQuote = existsSync(path.join(root, "deposit-request.json")) ? JSON.parse(readFileSync(path.join(root, "deposit-request.json"))) : undefined;
@@ -468,6 +475,72 @@ try {
   evidence.status = "PASS"; evidence.finalAccounting = finalState.accounting;
   evidence.protectedFrost = "SEPARATE_A_B_PROCESSES_CURRENT_PRINCIPAL_DPAPI_PINNED_MTLS_EXACT_2_OF_2";
   evidence.nativeEnvironment = "REGTEST_TEST_VALUE_ONLY"; evidence.runtimeFeePayer = feePayer.publicKeyBase58;
+  if (soakSeconds) {
+    stage = "DEVNET_EDGE_CHECKS";
+    const settled = service.status().accounting;
+    service.pause("DEVNET_TEST_MANUAL_REVIEW");
+    assert.equal((await service.tick()).state, "PAUSED");
+    assert.deepEqual(service.status().accounting, settled); assert.equal(signingRequests, signingCount);
+    // Explicit TEST operator review, not an automatic runtime unpause policy.
+    await service.resumeAfterReview(); assert.equal(service.status().state, "ACTIVE");
+    const originalSnapshot = solana.snapshot;
+    try {
+      solana.snapshot = async () => { throw new Error("TEST_INJECTED_RPC_OUTAGE"); };
+      const unavailable = await service.tick();
+      assert.equal(unavailable.state, "WAITING_FOR_DEPENDENCY");
+      assert.equal(service.status().state, "ACTIVE", "OutageMustNotFabricateContradiction");
+      assert.deepEqual(service.status().accounting, settled); assert.equal(signingRequests, signingCount);
+    } finally { solana.snapshot = originalSnapshot; }
+    await health();
+    const reconnected = await service.tick(); assert.equal(reconnected.reconciliation.state, "MATCH");
+    assert.deepEqual(await reader.discover([withdrawal.operationId]), [], "CompletedWithdrawalRediscovered");
+    evidence.edgeChecks = { pauseReviewedResume: "PASS", injectedRpcOutageAndRealReconnect: "PASS",
+      completedWithdrawalRediscovery: "PASS", noNewSigning: signingRequests === signingCount,
+      scope: "RETAINED_COMPLETED_OPERATIONS_NOT_A_PENDING_OPERATION_RESTORE_DRILL" };
+    event("DEVNET_EDGE_CHECKS_PASSED", evidence.edgeChecks);
+
+    stage = "DEVNET_SOAK";
+    const began = Date.now(), end = began + soakSeconds * 1000;
+    const miningIntervalMs = 600000, startHeight = Number(await nativeCli("getblockcount"));
+    // The retained regtest verifier deliberately accepts at most 4096 headers.
+    // Budget this TEST window up front; never reset its chain or weaken the bound.
+    assert(Number.isSafeInteger(startHeight) && startHeight + Math.ceil(soakSeconds * 1000 / miningIntervalMs) <= 4096,
+      "ObservationWindowExceedsRetainedRegtestHeaderBound");
+    evidence.soak = { startedAt: new Date(began).toISOString(), requestedSeconds: soakSeconds,
+      targetEndAt: new Date(end).toISOString(), observations: 0, waitingObservations: 0,
+      scope: "LIVE_SERVICE_OBSERVATION_OF_RETAINED_COMPLETED_TRANSFERS_NO_NEW_USER_TRANSFERS",
+      requiredRecoveryDrill: "NOT_RUN_ON_DEVNET", phase17Certified: false };
+    event("DEVNET_SOAK_STARTED", evidence.soak);
+    let previousState, lastReport = 0, lastMined = 0;
+    while (Date.now() < end) {
+      diskGuard();
+      // Keep isolated regtest fresh. This is TEST-driver mining, not a bridge
+      // runtime capability or a claim about public Native confirmation timing.
+      if (Date.now() - lastMined >= miningIntervalMs) {
+        await nativeCli("generatetoaddress", ["1", miner], wallet); lastMined = Date.now();
+      }
+      let sourcesAvailable = true;
+      try { await health(); } catch { sourcesAvailable = false; }
+      const result = await service.tick(), current = service.status();
+      assert.equal(current.state, "ACTIVE", "SoakPausedRequiresManualReview");
+      assert.deepEqual(current.accounting, settled, "UnexpectedEconomicActionDuringObservationSoak");
+      assert.equal(signingRequests, signingCount, "CompletedOperationSignedAgain");
+      const state = sourcesAvailable ? result.reconciliation?.state ?? result.state : "WAITING_FOR_DEPENDENCY";
+      evidence.soak.observations++; if (state !== "MATCH") evidence.soak.waitingObservations++;
+      if (state !== previousState || Date.now() - lastReport >= 3600000) {
+        const observation = { sourceSha: evidence.sourceSha, ...evidence.soak, observedAt: new Date().toISOString(),
+          elapsedSeconds: Math.floor((Date.now() - began) / 1000), state, residentBytes: process.memoryUsage().rss, ...diskGuard() };
+        retain("soak-observation-" + Date.now() + ".json", observation);
+        event("DEVNET_SOAK_OBSERVATION", observation); previousState = state; lastReport = Date.now();
+      }
+      await delay(Math.min(60000, Math.max(1, end - Date.now())));
+    }
+    evidence.soak.elapsedSeconds = Math.floor((Date.now() - began) / 1000);
+    // Even a complete observation window does not certify traffic/recovery,
+    // reorg, external-review or production readiness requirements by itself.
+    evidence.status = soakSeconds < 14 * 86400 ? "SMOKE_PASS_NOT_SOAK_COMPLETE" : "OBSERVATION_WINDOW_COMPLETE_NOT_PHASE17_PASS";
+    event("DEVNET_SOAK_WINDOW_ENDED", { ...evidence.soak, status: evidence.status });
+  }
 } catch (error) {
   phaseError = error; evidence.status = stage === "RPC_CAPABILITIES" && !error?.integrityCode ? "BLOCKED" : "FAIL"; evidence.failureStage = stage;
   // Do not include provider errors, process argv, private paths, buffers or keys.
@@ -488,9 +561,9 @@ try {
   if (fixture) try { await fixture.close({ retainState: true }); } catch { evidence.cleanupFailure = "IPC_SHUTDOWN"; }
   // Retain this real Devnet test's protected shares, wallet, journal and signed
   // packets for the next recovery/soak stage; never delete operational evidence.
-  try { evidence.diskAfter = diskGuard(); } catch { evidence.cleanupFailure = "DISK_HEADROOM"; }
+  try { evidence.diskAfter = diskGuard({ allowInterrupted: true }); } catch { evidence.cleanupFailure = "DISK_HEADROOM"; }
   if (root) retain("test-evidence-" + Date.now() + ".json", evidence);
-  console.log(json({ phase: 16, status: evidence.status, stage, evidenceRetained: Boolean(root), protectedStatePreserved: true,
+  console.log(json({ phase: evidence.phase, status: evidence.status, stage, evidenceRetained: Boolean(root), protectedStatePreserved: true,
     cleanupFailure: evidence.cleanupFailure ?? null, diskAfter: evidence.diskAfter, productionReady: false, mainnetActivation: "DISABLED" }));
   if (phaseError || evidence.cleanupFailure) process.exitCode = 1;
 }

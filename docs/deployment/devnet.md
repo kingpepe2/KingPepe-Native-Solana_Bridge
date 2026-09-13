@@ -126,3 +126,27 @@ submission uses identical signed bytes and sanitized bounded retry diagnostics.
 This is not a soak, independent review, public Native finality measurement or
 production-readiness certificate. Native blocks are mined only by the isolated
 regtest test driver; normal bridge services do not mine them.
+
+## Phase 17 observation window
+
+The same retained runner accepts the optional local-only
+`KINGPEPE_DEVNET_SOAK_SECONDS` setting with `KINGPEPE_DEVNET_TEST_RUN`.
+It checks policy pause/reviewed resume, a simulated RPC outage followed by real
+reconnection, and completed-withdrawal rediscovery before observing the service.
+Each check preserves accounting and forbids new signing for completed operations.
+
+Use 60 seconds for a smoke check or 1209600 seconds for a planned 14-day
+observation window. The runner checks disk headroom, budgets the retained
+regtest verifier's 4096-header limit, and issues test certificates covering the
+requested window. It samples live sources and service state every minute;
+unavailable health is recorded as WAIT, not fabricated success. Test-only mining
+is limited to one block per ten minutes. Reports go to the external run directory,
+hourly or on status changes, with bounded in-memory events. Shutdown preserves
+the protected test state needed for recovery; it creates no local Solana ledger.
+
+This mode observes the two retained completed transfers. It does not generate
+new user transactions and does not certify pending-operation restore, sustained
+transfer traffic, reorg testing, external review or production readiness. A short
+run reports `SMOKE_PASS_NOT_SOAK_COMPLETE`; even a completed observation window
+is not a Phase 17 PASS. Record the actual duration, interruptions and remaining
+edge/recovery work rather than treating the requested duration as elapsed time.

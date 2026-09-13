@@ -9,13 +9,36 @@
   "signerTopology": "SINGLE_HOST",
   "commonHostRiskDecision": "ACCEPTED_BY_KINGPEPE_TEAM",
   "lastUpdated": "2026-09-13",
-  "sourceStatus": "PHASE_16_BOTH_REAL_DIRECTIONS_COMPLETED_PUBLICATION_CI_PENDING",
+  "sourceStatus": "PHASE_16_PASS_PHASE_17_EDGE_CHECKS_IN_PROGRESS",
+  "phase17": {
+    "status": "IN_PROGRESS_NOT_CERTIFIED",
+    "milestone": "DEVNET_EDGE_SMOKE_AND_BOUNDED_OBSERVATION_RUNNER",
+    "milestoneValidation": { "windowsNode": "1009_PASS", "wslNode": "1009_PASS", "failedOrSkippedTests": 0,
+      "secretScan": "PASS", "provenance": "276_FILES_PASS", "guardrails": "PASS", "dependencyLicenseMetadata": "PASS", "npmVulnerabilities": 0 },
+    "edgeSmoke": {
+      "status": "SMOKE_PASS_NOT_SOAK_COMPLETE",
+      "sourceBaseSha": "e8f282fbe34975f96f4e0a1271072bbd7de5982e", "sourceWorktreeClean": false,
+      "executedHarnessSha256": "5a5d37daf6695943af5187c0cf185a4b24f7f3c2b46a0e13a2637a2796048bb8",
+      "startedAt": "2026-09-13T19:09:35.032Z", "requestedSeconds": 60, "elapsedSeconds": 82,
+      "observations": 2, "waitingObservations": 0,
+      "pauseAndReviewedResume": "PASS", "injectedRpcOutageAndRealReconnect": "PASS",
+      "completedWithdrawalRediscovery": "PASS", "noNewSigning": true, "accountingUnchanged": true,
+      "cleanup": "TEST_PROCESSES_STOPPED_PROTECTED_STATE_PRESERVED",
+      "initialHarnessFailure": "Invalid digit-bearing test pause label rejected by the existing journal; corrected test label, journal validation unchanged."
+    },
+    "observationScope": "RETAINED_COMPLETED_OPERATIONS_NO_NEW_USER_TRANSFERS_NOT_A_PENDING_RESTORE_DRILL",
+    "sustainedDevnetSoak": "NOT_COMPLETE",
+    "devnetRecoveryDrill": "NOT_RUN",
+    "remainingNetworkEdgeCases": "NOT_COMPLETE",
+    "phase17Certified": false
+  },
   "phase16": {
-    "status": "VALIDATED_PENDING_PUBLICATION_CI",
+    "status": "PASS",
     "milestone": "FINALIZED_HISTORY_DISCOVERY_AND_REAL_DEVNET_ROUND_TRIP",
     "milestoneValidation": { "windowsNode": "1009_PASS", "wslNode": "1009_PASS", "focusedHistoryAndSdk": "19_PASS",
       "failedOrSkippedTests": 0, "fullTreeSecretScan": "PASS", "provenance": "276_FILES_PASS", "guardrails": "PASS",
-      "dependencyLicenseMetadata": "PASS", "npmVulnerabilities": 0, "publicationExactShaCi": "PENDING" },
+      "dependencyLicenseMetadata": "PASS", "npmVulnerabilities": 0, "publicationExactShaCi": "PASS" },
+    "publicationExactShaCi": { "sourceSha": "e8f282fbe34975f96f4e0a1271072bbd7de5982e", "runId": "34774289824", "requiredJobsPassed": 4, "skippedJobs": 0, "skippedSteps": 0, "status": "PASS" },
     "preparedRuntimeExactShaCi": { "sourceSha": "1d89e5493a9e70131d132c6808301b85bd72edae", "runId": "34771920080", "requiredJobsPassed": 4, "skippedSteps": 0, "status": "PASS" },
     "serviceIntegrationExactShaCi": { "sourceSha": "d747e0bea0925079d88ffe08b164df30d35264bb", "runId": "34769417206", "requiredJobsPassed": 4, "skippedSteps": 0, "status": "PASS" },
     "admissionValidation": { "focusedNodeTests": "97_PASS", "liveDevnetSnapshotSlot": "497796861", "liveConfigMatch": true,
@@ -38,7 +61,7 @@
       "preflight": "READ_ONLY_RPC_CAPABILITY_CHECK_BEFORE_OPENING_SIGNERS_OR_SPENDING_TEST_FEES"
     },
     "realRoundTrip": {
-      "status": "PASS_WORKTREE_PUBLICATION_CI_REQUIRED",
+      "status": "PASS_WITH_SUBSEQUENT_PUBLICATION_CI_AND_CLEAN_SOURCE_RESTART",
       "completedAt": "2026-09-13T18:11:51.313Z",
       "sourceBaseSha": "1d89e5493a9e70131d132c6808301b85bd72edae",
       "sourceWorktreeClean": false,
@@ -71,11 +94,19 @@
       "reconciliation": { "state": "MATCH", "reserveAtomic": "0", "supplyAtomic": "0", "pendingMintAtomic": "0", "pendingWithdrawalAtomic": "0", "finalizedPayoutAtomic": "100000000", "nativeFeesAtomic": "1000" },
       "completedDepositRestart": "PASS_NO_SECOND_SWEEP_OR_MINT",
       "completedOperationRetick": "PASS_NO_NEW_FROST_SIGNING",
+      "cleanSourceRestart": { "sourceSha": "e8f282fbe34975f96f4e0a1271072bbd7de5982e", "sourceWorktreeClean": true,
+        "executedHarnessSha256": "053e9676efcf0327ff89e66349676b0ae3a22120440238b384d76197f8b9307b",
+        "completedAt": "2026-09-13T18:21:10.777Z", "bothDirections": "COMPLETED", "reconciliation": "MATCH",
+        "sameTransactionIds": true, "withdrawalSubmissionAttempts": 0, "newEconomicActions": 0 },
+      "finalizedOnNetworkBorsh": { "status": "PASS", "schemaVersion": 2, "canonicalMessageBytes": 514,
+        "types": ["ManagerDepositClaim", "ManagerWithdrawalRequest", "TransceiverVerifyMessage"],
+        "exactReencodedBytesAndDigestsMatch": true, "transceiverInstructionBytes": 519,
+        "scope": "READ_ONLY_DECODE_OF_FINALIZED_TRANSACTIONS_NO_NEW_SUBMISSIONS" },
       "cleanup": "TEST_PROCESSES_STOPPED_PROTECTED_STATE_RETAINED_OUTSIDE_GIT",
       "soak": "NOT_STARTED",
       "limitations": "RPC-observed Devnet finality; regtest blocks are mined by the test driver. Not a public Native network timing, full-host recovery or external review certificate."
     },
-    "scope": "Retained deposit, withdrawal, reconciliation and journal paths run against real Devnet and isolated regtest. Local defaults and protected state remain deployment-bound. Working-tree round trip awaits publication CI. No redeployment or Mainnet authorization."
+    "scope": "Retained deposit, withdrawal, reconciliation and journal paths run against real Devnet and isolated regtest. Published source passed exact-SHA CI and a clean-source restart. Local defaults and protected state remain deployment-bound. No redeployment or Mainnet authorization."
   },
   "phase15": {
     "status": "PASS",

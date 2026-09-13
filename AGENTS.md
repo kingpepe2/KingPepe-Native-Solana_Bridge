@@ -41,9 +41,11 @@ Its publication ddd234e0be44587b44a5d8f9b3ad4ade215b2b97 also passed matching
 CI 34735282747 (four required jobs passed, none skipped).
 Phase 15 TEST-only Devnet enrollment is PASS using canonical Borsh V2. Publication
 36f9e3a4d5af8495d8abb7fde6871894e3fec195 passed exact-SHA CI 34766210723:
-all four required jobs and every step, none skipped. Current phase: 16, explicit
-Devnet client admission followed by retained service integration and real
-regtest/Devnet flows in both directions. Public deployment identities, source, build hashes and
+all four required jobs and every step, none skipped. Phase 16 real regtest/Devnet
+flows in both directions are PASS at e8f282fbe34975f96f4e0a1271072bbd7de5982e,
+with exact-SHA CI 34774289824: all four jobs and every step, none skipped.
+Current phase: 17, scoped Devnet edge checks, recovery drill and sustained soak.
+Public deployment identities, source, build hashes and
 transactions are in docs/deployment/devnet.json. Both programs and the Mint
 already exist; do not redeploy them or recreate enrollment on a routine restart.
 Source 5ad33201402813503d31b6d97c2e3e6fdb7908c1 passed all four jobs and every
@@ -67,7 +69,10 @@ restart/drill checks; do not redeploy or regenerate signing state. The first
 user withdrawal packet expired without landing; its replacement preserved the
 exact Borsh message and operation ID after live absence/expiry checks. The test
 runner checks history capability before opening signers or spending test fees.
-Working-tree results still require publication CI. The soak has not started.
+A clean-source restart at that Phase-16 publication recognized both completed
+operations without new signing or submissions; reconciliation remained MATCH.
+The multi-week soak and Devnet recovery drill are not yet certified. A short
+observation of completed operations cannot substitute for either requirement.
 The pinned compiler's supported --arch v3 builds reproduce the deployed bytes;
 do not confuse them with default v0 local-test binaries or enable experimental ABI.
 Devnet test state must not enable Mainnet. Existing local callers stay local-only.

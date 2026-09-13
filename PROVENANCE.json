@@ -27,7 +27,7 @@
     {
       "path": "solana/tests/devnet-bridge-service.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original explicit regtest/Devnet E2E harness over retained bridge workers and protected A/B test processes; bounded identical-packet retries and expired TEST-user packet replacement preserve canonical operation identity. No production, deployment or airdrops; credentials and recovery state stay outside source.",
+      "notes": "Original explicit regtest/Devnet E2E harness over retained bridge workers and protected A/B test processes; bounded retries preserve canonical operation identity. Optional pause/RPC/rediscovery checks and a bounded observation window do not certify a complete soak or recovery drill. No production, deployment or airdrops; credentials and recovery state stay outside source.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },

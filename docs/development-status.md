@@ -114,7 +114,7 @@ deployment. No Devnet transfer, soak,
 external review or production readiness is certified by Phase 15. See
 [Devnet deployment](deployment/devnet.md).
 
-## Phase 16 integration in progress
+## Phase 16 real Devnet round trip: PASS
 
 The retained Solana clients now accept explicitly configured HTTPS Devnet access
 with the pinned genesis. Default local callers remain local-only; Mainnet and
@@ -173,10 +173,27 @@ The discovery/round-trip milestone passed 1,009 retained Node tests on each
 platform, 19 focused history/SDK checks, full-tree secret scanning, exact 276-file
 provenance coverage, guardrails and locked dependency/license metadata checks;
 npm reports zero vulnerabilities. No dependency or on-chain program was changed.
-The completed deposit was also safely recognized after restart without another
-sweep or mint. Working-tree validation requires publication and matching CI;
-the multi-week Devnet soak has not started. Native blocks were mined by the
-regtest driver, not observed on a public Native network.
+Publication `e8f282fbe34975f96f4e0a1271072bbd7de5982e` passed exact-SHA CI
+`34774289824`: all four required jobs and every step, none skipped. A clean-source
+restart recognized both completed operations with identical transaction IDs,
+zero new submissions/signing and reconciliation MATCH. Read-only decoding of the
+finalized claim, withdrawal and Transceiver verification instructions confirmed
+exact canonical Borsh bytes and digests. Phase 16 is PASS.
+
+Phase 17 now covers Devnet edge checks, the recovery drill and sustained soak.
+Neither a short check nor observation of completed transfers alone certifies the
+required multi-week operation or recovery drill. Native blocks were mined by
+the regtest driver, not observed on a public Native network. External review and
+production authorization remain outstanding; Mainnet stays disabled.
+
+The initial Phase 17 Devnet smoke check passed policy pause/reviewed resume,
+an injected RPC outage with real reconnection, and completed-withdrawal
+rediscovery. Its requested 60-second observation lasted 82 seconds and produced
+two MATCH observations, no new signing, unchanged accounting and clean shutdown.
+The first test attempt used an invalid digit-bearing pause reason; the test label
+was corrected without weakening the journal. This is not a completed soak or
+Devnet restore drill. The optional bounded observation mode in the same runner
+is documented in [Devnet deployment](deployment/devnet.md).
 
 ## Final simplification
 
