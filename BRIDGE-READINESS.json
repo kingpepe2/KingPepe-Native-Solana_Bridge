@@ -9,9 +9,19 @@
   "signerTopology": "SINGLE_HOST",
   "commonHostRiskDecision": "ACCEPTED_BY_KINGPEPE_TEAM",
   "lastUpdated": "2026-09-13",
-  "sourceStatus": "PHASE_15_DEVNET_DEPLOYMENT_VERIFIED_PUBLICATION_CI_REQUIRED",
+  "sourceStatus": "PHASE_16_EXPLICIT_DEVNET_RUNTIME_ADMISSION_IN_PROGRESS",
+  "phase16": {
+    "status": "IN_PROGRESS",
+    "milestone": "GENESIS_BOUND_DEVNET_RPC_AND_DEPLOYMENT_OBSERVATION",
+    "admissionValidation": { "focusedNodeTests": "97_PASS", "liveDevnetSnapshotSlot": "497796861", "liveConfigMatch": true,
+      "transactionsSubmitted": 0, "secretScan": "PASS", "provenance": "275_FILES_PASS", "guardrails": "PASS" },
+    "nativeToSolanaDevnet": "NOT_RUN",
+    "solanaDevnetToNative": "NOT_RUN",
+    "scope": "Retained clients gain explicit test-network admission; transfer engines remain local-only until the next integration milestone. No program redeployment or Mainnet authorization."
+  },
   "phase15": {
-    "status": "DEPLOYED_VERIFIED_PUBLICATION_CI_REQUIRED",
+    "status": "PASS",
+    "publicationExactShaCi": { "sourceSha": "36f9e3a4d5af8495d8abb7fde6871894e3fec195", "runId": "34766210723", "requiredJobsPassed": 4, "skippedJobs": 0, "skippedSteps": 0, "status": "PASS" },
     "milestone": "FINALIZED_ZERO_SUPPLY_DEVNET_DEPLOYMENT_AND_PUBLIC_EVIDENCE",
     "sourceBaseSha": "ddd234e0be44587b44a5d8f9b3ad4ade215b2b97",
     "enrollmentImplementationSha": "9e339122748848a4bc762e3a09bcaecded478d50",
@@ -448,5 +458,5 @@
     "status": "VERIFY_MATCHING_GITHUB_ACTIONS_RUN",
     "scope": "Local results do not substitute for the workflow run at this exact commit"
   },
-  "next": "VERIFY_PHASE_15_EVIDENCE_PUBLICATION_CI_THEN_PHASE_16_REGTEST_DEVNET_E2E"
+  "next": "PHASE_16_REGTEST_DEVNET_SERVICE_INTEGRATION_AND_BOTH_DIRECTION_E2E"
 }

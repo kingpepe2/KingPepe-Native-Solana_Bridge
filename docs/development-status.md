@@ -105,13 +105,24 @@ and did not redeploy the Manager or Transceiver. No further airdrop was needed.
 Fresh external builds with the pinned compiler and supported `--arch v3` reproduced
 both deployed hashes. CI also checks these release hashes; default v0 local-test
 hashes are a separate artifact identity. RPC credentials stay in local process
-configuration, never in public evidence. The evidence publication requires its
-own matching CI before automatic continuation to Phase 16.
+configuration, never in public evidence. Publication
+`36f9e3a4d5af8495d8abb7fde6871894e3fec195` passed exact-SHA CI `34766210723`:
+all four required jobs and every step, none skipped. Phase 15 is PASS.
 
 The operational workers remain local-only until Phase 16 integrates and validates
 Native regtest against this real Devnet deployment. No Devnet transfer, soak,
 external review or production readiness is certified by Phase 15. See
 [Devnet deployment](deployment/devnet.md).
+
+## Phase 16 integration in progress
+
+The retained Solana clients now accept explicitly configured HTTPS Devnet access
+with the pinned genesis. Default local callers remain local-only; Mainnet and
+automatic Devnet airdrops are rejected. The same deployment verifier understands
+the existing Borsh DevnetTesting config and constructs its runtime manifest from
+the reviewed public enrollment record, not from arbitrary RPC account values.
+No transfer engine, journal, wire format or on-chain authority changed in this
+milestone. Service integration and both real Devnet directions remain NOT_RUN.
 
 ## Final simplification
 

@@ -1,6 +1,8 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 import { encodeBridgeAbi, decodeBridgeAbi } from "../../shared/protocol/solana-bridge-abi.mjs";
 import { createHash } from "node:crypto";
+import { isTestSolanaCluster, devnetRpcEndpoint, assertDevnetGenesis } from "../../shared/solana-test-network.mjs";
+import { REGTEST_GENESIS } from "../../native/node/native-raw-evidence.mjs";
 import { setTimeout as delay } from "node:timers/promises";
 import { base58Decode, base58Encode, findProgramAddress } from "../bridge-validator/solana-deposit-claim-transaction-plan.mjs";
 import { SPL_TOKEN_PROGRAM_ID_BASE58 as TOKEN } from "../bridge-validator/localnet-solana-setup-plan.mjs";
@@ -29,7 +31,9 @@ function canonical(v) { if (Array.isArray(v)) return v.map(canonical); if (v && 
 export function validateDeploymentManifest(input) {
   const m = structuredClone(input);
   keys(m, ["protocol", "environment", "sourceSha", "identityVersion", "nativeGenesisHex", "solanaGenesis", "solanaDeploymentHex", "minimumSlot", "maximumStallMs", "manager", "transceiver", "mint", "config"]);
-  check(m.protocol === DEPLOYMENT_MONITOR_PROTOCOL && m.environment === "localnet");
+  check(m.protocol === DEPLOYMENT_MONITOR_PROTOCOL && ["localnet", "devnet"].includes(m.environment) &&
+    isTestSolanaCluster({ ...m, cluster: m.environment }));
+  if (m.environment === "devnet") check(m.nativeGenesisHex === REGTEST_GENESIS && m.config?.nativeNetwork === 8_000_111 && m.mint?.decimals === 8);
   check(typeof m.sourceSha === "string" && /^[0-9a-f]{40}$/u.test(m.sourceSha));
   check(bounded(m.identityVersion, 0xffff_ffff) > 0); hash(m.nativeGenesisHex); hash(m.solanaDeploymentHex); key(m.solanaGenesis); uint(m.minimumSlot);
   check(bounded(m.maximumStallMs, 300000) >= 1000);
@@ -57,6 +61,26 @@ export function validateDeploymentManifest(input) {
   return immutable(canonical(m));
 }
 export function deploymentManifestDigest(manifest) { return deploymentDigest(Buffer.from(JSON.stringify(validateDeploymentManifest(manifest)))); }
+
+// Consume the reviewed public enrollment record. Never enroll identities from
+// whatever the RPC happens to return, or substitute the runtime source SHA for
+// the separately pinned on-chain program source.
+export function devnetTestManifest(record) {
+  check(record?.schema === "KINGPEPE_PHASE15_DEVNET_DEPLOYMENT/V1" && record.scope === "DEVNET_TEST_ONLY" &&
+    record.borshSchemaVersion === 2 && record.canonicalMagic === "KPEPBRG2" && record.initialSupplyAtomic === "0" &&
+    record.freezeAuthority === null && record.productionReady === false && record.mainnetActivation === "DISABLED", "DevnetEnrollmentRecordRejected");
+  const program = (name, id) => ({ id, loader: UPGRADEABLE_LOADER, programData: record.pdas[name + "ProgramData"],
+    upgradeAuthority: record.upgradeAuthority, deploymentSlot: String(record.transactions[name + "Deployment"].slot) });
+  return validateDeploymentManifest({ protocol: DEPLOYMENT_MONITOR_PROTOCOL, environment: "devnet", sourceSha: record.sourceSha,
+    identityVersion: 1, nativeGenesisHex: record.nativeGenesis, solanaGenesis: record.solanaGenesis,
+    solanaDeploymentHex: record.solanaDeploymentHex, minimumSlot: String(record.transactions.mintAndConfigEnrollment.slot), maximumStallMs: 60000,
+    manager: program("manager", record.managerProgram), transceiver: program("transceiver", record.transceiverProgram),
+    mint: { id: record.mint, tokenProgram: record.tokenProgram, authority: record.pdas.mintAuthority, decimals: record.decimals },
+    config: { bridgePda: record.pdas.bridgePda, transceiverPda: record.pdas.transceiverPda,
+      policyEpoch: record.policyEpoch, keyEpoch: record.keyEpoch, protocolId: record.protocolId, nativeNetwork: record.nativeNetwork,
+      attesters: record.attesters, depositsPaused: false, withdrawalsPaused: false, transceiverActive: true } });
+}
+
 export function deploymentAddresses(m) { return [m.manager.id, m.transceiver.id, m.mint.id, m.config.bridgePda, m.config.transceiverPda,
   ...[m.manager, m.transceiver].filter(p => p.programData !== null).map(p => p.programData)]; }
 
@@ -64,8 +88,8 @@ function expectedConfig(m) {
   const c = m.config, h = v => Buffer.from(v, "hex");
   // Only the two economic counters are mutable; neither counter is an authority.
   const bridge = encodeBridgeAbi("BridgeState", {
-    magic: Buffer.from("KPBSTAT1"), version: 1, state: 2,
-    config: { binding: { environment: 0, managerProgramId: key(m.manager.id), transceiverProgramId: key(m.transceiver.id),
+    magic: Buffer.from("KPBSTAT1"), version: 1, state: m.environment === "devnet" ? 3 : 2,
+    config: { binding: { environment: m.environment === "devnet" ? 1 : 0, managerProgramId: key(m.manager.id), transceiverProgramId: key(m.transceiver.id),
       solanaDeployment: h(m.solanaDeploymentHex), mint: key(m.mint.id), tokenProgramId: key(TOKEN),
       mintAuthorityPda: key(m.mint.authority), decimals: m.mint.decimals, nativeDecimals: m.mint.decimals },
       freezeTag: 0, freezeKey: Buffer.alloc(32), initialSupply: 0n,
@@ -135,8 +159,11 @@ export function verifyDeploymentSnapshot(manifest, snapshot) {
 }
 
 export class LocalDeploymentRpc {
-  #endpoint; #id = 0;
-  constructor({ endpoint }) {
+  #endpoint; #id = 0; #environment;
+  constructor({ endpoint, environment = "localnet", expectedGenesis }) {
+    check(["localnet", "devnet"].includes(environment), "DeploymentEnvironmentRejected");
+    this.#environment = environment;
+    if (environment === "devnet") { this.#endpoint = devnetRpcEndpoint(endpoint, expectedGenesis); return; }
     const u = new URL(endpoint);
     check(u.protocol === "http:" && u.hostname === "127.0.0.1" && u.port && Number(u.port) >= 1024 && u.pathname === "/" && !u.username && !u.password && !u.search && !u.hash, "DeploymentLocalEndpointRequired");
     this.#endpoint = u.href;
@@ -153,13 +180,20 @@ export class LocalDeploymentRpc {
       check(v?.jsonrpc === "2.0" && v.id === id && Object.hasOwn(v, "result") && !Object.hasOwn(v, "error"), "DeploymentSourceUnavailable"); return v.result;
     } catch { fail("DeploymentSourceUnavailable"); }
   }
-  async genesis() { const result = await this.#call("getGenesisHash", []); key(result); return result; }
+  async genesis() {
+    const result = await this.#call("getGenesisHash", []); key(result);
+    if (this.#environment === "devnet") assertDevnetGenesis(result);
+    return result;
+  }
   async finalizedTransaction(signature) {
     check(typeof signature === "string" && signature.length <= 88 && base58Decode(signature).length === 64, "DeploymentTransactionSignatureRejected");
+    if (this.#environment === "devnet") await this.genesis();
     return this.#call("getTransaction", [signature, { commitment: "finalized", encoding: "json", maxSupportedTransactionVersion: 0 }]);
   }
   async withdrawalRecordAccounts(manifest) {
     const m = validateDeploymentManifest(manifest);
+    check(m.environment === this.#environment, "DeploymentEnvironmentMismatch");
+    if (this.#environment === "devnet") await this.genesis();
     const v = await this.#call("getProgramAccounts", [m.manager.id, { commitment: "finalized", encoding: "base64", withContext: true,
       filters: [{ dataSize: 283 }, { memcmp: { offset: 0, bytes: base58Encode(Buffer.from("KPBWDR01")) } }] }]);
     check(Number.isSafeInteger(v?.context?.slot) && BigInt(v.context.slot) >= uint(m.minimumSlot) && Array.isArray(v.value) && v.value.length <= 256, "WithdrawalDiscoveryUnavailable");
@@ -172,6 +206,7 @@ export class LocalDeploymentRpc {
   }
   async finalizedSignatures(address) {
     key(address);
+    if (this.#environment === "devnet") await this.genesis();
     const v = await this.#call("getSignaturesForAddress", [address, { commitment: "finalized", limit: 64 }]);
     check(Array.isArray(v) && v.length <= 64, "WithdrawalDiscoveryUnavailable");
     for (const r of v) check(typeof r?.signature === "string" && r.signature.length <= 88 && base58Decode(r.signature).length === 64 &&
@@ -183,6 +218,7 @@ export class LocalDeploymentRpc {
   }
   async snapshotWithAdditionalAccounts(manifest, additionalAccounts, minimumSlot = manifest.minimumSlot) {
     const m = validateDeploymentManifest(manifest); check(uint(minimumSlot) <= BigInt(Number.MAX_SAFE_INTEGER));
+    check(m.environment === this.#environment, "DeploymentEnvironmentMismatch");
     check(Array.isArray(additionalAccounts) && additionalAccounts.length <= 64);
     const addresses = [...deploymentAddresses(m), ...additionalAccounts];
     addresses.forEach(key); check(new Set(addresses).size === addresses.length);

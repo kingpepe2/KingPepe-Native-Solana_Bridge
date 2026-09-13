@@ -39,9 +39,11 @@ Phase 14 fresh-clone validation and the isolated encrypted restore drill passed
 at 1f8ce111f10f31e6984c25d02903071d2f893076 with exact-SHA CI 34732975925.
 Its publication ddd234e0be44587b44a5d8f9b3ad4ade215b2b97 also passed matching
 CI 34735282747 (four required jobs passed, none skipped).
-Current milestone: Phase 15 TEST-only Devnet enrollment is finalized and verified
-using canonical Borsh V2; verify the evidence publication's exact-SHA CI before
-proceeding to Phase 16. Public deployment identities, source, build hashes and
+Phase 15 TEST-only Devnet enrollment is PASS using canonical Borsh V2. Publication
+36f9e3a4d5af8495d8abb7fde6871894e3fec195 passed exact-SHA CI 34766210723:
+all four required jobs and every step, none skipped. Current phase: 16, explicit
+Devnet client admission followed by retained service integration and real
+regtest/Devnet flows in both directions. Public deployment identities, source, build hashes and
 transactions are in docs/deployment/devnet.json. Both programs and the Mint
 already exist; do not redeploy them or recreate enrollment on a routine restart.
 Source 5ad33201402813503d31b6d97c2e3e6fdb7908c1 passed all four jobs and every

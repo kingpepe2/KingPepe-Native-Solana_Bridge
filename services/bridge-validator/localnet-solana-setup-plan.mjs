@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { DEVNET_SOLANA_GENESIS } from "../../shared/solana-test-network.mjs";
+export { DEVNET_SOLANA_GENESIS } from "../../shared/solana-test-network.mjs";
 import { encodeBridgeAbi } from "../../shared/protocol/solana-bridge-abi.mjs";
 import { REGTEST_GENESIS } from "../../native/node/native-raw-evidence.mjs";
 import { ed25519 } from "@noble/curves/ed25519.js";
@@ -24,7 +26,6 @@ export const SPL_TOKEN_PROGRAM_ID_BASE58 = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss6
 export const SYSTEM_PROGRAM_ID_BASE58 = "11111111111111111111111111111111";
 
 export const LOCALNET_SOLANA_SETUP_SCOPE = "LOCALNET_MINT_CONFIG_AND_TEST_RECIPIENT_BOOTSTRAP";
-export const DEVNET_SOLANA_GENESIS = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG";
 export const DEVNET_SOLANA_SETUP_SCOPE = "DEVNET_ZERO_SUPPLY_TEST_MINT_AND_CONFIG";
 export const BRIDGE_INSTRUCTION_INITIALIZE = 1;
 export const TRANSCEIVER_INSTRUCTION_INITIALIZE = 1;
