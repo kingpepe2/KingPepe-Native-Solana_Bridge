@@ -35,14 +35,16 @@ required third-party notices and historical licensing facts.
 
 ## Current review scope
 
-Phase 14 fresh-clone validation and the required isolated encrypted restore
-drill before Devnet. Phase 13 core failure coverage passed at
-eb105cba5276f99e76572c824fe5c190b1fe1a75 with exact-SHA CI 34730712772
-(four required jobs passed, none skipped). Preserve the completed transfer
-engines, canonical Borsh, accounting, lifecycle, replay semantics, FROST topology,
-authorities and existing journal/inbox. Exercise the manual restore runbook
-through the existing real-chain harness, not a second recovery engine. Use fresh
-external build directories and locked dependencies. No new security platform.
+Phase 14 fresh-clone validation and the isolated encrypted restore drill passed
+at 1f8ce111f10f31e6984c25d02903071d2f893076 with exact-SHA CI 34732975925
+(four required jobs passed, none skipped). Complete this status publication's
+matching CI gate, then continue to Phase 15: first TEST-only Devnet deployment
+using canonical Borsh V2. No production configuration, keys, funds or deployment.
+Preserve the completed transfer engines, accounting, lifecycle, replay semantics,
+FROST topology, authorities and existing journal/inbox. Recovery is TESTED only
+for closed localnet/regtest state with a known quiescent gap, not production
+DPAPI portability or full-host rollback. Repeat the drill during Phase 17.
+Use external build directories and locked dependencies. No new security platform.
 User wallets sign their own transactions; no user-facing signing, minting or
 administrative API.
 Keep implementation commits phase-scoped. Commit/push each meaningful,
