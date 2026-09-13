@@ -144,24 +144,39 @@ the relayer. Test credentials, Native wallet, operation records and signed
 packets remain outside Git for safe resume. Signed user packets are retained
 before submission; retries check their chain status and reuse the same packet.
 
-Phase 16 is **BLOCKED**: the configured RPC returns HTTP 400 / JSON-RPC -32600
-for `getProgramAccounts` because its current tier does not permit that method.
-The existing finalized withdrawal observer requires it. A denied method is
-never interpreted as zero withdrawals. The Native test deposit is retained as
-`OBSERVED`; no reserve sweep, KPEPE mint or Native payout has been authorized.
-Mint supply remains zero. No airdrop or program redeployment was performed.
-The test runner now checks this capability before opening signer state or
-spending test fees. Diagnostics expose numeric status only, never provider
-messages or credentials. Enable this method on the locally configured RPC
-before resuming the retained test run. Neither real Devnet direction is yet
-certified, and the soak period has not started.
+Prepared runtime `1d89e5493a9e70131d132c6808301b85bd72edae` passed exact-SHA
+CI `34771920080`: four required jobs, every step passed, none skipped. Its 1,006
+Node tests per platform, secret/provenance/guardrail checks and read-only
+enrollment recheck preceded the real transfers; that CI alone does not certify
+the subsequent working-tree Devnet implementation.
 
-The prepared-runtime milestone passes 1,006 retained Node tests on Windows and
-WSL, including the denied-method regression. Full-tree secret scanning,
-276-file provenance coverage and guardrails pass. A read-only enrollment
-recheck at finalized slot 497822241 still matches the deployed program hashes,
-Borsh configuration, PDA Mint authority and absent freeze authority, with zero
-supply. These checks do not certify either blocked real Devnet transfer.
+The configured RPC tier still denies `getProgramAccounts` (HTTP 400 / RPC
+-32600). This no longer blocks Devnet discovery: supported finalized Manager
+address history feeds the same retained withdrawal verifier. It validates
+complete bounded pagination to the enrollment slot, exact transaction, Borsh
+bytes, BurnChecked CPI, token delta and live record/PDA. Missing or malformed
+history waits, never implies zero withdrawals. No account permission bypass,
+second database or weakened withdrawal check is used. Capability preflight
+still runs before opening signing state or spending test fees.
+
+The real round trip reached COMPLETED in both directions on 2026-09-13, with
+reconciliation MATCH. One KPEPE was minted, burned through the bridge record,
+then paid on Native regtest with a 1000 atomic Native fee. Final reserve, supply
+and pending liabilities were zero. Public operation IDs, transaction IDs and
+canonical digests are in `BRIDGE-READINESS.json`. The first user withdrawal
+packet expired with no on-chain signature/record; a replacement preserved the
+exact canonical message and operation ID. Its burn finalized in 11.701 seconds.
+The initial dropped submission's underlying cause is not established. Bounded
+identical-packet retries now retain sanitized diagnostics rather than swallowing
+preflight failures. No redeployment, new airdrop or production action occurred.
+The discovery/round-trip milestone passed 1,009 retained Node tests on each
+platform, 19 focused history/SDK checks, full-tree secret scanning, exact 276-file
+provenance coverage, guardrails and locked dependency/license metadata checks;
+npm reports zero vulnerabilities. No dependency or on-chain program was changed.
+The completed deposit was also safely recognized after restart without another
+sweep or mint. Working-tree validation requires publication and matching CI;
+the multi-week Devnet soak has not started. Native blocks were mined by the
+regtest driver, not observed on a public Native network.
 
 ## Final simplification
 

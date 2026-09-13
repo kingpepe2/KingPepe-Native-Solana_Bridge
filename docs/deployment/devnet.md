@@ -103,7 +103,26 @@ The Phase 16 Windows protected test runner is
 `KINGPEPE_DEVNET_TEST_CONTEXT` and, for recovery, `KINGPEPE_DEVNET_TEST_RUN`;
 do not recreate a funded test run. It also requires the configured development
 storage profile, pinned Native test binaries/verifier and test OpenSSL tool.
-All private values stay outside Git. The runner checks `getProgramAccounts`
-availability on the configured Devnet RPC before opening signer state or
-spending fees. That method is currently denied by the RPC tier, so Phase 16
-is BLOCKED. A denied method must never be treated as an empty withdrawal list.
+All private values stay outside Git. Before opening signer state or spending
+fees, the runner verifies deployment identity and finalized discovery history.
+The provider tier denies `getProgramAccounts`. Devnet instead uses the supported
+[finalized address history](https://solana.com/docs/rpc/http/getsignaturesforaddress)
+and [transaction](https://solana.com/docs/rpc/http/gettransaction) methods. Every
+candidate passes the same Borsh/BurnChecked/token-delta/record/PDA verifier.
+History is bounded to 64 pages of 64 signatures and must reach the pinned
+enrollment boundary. Missing, malformed, pruned or over-limit history waits;
+it never becomes an empty withdrawal list. No provider restriction is bypassed
+and no second database/cursor is introduced. Localnet keeps its existing scan.
+
+The first real round trip reached COMPLETED in both directions, with exact Borsh
+messages and final reserve/supply/pending liabilities all zero. The withdrawal
+burned 100000000 atomic KPEPE; its regtest payout delivered 99999000 with a 1000
+atomic Native transaction fee. Test-only public transaction evidence is in
+`BRIDGE-READINESS.json` under `phase16.realRoundTrip`; source/CI scope is explicit.
+The original user packet expired without landing. Its replacement kept the
+same canonical message and operation ID after finalized expiry, signature
+history and record-absence checks. Both packets are retained locally. Repeated
+submission uses identical signed bytes and sanitized bounded retry diagnostics.
+This is not a soak, independent review, public Native finality measurement or
+production-readiness certificate. Native blocks are mined only by the isolated
+regtest test driver; normal bridge services do not mine them.

@@ -27,7 +27,7 @@
     {
       "path": "solana/tests/devnet-bridge-service.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original explicit regtest/Devnet E2E harness over retained bridge workers and protected A/B test processes. No production, deployment or airdrops; credentials and retained recovery state stay outside source.",
+      "notes": "Original explicit regtest/Devnet E2E harness over retained bridge workers and protected A/B test processes; bounded identical-packet retries and expired TEST-user packet replacement preserve canonical operation identity. No production, deployment or airdrops; credentials and recovery state stay outside source.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
@@ -41,7 +41,7 @@
     {
       "path": "services/solana-observer/tests/devnet-admission.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original test-network admission, pre-send genesis, credential-redaction and Borsh deployment-state regressions; unit fixtures are not live-chain evidence.",
+      "notes": "Original test-network admission, pre-send genesis, credential-redaction, finalized-history discovery and Borsh deployment/withdrawal verification regressions; unit fixtures are not live-chain evidence.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },

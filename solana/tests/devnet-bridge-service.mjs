@@ -36,7 +36,7 @@ import { BridgeUserApi } from "../../services/bridge-validator/user-api.mjs";
 import { SolanaLocalRpcClient, sanitizedRpcDiagnostic } from "../../services/bridge-validator/solana-deposit-claim-submitter.mjs";
 import { base58Decode, base58Encode, shortvecEncode } from "../../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs";
 import { encodeCanonicalBridgeMessage, decodeCanonicalBridgeMessage } from "../../shared/protocol/canonical-message.mjs";
-import { createNativeDepositRequest } from "../ts/sdk/bridge.mjs";
+import { createNativeDepositRequest, createSolanaWithdrawalRequest } from "../ts/sdk/bridge.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "../.."), exec = promisify(execFile);
 const hash = v => createHash("sha256").update(v).digest("hex"), keyHex = v => Buffer.from(base58Decode(v)).toString("hex");
@@ -130,10 +130,10 @@ try {
   assert.equal(await rpc.call("getGenesisHash"), DEVNET_SOLANA_GENESIS);
   const initial = verifyDeploymentSnapshot(manifest, await solana.snapshot(manifest));
   if (!process.env.KINGPEPE_DEVNET_TEST_RUN) assert.equal(initial.mintSupplyAtomic, "0", "ExistingDevnetSupplyRequiresExistingStateRecovery");
-  // A denied discovery method is not an empty withdrawal list. Verify the
-  // configured RPC supports it before opening signing state or spending fees.
+  // Verify complete finalized discovery through the supported history API
+  // before opening signing state or spending fees. Unavailable is never empty.
   stage = "RPC_CAPABILITIES";
-  await solana.withdrawalRecordAccounts(manifest);
+  await new FinalizedWithdrawalReader({ rpc: solana, manifest }).discover([]);
   stage = "PREPARATION";
   const local = JSON.parse(readFileSync(validateRuntimeFile(required("KINGPEPE_DEVNET_TEST_CONTEXT"), repoRoot)));
   const resumeRoot = process.env.KINGPEPE_DEVNET_TEST_RUN;
@@ -155,7 +155,7 @@ try {
   evidence.sourceWorktreeClean = (await exec("git", ["status", "--porcelain=v1"], { cwd: repoRoot, windowsHide: true })).stdout.trim() === "";
   evidence.harnessSha256 = hash(readFileSync(import.meta.filename));
   evidence.programSourceSha = record.sourceSha; evidence.borshSchemaVersion = 2;
-  event("DEVNET_IDENTITY_VERIFIED", { mint: manifest.mint.id, initialSupplyAtomic: initial.mintSupplyAtomic });
+  event("DEVNET_IDENTITY_VERIFIED", { mint: manifest.mint.id, observedSupplyAtomic: initial.mintSupplyAtomic });
 
   const partial = { environment: "localnet", nativeGenesis: REGTEST_GENESIS, solanaDeployment: manifest.solanaDeploymentHex,
     managerProgramId: keyHex(manifest.manager.id), transceiverProgramId: keyHex(manifest.transceiver.id), mint: keyHex(manifest.mint.id), keyEpoch: manifest.config.keyEpoch };
@@ -211,25 +211,31 @@ try {
   assert.equal(fundingKey, manifest.manager.upgradeAuthority); assert.equal(userPublicKey, record.recipient);
   const userSigner = { publicKeyBase58: userPublicKey, sign: bytes => Buffer.from(ed25519.sign(bytes, userSeed)) };
   closers.push(() => userSeed.fill(0));
-  async function finalized(signature) {
-    const started = Date.now();
-    for (;;) {
-      diskGuard(); const status = await rpc.getSignatureStatus(signature);
-      if (status?.confirmationStatus === "finalized") { assert.equal(status.err, null, "DevnetTransactionFailed"); return { slot: status.slot, finalityMilliseconds: Date.now() - started }; }
-      assert(Date.now() - started < 180000, "DevnetFinalityTimeout"); await delay(2000);
-    }
-  }
   async function submitRetained(packet) {
     const bytes = Buffer.from(packet.signedTransactionBase64 ?? packet.packet, "base64");
     assert.equal(base58Encode(bytes.subarray(1, 65)), packet.signature, "RetainedTestSignatureMismatch");
-    const status = await rpc.getSignatureStatus(packet.signature);
-    if (status) assert.equal(status.err, null, "RetainedTestTransactionFailed");
-    else {
-      assert(await rpc.getBlockHeight() <= BigInt(packet.lastValidBlockHeight), "RetainedUserTransactionExpiredNeedsReview");
-      try { assert.equal(await rpc.sendTransaction(bytes.toString("base64")), packet.signature); }
-      catch { /* A lost submission response is resolved by the same signature. */ }
+    const started = Date.now(); let attempts = 0;
+    for (;;) {
+      diskGuard(); const status = await rpc.getSignatureStatus(packet.signature);
+      if (status) {
+        assert.equal(status.err, null, "RetainedTestTransactionFailed");
+        if (status.confirmationStatus === "finalized") return { slot: status.slot, finalityMilliseconds: Date.now() - started, attempts };
+      } else {
+        assert(await rpc.getBlockHeight() <= BigInt(packet.lastValidBlockHeight), "RetainedUserTransactionExpiredNeedsReview");
+        try {
+          attempts += 1;
+          assert.equal(await rpc.sendTransaction(bytes.toString("base64"), { maxRetries: 3 }), packet.signature);
+        } catch (error) {
+          // Retrying these exact signed bytes cannot create a second action.
+          // Preserve a safe diagnostic instead of swallowing a preflight error.
+          const diagnostic = sanitizedRpcDiagnostic(error);
+          event("TEST_SUBMISSION_RETRY", { signature: packet.signature, attempts, ...diagnostic });
+          if (error.code === "ERR_ASSERTION" || diagnostic.instructionFailure || diagnostic.executionFault ||
+              diagnostic.transactionFailure === "InsufficientFundsForFee") throw error;
+        }
+      }
+      assert(Date.now() - started < 180000, "DevnetFinalityTimeout"); await delay(3000);
     }
-    return finalized(packet.signature);
   }
   try {
     const balance = async address => BigInt((await rpc.call("getAccountInfo", [address, { encoding: "base64", commitment: "finalized" }])).value?.lamports ?? 0);
@@ -350,11 +356,14 @@ try {
   healthTask = (async () => { while (!stopHealth) { await delay(5000); if (!stopHealth) try { await health(); } catch { /* Next check must obtain fresh evidence; no synthetic health. */ } } })();
 
   stage = "NATIVE_DEPOSIT";
-  const recoveryAddress = await nativeCli("getnewaddress", ["recovery", "bech32"], wallet);
-  const recovery = JSON.parse(await nativeCli("getaddressinfo", [recoveryAddress], wallet));
-  assert(recovery.ismine && /^(02|03)[0-9a-f]{64}$/u.test(recovery.pubkey), "NativeUserRecoveryPublicKeyRequired");
   const oldQuote = existsSync(path.join(root, "deposit-request.json")) ? JSON.parse(readFileSync(path.join(root, "deposit-request.json"))) : undefined;
-  const request = oldQuote?.request ?? { amountAtomic: "100000000", recipient: record.recipientSplAccount, userRecoveryPublicKeyHex: recovery.pubkey.slice(2), nonceHex: randomBytes(32).toString("hex") };
+  let request = oldQuote?.request;
+  if (!request) {
+    const recoveryAddress = await nativeCli("getnewaddress", ["recovery", "bech32"], wallet);
+    const recovery = JSON.parse(await nativeCli("getaddressinfo", [recoveryAddress], wallet));
+    assert(recovery.ismine && /^(02|03)[0-9a-f]{64}$/u.test(recovery.pubkey), "NativeUserRecoveryPublicKeyRequired");
+    request = { amountAtomic: "100000000", recipient: record.recipientSplAccount, userRecoveryPublicKeyHex: recovery.pubkey.slice(2), nonceHex: randomBytes(32).toString("hex") };
+  }
   const quote = createNativeDepositRequest({ policy, ...request }); retain("deposit-request.json", quote);
   const history = JSON.parse(await nativeCli("listtransactions", ["*", "1000"], wallet));
   const oldDeposit = history.filter(tx => tx.category === "send" && tx.address === quote.depositAddress);
@@ -409,6 +418,39 @@ try {
     userSigner.sign(userPacket.subarray(65)).copy(userPacket, 1);
     withdrawal = { ...unsigned, signedTransactionBase64: userPacket.toString("base64"), signature: base58Encode(userPacket.subarray(1, 65)) };
     retain("withdrawal-user-packet.json", withdrawal);
+  }
+  // A TEST user may replace an expired *unlanded* packet, not the withdrawal.
+  // Keep every old signed packet and the exact Borsh message/operation ID.
+  let retry = 1;
+  while (existsSync(path.join(root, `withdrawal-user-packet-${retry}.json`))) {
+    assert(retry <= 8, "TestWithdrawalRetryLimit");
+    const next = JSON.parse(readFileSync(path.join(root, `withdrawal-user-packet-${retry}.json`)));
+    assert.equal(next.encodedMessageHex, withdrawal.encodedMessageHex, "RetainedWithdrawalMessageChanged");
+    assert.equal(next.operationId, withdrawal.operationId, "RetainedWithdrawalOperationChanged");
+    withdrawal = next; retry += 1;
+  }
+  if (await rpc.getSignatureStatus(withdrawal.signature) === null && await rpc.getBlockHeight() > BigInt(withdrawal.lastValidBlockHeight)) {
+    assert(retry <= 8, "TestWithdrawalRetryLimit");
+    const old = withdrawal, message = decodeCanonicalBridgeMessage(old.encodedMessageHex);
+    const context = await service.userTransactionContext({ tokenAccount: record.recipientSplAccount,
+      authority: userPublicKey, amountAtomic: message.amountAtomic.toString() });
+    assert(BigInt(context.unixTimestamp) < message.validUntil, "TestWithdrawalMessageExpiredNeedsReview");
+    assert.equal(await rpc.getAccountInfo(old.instruction.accounts[1].key), null, "WithdrawalAlreadyRecordedNeedsReview");
+    assert.equal(await rpc.getSignatureStatus(old.signature), null, "WithdrawalAlreadySubmittedNeedsReview");
+    const unsigned = createSolanaWithdrawalRequest({ policy, amountAtomic: message.amountAtomic.toString(), feeAtomic: message.feeAtomic.toString(),
+      destination: old.destination, userAuthority: userPublicKey, sourceTokenAccount: record.recipientSplAccount,
+      withdrawalIdHex: message.withdrawalIdHex, nonceHex: Buffer.from(message.nonce).toString("hex"),
+      validFrom: message.validFrom.toString(), validUntil: message.validUntil.toString(), recentBlockhash: context.blockhash });
+    assert.equal(unsigned.encodedMessageHex, old.encodedMessageHex, "RetryMustPreserveExactWithdrawalMessage");
+    assert.equal(unsigned.operationId, old.operationId, "RetryMustPreserveWithdrawalOperation");
+    const packet = Buffer.from(unsigned.transactionBase64, "base64");
+    assert(packet[0] === 1 && packet.subarray(1, 65).equals(Buffer.alloc(64)), "TestUserPacketRejected");
+    userSigner.sign(packet.subarray(65)).copy(packet, 1);
+    withdrawal = { ...unsigned, lastValidBlockHeight: String(context.lastValidBlockHeight),
+      signedTransactionBase64: packet.toString("base64"), signature: base58Encode(packet.subarray(1, 65)) };
+    retain(`withdrawal-user-packet-${retry}.json`, withdrawal); // persist BEFORE send
+    event("EXPIRED_TEST_USER_PACKET_REPLACED", { oldSignature: old.signature, signature: withdrawal.signature,
+      operationId: withdrawal.operationId, canonicalMessageUnchanged: true, priorSignatureAbsent: true, withdrawalRecordAbsent: true });
   }
   const withdrawalSignature = withdrawal.signature;
   event("DEVNET_USER_BURN_FINALIZED", { signature: withdrawalSignature, ...await submitRetained(withdrawal) });

@@ -54,15 +54,20 @@ The funded test fee payer needs no further airdrops. Preserve its prepared
 protected credentials. Read SOLANA_DEVNET_RPC_URL from local process configuration
 without exposing it in source, logs, CLI diagnostics or public evidence.
 Service integration d747e0bea0925079d88ffe08b164df30d35264bb passed exact-SHA
-CI 34769417206, four required jobs and every step, none skipped. Phase 16 is
-blocked by the configured RPC tier denying getProgramAccounts (HTTP 400,
-JSON-RPC -32600). Do not bypass account permissions or treat the denial as
-an empty withdrawal list. The prepared protected Devnet test run retains an
-OBSERVED Native deposit, its original wallet, fee funding and journal outside
-Git. No sweep, mint or payout occurred. After RPC method access is enabled,
-resume that exact test state; do not redeploy or regenerate its signing state.
-The test runner checks discovery capability before opening signing state or
-spending test fees. Both real Devnet directions and the soak remain incomplete.
+CI 34769417206, four required jobs and every step, none skipped. Prepared-runtime
+1d89e5493a9e70131d132c6808301b85bd72edae also passed all jobs/steps in CI
+34771920080. The configured RPC tier denies getProgramAccounts; Devnet discovery
+now uses supported, bounded finalized Manager address history instead, feeding
+the same transaction/BurnChecked/record verifier. Missing history waits; no
+permission bypass, second index or database. Localnet discovery is unchanged.
+Both real regtest/Devnet directions reached COMPLETED with reconciliation MATCH
+in the retained protected test run. The original Native wallet, signing state,
+journal and signed packets remain outside Git. Preserve that exact state for
+restart/drill checks; do not redeploy or regenerate signing state. The first
+user withdrawal packet expired without landing; its replacement preserved the
+exact Borsh message and operation ID after live absence/expiry checks. The test
+runner checks history capability before opening signers or spending test fees.
+Working-tree results still require publication CI. The soak has not started.
 The pinned compiler's supported --arch v3 builds reproduce the deployed bytes;
 do not confuse them with default v0 local-test binaries or enable experimental ABI.
 Devnet test state must not enable Mainnet. Existing local callers stay local-only.

@@ -72,6 +72,15 @@ test("withdrawal produces the exact Borsh record instruction and one unsigned us
   const packet = Buffer.from(r.transactionBase64, "base64"); assert(packet.length <= 1232);
   assert.equal(packet[0], 1); assert(packet.subarray(1, 65).equals(Buffer.alloc(64))); assert.equal(packet[65], 1);
   assert.equal(r.walletAction, "SIGN_AND_SEND_WITH_YOUR_SOLANA_WALLET");
+  // A user wallet can replace an expired packet's blockhash without changing
+  // its economic operation, canonical Borsh authorization or replay identity.
+  const renewed = createSolanaWithdrawalRequest({ policy, ...withdrawal, recentBlockhash: key(12) });
+  assert.notEqual(renewed.transactionBase64, r.transactionBase64);
+  assert.equal(renewed.encodedMessageHex, r.encodedMessageHex);
+  assert.equal(renewed.messageDigestHex, r.messageDigestHex);
+  assert.equal(renewed.operationId, r.operationId);
+  assert.deepEqual(renewed.instruction, r.instruction);
+  assert(Buffer.from(renewed.transactionBase64, "base64").subarray(1, 65).equals(Buffer.alloc(64)));
 });
 test("withdrawal refuses wrong amount, fee, destination, signer and unsupported validity", () => {
   for (const changes of [{ amountAtomic: "0" }, { feeAtomic: "10001" }, { feeAtomic: withdrawal.amountAtomic },

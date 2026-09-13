@@ -32,6 +32,23 @@ export class FinalizedWithdrawalReader {
       Number.isInteger(limit) && limit >= 1 && limit <= 100, "WithdrawalDiscoveryRequestRejected");
     const m = this.#manifest, known = new Set(knownOperationIds), found = [];
     verifyDeploymentSnapshot(m, await this.#rpc.snapshot(m));
+    if (m.environment === "devnet") {
+      // Discovery is transport only. Each candidate still passes the same
+      // finalized transaction, BurnChecked, Borsh and live record/PDA verifier.
+      for (const signature of await this.#rpc.finalizedProgramSignatures(m)) {
+        let receipt;
+        try { receipt = await this.read(signature); }
+        catch (error) {
+          if (["WithdrawalManagerInstructionRequired", "WithdrawalInstructionNotPresent"].includes(error.message)) continue;
+          throw error;
+        }
+        requireFinalizedWithdrawal(receipt);
+        if (known.has(receipt.operationId)) continue;
+        known.add(receipt.operationId); found.push(receipt);
+        if (found.length === limit) break;
+      }
+      return found;
+    }
     // Records remain on chain. Re-scan the bounded local deployment rather
     // than introduce another database/cursor that could lose an owed request.
     for (const account of await this.#rpc.withdrawalRecordAccounts(m)) {
@@ -42,7 +59,7 @@ export class FinalizedWithdrawalReader {
       for (const signature of await this.#rpc.finalizedSignatures(account.address)) {
         try { receipt = await this.read(signature); }
         catch (error) {
-          if (["WithdrawalManagerInstructionRequired", "WithdrawalInstructionMalformed"].includes(error.message)) continue;
+          if (["WithdrawalManagerInstructionRequired", "WithdrawalInstructionNotPresent"].includes(error.message)) continue;
           throw error;
         }
         check(receipt.operationId === id && receipt.record === account.address, "WithdrawalDiscoveryRecordMismatch");
@@ -71,9 +88,12 @@ export class FinalizedWithdrawalReader {
     const candidates = instructions.map((ix, index) => ({ ix, index })).filter(({ ix }) => keyAt(ix.programIdIndex) === m.manager.id);
     check(candidates.length === 1, "WithdrawalManagerInstructionRequired");
     const { ix, index } = candidates[0];
-    check(typeof ix.data === "string" && ix.data.length <= 1000 && Array.isArray(ix.accounts) && ix.accounts.length === 9);
+    check(typeof ix.data === "string" && ix.data.length <= 1000 && Array.isArray(ix.accounts) && ix.accounts.length <= 256);
     const wire = Buffer.from(base58DecodeInstruction(ix.data));
-    check(wire.length === 1 + MESSAGE_LENGTH + 105 && wire[0] === 3, "WithdrawalInstructionMalformed");
+    check(wire.length > 0, "WithdrawalInstructionMalformed");
+    check(wire[0] === 3, "WithdrawalInstructionNotPresent");
+    check(ix.accounts.length === 9, "WithdrawalAccountsSubstituted");
+    check(wire.length === 1 + MESSAGE_LENGTH + 105, "WithdrawalInstructionMalformed");
     const instruction = decodeBridgeAbi("RecordWithdrawal", wire);
     const encoded = Buffer.from(instruction.message), request = decodeCanonicalBridgeMessage(encoded);
     if (expectedMessageHex !== undefined) check(encoded.toString("hex") === expectedMessageHex, "WithdrawalMessageSubstituted");

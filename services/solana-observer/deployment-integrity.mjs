@@ -222,6 +222,33 @@ export class LocalDeploymentRpc {
       Number.isSafeInteger(r.slot) && r.slot >= 0 && Object.hasOwn(r, "err"), "WithdrawalDiscoveryMalformed");
     return v.filter(r => r.err === null).map(r => r.signature);
   }
+  async finalizedProgramSignatures(manifest) {
+    const m = validateDeploymentManifest(manifest);
+    check(m.environment === "devnet" && this.#environment === "devnet", "DeploymentEnvironmentMismatch");
+    const minimum = Number(uint(m.minimumSlot));
+    check(Number.isSafeInteger(minimum) && minimum > 0, "WithdrawalHistoryBoundaryRequired");
+    const signatures = [], seen = new Set(); let before, previousSlot = Number.MAX_SAFE_INTEGER, reachedBoundary = false;
+    // Standard finalized history, newest first, bounded and rescanned from the
+    // pinned enrollment boundary. No index database or persistent second cursor.
+    for (let page = 0; page < 64; page++) {
+      await this.genesis();
+      const rows = await this.#call("getSignaturesForAddress", [m.manager.id, { commitment: "finalized", minContextSlot: minimum, limit: 64,
+        ...(before === undefined ? {} : { before }) }]);
+      check(Array.isArray(rows) && rows.length <= 64, "WithdrawalDiscoveryHistoryMalformed");
+      for (const row of rows) {
+        check(typeof row?.signature === "string" && row.signature.length <= 88 && base58Decode(row.signature).length === 64 && !seen.has(row.signature) &&
+          Number.isSafeInteger(row.slot) && row.slot >= 0 && row.slot <= previousSlot && row.confirmationStatus === "finalized" &&
+          Object.hasOwn(row, "err"), "WithdrawalDiscoveryHistoryMalformed");
+        seen.add(row.signature); previousSlot = row.slot;
+        if (row.slot < minimum) return signatures;
+        if (row.slot === minimum) reachedBoundary = true;
+        if (row.err === null) signatures.push(row.signature);
+      }
+      if (rows.length < 64) { check(reachedBoundary, "WithdrawalDiscoveryHistoryIncomplete"); return signatures; }
+      before = rows.at(-1).signature;
+    }
+    fail("WithdrawalDiscoveryHistoryLimit");
+  }
   async snapshot(manifest, minimumSlot = manifest.minimumSlot) {
     return this.snapshotWithAdditionalAccounts(manifest, [], minimumSlot);
   }
