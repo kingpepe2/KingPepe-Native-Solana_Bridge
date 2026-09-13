@@ -59,7 +59,7 @@ host compromise can affect both participants; one host outage can stop both.
 not a claim of physical independence. A/B remain separate processes/services
 with separate protected shares and nonce state on the same approved host.
 The Team explicitly accepts that host compromise or outage may affect both.
-Record this decision at Phase 13 and present it, together with the unaudited
+Phase 13 records this decision; present it, together with the unaudited
 Noble FROST integration, to the Phase-18 external reviewer. No second physical
 host, HSM or hardware signer is required. Local tests do not certify production
 deployment or remove the common-host and snapshot limitations. Exact 2-of-2
