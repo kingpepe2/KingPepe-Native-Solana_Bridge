@@ -65,7 +65,8 @@ export function validateSolanaDepositDelivery(input, policy) {
   const p = validateSolanaDeliveryPolicy(policy), checked = validateSolanaDepositSigningIntent(intent, p), m = checked.message, op = p.operationPolicy;
   const v = { ...checked.intent, preparedTransactionBase64 };
   check(Buffer.byteLength(JSON.stringify(v)) <= 12000);
-  const config = { environment: "localnet", cluster: "localnet", managerProgramIdHex: op.managerProgramId, transceiverProgramIdHex: op.transceiverProgramId,
+  const config = { environment: op.environment, cluster: op.environment, solanaGenesis: op.solanaGenesis,
+    managerProgramIdHex: op.managerProgramId, transceiverProgramIdHex: op.transceiverProgramId,
     mintHex: op.mint, recipientTokenAccountHex: m.destinationHex, encodedMessageHex: v.encodedMessageHex, attestations: v.attestations,
     recentBlockhashBase58: v.recentBlockhash, lastValidBlockHeight: v.lastValidBlockHeight, preparedTransactionBase64: v.preparedTransactionBase64 };
   const verify = v.kind === "RECEIPT" ? verifySignedLocalnetSolanaDepositReceiptTransaction : verifySignedLocalnetSolanaDepositClaimTransaction;

@@ -1,4 +1,5 @@
 import { setTimeout as delay } from "node:timers/promises";
+import { isTestSolanaCluster } from "../../shared/solana-test-network.mjs";
 import {
   bytesToHex,
   decodeCanonicalBridgeMessage,
@@ -199,6 +200,7 @@ export async function prepareLocalnetSolanaDepositClaimRequest(config, request, 
   const planConfig = {
     environment: bridgeConfig.environment,
     cluster: bridgeConfig.cluster,
+    solanaGenesis: bridgeConfig.solanaGenesis,
     managerProgramIdHex: bridgeConfig.managerProgramIdHex,
     transceiverProgramIdHex: bridgeConfig.transceiverProgramIdHex,
     mintHex: bridgeConfig.mintHex,
@@ -236,12 +238,13 @@ function normalizeLocalnetBridgeConfig(config) {
   const value = requireObject(config, "config");
   const environment = value.environment ?? LOCALNET;
   const cluster = value.cluster ?? LOCALNET;
-  if (environment !== LOCALNET || cluster !== LOCALNET) {
+  if (!isTestSolanaCluster(value)) {
     throw new Error("LocalnetSolanaDepositClaimBridgeLocalnetOnly");
   }
   return Object.freeze({
     environment,
     cluster,
+    solanaGenesis: value.solanaGenesis,
     solanaDeploymentHex: normalizeHash32(value.solanaDeploymentHex, "solanaDeploymentHex"),
     managerProgramIdHex: normalizeHash32(value.managerProgramIdHex, "managerProgramIdHex"),
     transceiverProgramIdHex: normalizeHash32(value.transceiverProgramIdHex, "transceiverProgramIdHex"),
@@ -262,6 +265,7 @@ function submitterConfig(config) {
   return Object.freeze({
     environment: config.environment,
     cluster: config.cluster,
+    solanaGenesis: config.solanaGenesis,
     solanaDeploymentHex: config.solanaDeploymentHex,
     managerProgramIdHex: config.managerProgramIdHex,
     transceiverProgramIdHex: config.transceiverProgramIdHex,

@@ -1,5 +1,5 @@
 import { bytesToHex, isHash32Hex, normalizeHex } from "../../shared/protocol/canonical-message.mjs";
-import { devnetRpcEndpoint, assertDevnetGenesis } from "../../shared/solana-test-network.mjs";
+import { devnetRpcEndpoint, assertDevnetGenesis, isTestSolanaCluster } from "../../shared/solana-test-network.mjs";
 import { decodeBridgeAbi } from "../../shared/protocol/solana-bridge-abi.mjs";
 import { base58Decode, base58Encode, findProgramAddress, DEPOSIT_CLAIM_PDA_SEED_PREFIX, MINT_AUTHORITY_PDA_SEED_PREFIX } from "../bridge-validator/solana-deposit-claim-transaction-plan.mjs";
 import { verifyDepositMintExecution } from "./deposit-mint-execution.mjs";
@@ -41,6 +41,8 @@ export class SolanaDepositClaimObserver {
       options.rpcClient ??
       new SolanaDepositClaimRpcClient({
         endpoint: options.endpoint,
+        environment: this.#config.environment,
+        expectedGenesis: this.#config.solanaGenesis,
       });
   }
 
@@ -69,7 +71,7 @@ export class SolanaDepositClaimObserver {
   }
 
   async observeFinalizedDepositClaim(input = {}) {
-    if (this.#config.environment !== LOCALNET || this.#config.cluster !== LOCALNET) {
+    if (!isTestSolanaCluster(this.#config)) {
       throw new Error("SolanaDepositClaimObserverLocalnetOnly");
     }
 
@@ -318,6 +320,7 @@ function normalizeSolanaDepositClaimObserverConfig(config) {
   return Object.freeze({
     environment: config.environment ?? LOCALNET,
     cluster: config.cluster ?? LOCALNET,
+    solanaGenesis: config.solanaGenesis,
     managerProgramIdHex: normalizeHashLike(config.managerProgramIdHex, "managerProgramIdHex"),
     transceiverProgramIdHex: normalizeHashLike(config.transceiverProgramIdHex, "transceiverProgramIdHex"),
     mintHex: normalizeHashLike(config.mintHex, "mintHex"),
