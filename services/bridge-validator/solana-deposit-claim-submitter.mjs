@@ -39,6 +39,7 @@ const TRANSACTION_FAILURES = new Set(["BlockhashNotFound", "AccountNotFound", "I
 // Narrow shared projection, never provider messages, logs, paths or packets.
 export function sanitizedRpcDiagnostic(error) {
   const result = {};
+  if (Number.isInteger(error?.httpStatus) && error.httpStatus >= 100 && error.httpStatus <= 599) result.httpStatus = error.httpStatus;
   if (Number.isSafeInteger(error?.code)) result.rpcCode = error.code;
   if (EXECUTION_FAULTS.has(error?.executionFault)) result.executionFault = error.executionFault;
   if (TRANSACTION_FAILURES.has(error?.transactionFailure)) result.transactionFailure = error.transactionFailure;
