@@ -35,13 +35,14 @@ required third-party notices and historical licensing facts.
 
 ## Current review scope
 
-Phase 13 practical core failure coverage and the accepted SINGLE_HOST decision.
-Phase 12 SDK, CLI and interface passed at
-71c68af9e8ec01737a52b6ab48a54e32263d0554 with exact-SHA CI 34728490291
+Phase 14 fresh-clone validation and the required isolated encrypted restore
+drill before Devnet. Phase 13 core failure coverage passed at
+eb105cba5276f99e76572c824fe5c190b1fe1a75 with exact-SHA CI 34730712772
 (four required jobs passed, none skipped). Preserve the completed transfer
 engines, canonical Borsh, accounting, lifecycle, replay semantics, FROST topology,
-authorities and existing journal/inbox. Reuse existing failure tests, add only
-bounded exposed-parser checks, and fix actual defects. No new security platform.
+authorities and existing journal/inbox. Exercise the manual restore runbook
+through the existing real-chain harness, not a second recovery engine. Use fresh
+external build directories and locked dependencies. No new security platform.
 User wallets sign their own transactions; no user-facing signing, minting or
 administrative API.
 Keep implementation commits phase-scoped. Commit/push each meaningful,
