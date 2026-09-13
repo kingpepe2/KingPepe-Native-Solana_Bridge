@@ -39,16 +39,20 @@ Phase 14 fresh-clone validation and the isolated encrypted restore drill passed
 at 1f8ce111f10f31e6984c25d02903071d2f893076 with exact-SHA CI 34732975925.
 Its publication ddd234e0be44587b44a5d8f9b3ad4ade215b2b97 also passed matching
 CI 34735282747 (four required jobs passed, none skipped).
-Current phase: 15, first TEST-only Devnet deployment using canonical Borsh V2.
-Test enrollment is published at 9e339122748848a4bc762e3a09bcaecded478d50.
-Funding is verified: the same prepared test fee payer has 5 Devnet SOL. No more
-airdrops are needed. Preserve the prepared local-only credentials and identities.
-Publication 66c292beeda8c30c1c02bc078f2df549e8515634 passed all four CI jobs.
-Earlier enrollment CI 34737496362 attempt 1 failed its first local flow; the
-public result omitted the already-sanitized failure location and no detailed
-artifact survived. Do not invent its original exception. Revalidate the failed
-path with visible pinned verifier setup and safe source-location diagnostics,
-and verify the new exact-SHA CI before any Devnet deployment.
+Current milestone: Phase 15 TEST-only Devnet enrollment is finalized and verified
+using canonical Borsh V2; verify the evidence publication's exact-SHA CI before
+proceeding to Phase 16. Public deployment identities, source, build hashes and
+transactions are in docs/deployment/devnet.json. Both programs and the Mint
+already exist; do not redeploy them or recreate enrollment on a routine restart.
+Source 5ad33201402813503d31b6d97c2e3e6fdb7908c1 passed all four jobs and every
+step in CI 34745104679. Enrollment CI 34737496362 attempt 2 also passed; its
+attempt 1 exception is not recoverable from retained diagnostics, so do not
+invent a root cause. The safe-diagnostic/pinned-verifier setup fixes are retained.
+The funded test fee payer needs no further airdrops. Preserve its prepared
+protected credentials. Read SOLANA_DEVNET_RPC_URL from local process configuration
+without exposing it in source, logs, CLI diagnostics or public evidence.
+The pinned compiler's supported --arch v3 builds reproduce the deployed bytes;
+do not confuse them with default v0 local-test binaries or enable experimental ABI.
 Devnet test state must not enable Mainnet. Existing local callers stay local-only.
 No production configuration, keys, funds or deployment.
 Preserve the completed transfer engines, accounting, lifecycle, replay semantics,

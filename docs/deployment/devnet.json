@@ -1,0 +1,66 @@
+{
+  "schema": "KINGPEPE_PHASE15_DEVNET_DEPLOYMENT/V1",
+  "scope": "DEVNET_TEST_ONLY",
+  "sourceSha": "5ad33201402813503d31b6d97c2e3e6fdb7908c1",
+  "sourceCi": { "runId": "34745104679", "requiredJobsPassed": 4, "skippedSteps": 0 },
+  "borshSchemaVersion": 2,
+  "canonicalMagic": "KPEPBRG2",
+  "bridgeAccountLayoutVersion": 1,
+  "transceiverAccountLayoutVersion": 1,
+  "solanaGenesis": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+  "nativeGenesis": "352a1a62f7880d325da6d3fe2e62272cd0ce735a7ba003eae4fb59d2a175a8b9",
+  "nativeNetwork": 8000111,
+  "solanaDeploymentHex": "225638bc06c76e204b1b067c7ef0d59cc329ad7c81e09c739a41ec43fc4f1112",
+  "feePayer": "E7mox7hc7LdSvCu6PH8sf7U7mJQBnEjA7z3xYiwh2m2k",
+  "upgradeAuthority": "E7mox7hc7LdSvCu6PH8sf7U7mJQBnEjA7z3xYiwh2m2k",
+  "authorityScope": "TEST_DEPLOYMENT_ONLY_PRODUCTION_MODEL_UNDECIDED",
+  "managerProgram": "JB8cngNshwyUzsxz3HiiVvY5CrHQsfUxo3dcfzQsemBJ",
+  "transceiverProgram": "EFkUHysqyqyPJdqEJbiWj8e4cHVe6Wde1qTDr3aaQ4YM",
+  "mint": "5mhfBnB4u5w8V9Fu1gT7U57prZf5Und6z5n2rrNAC9S",
+  "recipientSplAccount": "CgJg5vTCXYV6VLJr7Rv3SoqwkWBco6f6vcg8dTkNuE7X",
+  "recipient": "2zgGtJx3zYVAGBPaYQWaAxSVystXMzUVTdvdBKVtuw5T",
+  "attesters": ["EAowT6XLcgS2Da634ZVHVaMYaQY7FcQaWNoreY3EGxZF", "Dey6Zx2jKk7JR8Nb9SuWKey3V9kij7swjFAjaviZTYzB"],
+  "tokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  "initialSupplyAtomic": "0",
+  "decimals": 8,
+  "freezeAuthority": null,
+  "pdas": {
+    "managerProgramData": "3Hno7wZy8TSBRMbgpB9p2CxWptjv9P48MpjmFHRhk1Nn",
+    "transceiverProgramData": "Fausqn9o9r6YjHZK3fGgM1MF3vAR266YwZdyT4ccGbVg",
+    "mintAuthority": "Gny9RALjiAUcQWtApqSqCbf68Tv6FVycXcscmsiHDuy9",
+    "bridgePda": "3YsiEkchuQkfKZoe4daFXbC8LwPkWsCmD6zRcCZF9cSE",
+    "transceiverPda": "6V3Rks1Aca7JgFRpK7MSUmcFTJurAPCpTaTGBHcEZDRr"
+  },
+  "build": {
+    "agaveCli": "4.2.2",
+    "sbfBuilder": "4.1.0",
+    "platformTools": "v1.54",
+    "compiler": "rustc 1.89.0",
+    "architecture": "v3",
+    "abiV2": false,
+    "lockedDependencies": true,
+    "note": "Supported --arch v3 selects the Devnet deployment target. Pinned compiler/tools are unchanged. Default v0 local build hashes are not these deployment hashes."
+  },
+  "binaries": {
+    "manager": { "bytes": 225488, "sha256": "994593c2e160e28a06e396e34c47ad9f93472ac79e711e2dcd0ea6798d3f0ff0" },
+    "transceiver": { "bytes": 222664, "sha256": "d2369ded502ebd24540146f388271dd0fcdc6c978e1ffedbd9599b830fdf8186" }
+  },
+  "transactions": {
+    "managerDeployment": { "slot": 497628819, "signature": "5XX2s87ECWq1mwzqC2a84w21WSpjqZtCYM4vj7GqNDURsNCdDDye1bSBqXvRPa1WQH4zbVmvun5h9ye9s7ZWCirY" },
+    "transceiverDeployment": { "slot": 497770120, "signature": "3xx4LkAxJjQPUwjrD1iZ6uAfNZTt44m5yiDBdd5woWYWVn7u1tpfAvfL2Tvuiv2DiuCuuXHJP667GQFCweWRi6qi" },
+    "mintAndConfigEnrollment": { "slot": 497770205, "signature": "vThEqLS3yfsrgTxei7wTmTQqxy4Nw5yj4a2PB42fc4naAj2KoEw2MJ3f7gETtUNxKJf1EJvahA4KsHwJ7pxGkDV" }
+  },
+  "zeroSupplyVerification": {
+    "status": "PASS",
+    "verifiedAt": "2026-09-13T15:27:18.840Z",
+    "finalizedSlot": 497778617,
+    "exactBorshConfigBytes": true,
+    "deployedProgramBytesMatchLocalBuild": true,
+    "independentFreshBuildBytesMatch": true,
+    "deploymentAndEnrollmentTransactionsFinalized": true,
+    "mainnetFlagOnChain": false,
+    "note": "Enrollment evidence before Phase 16 transfers; later test supply may change. Verification sent no transactions and did not redeploy either program."
+  },
+  "productionReady": false,
+  "mainnetActivation": "DISABLED"
+}
