@@ -72,6 +72,24 @@ jobs:
           test -s "${tool_root}/output/kingpepe_bridge.so"
           sha256sum "${tool_root}/output/kingpepe_transceiver.so" "${tool_root}/output/kingpepe_bridge.so"
           test -z "$(find . -path './.git' -prune -o -name '*-keypair.json' -print)"
+      - name: Reproduce pinned Devnet v3 program identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="${KINGPEPE_CI_TOOL_ROOT}/solana-release/bin:${PATH}"
+          for program in kingpepe-transceiver kingpepe-bridge; do
+            (
+              cd solana
+              cargo-build-sbf --manifest-path "programs/${program}/Cargo.toml" \
+                --sbf-out-dir "${KINGPEPE_CI_TOOL_ROOT}/devnet-output" --tools-version v1.54 --arch v3 \
+                -- --locked --jobs 2 --target-dir "${KINGPEPE_CI_TOOL_ROOT}/devnet-build"
+            )
+          done
+          manager=$(jq -r .binaries.manager.sha256 docs/deployment/devnet.json)
+          transceiver=$(jq -r .binaries.transceiver.sha256 docs/deployment/devnet.json)
+          printf '%s  %s\n' "$manager" "${KINGPEPE_CI_TOOL_ROOT}/devnet-output/kingpepe_bridge.so" \
+            "$transceiver" "${KINGPEPE_CI_TOOL_ROOT}/devnet-output/kingpepe_transceiver.so" | sha256sum --check
+          test -z "$(find . -path './.git' -prune -o -name '*-keypair.json' -print)"
       - name: Pin Node for local integration
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:

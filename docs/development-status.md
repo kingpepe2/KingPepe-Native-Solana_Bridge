@@ -36,7 +36,7 @@ uncertain delivery waits. Confirmed accepted-chain or accounting contradiction
 records an incident and pauses new mint/payout authorization. Read-only monitoring
 may continue; no automatic repair or unpause exists.
 
-## Phase 15 test enrollment and CI revalidation
+## Phase 15 finalized Devnet enrollment
 
 Phase 14's publication ddd234e0be44587b44a5d8f9b3ad4ade215b2b97 passed
 exact-SHA CI 34735282747: all four jobs, no skipped jobs or steps. Its SBF
@@ -88,9 +88,29 @@ old exception. Thirty-nine focused checks and a fresh 55-check actual-chain
 deposit run passed, with automatic test-ledger cleanup. Exact-SHA revalidation
 is required before deployment; all original acceptance checks remain unchanged.
 
-No Devnet program deployment or Mint enrollment has run. The operational workers
-remain local-only until the separate Phase 16 integration. Resume with the same
-prepared test identities once funded and matching CI is verified. See
+Source `5ad33201402813503d31b6d97c2e3e6fdb7908c1` subsequently passed all four
+jobs and every step in exact-SHA CI `34745104679`. The enrollment rerun
+`34737496362`, attempt 2, also passed every job/step. This resolves the current
+CI gate without inventing the cause of the original lost diagnostic.
+
+Both Devnet programs and the Mint/config enrollment are now finalized. The
+[public deployment record](deployment/devnet.json) lists their exact identities,
+transactions and source. At finalized slot 497778617, supply was zero, decimals
+eight, authority the Bridge PDA, and freeze authority None. Both config accounts
+matched the expected canonical Borsh bytes. Each deployment transaction was
+identified at its ProgramData deployment slot; the atomic enrollment transaction
+was recovered from finalized Mint history. Verification submitted no transaction
+and did not redeploy the Manager or Transceiver. No further airdrop was needed.
+
+Fresh external builds with the pinned compiler and supported `--arch v3` reproduced
+both deployed hashes. CI also checks these release hashes; default v0 local-test
+hashes are a separate artifact identity. RPC credentials stay in local process
+configuration, never in public evidence. The evidence publication requires its
+own matching CI before automatic continuation to Phase 16.
+
+The operational workers remain local-only until Phase 16 integrates and validates
+Native regtest against this real Devnet deployment. No Devnet transfer, soak,
+external review or production readiness is certified by Phase 15. See
 [Devnet deployment](deployment/devnet.md).
 
 ## Final simplification

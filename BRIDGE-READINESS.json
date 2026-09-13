@@ -9,16 +9,33 @@
   "signerTopology": "SINGLE_HOST",
   "commonHostRiskDecision": "ACCEPTED_BY_KINGPEPE_TEAM",
   "lastUpdated": "2026-09-13",
-  "sourceStatus": "PHASE_15_FUNDED_CI_FAILURE_INVESTIGATION_DEPLOYMENT_NOT_RUN",
+  "sourceStatus": "PHASE_15_DEVNET_DEPLOYMENT_VERIFIED_PUBLICATION_CI_REQUIRED",
   "phase15": {
-    "status": "BLOCKED",
-    "milestone": "EXPLICIT_DEVNET_TEST_ENROLLMENT_REUSING_BORSH_AND_PROTECTED_STORAGE",
+    "status": "DEPLOYED_VERIFIED_PUBLICATION_CI_REQUIRED",
+    "milestone": "FINALIZED_ZERO_SUPPLY_DEVNET_DEPLOYMENT_AND_PUBLIC_EVIDENCE",
     "sourceBaseSha": "ddd234e0be44587b44a5d8f9b3ad4ade215b2b97",
     "enrollmentImplementationSha": "9e339122748848a4bc762e3a09bcaecded478d50",
     "enrollmentCiRunId": "34737496362",
     "ciPolicy": "VERIFY_ALL_FOUR_REQUIRED_JOBS_AT_THE_EXACT_SHA_BEFORE_DEPLOYMENT",
-    "deployment": "NOT_RUN",
-    "blocker": "EARLIER_CI_FLOW_FAILURE_ORIGINAL_EXCEPTION_NOT_RETAINED_REVALIDATION_REQUIRED",
+    "deployment": "FINALIZED",
+    "blocker": null,
+    "deploymentRecord": "docs/deployment/devnet.json",
+    "deployedSourceSha": "5ad33201402813503d31b6d97c2e3e6fdb7908c1",
+    "deployedSourceCi": { "runId": "34745104679", "requiredJobsPassed": 4, "skippedJobs": 0, "skippedSteps": 0, "status": "PASS" },
+    "onChainValidation": {
+      "status": "PASS",
+      "finalizedSlot": 497778617,
+      "initialSupplyAtomic": "0",
+      "mintAuthority": "EXPECTED_BRIDGE_PDA",
+      "freezeAuthority": "NONE",
+      "borshSchemaVersion": 2,
+      "exactConfigBytes": true,
+      "deploymentAndEnrollmentTransactions": "FINALIZED_AND_VERIFIED",
+      "programBytes": "MATCH_PINNED_AND_INDEPENDENT_FRESH_V3_BUILDS",
+      "transactionsSubmittedByVerification": 0,
+      "managerRedeployed": false,
+      "scope": "ZERO_SUPPLY_ENROLLMENT_NOT_PHASE_16_TRANSFER_VALIDATION"
+    },
     "ciInvestigation": {
       "initialRunId": "34737496362",
       "initialAttempt": "FAILED_FIRST_REAL_FLOW_LATER_CHAIN_STEPS_SKIPPED",
@@ -30,16 +47,17 @@
       "setupFix": "BUILD_PINNED_NATIVE_PROOF_VERIFIER_IN_VISIBLE_STEP_BEFORE_TEST_CHAINS",
       "localRepeat": "55_REAL_CHAIN_CHECKS_PASS_NATIVE_TO_SOLANA_COMPLETED",
       "focusedTests": "39_PASS",
-      "newCommitCi": "REQUIRED_BEFORE_DEPLOYMENT"
+      "newCommitCi": "5ad33201402813503d31b6d97c2e3e6fdb7908c1_RUN_34745104679_ALL_FOUR_JOBS_AND_STEPS_PASS",
+      "enrollmentRerun": "34737496362_ATTEMPT_2_ALL_FOUR_JOBS_AND_STEPS_PASS"
     },
     "funding": {
       "scope": "DEVNET_TEST_ONLY_NO_PRODUCTION_FUNDS",
       "testFeePayer": "E7mox7hc7LdSvCu6PH8sf7U7mJQBnEjA7z3xYiwh2m2k",
-      "observedBalanceLamports": "5000000000",
-      "observedFinalizedSlot": "497598163",
+      "observedBalanceLamports": "7711069680",
+      "observedFinalizedSlot": "497776963",
       "programDataRentLamports": "2364242160",
       "feesAndSetupRentAdditional": true,
-      "programsAndMintNotDeployed": true,
+      "programsAndMintNotDeployed": false,
       "faucetAttempts": 2,
       "furtherAttemptsStopped": true,
       "testCredentials": "FRESH_CURRENTUSER_DPAPI_LOCAL_ONLY_PRIVATE_OS_PIPE_CHECK_PASS"
@@ -403,7 +421,7 @@
   "production": {
     "configuration": "NOT_CONFIGURED",
     "deployment": "NOT_DEPLOYED",
-    "devnet": "NOT_RUN",
+    "devnet": "PHASE_15_DEPLOYED_ZERO_SUPPLY_VERIFIED_PHASE_16_TRANSFERS_NOT_RUN",
     "externalReview": "NOT_RUN",
     "activationApproval": false,
     "backupMethod": "MANUAL_OR_EXISTING_OS_SCHEDULER_NO_CUSTOM_DAEMON",
@@ -430,5 +448,5 @@
     "status": "VERIFY_MATCHING_GITHUB_ACTIONS_RUN",
     "scope": "Local results do not substitute for the workflow run at this exact commit"
   },
-  "next": "VERIFY_CURRENT_PUBLICATION_CI_THEN_PHASE_15_FIRST_TEST_DEVNET_DEPLOYMENT"
+  "next": "VERIFY_PHASE_15_EVIDENCE_PUBLICATION_CI_THEN_PHASE_16_REGTEST_DEVNET_E2E"
 }

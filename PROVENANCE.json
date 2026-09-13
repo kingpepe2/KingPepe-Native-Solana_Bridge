@@ -25,6 +25,20 @@
   },
   "trackedFiles": [
     {
+      "path": "docs/deployment/devnet.json",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Public test-only finalized Devnet identities, transactions, Borsh version and program binary build evidence; no endpoint credentials, keys or operational state.",
+      "purpose": "REQUIRED_DOCUMENTATION",
+      "reviewDisposition": "KEEP_LEGAL_AND_CURRENT_CONTRACT"
+    },
+    {
+      "path": "solana/tests/verify-devnet-deployment.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original read-only Devnet enrollment verifier using existing Borsh setup/ABI and PDA helpers; checks actual finalized program, Mint and config state without signing or deploying.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
       "path": "docs/deployment/devnet.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
       "notes": "Original test-only Devnet enrollment/deployment procedure using retained Borsh and protected storage, with links to official CLI/RPC documentation; no operational credentials or private paths.",

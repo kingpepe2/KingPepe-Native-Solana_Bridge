@@ -4,6 +4,36 @@ Phase 15 uses canonical Borsh V2 and fresh TEST credentials. Production remains
 disabled. No production upgrade-authority model is selected by this test.
 The independent-review and KingPepe Team activation gates still apply.
 
+## Finalized test deployment
+
+The public [deployment record](devnet.json) pins source
+`5ad33201402813503d31b6d97c2e3e6fdb7908c1`, its four-job passing CI
+`34745104679`, both Program IDs, the Mint, PDAs, test authority and finalized
+deployment/enrollment transactions. At finalized slot 497778617 the supply was
+zero, decimals eight, Mint authority the Bridge PDA and freeze authority None.
+Both config accounts exactly matched the expected Borsh layouts. Phase 16 test
+transfers may subsequently change supply; the record preserves enrollment facts.
+
+Both binaries were independently rebuilt into fresh external output directories
+and matched the deployed bytes. The deployment uses the pinned builder's
+supported `--arch v3` option, with platform-tools v1.54, rustc 1.89.0, and no
+experimental `--abi-v2`. Default v0 local-test hashes identify different artifacts.
+CI retains local-chain validation and also reproduces the pinned v3 hashes.
+
+Before the first test transfer, run the read-only enrollment verifier:
+
+```sh
+node solana/tests/verify-devnet-deployment.mjs docs/deployment/devnet.json "$KINGPEPE_DEVNET_SBF_DIR"
+```
+
+`SOLANA_DEVNET_RPC_URL` must already exist in the local process environment.
+Its value is private; do not put it in source, templates, command output, CI,
+or public artifacts. The verifier checks actual Devnet genesis before other
+reads, queries finalized accounts and transactions, and sends no transactions.
+`KINGPEPE_DEVNET_SBF_DIR` points to externally built v3 binaries. No deployment
+credential is needed for verification. The zero-supply verifier is intentionally
+an enrollment check, not a post-transfer supply assertion.
+
 ## Enrollment
 
 The existing setup planner exports `buildDevnetSolanaSetupTransactionPlan` and
