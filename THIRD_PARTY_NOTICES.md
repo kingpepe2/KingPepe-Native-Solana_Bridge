@@ -70,6 +70,22 @@ docs/security/windows-protected-storage.md.
     address encoder is replaced by this shared package API.
   - This does not claim an external audit of version 2.4.0 or the bridge.
 
+- `@wallet-standard/app` / `@wallet-standard/base` `1.1.1`
+  - License: Apache-2.0; upstream: https://github.com/wallet-standard/wallet-standard
+  - Use: standard discovery/connection of user-controlled localnet wallets.
+    The application serves the installed, unmodified `wallets.js` module and
+    its upstream LICENSE from `/licenses/wallet-standard`; no source is vendored
+    or claimed as KingPepe code. The browser also serves the unmodified pinned
+    scure-base module with its MIT license at `/licenses/scure-base`.
+
+- `playwright-core` `1.63.0` (development only)
+  - License: Apache-2.0; upstream: https://github.com/microsoft/playwright
+  - Use: library for isolated real-browser UI checks with the existing Node test
+    runner and installed Chrome/Edge. It is not shipped in the bridge interface.
+    Preserve upstream LICENSE, NOTICE and ThirdPartyNotices.txt from the installed
+    package in any redistribution of this development dependency. No browser
+    binary, upstream source implementation or browser profile is vendored.
+
 - `borsh` JavaScript `2.0.0`
   - License declared by the pinned npm distribution: Apache-2.0
   - Upstream: https://github.com/near/borsh-js
