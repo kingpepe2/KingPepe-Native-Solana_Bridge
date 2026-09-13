@@ -90,3 +90,10 @@ IDs. Exclude credentials, private configuration, local paths and runtime state.
 Do not point the local operational service at Devnet by changing an endpoint.
 Phase 16 separately integrates and validates the retained workers against the
 real Devnet deployment. Phase 15 is not a Devnet transfer or production certificate.
+
+Phase 16 client admission requires `environment: "devnet"` and
+`expectedGenesis: DEVNET_SOLANA_GENESIS`, in addition to the locally supplied
+HTTPS endpoint. It queries actual genesis before requests/sends, refuses automatic
+airdrops, and sanitizes provider failures. Local defaults still reject remote
+endpoints. `devnetTestManifest` consumes the reviewed public record for read-only
+deployment checks. This client milestone alone does not enable the transfer workers.

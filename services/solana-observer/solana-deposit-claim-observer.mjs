@@ -1,4 +1,5 @@
 import { bytesToHex, isHash32Hex, normalizeHex } from "../../shared/protocol/canonical-message.mjs";
+import { devnetRpcEndpoint, assertDevnetGenesis } from "../../shared/solana-test-network.mjs";
 import { decodeBridgeAbi } from "../../shared/protocol/solana-bridge-abi.mjs";
 import { base58Decode, base58Encode, findProgramAddress, DEPOSIT_CLAIM_PDA_SEED_PREFIX, MINT_AUTHORITY_PDA_SEED_PREFIX } from "../bridge-validator/solana-deposit-claim-transaction-plan.mjs";
 import { verifyDepositMintExecution } from "./deposit-mint-execution.mjs";
@@ -144,9 +145,12 @@ export class SolanaDepositClaimRpcClient {
   #requestId = 0;
   #timeoutMs;
   #maxResponseBytes;
+  #devnet;
 
   constructor(options = {}) {
-    this.#endpoint = normalizeSolanaDepositClaimRpcEndpoint(options.endpoint);
+    if (![undefined, "localnet", "devnet"].includes(options.environment)) throw new Error("SolanaDepositClaimRpcEnvironmentRejected");
+    this.#devnet = options.environment === "devnet";
+    this.#endpoint = this.#devnet ? devnetRpcEndpoint(options.endpoint, options.expectedGenesis) : normalizeSolanaDepositClaimRpcEndpoint(options.endpoint);
     this.#timeoutMs = boundedLimit(options.timeoutMs ?? 10_000, 10, 30_000);
     this.#maxResponseBytes = boundedLimit(options.maxResponseBytes ?? 2_097_152, 128, 4_194_304);
     RPC_INSTANCES.add(this);
@@ -188,6 +192,7 @@ export class SolanaDepositClaimRpcClient {
     if (!ALLOWED_RPC_METHODS.has(method)) {
       throw new Error(`SolanaDepositClaimRpcMethodNotAllowed:${method}`);
     }
+    if (this.#devnet && method !== "getGenesisHash") assertDevnetGenesis(await this.getGenesisHash());
     const id = ++this.#requestId;
     if (!Number.isSafeInteger(id)) throw new Error("SolanaDepositClaimRpcRequestIdExhausted");
     const abort = new AbortController();

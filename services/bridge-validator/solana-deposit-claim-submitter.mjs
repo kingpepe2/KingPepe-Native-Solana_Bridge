@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { devnetRpcEndpoint, assertDevnetGenesis } from "../../shared/solana-test-network.mjs";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { validateRuntimeFile, validateRuntimeStateRoot as validateStateRootOutsideRepo } from "../../shared/runtime-path-boundary.mjs";
@@ -52,6 +53,7 @@ export function sanitizedRpcDiagnostic(error) {
   return result;
 }
 const ALLOWED_SOLANA_RPC_METHODS = new Set([
+  "getGenesisHash",
   "getAccountInfo",
   "getBlockHeight",
   "getHealth",
@@ -286,10 +288,13 @@ export class SolanaLocalRpcClient {
   #endpoint;
   #fetchImpl;
   #nextId = 0;
+  #devnet;
 
   constructor(options) {
     const value = requireObject(options, "options");
-    this.#endpoint = normalizeSolanaRpcEndpoint(value.endpoint);
+    if (![undefined, "localnet", "devnet"].includes(value.environment)) throw new Error("SolanaRpcEnvironmentRejected");
+    this.#devnet = value.environment === "devnet";
+    this.#endpoint = this.#devnet ? devnetRpcEndpoint(value.endpoint, value.expectedGenesis) : normalizeSolanaRpcEndpoint(value.endpoint);
     this.#fetchImpl = value.fetchImpl ?? globalThis.fetch;
     if (typeof this.#fetchImpl !== "function") {
       throw new Error("SolanaRpcFetchUnavailable");
@@ -303,6 +308,9 @@ export class SolanaLocalRpcClient {
     if (!Array.isArray(params)) {
       throw new Error("SolanaRpcParamsMustBeArray");
     }
+    if (this.#devnet && method === "requestAirdrop") throw new Error("DevnetAutomaticAirdropDisabled");
+    // Even direct call(sendTransaction) must pass the same live genesis gate.
+    if (this.#devnet && method !== "getGenesisHash") assertDevnetGenesis(await this.call("getGenesisHash"));
     const id = ++this.#nextId;
     if (!Number.isSafeInteger(id)) throw rpcError("SolanaRpcRequestIdentityExhausted", method);
     const body = JSON.stringify({ jsonrpc: JSON_RPC_VERSION, id, method, params });
@@ -368,6 +376,7 @@ export class SolanaLocalRpcClient {
       throw error;
     }
     if (!Object.hasOwn(envelope, "result")) throw rpcError("SolanaRpcInvalidEnvelope", method);
+    if (this.#devnet && method === "getGenesisHash") assertDevnetGenesis(envelope.result);
     return envelope.result;
   }
 
