@@ -52,6 +52,18 @@
   },
   "standardsReferences": [
     {
+      "project": "Wallet Standard and isolated browser validation",
+      "urls": [
+        "https://github.com/wallet-standard/wallet-standard/tree/master/packages/core/app",
+        "https://github.com/wallet-standard/wallet-standard/tree/master/packages/core/features",
+        "https://github.com/anza-xyz/wallet-standard/blob/master/packages/core/features/src/signAndSendTransaction.ts",
+        "https://playwright.dev/docs/api/class-browsertype",
+        "https://playwright.dev/docs/browsers#google-chrome--microsoft-edge"
+      ],
+      "checkedAt": "2026-09-13",
+      "use": "Original integration using pinned @wallet-standard/app and base 1.1.1 Apache-2.0 APIs, not copied discovery code. User wallets sign and send. Playwright-core 1.63.0 Apache-2.0 is a development-only library used by the existing Node test runner with an isolated installed-browser profile. UI fixtures cannot sign or prove chain behavior; existing real-chain SDK/service tests remain required. Browser-served dependency modules are unmodified and accompanied by upstream licenses."
+    },
+    {
       "project": "Native witness addresses and scure-base",
       "urls": ["https://bips.dev/173/", "https://bips.dev/350/", "https://github.com/paulmillr/scure-base"],
       "checkedAt": "2026-09-13",

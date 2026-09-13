@@ -2,7 +2,26 @@
 // Optional loopback listener in the SAME service process, no extra journal.
 import { createServer } from "node:http";
 import { timingSafeEqual } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { BridgeUserApi } from "./user-api.mjs";
+
+function appAssets() {
+  const file = (name, type) => [readFileSync(new URL(name, import.meta.url)), type];
+  const vendor = (name, entry, type = "text/javascript; charset=utf-8") => [readFileSync(new URL(name, import.meta.resolve(entry))), type];
+  // Exact static allowlist, never a filesystem path derived from a request.
+  return new Map([
+    ["/", file("../../app/index.html", "text/html; charset=utf-8")],
+    ...["bridge.mjs", "model.mjs"].map(name => ["/app/" + name, file("../../app/" + name, "text/javascript; charset=utf-8")]),
+    ["/app/style.css", file("../../app/style.css", "text/css; charset=utf-8")],
+    ["/sdk/client.mjs", file("../../solana/ts/sdk/client.mjs", "text/javascript; charset=utf-8")],
+    ["/vendor/scure-base.js", vendor("index.js", "@scure/base")],
+    ["/vendor/wallet-standard/wallets.js", vendor("wallets.js", "@wallet-standard/app")],
+    ["/licenses/scure-base", vendor("LICENSE", "@scure/base", "text/plain; charset=utf-8")],
+    ["/licenses/wallet-standard", vendor("../../LICENSE", "@wallet-standard/app", "text/plain; charset=utf-8")],
+    ["/notices", file("../../THIRD_PARTY_NOTICES.md", "text/plain; charset=utf-8")],
+    ["/license", file("../../LICENSE", "text/plain; charset=utf-8")],
+  ]);
+}
 
 export async function listenBridgeUserApi({ api, accessToken, port = 0 }) {
   if (!(api instanceof BridgeUserApi) || !(accessToken instanceof Uint8Array) || accessToken.length !== 32 || !accessToken.some(v => v !== 0) ||
@@ -10,6 +29,7 @@ export async function listenBridgeUserApi({ api, accessToken, port = 0 }) {
   // Token is supplied by local protected configuration (or isolated test state),
   // never a URL/query value, log entry, Git value or a FROST signing credential.
   const expected = Buffer.from("Bearer " + Buffer.from(accessToken).toString("hex"));
+  const assets = appAssets();
   let active = 0;
   const server = createServer({ maxHeaderSize: 4096, headersTimeout: 10000, requestTimeout: 15000 }, async (req, res) => {
     const reply = (status, value) => {
@@ -19,8 +39,18 @@ export async function listenBridgeUserApi({ api, accessToken, port = 0 }) {
     };
     try {
       const host = `127.0.0.1:${server.address()?.port}`;
-      if (req.headers.host !== host || req.headers.origin && req.headers.origin !== `http://${host}` ||
-          req.headersDistinct.authorization?.length !== 1) return reply(403, { error: "ACCESS_DENIED" });
+      if (req.headers.host !== host || req.headers.origin && req.headers.origin !== `http://${host}`) return reply(403, { error: "ACCESS_DENIED" });
+      // Static public introduction/interface contains no credential or runtime
+      // state. Every API route still requires the separate user-access token.
+      if (req.method === "GET" && req.url === "/favicon.ico") { res.writeHead(204); res.end(); return; }
+      if (req.method === "GET" && assets.has(req.url)) {
+        const [body, type] = assets.get(req.url);
+        res.writeHead(200, { "content-type": type, "cache-control": "no-store", "x-content-type-options": "nosniff",
+          "referrer-policy": "no-referrer", "cross-origin-resource-policy": "same-origin",
+          "content-security-policy": "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'" });
+        res.end(body); return;
+      }
+      if (req.headersDistinct.authorization?.length !== 1) return reply(403, { error: "ACCESS_DENIED" });
       const given = Buffer.from(req.headers.authorization ?? "");
       if (given.length !== expected.length || !timingSafeEqual(given, expected)) return reply(403, { error: "ACCESS_DENIED" });
       if (active >= 4) return reply(429, { error: "RETRY_LATER" });

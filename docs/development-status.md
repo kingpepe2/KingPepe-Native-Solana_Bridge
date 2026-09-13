@@ -57,18 +57,31 @@ aggregate after restart. Worker errors expose fixed public classes, not secrets.
 
 ## Phase 12 user access
 
-The SDK, same-process user HTTP boundary and CLI milestone passed local validation.
+The SDK, same-process user HTTP boundary and CLI milestone is published as
+6e8230ae67671dec9e373c012590af0751f3f394; matching CI run 34727112550 passed
+all four required jobs, with none skipped.
 It prepares public Native deposit requests and unsigned Solana withdrawals, and
 reads operation/bridge status from the existing journal. Wallets sign user-owned
 transactions; the boundary has no minting, FROST signing or administration route.
 Deployment, initialized KPEPE token account, withdrawal authority/balance and
 finalized network time are checked through the existing Solana reader. There is
-no new database or transfer engine. The simple interface is the next milestone,
-after SDK/API/CLI validation, publication and matching CI.
+no new database or transfer engine.
 
-The reviewed milestone worktree based on
-2a37d0d0dc093a3ad545014bd45b2760ec6fd3db passed 988 Node tests on both Windows
-and WSL (zero failures/skips), including nine SDK/HTTP/CLI tests. The existing
+The simple interface uses the same authenticated loopback listener with a fixed
+public-asset allowlist. It shows exact decimal amounts, destinations, public
+request downloads, operation states and transaction IDs. Wallet Standard delegates
+Solana signing/sending to the user's wallet; Native funding stays in the user's
+Native wallet. No key import, private wallet material or persistent browser token
+storage is added. A fresh pause check precedes wallet handoff; an unknown wallet
+outcome cannot trigger automatic re-signing or a replacement economic operation.
+
+The reviewed interface worktree based on the SDK milestone passed 991 Node tests
+on both Windows and WSL (zero failures/skips), including nine SDK/HTTP/CLI and
+three display/request tests. Four additional isolated real-Chrome UI tests pass
+with desktop/mobile visual review. Their wallet/status fixtures have no signing
+key and are explicitly not economic evidence. CI retains all existing jobs and
+adds the browser checks to Windows, failing rather than skipping if unavailable.
+The existing
 real service harness now passes 25 checks: both directions COMPLETED, user-only
 Solana wallet signature, authenticated intake, restart/lost-response recovery,
 no duplicate economic action, status transaction IDs and reconciliation MATCH.
@@ -77,12 +90,16 @@ host-time withdrawal window failed finalized preflight; network Clock-based
 construction fixed it without changing on-chain validity rules. This is localnet
 evidence, not an executed browser-wallet or Devnet certification.
 
-Provenance covers 263 files; guardrails, source/history secret scans and the
+Provenance covers 269 files; guardrails, source/history secret scans and the
 dependency/license audit passed. The latter ran in WSL with pinned Cargo metadata;
 the Windows shell without that metadata could not run that particular audit.
 The npm audit has zero vulnerabilities. Exact-SHA publication CI is still required
-for this milestone. Temporary validator databases were removed after each run;
-test key files and diagnostic evidence remain external to Git.
+for the interface milestone. Its fresh real-chain service rerun passed all 25
+checks: both directions COMPLETED, reserve/supply 80,000,000 atomic units, no
+pending mint/withdrawal liabilities and reconciliation MATCH. Temporary validator
+databases were removed after shutdown; test key files and diagnostic evidence
+remain external to Git. RecoveryProcedure remains NOT_TESTED; the actual encrypted
+snapshot/chain-resume drill is still required before Phase 15.
 
 See [user access](user-access.md) for the local-only API and CLI contract.
 

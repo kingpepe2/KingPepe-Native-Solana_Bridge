@@ -30,6 +30,44 @@ loopback endpoint. There is no plaintext config fallback or remote listener.
 This limited user credential cannot call signing, minting, pause or resume APIs.
 Signing services retain their separate existing authenticated channels.
 
+## Simple browser interface
+
+Open the loopback listener's root page. It serves only the interface and an
+explicit allowlist of local assets; it does not expose filesystem paths or
+runtime configuration. The same listener/process handles the authenticated API.
+Enter the local user-access code once; it is cleared from the field and held
+only in memory, never browser persistent storage. Disconnect clears the client.
+
+Choose Native to Solana or Solana to Native, enter an exact eight-decimal KPEPE
+amount and public destination/account information, and prepare a request. Save
+the public request before using a wallet. The Native recovery field is a
+**public** x-only key, never a seed/private key. The Solana recipient must be an
+initialized KPEPE token account, not an ordinary wallet address.
+
+For a withdrawal, connect a Wallet Standard localnet-capable wallet, or sign the
+downloaded unsigned transaction externally. The user reviews and signs the
+atomic burn/withdrawal and pays Solana network fees. The UI displays the explicit
+Native network fee and net payout. It never accesses a wallet signing key and
+never signs or sends a Native payment. A submitted/unknown wallet outcome locks
+the sign button: notification/status may be retried, not the economic action.
+An unavailable/finalizing transaction is not declared failed. The existing
+observer independently discovers finalized withdrawals.
+
+Operation tracking displays pending/completed/failed service states and known
+transaction IDs. Requests are frozen after preparation; a completed operation
+allows a new transfer. Save the request/operation ID before closing the page.
+No auto-replacement, private-key import, wallet balance correction, administrative
+control or new service/database is added. This is a local development interface,
+not production activation or wallet compatibility certification for every wallet.
+
+`npm run test:app` checks display amounts/request binding. On a host with installed
+Chrome, `npm run test:user-interface` uses isolated browser contexts; set
+`KINGPEPE_UI_BROWSER_CHANNEL=msedge` for installed Edge. Temporary browser data
+uses the configured external TEMP/TMP. Optional `KINGPEPE_UI_EVIDENCE_ROOT` stores
+screenshots outside Git. These browser tests use explicitly presentation-only
+wallet/status fixtures with **no signing key**; real economic proof remains in
+`npm run local:e2e:service`. A missing browser fails instead of skipping tests.
+
 ## CLI
 
 Run `node cli/bridge.mjs --help`, or `npm run bridge -- --help`.
@@ -73,4 +111,4 @@ The address adapter uses [BIP-173](https://bips.dev/173/) and
 [BIP-350](https://bips.dev/350/) through the pinned
 [@scure/base API](https://github.com/paulmillr/scure-base). It rejects wrong-network
 addresses, mixed case, checksum errors and unsupported script forms. The Native
-  prefix comes from the pinned KingPepe source, not Bitcoin defaults.
+prefix comes from the pinned KingPepe source, not Bitcoin defaults.

@@ -25,6 +25,48 @@
   },
   "trackedFiles": [
     {
+      "path": "app/index.html",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original minimal local-only two-direction user interface; no embedded configuration or wallet secrets.",
+      "purpose": "CORE_BRIDGE",
+      "reviewDisposition": "KEEP_CORE"
+    },
+    {
+      "path": "app/style.css",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original responsive interface styling with local system fonts and no external assets.",
+      "purpose": "CORE_BRIDGE",
+      "reviewDisposition": "KEEP_CORE"
+    },
+    {
+      "path": "app/bridge.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original browser adapter over the existing user API and official Wallet Standard package API; no upstream implementation copied, no wallet signing key or transfer engine.",
+      "purpose": "CORE_BRIDGE",
+      "reviewDisposition": "KEEP_CORE"
+    },
+    {
+      "path": "app/model.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original exact decimal presentation and request-display binding helpers; not a new wire codec or economic authority.",
+      "purpose": "CORE_BRIDGE",
+      "reviewDisposition": "KEEP_CORE"
+    },
+    {
+      "path": "app/tests/model.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original bounded amount and public request-display regressions.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "app/tests/browser.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated browser/HTTP UI regressions via Playwright library and Node test runner; explicitly UI-only unsigned wallet/status fixtures, not real-chain proof.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
       "path": "native/node/witness-address.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original bounded public Native witness-address adapter using the pinned scure-base package API; no upstream implementation copied.",

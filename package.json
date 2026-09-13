@@ -19,7 +19,9 @@
     "local:e2e:round-trip": "node solana/tests/local-withdrawal-e2e.mjs",
     "local:e2e:service": "node solana/tests/local-bridge-service.mjs",
     "local:e2e:plan": "node scripts/local-e2e-orchestrator.mjs plan",
-    "test": "npm run test:protocol && npm run test:frost && npm run test:native-node && npm run test:attesters && npm run test:solana-observer && npm run test:bridge-validator && npm run test:reconciliation && npm run test:relayer && npm run test:local-e2e-readiness",
+    "test": "npm run test:protocol && npm run test:frost && npm run test:native-node && npm run test:attesters && npm run test:solana-observer && npm run test:bridge-validator && npm run test:reconciliation && npm run test:relayer && npm run test:local-e2e-readiness && npm run test:app",
+    "test:app": "node --test app/tests/model.test.mjs",
+    "test:user-interface": "node --test app/tests/browser.test.mjs",
     "test:relayer": "node --test services/relayer/tests/*.test.mjs",
     "test:reconciliation": "node --test services/reconciliation/tests/*.test.mjs",
     "test:attesters": "node --test services/attesters/tests/*.test.mjs",
@@ -34,6 +36,10 @@
   "dependencies": {
     "@noble/curves": "2.3.0",
     "@scure/base": "2.4.0",
+    "@wallet-standard/app": "1.1.1",
     "borsh": "2.0.0"
+  },
+  "devDependencies": {
+    "playwright-core": "1.63.0"
   }
 }
