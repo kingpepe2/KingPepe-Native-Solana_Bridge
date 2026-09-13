@@ -13,8 +13,9 @@ import { RemoteIntegrityGuard } from "../../services/supervisor/protected-integr
 import { validateRuntimeStateRoot } from "../../shared/runtime-path-boundary.mjs";
 import { REGTEST_GENESIS } from "../../native/node/native-raw-evidence.mjs";
 
-export async function createLocalSecurityFixture({ repoRoot, policy, authorityOptions: retainedAuthority }) {
+export async function createLocalSecurityFixture({ repoRoot, policy, authorityOptions: retainedAuthority, testCertificateDays = 1 }) {
   assert.equal(process.platform, "win32"); assert.equal(policy.environment, "localnet"); assert.equal(policy.nativeGenesis, REGTEST_GENESIS);
+  assert(Number.isSafeInteger(testCertificateDays) && testCertificateDays >= 1 && testCertificateDays <= 30, "TestCertificateLifetimeRejected");
   const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-ipc-test-"));
   validateRuntimeStateRoot(root, repoRoot);
   const sid = windowsCurrentServiceSid(), closers = [], ids = new Set();
@@ -33,7 +34,7 @@ export async function createLocalSecurityFixture({ repoRoot, policy, authorityOp
   function certificate(name) {
     const key = path.join(root, name + ".key"), cert = path.join(root, name + ".crt");
     const result = spawnSync(process.env.KINGPEPE_TEST_OPENSSL ?? "openssl", ["req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1",
-      "-nodes", "-days", "1", "-subj", "/CN=kingpepe-service.invalid", "-addext", "subjectAltName=DNS:kingpepe-service.invalid",
+      "-nodes", "-days", String(testCertificateDays), "-subj", "/CN=kingpepe-service.invalid", "-addext", "subjectAltName=DNS:kingpepe-service.invalid",
       "-keyout", key, "-out", cert], { stdio: ["ignore", "pipe", "pipe"], windowsHide: true, timeout: 15000 });
     assert.equal(result.status, 0, "AuthoritativeTestOpenSslRequired");
     const privateKeyPem = readFileSync(key, "utf8"), certificatePem = readFileSync(cert, "utf8");
