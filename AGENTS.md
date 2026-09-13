@@ -36,10 +36,14 @@ required third-party notices and historical licensing facts.
 ## Current review scope
 
 Phase 14 fresh-clone validation and the isolated encrypted restore drill passed
-at 1f8ce111f10f31e6984c25d02903071d2f893076 with exact-SHA CI 34732975925
-(four required jobs passed, none skipped). Complete this status publication's
-matching CI gate, then continue to Phase 15: first TEST-only Devnet deployment
-using canonical Borsh V2. No production configuration, keys, funds or deployment.
+at 1f8ce111f10f31e6984c25d02903071d2f893076 with exact-SHA CI 34732975925.
+Its publication ddd234e0be44587b44a5d8f9b3ad4ade215b2b97 also passed matching
+CI 34735282747 (four required jobs passed, none skipped).
+Current phase: 15, first TEST-only Devnet deployment using canonical Borsh V2.
+Finish and publish the focused test-enrollment milestone, verify matching CI,
+then deploy with fresh protected TEST credentials and record public identities.
+Devnet test state must not enable Mainnet. Existing local callers stay local-only.
+No production configuration, keys, funds or deployment.
 Preserve the completed transfer engines, accounting, lifecycle, replay semantics,
 FROST topology, authorities and existing journal/inbox. Recovery is TESTED only
 for closed localnet/regtest state with a known quiescent gap, not production

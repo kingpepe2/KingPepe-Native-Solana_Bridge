@@ -21,6 +21,10 @@ import {
 } from "../localnet-solana-setup-plan.mjs";
 import { base58Decode, base58Encode } from "../solana-deposit-claim-transaction-plan.mjs";
 import { bytesToHex } from "../../../shared/protocol/canonical-message.mjs";
+import { decodeBridgeAbi, encodeBridgeAbi } from "../../../shared/protocol/solana-bridge-abi.mjs";
+import { REGTEST_GENESIS } from "../../../native/node/native-raw-evidence.mjs";
+import { buildDevnetSolanaSetupTransactionPlan, prepareSignedDevnetSolanaSetupTransaction,
+  DEVNET_SOLANA_GENESIS, DEVNET_SOLANA_SETUP_SCOPE } from "../localnet-solana-setup-plan.mjs";
 
 function h(label) {
   return createHash("sha256").update(label).digest("hex");
@@ -102,6 +106,50 @@ function dataFor(plan, role) {
   assert.ok(instruction, `missing instruction ${role}`);
   return Buffer.from(instruction.dataBase64, "base64");
 }
+
+function devnetFixture(overrides = {}) {
+  return fixture({ environment: "devnet", cluster: "devnet", solanaGenesis: DEVNET_SOLANA_GENESIS,
+    nativeGenesisHex: REGTEST_GENESIS, managerProgramIdBase58: pubkey("devnet-manager-test").base58,
+    transceiverProgramIdBase58: pubkey("devnet-transceiver-test").base58, ...overrides });
+}
+
+test("Devnet enrollment uses the same canonical Borsh with an explicit test environment and zero supply", async () => {
+  const { config } = devnetFixture();
+  const plan = await prepareSignedDevnetSolanaSetupTransaction(config);
+  assert.equal(plan.environment, "devnet"); assert.equal(plan.cluster, "devnet");
+  assert.equal(plan.setupScope, DEVNET_SOLANA_SETUP_SCOPE);
+  assert.equal(plan.initialSupplyAtomic, "0"); assert.equal(plan.freezeAuthority, null);
+  assert.equal(plan.productionReady, false); assert.equal(plan.mainnetActivation, "DISABLED");
+  const binding = decodeBridgeAbi("BridgeInitialize", dataFor(plan, "bridgeInitialize"));
+  assert.equal(binding.binding.environment, 1); assert.equal(binding.policy.mainnetActivationEnabled, false);
+  assert(encodeBridgeAbi("BridgeInitialize", binding).equals(dataFor(plan, "bridgeInitialize")));
+  const transceiver = decodeBridgeAbi("TransceiverInitialize", dataFor(plan, "transceiverInitialize"));
+  assert.equal(Buffer.from(transceiver.config.nativeGenesis).toString("hex"), REGTEST_GENESIS);
+  const packet = Buffer.from(plan.preparedTransactionBase64, "base64");
+  assert(packet.length <= 1232); assert.equal(packet[0], 3);
+  for (const signer of plan.signatures) assert(ed25519.verify(base58Decode(signer.signatureBase58),
+    Buffer.from(plan.messageBase64, "base64"), base58Decode(signer.publicKeyBase58)));
+  assert.throws(() => buildLocalnetSolanaSetupTransactionPlan(config), /LocalnetOnly/u);
+});
+
+test("Devnet enrollment rejects cross-network/default identities and unsafe Mint configuration", () => {
+  for (const overrides of [
+    { environment: "mainnet" }, { environment: "localnet" }, { cluster: "localnet" },
+    { solanaGenesis: undefined }, { solanaGenesis: pubkey("wrong-genesis").base58 },
+    { nativeGenesisHex: h("wrong-native") }, { nativeNetwork: 1 }, { decimals: 9, nativeDecimals: 9 },
+    { managerProgramIdBase58: undefined }, { transceiverProgramIdBase58: undefined },
+    { managerProgramIdBase58: LOCALNET_MANAGER_PROGRAM_ID_BASE58 },
+    { transceiverProgramIdBase58: LOCALNET_TRANSCEIVER_PROGRAM_ID_BASE58 },
+    { mainnetActivationEnabled: true }, { initialSupplyAtomic: "1" },
+    { freezeAuthorityBase58: pubkey("freeze").base58 }, { tokenProgramIdBase58: pubkey("wrong-token").base58 },
+    { attesterPublicKeysHex: [h("same"), h("same")] },
+  ]) assert.throws(() => buildDevnetSolanaSetupTransactionPlan(devnetFixture(overrides).config));
+});
+
+test("Devnet enrollment rejects a signer mismatch before producing a transaction", async () => {
+  const { config } = devnetFixture();
+  await assert.rejects(prepareSignedDevnetSolanaSetupTransaction({ ...config, mintSigner: keypair() }), /SignerMismatch/u);
+});
 
 test("localnet setup plan initializes mint, recipient token account, transceiver config, and bridge state", () => {
   const { config, recipientTokenAccountOwner, attesterA, attesterB } = fixture();
