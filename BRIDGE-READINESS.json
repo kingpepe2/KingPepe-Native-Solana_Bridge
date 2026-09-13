@@ -9,9 +9,37 @@
   "signerTopology": "SINGLE_HOST",
   "commonHostRiskDecision": "ACCEPTED_BY_KINGPEPE_TEAM",
   "lastUpdated": "2026-09-13",
-  "sourceStatus": "PHASE_14_FRESH_CLONE_VALIDATION_PASS_CURRENT_PUBLICATION_CI_REQUIRED",
+  "sourceStatus": "PHASE_15_TEST_ENROLLMENT_IN_PROGRESS_NO_DEVNET_DEPLOYMENT_YET",
+  "phase15": {
+    "status": "IN_PROGRESS",
+    "milestone": "EXPLICIT_DEVNET_TEST_ENROLLMENT_REUSING_BORSH_AND_PROTECTED_STORAGE",
+    "sourceBaseSha": "ddd234e0be44587b44a5d8f9b3ad4ade215b2b97",
+    "deployment": "NOT_RUN",
+    "validation": {
+      "scope": "TEST_ENROLLMENT_WORKTREE_LOCAL_PASS_MATCHING_COMMIT_CI_REQUIRED_BEFORE_DEPLOYMENT",
+      "windowsNode": "994_PASS_ZERO_FAIL_ZERO_SKIP",
+      "wslNode": "994_PASS_ZERO_FAIL_ZERO_SKIP",
+      "rust": "102_PASS",
+      "devnetSetupPlanner": "9_PASS",
+      "devnetProtectedStorage": "1_FOCUSED_REAL_CURRENTUSER_DPAPI_TEST_PASS",
+      "sbf": "BOTH_PASS",
+      "localService": "25_PASS_BOTH_DIRECTIONS_COMPLETED",
+      "secretScan": "WORKTREE_AND_FULL_HISTORY_PASS",
+      "provenance": "271_FILES_PASS",
+      "dependencyAudit": "NPM_ZERO_VULNERABILITIES_RETAINED_NON_BRIDGE_BINCODE_ADVISORY_UNCHANGED"
+    },
+    "productionUpgradeAuthorityDecision": "UNDECIDED_KINGPEPE_TEAM_DECISION_REQUIRED_IN_PHASE_18"
+  },
   "phase14": {
     "status": "PASS",
+    "publicationExactShaCi": {
+      "sourceSha": "ddd234e0be44587b44a5d8f9b3ad4ade215b2b97",
+      "runId": "34735282747",
+      "requiredJobsPassed": 4,
+      "skippedJobs": 0,
+      "skippedSteps": 0,
+      "status": "PASS"
+    },
     "milestone": "FULL_FRESH_CLONE_VALIDATION_AND_ISOLATED_ENCRYPTED_RESTORE",
     "sourceBaseSha": "eb105cba5276f99e76572c824fe5c190b1fe1a75",
     "sourceSha": "1f8ce111f10f31e6984c25d02903071d2f893076",

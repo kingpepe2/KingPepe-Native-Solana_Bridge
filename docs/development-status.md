@@ -36,6 +36,34 @@ uncertain delivery waits. Confirmed accepted-chain or accounting contradiction
 records an incident and pauses new mint/payout authorization. Read-only monitoring
 may continue; no automatic repair or unpause exists.
 
+## Phase 15 test deployment preparation
+
+Phase 14's publication ddd234e0be44587b44a5d8f9b3ad4ade215b2b97 passed
+exact-SHA CI 34735282747: all four jobs, no skipped jobs or steps. Its SBF
+hashes match the fresh-clone evidence below.
+
+The first Phase 15 milestone adds an explicit Devnet enrollment path over the
+existing Borsh/SPL setup planner, a distinct Devnet test state, and a Devnet-only
+purpose in the existing Windows protected store. Localnet entry points remain
+local-only. Mainnet activation, production signing and broadcasting stay disabled.
+There is no new database, service, transfer engine or wire format. Test enrollment
+still requires the exact Mint signer, zero initial supply, Bridge PDA mint
+authority, no freeze authority and two attesters. Test keys are never source.
+
+Enrollment milestone validation: 994 Node tests per platform; 102 Rust tests;
+nine setup-planner tests; one focused real CurrentUser DPAPI test; both SBF
+builds; provenance coverage of 271 files; guardrails, dependency/license and
+worktree/full-history secret scans passed. The real local service passed all
+25 checks with both directions COMPLETED, including restart, lost responses,
+replay, reconciliation and pause/resume. Its temporary ledger database was
+removed after shutdown; test key files remain protected and untouched.
+These are working-tree results, not a Devnet deployment certificate. The
+milestone commit requires matching CI before deployment. No dependency was
+changed; the retained non-bridge SDK bincode advisory remains disclosed.
+
+Deployment has not run yet. The operational workers remain local-only until the
+separate Phase 16 integration. See [Devnet deployment](deployment/devnet.md).
+
 ## Final simplification
 
 Review baseline: ab15b2f38084f024e49d8fae9a13182dfe85721d.

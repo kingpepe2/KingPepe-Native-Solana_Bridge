@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { encodeBridgeAbi } from "../../shared/protocol/solana-bridge-abi.mjs";
+import { REGTEST_GENESIS } from "../../native/node/native-raw-evidence.mjs";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import {
   bytesToHex,
@@ -23,6 +24,8 @@ export const SPL_TOKEN_PROGRAM_ID_BASE58 = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss6
 export const SYSTEM_PROGRAM_ID_BASE58 = "11111111111111111111111111111111";
 
 export const LOCALNET_SOLANA_SETUP_SCOPE = "LOCALNET_MINT_CONFIG_AND_TEST_RECIPIENT_BOOTSTRAP";
+export const DEVNET_SOLANA_GENESIS = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG";
+export const DEVNET_SOLANA_SETUP_SCOPE = "DEVNET_ZERO_SUPPLY_TEST_MINT_AND_CONFIG";
 export const BRIDGE_INSTRUCTION_INITIALIZE = 1;
 export const TRANSCEIVER_INSTRUCTION_INITIALIZE = 1;
 export const SYSTEM_INSTRUCTION_CREATE_ACCOUNT = 0;
@@ -43,7 +46,21 @@ const MAX_U64 = 0xffff_ffff_ffff_ffffn;
 const MAX_U8 = 0xffn;
 
 export function buildLocalnetSolanaSetupTransactionPlan(config) {
-  const normalized = normalizeSetupConfig(config);
+  return buildSolanaSetupTransactionPlan(config, LOCALNET);
+}
+
+// An explicit test-only entry point; existing local callers remain local-only.
+// The submitter must obtain solanaGenesis from the actual RPC before signing.
+export function buildDevnetSolanaSetupTransactionPlan(config) {
+  if (config?.solanaGenesis !== DEVNET_SOLANA_GENESIS || config.nativeGenesisHex !== REGTEST_GENESIS ||
+      config.nativeNetwork !== 8_000_111 || config.decimals !== 8 || config.nativeDecimals !== 8) {
+    throw new Error("DevnetSolanaSetupTestNetworkRequired");
+  }
+  return buildSolanaSetupTransactionPlan(config, "devnet");
+}
+
+function buildSolanaSetupTransactionPlan(config, environment) {
+  const normalized = normalizeSetupConfig(config, environment);
   const mintAuthority = findProgramAddress(
     [utf8(MINT_AUTHORITY_PDA_SEED_PREFIX), normalized.mint.bytes],
     normalized.managerProgram.bytes,
@@ -131,6 +148,7 @@ export function buildLocalnetSolanaSetupTransactionPlan(config) {
       9,
       [3, 1, 6, 0, 7],
       encodeBridgeInitialize({
+        environment: normalized.environment,
         managerProgram: normalized.managerProgram,
         transceiverProgram: normalized.transceiverProgram,
         solanaDeployment: normalized.solanaDeployment,
@@ -156,10 +174,10 @@ export function buildLocalnetSolanaSetupTransactionPlan(config) {
   });
 
   return Object.freeze({
-    protocol: LOCALNET_SOLANA_SETUP_PLAN_PROTOCOL,
-    setupScope: LOCALNET_SOLANA_SETUP_SCOPE,
-    environment: LOCALNET,
-    cluster: LOCALNET,
+    protocol: environment === LOCALNET ? LOCALNET_SOLANA_SETUP_PLAN_PROTOCOL : "KINGPEPE_NATIVE_SOLANA_BRIDGE/DEVNET_SOLANA_SETUP_PLAN/V1",
+    setupScope: environment === LOCALNET ? LOCALNET_SOLANA_SETUP_SCOPE : DEVNET_SOLANA_SETUP_SCOPE,
+    environment,
+    cluster: environment,
     mainnetActivation: "DISABLED",
     productionReady: false,
     solanaDeploymentHex: normalized.solanaDeployment.hex,
@@ -205,7 +223,14 @@ export function buildLocalnetSolanaSetupTransactionPlan(config) {
 }
 
 export async function prepareSignedLocalnetSolanaSetupTransaction(config) {
-  const plan = buildLocalnetSolanaSetupTransactionPlan(config);
+  return signSetupTransaction(buildLocalnetSolanaSetupTransactionPlan(config), config);
+}
+
+export async function prepareSignedDevnetSolanaSetupTransaction(config) {
+  return signSetupTransaction(buildDevnetSolanaSetupTransactionPlan(config), config);
+}
+
+async function signSetupTransaction(plan, config) {
   const signers = [
     ["feePayer", plan.feePayerBase58, requireObject(config?.feePayerSigner, "feePayerSigner")],
     ["mint", plan.mintBase58, requireObject(config?.mintSigner, "mintSigner")],
@@ -258,20 +283,24 @@ export async function prepareSignedLocalnetSolanaSetupTransaction(config) {
   });
 }
 
-function normalizeSetupConfig(config) {
+function normalizeSetupConfig(config, expectedEnvironment) {
   const value = requireObject(config, "config");
   const environment = value.environment ?? LOCALNET;
   const cluster = value.cluster ?? LOCALNET;
-  if (environment !== LOCALNET || cluster !== LOCALNET) {
-    throw new Error("LocalnetSolanaSetupPlanLocalnetOnly");
+  if (environment !== expectedEnvironment || cluster !== expectedEnvironment) {
+    throw new Error(expectedEnvironment === LOCALNET ? "LocalnetSolanaSetupPlanLocalnetOnly" : "DevnetSolanaSetupPlanDevnetOnly");
   }
 
   const managerProgram = normalizePubkeyPair(value, "managerProgramIdBase58", "managerProgramIdHex", {
-    defaultBase58: LOCALNET_MANAGER_PROGRAM_ID_BASE58,
+    defaultBase58: expectedEnvironment === LOCALNET ? LOCALNET_MANAGER_PROGRAM_ID_BASE58 : undefined,
   });
   const transceiverProgram = normalizePubkeyPair(value, "transceiverProgramIdBase58", "transceiverProgramIdHex", {
-    defaultBase58: LOCALNET_TRANSCEIVER_PROGRAM_ID_BASE58,
+    defaultBase58: expectedEnvironment === LOCALNET ? LOCALNET_TRANSCEIVER_PROGRAM_ID_BASE58 : undefined,
   });
+  if (expectedEnvironment === "devnet" &&
+      (managerProgram.base58 === LOCALNET_MANAGER_PROGRAM_ID_BASE58 || transceiverProgram.base58 === LOCALNET_TRANSCEIVER_PROGRAM_ID_BASE58)) {
+    throw new Error("DevnetSolanaSetupDistinctTestProgramIdsRequired");
+  }
   const tokenProgram = normalizePubkeyPair(value, "tokenProgramIdBase58", "tokenProgramIdHex", {
     defaultBase58: SPL_TOKEN_PROGRAM_ID_BASE58,
   });
@@ -434,12 +463,12 @@ function encodeTransceiverInitialize({
 }
 
 function encodeBridgeInitialize({
-  managerProgram, transceiverProgram, solanaDeployment, mint, tokenProgram, mintAuthority,
+  environment, managerProgram, transceiverProgram, solanaDeployment, mint, tokenProgram, mintAuthority,
   decimals, nativeDecimals, policyEpoch, keyEpoch, depositsPaused, withdrawalsPaused, hardStop, mainnetActivationEnabled,
 }) {
   // None freeze authority and zero premine remain implicit, not caller-selectable.
   return encodeBridgeAbi("BridgeInitialize", { tag: BRIDGE_INSTRUCTION_INITIALIZE,
-    binding: { environment: 0, managerProgramId: managerProgram.bytes, transceiverProgramId: transceiverProgram.bytes,
+    binding: { environment: environment === "devnet" ? 1 : 0, managerProgramId: managerProgram.bytes, transceiverProgramId: transceiverProgram.bytes,
       solanaDeployment: solanaDeployment.bytes, mint: mint.bytes, tokenProgramId: tokenProgram.bytes,
       mintAuthorityPda: mintAuthority.bytes, decimals, nativeDecimals },
     policy: { policyEpoch, keyEpoch, depositsPaused, withdrawalsPaused, hardStop, mainnetActivationEnabled } });

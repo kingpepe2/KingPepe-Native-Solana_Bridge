@@ -63,6 +63,20 @@ test("protected storage never initializes missing state on read or write", t => 
   assert.throws(() => store.write(randomBytes(32), "1"), /WindowsProtectedStoreRejected/u);
   assert.equal(existsSync(options.root), false);
 });
+
+test("Devnet deployment test material uses real DPAPI without a plaintext fallback", t => {
+  const { options } = fixture(t, "FEE_PAYER", "devnet-deployment-keys", { environment: "devnet" });
+  const payload = randomBytes(256);
+  const store = WindowsProtectedStore.create(options, payload);
+  assert.equal(readFileSync(stateFile(options)).includes(payload), false);
+  const reopened = new WindowsProtectedStore(options), restored = reopened.read().payload;
+  sameProtectedBytes(restored, payload); restored.fill(0); payload.fill(0); store.close(); reopened.close();
+  for (const overrides of [{ environment: "localnet" }, { environment: "mainnet" }, { role: "COORDINATOR" }]) {
+    assert.throws(() => new WindowsProtectedStore({ ...options, context: { ...options.context, ...overrides } }), /ProtectedDevnetDeploymentContextRequired/u);
+  }
+  assert.throws(() => new WindowsProtectedStore({ ...options, context: { ...options.context,
+    solanaDeployment: h("different-devnet-deployment") } }).read(), /WindowsProtectedStoreRejected/u);
+});
 test("local economic journal uses an existing DPAPI key without plaintext fallback", t => {
   const vector = JSON.parse(readFileSync(path.join(repoRoot, "solana/modules/bridge-messages/vectors/canonical-borsh-v2.json"))).vectors[0];
   const deployment = Buffer.from(vector.encodedHex.slice(24, 360), "hex");

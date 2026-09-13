@@ -25,6 +25,13 @@
   },
   "trackedFiles": [
     {
+      "path": "docs/deployment/devnet.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original test-only Devnet enrollment/deployment procedure using retained Borsh and protected storage, with links to official CLI/RPC documentation; no operational credentials or private paths.",
+      "purpose": "REQUIRED_DOCUMENTATION",
+      "reviewDisposition": "KEEP_LEGAL_AND_CURRENT_CONTRACT"
+    },
+    {
       "path": "app/index.html",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original minimal local-only two-direction user interface; no embedded configuration or wallet secrets.",

@@ -199,6 +199,7 @@ pub enum ProgramState {
     Uninitialized,
     Phase0Disabled,
     LocalnetTesting,
+    DevnetTesting,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -400,7 +401,8 @@ impl BridgeProgram {
         validate_config(&config)?;
         self.state = match config.environment {
             BridgeEnvironment::Localnet => ProgramState::LocalnetTesting,
-            BridgeEnvironment::Devnet | BridgeEnvironment::Mainnet => ProgramState::Phase0Disabled,
+            BridgeEnvironment::Devnet => ProgramState::DevnetTesting,
+            BridgeEnvironment::Mainnet => ProgramState::Phase0Disabled,
         };
         self.config = Some(config);
         Ok(())
@@ -415,7 +417,10 @@ impl BridgeProgram {
     }
 
     pub fn is_operational(&self) -> bool {
-        self.state == ProgramState::LocalnetTesting
+        matches!(
+            self.state,
+            ProgramState::LocalnetTesting | ProgramState::DevnetTesting
+        )
     }
 
     pub fn minted_supply(&self) -> u128 {
@@ -572,10 +577,12 @@ fn require_ready_for_action(
     config: &BridgeConfig,
     deposit: bool,
 ) -> Result<(), BridgeError> {
-    if *state != ProgramState::LocalnetTesting
-        || config.environment != BridgeEnvironment::Localnet
-        || config.mainnet_activation_enabled
-    {
+    let test_environment_matches = matches!(
+        (state, &config.environment),
+        (ProgramState::LocalnetTesting, BridgeEnvironment::Localnet)
+            | (ProgramState::DevnetTesting, BridgeEnvironment::Devnet)
+    );
+    if !test_environment_matches || config.mainnet_activation_enabled {
         return Err(BridgeError::ActivationDisabled);
     }
     if config.hard_stop
@@ -1801,6 +1808,7 @@ fn program_state_to_u8(state: &ProgramState) -> u8 {
         ProgramState::Uninitialized => 0,
         ProgramState::Phase0Disabled => 1,
         ProgramState::LocalnetTesting => 2,
+        ProgramState::DevnetTesting => 3,
     }
 }
 
@@ -1809,6 +1817,7 @@ fn program_state_from_u8(value: u8) -> Result<ProgramState, AccountCodecError> {
         0 => Ok(ProgramState::Uninitialized),
         1 => Ok(ProgramState::Phase0Disabled),
         2 => Ok(ProgramState::LocalnetTesting),
+        3 => Ok(ProgramState::DevnetTesting),
         _ => Err(AccountCodecError::InvalidEncoding),
     }
 }
@@ -3017,6 +3026,91 @@ mod tests {
             mainnet_program.accept_deposit_claim(&mut transceiver, &message, &account_context),
             Err(BridgeError::ActivationDisabled)
         );
+    }
+
+    #[test]
+    fn devnet_test_state_preserves_borsh_replay_accounting_and_pause() {
+        let mut config = base_config();
+        config.environment = BridgeEnvironment::Devnet;
+        let mut bridge = BridgeProgram::new();
+        bridge.initialize(config.clone()).unwrap();
+        assert_eq!(bridge.state(), &ProgramState::DevnetTesting);
+        assert!(bridge.is_operational());
+        let state = BridgeStateAccount {
+            state: bridge.state().clone(),
+            config: config.clone(),
+            minted_supply: 0,
+            burned_unpaid_withdrawals: 0,
+        };
+        let encoded = encode_bridge_state_account(&state).unwrap();
+        assert_eq!(encoded[9], 3);
+        assert_eq!(decode_bridge_state_account(&encoded).unwrap(), state);
+        for deposit in [true, false] {
+            assert_eq!(
+                require_ready_for_action(bridge.state(), &config, deposit),
+                Ok(())
+            );
+            for wrong in [BridgeEnvironment::Localnet, BridgeEnvironment::Mainnet] {
+                let mut other = config.clone();
+                other.environment = wrong;
+                assert_eq!(
+                    require_ready_for_action(bridge.state(), &other, deposit),
+                    Err(BridgeError::ActivationDisabled)
+                );
+            }
+            let mut paused = config.clone();
+            paused.deposits_paused = deposit;
+            paused.withdrawals_paused = !deposit;
+            assert_eq!(
+                require_ready_for_action(bridge.state(), &paused, deposit),
+                Err(BridgeError::PausedOrHardStopped)
+            );
+            paused = config.clone();
+            paused.hard_stop = true;
+            assert_eq!(
+                require_ready_for_action(bridge.state(), &paused, deposit),
+                Err(BridgeError::PausedOrHardStopped)
+            );
+            paused = config.clone();
+            paused.mainnet_activation_enabled = true;
+            assert_eq!(
+                require_ready_for_action(bridge.state(), &paused, deposit),
+                Err(BridgeError::ActivationDisabled)
+            );
+        }
+        let accounts = accounts(&config);
+        let mut transceiver = transceiver(&config);
+        let message = deposit_message(&config);
+        transceiver
+            .verify_message(
+                &message,
+                &observations(&config, message.message_digest().unwrap()),
+            )
+            .unwrap();
+        bridge
+            .accept_deposit_claim(&mut transceiver, &message, &accounts)
+            .unwrap();
+        assert_eq!(
+            bridge.accept_deposit_claim(&mut transceiver, &message, &accounts),
+            Err(BridgeError::Replay)
+        );
+        let withdrawal = withdrawal_message(&config);
+        let burn = BurnChecked {
+            token_program_id: config.mint_binding.token_program_id,
+            mint: config.mint_binding.mint,
+            authority: h(10),
+            amount_atomic: withdrawal.amount_atomic,
+            decimals: 8,
+        };
+        bridge
+            .record_withdrawal_request(&withdrawal, &burn, &accounts)
+            .unwrap();
+        assert_eq!(
+            bridge.record_withdrawal_request(&withdrawal, &burn, &accounts),
+            Err(BridgeError::Replay)
+        );
+        assert_eq!(bridge.minted_supply(), 1_000);
+        assert_eq!(bridge.burned_unpaid_withdrawals(), 4_000);
     }
 
     #[test]
