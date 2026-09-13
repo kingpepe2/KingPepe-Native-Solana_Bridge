@@ -36,13 +36,14 @@ uncertain delivery waits. Confirmed accepted-chain or accounting contradiction
 records an incident and pauses new mint/payout authorization. Read-only monitoring
 may continue; no automatic repair or unpause exists.
 
-## Phase 15 test deployment preparation
+## Phase 15 test enrollment and Devnet funding blocker
 
 Phase 14's publication ddd234e0be44587b44a5d8f9b3ad4ade215b2b97 passed
 exact-SHA CI 34735282747: all four jobs, no skipped jobs or steps. Its SBF
 hashes match the fresh-clone evidence below.
 
-The first Phase 15 milestone adds an explicit Devnet enrollment path over the
+The first Phase 15 milestone, 9e339122748848a4bc762e3a09bcaecded478d50,
+adds an explicit Devnet enrollment path over the
 existing Borsh/SPL setup planner, a distinct Devnet test state, and a Devnet-only
 purpose in the existing Windows protected store. Localnet entry points remain
 local-only. Mainnet activation, production signing and broadcasting stay disabled.
@@ -60,9 +61,24 @@ removed after shutdown; test key files remain protected and untouched.
 These are working-tree results, not a Devnet deployment certificate. The
 milestone commit requires matching CI before deployment. No dependency was
 changed; the retained non-bridge SDK bincode advisory remains disclosed.
+Enrollment's exact-SHA [CI run 34737496362](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34737496362)
+must have all four required jobs executed successfully; later status publications
+also require their own matching CI.
 
-Deployment has not run yet. The operational workers remain local-only until the
-separate Phase 16 integration. See [Devnet deployment](deployment/devnet.md).
+Deployment is BLOCKED by Devnet test funding, not by the local bridge tests.
+Two bounded standard airdrop attempts returned RPC `-32603: Internal error`
+and then HTTP 429 (daily limit or exhausted faucet). Further attempts stopped;
+no limit bypass, alternate identity or production funds were used. The new
+test fee payer `E7mox7hc7LdSvCu6PH8sf7U7mJQBnEjA7z3xYiwh2m2k` has zero balance.
+At finalized slot 497535192 the prepared programs, Mint and fee-payer account
+were all absent. ProgramData rent alone was 2.364242160 Devnet SOL, plus fees
+and setup rent. Fresh test credentials are protected locally with CurrentUser
+DPAPI; the private CLI pipe check passed without plaintext key files.
+
+No Devnet program deployment or Mint enrollment has run. The operational workers
+remain local-only until the separate Phase 16 integration. Resume with the same
+prepared test identities once funded and matching CI is verified. See
+[Devnet deployment](deployment/devnet.md).
 
 ## Final simplification
 
