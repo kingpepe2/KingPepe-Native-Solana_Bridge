@@ -26,11 +26,13 @@ import { LocalDeploymentRpc, verifyDeploymentSnapshot } from "../../services/sol
 import { LocalBridgeService } from "../../services/relayer/withdrawal-service.mjs";
 import { base58Encode } from "../../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs";
 import { SYSTEM_PROGRAM_ID_BASE58 as SYSTEM } from "../../services/bridge-validator/localnet-solana-setup-plan.mjs";
-import { decodeCanonicalBridgeMessage, encodeCanonicalBridgeMessage } from "../../shared/protocol/canonical-message.mjs";
+import { decodeCanonicalBridgeMessage } from "../../shared/protocol/canonical-message.mjs";
 import { validateRuntimeFile } from "../../shared/runtime-path-boundary.mjs";
-import { createWithdrawalInstruction } from "../ts/sdk/withdrawal.mjs";
+import { createNativeDepositRequest } from "../ts/sdk/bridge.mjs";
+import { createBridgeClient } from "../ts/sdk/client.mjs";
+import { BridgeUserApi } from "../../services/bridge-validator/user-api.mjs";
+import { listenBridgeUserApi } from "../../services/bridge-validator/user-http.mjs";
 import { localDeploymentManifest } from "./local-deployment-integrity.mjs";
-import { packet } from "./local-transaction-packet.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "../.."), self = fileURLToPath(import.meta.url);
 function testIdentity(encoded) {
@@ -105,10 +107,40 @@ async function child(file, mode) {
       nativeVerifier: verifier, nativeRpc: native, solanaRpc: solana, manifest: c.manifest, createCoordinator: factory,
       reserveScriptHex: "5120" + p.frostPublicKeyHex, minimumConfirmations: p.minimumConfirmations, maxAmountAtomic: p.maximumAmountAtomic, maxFeeAtomic: p.maximumFeeAtomic });
     const service = new LocalBridgeService({ ledger, worker, depositWorker });
+    const userApi = new BridgeUserApi({ service, ledger, depositFeeInputs: async () => c.publicDeposit.feeFundingInputs });
+    if (mode === "user-api-withdrawal-request") {
+      const before = ledger.checkpoint();
+      await assert.rejects(userApi.createSolanaWithdrawal({ ...c.publicWithdrawal, userAuthority: c.manifest.config.attesters[0] }));
+      await assert.rejects(userApi.createSolanaWithdrawal({ ...c.publicWithdrawal, amountAtomic: (BigInt(c.policy.maximumAmountAtomic) + 1n).toString() }));
+      assert.deepEqual(ledger.checkpoint(), before); assert.equal(service.status().state, "ACTIVE");
+      const request = await userApi.createSolanaWithdrawal(c.publicWithdrawal);
+      process.stdout.write(JSON.stringify(request) + "\n"); return;
+    }
+    if (mode === "user-api-intake") {
+      const accessToken = randomBytes(32), server = await listenBridgeUserApi({ api: userApi, accessToken });
+      try {
+        const client = createBridgeClient({ endpoint: `http://127.0.0.1:${server.address().port}/`, accessToken: accessToken.toString("hex") });
+        const before = ledger.checkpoint();
+        await assert.rejects(client.createNativeDepositRequest({ ...c.publicDeposit.request, recipient: c.manifest.config.attesters[0] }));
+        await assert.rejects(client.createNativeDepositRequest({ ...c.publicDeposit.request, policy: c.policy }));
+        assert.deepEqual(ledger.checkpoint(), before); assert.equal(service.status().state, "ACTIVE");
+        const quote = await client.createNativeDepositRequest(c.publicDeposit.request);
+        assert.equal(quote.scriptPubKeyHex, c.publicDeposit.scriptPubKeyHex);
+        const input = { request: c.publicDeposit.request, depositTxidHex: c.publicDeposit.depositTxidHex, depositVout: null };
+        await client.submitNativeDeposit(input); const checkpoint = ledger.checkpoint();
+        await client.submitNativeDeposit(input); assert.deepEqual(ledger.checkpoint(), checkpoint);
+        const status = await client.getDepositStatus(quote.operationId); assert.equal(status.state, "OBSERVED");
+        service.pause(); await assert.rejects(client.createNativeDepositRequest(c.publicDeposit.request));
+        assert.equal((await client.getBridgeStatus()).state, "PAUSED");
+        process.stdout.write(JSON.stringify({ state: "USER_API_INTAKE_PASS" }) + "\n"); return;
+      } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); accessToken.fill(0); }
+    }
     if (mode === "resume-reviewed") await service.resumeAfterReview();
     const stop = new AbortController(); let result;
     await service.run({ signal: stop.signal, intervalMs: 250, onStatus: value => { result = value; stop.abort(); } });
-    process.stdout.write(JSON.stringify({ result, status: service.status(), signingRequests, sends }) + "\n");
+    process.stdout.write(JSON.stringify({ result, status: service.status(), signingRequests, sends,
+      userDeposit: userApi.getDepositStatus(c.publicDeposit.operationId),
+      userWithdrawal: ledger.knownWithdrawalIds()[0] ? userApi.getWithdrawalStatus(ledger.knownWithdrawalIds()[0]) : null }) + "\n");
   } finally {
     signers.forEach(s => s.close()); attesters.forEach(a => a.close()); ledger.close();
     if (unavailableRpc) { unavailableRpc.closeAllConnections(); await new Promise(resolve => unavailableRpc.close(resolve)); }
@@ -176,14 +208,20 @@ export async function runLocalBridgeService(onCheck = () => {}) {
         ledger: { environment: "localnet", root: path.join(plan.runRoot, "service-journal"), journalIdHex: randomBytes(32).toString("hex"),
           testAuthenticationKeyHex: randomBytes(32).toString("hex"), deploymentHex: Buffer.concat([deploymentHeader,
             ...[policy.nativeGenesis, policy.solanaDeployment, policy.managerProgramId, policy.transceiverProgramId, policy.mint].map(v => Buffer.from(v, "hex"))]).toString("hex") } };
-      const request = { operationId: f.operationIdHex, depositIntent: f.depositIntentContext, userRecoveryPublicKeyHex: f.depositPolicy.userRecoveryPublicKeyHex,
+      const publicRequest = { amountAtomic: f.depositIntentContext.amountAtomic, recipient: setup.recipientTokenAccountBase58,
+        userRecoveryPublicKeyHex: f.depositPolicy.userRecoveryPublicKeyHex, nonceHex: f.depositIntentContext.nonceHex };
+      const quote = createNativeDepositRequest({ policy, ...publicRequest });
+      assert.equal(quote.scriptPubKeyHex, f.depositPolicy.scriptPubKeyHex); assert.deepEqual(quote.depositIntent, f.depositIntentContext);
+      const request = { operationId: quote.operationId, depositIntent: f.depositIntentContext, userRecoveryPublicKeyHex: f.depositPolicy.userRecoveryPublicKeyHex,
         depositTxidHex: f.inputs[0].txid, depositVout: null, feeFundingInputs: f.inputs.slice(1) };
+      c.publicDeposit = { request: publicRequest, operationId: quote.operationId, scriptPubKeyHex: quote.scriptPubKeyHex,
+        depositTxidHex: request.depositTxidHex, feeFundingInputs: request.feeFundingInputs };
       const file = validateRuntimeFile(path.join(plan.runRoot, "local-service-private-test-context.json"), repoRoot);
       writeFileSync(file, JSON.stringify(c), { flag: "wx", mode: 0o600 });
       const useLedger = fn => { const ledger = AuthenticatedLocalDepositLedger.openLocal(ledgerOptions(c)); try { return fn(ledger); } finally { ledger.close(); } };
       stage = "SERVICE_JOURNAL_SETUP";
       const created = AuthenticatedLocalDepositLedger.createLocal(ledgerOptions(c));
-      try { created.watchServiceDeposit(request, policy); created.pause(); } finally { created.close(); }
+      created.close();
       const once = async mode => { diskGuard(); const r = await promisify(execFile)(process.execPath, [self, "--service-child", file, mode ?? "tick"],
         { cwd: repoRoot, timeout: 90000, maxBuffer: 65536, windowsHide: true }); return JSON.parse(r.stdout); };
       const cli = async (command, parameters = [], wallet) => {
@@ -192,6 +230,8 @@ export async function runLocalBridgeService(onCheck = () => {}) {
           args: buildRegtestCliArguments({ datadir: plan.paths.nativeDatadir, rpcPort: plan.ports.nativeRpcPort, wallet, command, parameters }), cwd: repoRoot });
         return String(r.output).trim();
       };
+      assert.equal((await once("user-api-intake")).state, "USER_API_INTAKE_PASS");
+      pass("SDK_HTTP_DEPOSIT_INTAKE_IDEMPOTENT_EXISTING_JOURNAL");
       const before = await once(); assert.equal(before.status.state, "PAUSED"); assert.equal(before.signingRequests, 0); assert.equal(before.sends, 0);
       pass("PENDING_DEPOSIT_RESTART_PRESERVES_PAUSE_NO_SIGNING");
       useLedger(l => l.resumeAfterReview()); // Explicit test Team policy action, not a per-transfer approval.
@@ -247,6 +287,7 @@ export async function runLocalBridgeService(onCheck = () => {}) {
       let minted;
       for (let i = 0; i < 100; i++) { minted = await once(); if (minted.status.deposits[0]?.state === "COMPLETED") break; await delay(500); }
       assert.equal(minted.status.deposits[0].state, "COMPLETED"); assert.equal(minted.result.reconciliation.state, "MATCH");
+      assert.equal(minted.userDeposit.state, "COMPLETED"); assert(minted.userDeposit.transactionIds.solanaClaim);
       assert.equal(dropped.size, 2); pass("LOST_SOLANA_RECEIPT_AND_CLAIM_RESPONSES_RECOVERED");
       pass("AUTOMATIC_NATIVE_TO_SOLANA_COMPLETED_AND_RECONCILED");
       const sendCount = solanaSends, replay = await once();
@@ -255,23 +296,37 @@ export async function runLocalBridgeService(onCheck = () => {}) {
       pass("DUPLICATE_DEPOSIT_AND_RESTART_NO_DOUBLE_MINT");
       let rpcId = 0;
       const rpc = async (method, params = []) => { const response = await fetch(realSolana, { method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ jsonrpc: "2.0", id: ++rpcId, method, params }), signal: AbortSignal.timeout(10000) }); const value = await response.json(); assert(response.ok && !value.error, "TEST_SOLANA_RPC_FAILED"); return value.result; };
+        body: JSON.stringify({ jsonrpc: "2.0", id: ++rpcId, method, params }), signal: AbortSignal.timeout(10000) }); const value = await response.json();
+        if (value.error) console.error(JSON.stringify({ testRpcMethod: method, code: value.error.code, transactionError: value.error.data?.err ?? null }));
+        assert(response.ok && !value.error, "TEST_SOLANA_RPC_FAILED:" + method); return value.result; };
       const address = await cli("getnewaddress", ["service-withdrawal", "bech32m"], config.userWalletName);
       const destination = JSON.parse(await cli("getaddressinfo", [address], config.userWalletName)).scriptPubKey;
-      const depositCredit = useLedger(l => l.serviceDeposit(request.operationId).operation.finalizedCredit);
-      const originalMessage = decodeCanonicalBridgeMessage(depositCredit.encodedMessageHex);
-      const encoded = encodeCanonicalBridgeMessage({ ...originalMessage, operationId: undefined, action: "WithdrawalRequest", direction: "SolanaToNative",
-        depositOutpoint: { txid: new Uint8Array(32), vout: 0 }, withdrawalId: randomBytes(32), nonce: randomBytes(32), amountAtomic: 20_000_000n,
-        feeAtomic: 1000n, destination: Buffer.from(destination, "hex") });
-      const instruction = createWithdrawalInstruction({ encodedMessageHex: Buffer.from(encoded).toString("hex"), userAuthority: user.signer.publicKeyBase58,
-        payer: fee.signer.publicKeyBase58, sourceTokenAccount: setup.recipientTokenAccountBase58 });
-      const budget = Buffer.alloc(5); budget[0] = 2; budget.writeUInt32LE(600000, 1);
-      const latest = (await rpc("getLatestBlockhash", [{ commitment: "finalized" }])).value;
-      const bytes = await packet(fee.signer, [user.signer], latest.blockhash, [{ program: "ComputeBudget111111111111111111111111111111", accounts: [], data: budget }, instruction]);
+      // Test faucet funds the USER'S Solana wallet; the bridge SDK cannot sign it.
+      const airdrop = await rpc("requestAirdrop", [user.signer.publicKeyBase58, 50000000]);
+      for (let i = 0; i < 240; i++) {
+        if ((await rpc("getSignatureStatuses", [[airdrop]])).value[0]?.confirmationStatus === "finalized") break;
+        if (i === 239) throw new Error("TEST_USER_FEE_BALANCE_TIMEOUT"); await delay(250);
+      }
+      c.publicWithdrawal = { amountAtomic: "20000000", feeAtomic: "1000", destination: address,
+        userAuthority: user.signer.publicKeyBase58, sourceTokenAccount: setup.recipientTokenAccountBase58,
+        withdrawalIdHex: randomBytes(32).toString("hex"), nonceHex: randomBytes(32).toString("hex") };
+      writeFileSync(file, JSON.stringify(c), { mode: 0o600 }); // Existing isolated test context only.
+      stage = "SDK_USER_WITHDRAWAL";
+      const walletRequest = await once("user-api-withdrawal-request");
+      const walletMessage = decodeCanonicalBridgeMessage(walletRequest.encodedMessageHex);
+      assert.equal(walletMessage.destinationHex, destination);
+      const clockAccount = (await rpc("getAccountInfo", ["SysvarC1ock11111111111111111111111111111111", { encoding: "base64", commitment: "finalized" }])).value;
+      const chainTime = Buffer.from(clockAccount.data[0], "base64").readBigInt64LE(32);
+      assert(walletMessage.validFrom <= chainTime && walletMessage.validUntil > chainTime);
+      assert.equal(walletMessage.validUntil - walletMessage.validFrom, 3600n);
+      const userPacket = Buffer.from(walletRequest.transactionBase64, "base64"); assert(userPacket.subarray(1, 65).equals(Buffer.alloc(64)));
+      user.signer.sign(userPacket.subarray(65)).copy(userPacket, 1);
+      const bytes = userPacket.toString("base64");
       const signature = await rpc("sendTransaction", [bytes, { encoding: "base64", skipPreflight: false, maxRetries: 0 }]);
       for (let i = 0; i < 240; i++) { const status = (await rpc("getSignatureStatuses", [[signature], { searchTransactionHistory: true }])).value[0];
         if (status?.confirmationStatus === "finalized") { assert.equal(status.err, null); break; } if (i === 239) throw new Error("TEST_BURN_FINALITY_TIMEOUT"); await delay(250); }
       stage = "AUTOMATIC_WITHDRAWAL_SERVICE";
+      pass("SDK_BORSH_WITHDRAWAL_SIGNED_ONLY_BY_USER_ACCEPTED_ON_CHAIN");
       useLedger(l => l.pause()); const burnPaused = await once();
       assert.equal(burnPaused.status.accounting.pendingWithdrawalAtomic, "20000000"); assert.equal(burnPaused.sends, 0); assert.equal(burnPaused.signingRequests, 0);
       pass("PAUSED_SERVICE_OBSERVES_BURN_LIABILITY_WITHOUT_SIGNING");
@@ -289,6 +344,8 @@ export async function runLocalBridgeService(onCheck = () => {}) {
       pass("PAUSED_SERVICE_RETAINS_FINALIZED_PAYOUT_CHANGE_AFTER_RESTART");
       await once("resume-reviewed");
       const completed = await once(); assert.equal(completed.status.withdrawals[0].state, "COMPLETED"); assert.equal(completed.result.reconciliation.state, "MATCH");
+      assert.equal(completed.userWithdrawal.state, "COMPLETED"); assert.equal(completed.userWithdrawal.operationId, walletRequest.operationId);
+      assert(completed.userWithdrawal.transactionIds.nativePayout); pass("USER_OPERATION_STATUS_HAS_FINALIZED_TRANSACTION_IDS");
       pass("AUTOMATIC_SOLANA_TO_NATIVE_COMPLETED_AND_RECONCILED");
       const duplicated = await once(); assert.equal(duplicated.sends, 0); assert.equal(duplicated.signingRequests, 0); pass("COMPLETED_WITHDRAWAL_REPLAY_NO_SECOND_PAYOUT");
       useLedger(l => l.pause()); const paused = await once(); assert.equal(paused.status.state, "PAUSED"); assert.equal(paused.sends, 0);
@@ -309,7 +366,7 @@ export async function runLocalBridgeService(onCheck = () => {}) {
     }
     finally { if (proxy) { proxy.closeAllConnections(); await new Promise(resolve => proxy.close(resolve)); } diskGuard(); }
   });
-  const complete = result.state === "LOCAL_E2E_BOOTSTRAP_READY" && report?.nativeToSolana === "COMPLETED" && report?.solanaToNative === "COMPLETED" && !failure && passed.length === 22;
+  const complete = result.state === "LOCAL_E2E_BOOTSTRAP_READY" && report?.nativeToSolana === "COMPLETED" && report?.solanaToNative === "COMPLETED" && !failure && passed.length === 25;
   return { ...report, state: complete ? "COMPLETED" : "BLOCKED", stage, reason: failure ?? result.reason, failureLocation,
     checks: { pass: passed.length, fail: complete ? 0 : 1, passed }, productionReady: false, mainnetActivation: "DISABLED" };
 }

@@ -93,9 +93,39 @@ export class AutomaticNativeToSolanaDeposit {
     this.#active(); return { signature: v.signature, finalizedHeight: height.toString(), slot: observed.slot.toString() };
   }
   assertLedger(ledger) { check(ledger === this.#ledger, "DepositServiceLedgerMismatch"); }
+  publicPolicy() { return structuredClone(this.#policy); }
+  async userTransactionContext({ tokenAccount, authority, amountAtomic } = {}) {
+    this.#active();
+    const snapshot = await this.#solana.snapshotWithAdditionalAccounts(this.#manifest,
+      [tokenAccount, "SysvarC1ock11111111111111111111111111111111"]);
+    check(Array.isArray(snapshot.accounts) && snapshot.accounts.length > 2, "UserTokenAccountUnavailable");
+    await this.#deployment({ ...snapshot, accounts: snapshot.accounts.slice(0, -2) });
+    const a = snapshot.accounts.at(-2);
+    // Standard SPL Token Account layout, not Token-2022/extensions. A bad user
+    // account rejects intake; it is not a deployment incident or global pause.
+    check(a && a.owner === this.#manifest.mint.tokenProgram && a.executable === false &&
+      Array.isArray(a.data) && a.data.length === 2 && a.data[1] === "base64" && typeof a.data[0] === "string" && a.data[0].length === 220, "UserTokenAccountRejected");
+    const bytes = Buffer.from(a.data[0], "base64");
+    check(bytes.length === 165 && bytes.toString("base64") === a.data[0] && bytes.subarray(0, 32).toString("hex") === this.#policy.mint && bytes[108] === 1,
+      "UserTokenAccountRejected");
+    if (authority !== undefined) check(bytes.subarray(32, 64).toString("hex") === keyHex(authority), "UserTokenAuthorityRejected");
+    if (amountAtomic !== undefined) check(typeof amountAtomic === "string" && /^[1-9][0-9]{0,19}$/u.test(amountAtomic) &&
+      bytes.readBigUInt64LE(64) >= BigInt(amountAtomic), "UserTokenBalanceInsufficient");
+    // A host wall clock can be ahead of finalized preflight. Use the network's
+    // Clock from the SAME finalized bank; leave Solana sysvar encoding unchanged.
+    const clock = snapshot.accounts.at(-1);
+    check(clock && clock.owner === "Sysvar1111111111111111111111111111111111111" && clock.executable === false &&
+      Array.isArray(clock.data) && clock.data.length === 2 && clock.data[1] === "base64" && typeof clock.data[0] === "string" && clock.data[0].length === 56,
+      "UserNetworkClockUnavailable");
+    const clockBytes = Buffer.from(clock.data[0], "base64");
+    check(clockBytes.length === 40 && clockBytes.toString("base64") === clock.data[0] && clockBytes.readBigUInt64LE(0) === BigInt(snapshot.slot) &&
+      clockBytes.readBigInt64LE(32) >= 0n, "UserNetworkClockUnavailable");
+    this.#active();
+    return { ...await this.#claimRpc.getLatestBlockhash(), unixTimestamp: clockBytes.readBigInt64LE(32).toString() };
+  }
   #active() { check(this.#ledger.status().state === "OPEN_LOCAL_ACCOUNTING_ONLY", "DepositServicePaused"); }
-  async #deployment() {
-    try { return verifyDeploymentSnapshot(this.#manifest, await this.#solana.snapshot(this.#manifest)); }
+  async #deployment(snapshot) {
+    try { return verifyDeploymentSnapshot(this.#manifest, snapshot ?? await this.#solana.snapshot(this.#manifest)); }
     catch (error) { if (error?.integrityCode && this.#ledger.status().state !== "HARD_STOP") this.#ledger.hardStop("DEPOSIT_DEPLOYMENT_CHANGED"); throw error; }
   }
   submit(request) {

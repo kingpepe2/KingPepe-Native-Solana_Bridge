@@ -55,6 +55,37 @@ The separately reviewed coordinator correction is
 sweep and withdrawal purposes, preserves exact intent binding and reuses a retained
 aggregate after restart. Worker errors expose fixed public classes, not secrets.
 
+## Phase 12 user access
+
+The SDK, same-process user HTTP boundary and CLI milestone passed local validation.
+It prepares public Native deposit requests and unsigned Solana withdrawals, and
+reads operation/bridge status from the existing journal. Wallets sign user-owned
+transactions; the boundary has no minting, FROST signing or administration route.
+Deployment, initialized KPEPE token account, withdrawal authority/balance and
+finalized network time are checked through the existing Solana reader. There is
+no new database or transfer engine. The simple interface is the next milestone,
+after SDK/API/CLI validation, publication and matching CI.
+
+The reviewed milestone worktree based on
+2a37d0d0dc093a3ad545014bd45b2760ec6fd3db passed 988 Node tests on both Windows
+and WSL (zero failures/skips), including nine SDK/HTTP/CLI tests. The existing
+real service harness now passes 25 checks: both directions COMPLETED, user-only
+Solana wallet signature, authenticated intake, restart/lost-response recovery,
+no duplicate economic action, status transaction IDs and reconciliation MATCH.
+CI requires all 25 checks and explicitly names the three additions. The initial
+host-time withdrawal window failed finalized preflight; network Clock-based
+construction fixed it without changing on-chain validity rules. This is localnet
+evidence, not an executed browser-wallet or Devnet certification.
+
+Provenance covers 263 files; guardrails, source/history secret scans and the
+dependency/license audit passed. The latter ran in WSL with pinned Cargo metadata;
+the Windows shell without that metadata could not run that particular audit.
+The npm audit has zero vulnerabilities. Exact-SHA publication CI is still required
+for this milestone. Temporary validator databases were removed after each run;
+test key files and diagnostic evidence remain external to Git.
+
+See [user access](user-access.md) for the local-only API and CLI contract.
+
 ## Phase 11 canonical Borsh validation
 
 The schema, caller, vector and legacy-encoder changes form atomic migration
@@ -95,12 +126,15 @@ tool caches, private/operational state, wallets and backups are untouched.
 All local Phase 11 validation is complete. Migration commit
 3b083b34477c0d2c841f43561eb91d104e73a9b8 passed all four required jobs, none
 skipped, in [Actions run 34722632015](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34722632015).
-Later publication commits, including documentation-only updates, require their
-own matching exact-SHA CI; do not inherit that older run. The schema inventory is in
+The final publication commit 2a37d0d0dc093a3ad545014bd45b2760ec6fd3db also
+passed all four jobs, none skipped, in
+[Actions run 34723965490](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34723965490).
+Later commits require their own matching exact-SHA CI; do not inherit an older run.
+The schema inventory is in
 `docs/architecture/protocol-messages.md`. Bincode remains required by the
 retained Solana SDK/System-instruction path, not by a legacy bridge codec;
-its maintenance warning is unsuppressed. Devnet has not started. After the
-matching CI passes, continue to Phase 12 without routine approval.
+its maintenance warning is unsuppressed. Devnet has not started. Phase 12 follows
+the completed Phase 11 gate without routine approval.
 
 ## Phase 10 validation
 

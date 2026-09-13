@@ -291,6 +291,10 @@ export class AuthenticatedLocalDepositLedger {
     this.#record(WITHDRAWAL, Buffer.from(JSON.stringify({ ...r, state: "COMPLETED", reconciliation: reconciliationDigest })));
   }
   withdrawal(id) { this.#assertHead(); return structuredClone(this.#withdrawals.get(id)); }
+  withdrawalRequest(id) {
+    this.#assertHead(); const r = this.#withdrawals.get(id);
+    return structuredClone(this.#requests.get(id) ?? (r && { signature: r.plan.solanaSignature, encodedMessageHex: r.plan.encodedMessageHex }));
+  }
   knownWithdrawalIds() { this.#assertHead(); return [...new Set([...this.#requests.keys(), ...this.#withdrawals.keys()])]; }
   pendingSignedWithdrawals() {
     this.#assertHead(); return structuredClone([...this.#withdrawals.values()].filter(r => r.signedTransactionHex && !r.payment));

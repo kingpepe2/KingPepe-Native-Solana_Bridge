@@ -25,6 +25,62 @@
   },
   "trackedFiles": [
     {
+      "path": "native/node/witness-address.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original bounded public Native witness-address adapter using the pinned scure-base package API; no upstream implementation copied.",
+      "purpose": "CORE_BRIDGE",
+      "reviewDisposition": "KEEP_CORE"
+    },
+    {
+      "path": "solana/ts/sdk/bridge.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original unsigned deposit/withdrawal request builders using retained Borsh codecs, Native recovery scripts and Solana instruction builder; no wallet keys.",
+      "purpose": "CORE_BRIDGE",
+      "reviewDisposition": "KEEP_CORE"
+    },
+    {
+      "path": "solana/ts/sdk/client.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original bounded authenticated loopback user API client; no signing or automatic economic retry.",
+      "purpose": "CORE_BRIDGE",
+      "reviewDisposition": "KEEP_CORE"
+    },
+    {
+      "path": "services/bridge-validator/user-api.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original public user boundary over the existing service and journal, with policy binding and status projection; no new database or signer.",
+      "purpose": "CORE_BRIDGE",
+      "reviewDisposition": "KEEP_CORE"
+    },
+    {
+      "path": "services/bridge-validator/user-http.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original optional bounded token-authenticated loopback listener in the existing service process; no privileged methods.",
+      "purpose": "CORE_BRIDGE",
+      "reviewDisposition": "KEEP_CORE"
+    },
+    {
+      "path": "cli/bridge.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original minimal public JSON user-request and status CLI; no wallet signing or secret import.",
+      "purpose": "REQUIRED_TOOLING",
+      "reviewDisposition": "KEEP_CORE"
+    },
+    {
+      "path": "services/bridge-validator/tests/user-access.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original request, address, HTTP and CLI regressions; transport stubs are explicitly unit-only and not chain evidence.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "docs/user-access.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original public-safe SDK/CLI integration and wallet workflow instructions without local credentials or operational paths.",
+      "purpose": "REQUIRED_DOCUMENTATION",
+      "reviewDisposition": "KEEP_CORE"
+    },
+    {
       "path": "shared/protocol/bridge-inputs.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original typed Borsh schemas and bounded preimage codecs for bridge signing, DKG context and deposit/withdrawal evidence. Native sighash and Noble primitives are not reimplemented.",

@@ -5,12 +5,14 @@
   "description": "Proprietary KingPepe Native to Solana bridge source and tests.",
   "license": "UNLICENSED",
   "type": "module",
+  "bin": { "bridge": "cli/bridge.mjs" },
   "packageManager": "npm@11.19.0",
   "engines": {
     "node": "24.21.0",
     "npm": "11.19.0"
   },
   "scripts": {
+    "bridge": "node cli/bridge.mjs",
     "doctor:local-e2e": "node scripts/local-e2e-readiness.mjs",
     "local:e2e:bootstrap": "node scripts/local-e2e-bootstrap.mjs",
     "local:e2e:native-to-solana": "node scripts/local-e2e-native-to-solana.mjs",
@@ -31,6 +33,7 @@
   },
   "dependencies": {
     "@noble/curves": "2.3.0",
+    "@scure/base": "2.4.0",
     "borsh": "2.0.0"
   }
 }

@@ -17,6 +17,9 @@ export class LocalWithdrawalService {
     }
   }
   submit(signature) { return this.#worker.enqueue(signature); }
+  assertLedger(ledger) { check(ledger === this.#ledger); }
+  depositPolicy() { check(this.#deposits !== undefined); return this.#deposits.publicPolicy(); }
+  userTransactionContext(account) { check(this.#deposits !== undefined); return this.#deposits.userTransactionContext(account); }
   submitDeposit(request) { check(this.#deposits !== undefined); return this.#deposits.submit(request); }
   pause(reason) { this.#ledger.pause(reason); }
   async resumeAfterReview() {

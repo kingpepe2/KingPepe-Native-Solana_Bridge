@@ -60,6 +60,16 @@ docs/security/windows-protected-storage.md.
   - Copyright: Copyright (c) 2022 Paul Miller
   - Use: transitive dependency of `@noble/curves`
 
+- `@scure/base` `2.4.0`
+  - License: MIT; Copyright (c) 2022 Paul Miller (https://paulmillr.com).
+  - Use: pinned zero-dependency Bech32/Bech32m address codec for public wallet
+    requests; no signing or FROST algorithm change. Original license remains in
+    the npm package and must accompany redistribution. No implementation copied.
+  - Reference specifications: BIP-173 and BIP-350 (BSD-2-Clause). No specification
+    pseudocode or vectors copied during this integration. The existing test-only
+    address encoder is replaced by this shared package API.
+  - This does not claim an external audit of version 2.4.0 or the bridge.
+
 - `borsh` JavaScript `2.0.0`
   - License declared by the pinned npm distribution: Apache-2.0
   - Upstream: https://github.com/near/borsh-js

@@ -258,9 +258,12 @@ jobs:
             console.log(JSON.stringify(r));
             if (r.sourceSha !== process.env.GITHUB_SHA || r.worktreeDirty !== false || r.state !== "COMPLETED" ||
                 r.nativeToSolana !== "COMPLETED" || r.solanaToNative !== "COMPLETED" ||
-                r.noPerTransferKingPepeTeamApproval !== true || r.checks?.pass !== 22 || r.checks?.fail !== 0) process.exit(1);
+                r.noPerTransferKingPepeTeamApproval !== true || r.checks?.pass !== 25 || r.checks?.fail !== 0) process.exit(1);
             for (const check of ["CREDIT_APPEND_CRASH_AND_RPC_OUTAGE_WAIT_NOT_FALSE_DEFICIT",
-              "RPC_RECOVERY_RETAINS_EXACT_CREDIT_AND_CANONICAL_RESERVE"]) {
+              "RPC_RECOVERY_RETAINS_EXACT_CREDIT_AND_CANONICAL_RESERVE",
+              "SDK_HTTP_DEPOSIT_INTAKE_IDEMPOTENT_EXISTING_JOURNAL",
+              "SDK_BORSH_WITHDRAWAL_SIGNED_ONLY_BY_USER_ACCEPTED_ON_CHAIN",
+              "USER_OPERATION_STATUS_HAS_FINALIZED_TRANSACTION_IDS"]) {
               if (!r.checks.passed.includes(check)) process.exit(1);
             }
           '

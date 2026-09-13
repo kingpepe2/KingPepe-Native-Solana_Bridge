@@ -9,9 +9,38 @@
   "signerTopology": "SINGLE_HOST",
   "commonHostRiskDecision": "ACCEPTED_BY_KINGPEPE_TEAM",
   "lastUpdated": "2026-09-13",
-  "sourceStatus": "PHASE_11_BORSH_MIGRATION_VALIDATED_MATCHING_PUBLICATION_CI_REQUIRED",
+  "sourceStatus": "PHASE_12_SDK_API_CLI_VALIDATED_MATCHING_CI_REQUIRED_UI_PENDING",
+  "phase12": {
+    "status": "IN_PROGRESS",
+    "milestone": "SDK_API_CLI",
+    "sourceBaseSha": "2a37d0d0dc093a3ad545014bd45b2760ec6fd3db",
+    "scope": "LOCALNET_REGTEST_PUBLIC_REQUESTS_AND_STATUS_ONLY",
+    "userTransactions": "UNSIGNED_USER_WALLET_SIGNS",
+    "existingServiceAndJournalReused": true,
+    "newDatabases": 0,
+    "interface": "NOT_STARTED",
+    "validation": {
+      "scope": "REVIEWED_MILESTONE_WORKTREE_BASED_ON_SOURCE_BASE_SHA_MATCHING_COMMIT_CI_REQUIRED",
+      "nodeWindows": { "pass": 988, "fail": 0, "skip": 0 },
+      "nodeWsl": { "pass": 988, "fail": 0, "skip": 0 },
+      "sdkHttpCliTests": 9,
+      "realServiceChecks": { "pass": 25, "fail": 0 },
+      "nativeToSolana": "COMPLETED",
+      "solanaToNative": "COMPLETED",
+      "reconciliation": "MATCH",
+      "userSignedWithdrawal": "PASS_REAL_LOCALNET",
+      "requestTime": "FINALIZED_SOLANA_CLOCK_NOT_HOST_WALL_CLOCK",
+      "secretScan": "PASS_WORKTREE_AND_HISTORY_STAGED_SCAN_REQUIRED_BEFORE_COMMIT",
+      "sourceProvenance": { "status": "PASS", "files": 263 },
+      "guardrails": "PASS",
+      "dependencyLicenseAudit": "PASS_IN_WSL_PINNED_CARGO_ENVIRONMENT",
+      "npmAuditVulnerabilities": 0,
+      "testLedgerDatabase": "REMOVED_AFTER_SHUTDOWN_KEYS_PRESERVED"
+    },
+    "exactShaCi": "VERIFY_MATCHING_GITHUB_ACTIONS_RUN"
+  },
   "phase11": {
-    "status": "PASS_MIGRATION_SOURCE",
+    "status": "PASS",
     "milestone": "FULL_BORSH_VALIDATION_AND_PROVENANCE",
     "sourceBaseSha": "e60d4d70261114b075049b0bd5076495ce9f7f2e",
     "migrationSourceSha": "3b083b34477c0d2c841f43561eb91d104e73a9b8",
@@ -53,7 +82,7 @@
     "initialCoreRunRetry": "CONTENDED_TEST_MINING_TIMEOUT_BEFORE_FLOW_FRESH_ISOLATED_RERUN_PASSED_FAILURE_EVIDENCE_RETAINED_LOCALLY",
     "legacyBridgeEncoding": "REMOVED_NO_V1_COMPATIBILITY_READER",
     "bincode": "STILL_REQUIRED_FOR_NON_BRIDGE_SDK_SERIALIZATION",
-    "exactShaCi": "VERIFY_MATCHING_GITHUB_ACTIONS_RUN"
+    "exactShaCi": { "sourceSha": "2a37d0d0dc093a3ad545014bd45b2760ec6fd3db", "runId": "34723965490", "requiredJobsPassed": 4, "skippedJobs": 0, "status": "PASS" }
   },
   "phase10": {
     "status": "PASS_SERVICE_AND_RECOVERY_RUNBOOK",

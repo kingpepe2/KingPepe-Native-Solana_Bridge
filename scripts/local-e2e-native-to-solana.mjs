@@ -1,4 +1,5 @@
 import { bridgeInputDigest } from "../shared/protocol/bridge-inputs.mjs";
+import { witnessAddressFromScript } from "../native/node/witness-address.mjs";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -110,8 +111,6 @@ const DEFAULT_DEPOSIT_FINALITY_BLOCKS = 6;
 const DEFAULT_DEPOSIT_CLAIM_VALID_FROM = "0";
 const DEFAULT_DEPOSIT_CLAIM_VALID_UNTIL = "4102444800";
 const MAX_UNSIGNED_SWEEP_BYTES = 400_000;
-const BECH32M_CONST = 0x2bc830a3;
-const BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 const ZERO_HASH = "00".repeat(32);
 
 export async function runLocalNativeToSolanaE2e(options = {}) {
@@ -2037,9 +2036,7 @@ export function validateP2trScriptPubKeyHex(scriptPubKeyHex, label = "scriptPubK
 }
 
 export function taprootAddressFromXOnlyPublicKey(xOnlyPublicKeyHex, hrp = DEFAULT_NATIVE_BECH32_HRP) {
-  const program = Buffer.from(normalizeHash32(xOnlyPublicKeyHex, "xOnlyPublicKeyHex"), "hex");
-  const data = [1, ...convertBits([...program], 8, 5, true)];
-  return bech32Encode(sanitizeBech32Hrp(hrp), data, BECH32M_CONST);
+  return witnessAddressFromScript(p2trScriptPubKeyHex(xOnlyPublicKeyHex), sanitizeBech32Hrp(hrp));
 }
 
 export function createLocalSolanaSetupContext(options = {}) {
@@ -2292,63 +2289,6 @@ function extractOutputAddresses(scriptPubKey) {
     }
   }
   return [...addresses];
-}
-
-function bech32Encode(hrp, data, checksumConstant) {
-  const values = [...data];
-  if (values.some((entry) => !Number.isInteger(entry) || entry < 0 || entry > 31)) {
-    throw new Error("Bech32 data value outside 5-bit range");
-  }
-  const checksum = bech32CreateChecksum(hrp, values, checksumConstant);
-  return `${hrp}1${[...values, ...checksum].map((entry) => BECH32_CHARSET[entry]).join("")}`;
-}
-
-function bech32CreateChecksum(hrp, data, checksumConstant) {
-  const values = [...bech32HrpExpand(hrp), ...data, 0, 0, 0, 0, 0, 0];
-  const polymod = bech32Polymod(values) ^ checksumConstant;
-  return [0, 1, 2, 3, 4, 5].map((index) => (polymod >> (5 * (5 - index))) & 31);
-}
-
-function bech32HrpExpand(hrp) {
-  return [...hrp].map((char) => char.charCodeAt(0) >> 5).concat([0], [...hrp].map((char) => char.charCodeAt(0) & 31));
-}
-
-function bech32Polymod(values) {
-  const generator = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
-  let checksum = 1;
-  for (const value of values) {
-    const top = checksum >> 25;
-    checksum = ((checksum & 0x1ffffff) << 5) ^ value;
-    for (let index = 0; index < generator.length; index += 1) {
-      if (((top >> index) & 1) !== 0) {
-        checksum ^= generator[index];
-      }
-    }
-  }
-  return checksum;
-}
-
-function convertBits(data, fromBits, toBits, pad) {
-  let accumulator = 0;
-  let bits = 0;
-  const maxValue = (1 << toBits) - 1;
-  const maxAccumulator = (1 << (fromBits + toBits - 1)) - 1;
-  const result = [];
-  for (const value of data) {
-    if (value < 0 || value >> fromBits !== 0) throw new Error("invalid value while converting Bech32 groups");
-    accumulator = ((accumulator << fromBits) | value) & maxAccumulator;
-    bits += fromBits;
-    while (bits >= toBits) {
-      bits -= toBits;
-      result.push((accumulator >> bits) & maxValue);
-    }
-  }
-  if (pad) {
-    if (bits > 0) result.push((accumulator << (toBits - bits)) & maxValue);
-  } else if (bits >= fromBits || ((accumulator << (toBits - bits)) & maxValue) !== 0) {
-    throw new Error("invalid padding while converting Bech32 groups");
-  }
-  return result;
 }
 
 function sanitizeBech32Hrp(value) {
