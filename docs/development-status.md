@@ -99,15 +99,44 @@ all four required jobs, with none skipped. Its fresh real-chain service rerun
 passed all 25 checks: both directions COMPLETED, reserve/supply 80,000,000 atomic units, no
 pending mint/withdrawal liabilities and reconciliation MATCH. Temporary validator
 databases were removed after shutdown; test key files and diagnostic evidence
-remain external to Git. RecoveryProcedure remains NOT_TESTED; the actual encrypted
-snapshot/chain-resume drill is still required before Phase 15.
+remain external to Git. At Phase 12, recoveryProcedure was NOT_TESTED. The
+Phase-14 section records the later actual encrypted snapshot/chain-resume drill;
+process-restart results alone did not certify it.
 
 See [user access](user-access.md) for the local-only API and CLI contract.
 
+## Phase 14 recovery milestone and fresh-clone gate
+
+The isolated encrypted snapshot/chain-resume drill passes on the reviewed
+Phase-14 milestone worktree based on eb105cba5276f99e76572c824fe5c190b1fe1a75.
+This is not certification of that parent commit. The existing service harness
+passes all 25 checks and both directions reach COMPLETED after three restores:
+pending Native sweep, finalized mint awaiting accounting, and pending Native
+payout. Restored services start PAUSED, query real chain state, and issue no new
+signing or broadcast during catch-up. Original state, journal identity, consumed
+signer records and exact file hashes are preserved. Final reserve/outstanding
+supply is 80,000,000 atomic units with zero pending liabilities and MATCH.
+
+GNU tar 1.35 and GnuPG 2.4.4 provide encrypted capture without a plaintext disk
+archive. Wrong passphrases and corrupted ciphertext fail before extraction.
+The manual runbook's expected-operation and activity-gap checks retain pause on
+ambiguity; this is not automatic full-host rollback detection. The local test
+uses a newly provisioned private Windows destination and native Linux GnuPG
+control sockets; no existing ACLs, production keys or system configuration change.
+`recoveryProcedure = TESTED` refers only to this controlled local drill, not
+production DPAPI recovery, a cold-backup policy or the required Phase-17 Devnet
+drill. See [the recovery runbook](security/deposit-operation-recovery.md).
+
+No transfer engine, database, codec, economics or signing topology changes.
+The temporary validator database is removed after shutdown; original test keys,
+encrypted snapshots and useful evidence remain outside Git. Matching milestone
+CI and complete fresh-clone validation remain required before Phase 15. Devnet
+and production are not started by this milestone.
+
 ## Phase 13 core hardening
 
-Locally validated, based on the completed Phase-12 source above; matching
-publication CI is required. The retained suites cover
+PASS at eb105cba5276f99e76572c824fe5c190b1fe1a75. Exact-SHA CI 34730712772
+passed all four required jobs with no skipped steps. The retained suites cover
 replay, duplicate-action, wrong identity/amount/recipient, signature/participant,
 RPC, restart, pause, reorg and exact reconciliation regressions. A bounded
 deterministic test flips every bit of the three canonical Borsh message vectors
@@ -242,9 +271,10 @@ state was unchanged. This check used no chains or production identities and did
 not install a production backup job; its disposable copies were removed.
 
 Phase 10 service and runbook requirements are complete under that scope.
-`recoveryProcedure` remains NOT_TESTED: archive verification is not the actual
-snapshot/chain-resume drill. That drill must pass before Phase 15, repeat during
-Phase 17, and be TESTED before Phase 19. A stale snapshot is not permission to
+At that Phase-10 milestone, `recoveryProcedure` remained NOT_TESTED: archive
+verification was not the actual snapshot/chain-resume drill. The later Phase-14
+result above supplies the local drill; repeat it during Phase 17 and require
+TESTED before Phase 19. A stale snapshot is not permission to
 reuse nonce state. Unknown post-snapshot history still requires pause/manual
 review. Do not power off the physical host or recreate WSL for the runtime drill.
 

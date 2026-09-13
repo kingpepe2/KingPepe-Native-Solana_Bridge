@@ -70,10 +70,11 @@ be observed and accounted. All production activation remains disabled.
 
 ## Minimal encrypted backup and manual restore
 
-Status: `recoveryProcedure = NOT_TESTED`. Process-restart tests are not a
-snapshot/chain-resume drill. This procedure must be exercised on isolated test
-state before Phase 15, repeated during the Phase-17 Devnet soak, and recorded
-as TESTED before Phase 19. No production backup job has been installed. Manual
+Status: `recoveryProcedure = TESTED` for the isolated Phase-14 localnet/regtest
+drill described below, not production DPAPI or full-host recovery. Process-restart
+tests alone are not a snapshot/chain-resume drill. Repeat this procedure during
+the Phase-17 Devnet soak and require its recorded result before Phase 19.
+No production backup job has been installed. Manual
 capture is allowed; an existing OS scheduler may be used but is not required.
 
 Keep the actual capture policy, source/destination inventory, encryption
@@ -112,7 +113,10 @@ archive. Give the passphrase through protected input, never a command-line
 argument, shell history or log; retain GnuPG's integrity checks. Decrypt once
 to a discard sink and require success before a second verified extraction into
 an empty directory, with every pipeline failure checked. The archive must remain
-unchanged between verification and extraction. See the upstream
+unchanged between verification and extraction. For the small isolated drill,
+complete decryption into bounded memory is also suitable: require successful
+integrity verification before extracting those same bytes, then clear the buffer.
+Neither method creates a plaintext archive on disk. See the upstream
 [GnuPG commands](https://www.gnupg.org/documentation/manuals/gnupg/Operational-GPG-Commands.html)
 and [passphrase/input options](https://www.gnupg.org/documentation/manuals/gnupg/GPG-Esoteric-Options.html).
 This is an available test mechanism, not a new backup framework or certification
@@ -180,3 +184,33 @@ chain results and gaps in the existing readiness/status files. Do not publish
 archive contents, keys, private paths or machine identities. The later Devnet
 report must record its own controlled runtime snapshot/restore drill, not reuse
 local restart or archive-only evidence.
+
+### Exercised local procedure
+
+`npm run local:e2e:recovery` reuses the normal 25-check bidirectional service
+harness with three closed-writer checkpoints: a broadcast sweep awaiting Native
+finality, a finalized mint awaiting journal accounting, and a broadcast payout
+awaiting Native finality. GNU tar/GnuPG capture the existing journal, separate
+test signer states and private test configuration. The encrypted inventory
+records source/message/runtime versions, network identities, checkpoint and file
+hashes. Restores use new directories and the original journal identity/key;
+original files remain unchanged. No old signer process remains running.
+
+The restored journal is paused before a child service starts. Real-chain catch-up
+must make no signing or broadcast request; after explicit review of the known
+quiescent gap, the existing workers complete the pending flow and reconcile.
+All three restore checkpoints and both directions passed locally. Wrong
+passphrases and corrupted ciphertext fail before extraction. Manual inventory
+checks also reject a missing expected operation or a declared unaccounted activity
+gap while paused. These checks do NOT discover an unknown full-host rollback or
+prove that an arbitrary older snapshot contains every operation.
+
+Use a new private external test destination. On WSL, set
+`KINGPEPE_TEST_RECOVERY_ROOT` to an operator-provisioned private Windows directory;
+DrvFS chmod is not Windows ACL enforcement. `KINGPEPE_SOCKET_ROOT` may select
+native Linux storage for tiny GnuPG control sockets. Retained archives, restored
+state and logs stay on the development-data volume; no key or operational path is
+published. The random TEST archive passphrase is held only for the drill, not
+provisioned as a production recovery credential. Production backup configuration,
+off-host/cold custody and DPAPI account/machine recovery remain separate untested
+deployment responsibilities. The Devnet drill must still run during Phase 17.

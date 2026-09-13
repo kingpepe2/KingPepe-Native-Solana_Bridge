@@ -223,7 +223,14 @@
     {
       "path": "solana/tests/local-bridge-service.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original real REGTEST/local-validator combined-service harness with actual FROST sweep/payout, mint/burn, separate process restarts, dropped broadcast responses and reconciliation. Disposable test material stays outside source.",
+      "notes": "Original real REGTEST/local-validator combined-service harness with actual FROST sweep/payout, mint/burn, separate process restarts, dropped broadcast responses, optional closed-state manual restore checkpoints and reconciliation. Disposable test material stays outside source.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "solana/tests/local-service-recovery.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated encrypted snapshot/restore runbook drill over the existing real-chain service harness. Invokes installed GNU tar/GnuPG without copying upstream implementation; no production backup daemon, automatic rollback guarantee or secret fixture in source.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },

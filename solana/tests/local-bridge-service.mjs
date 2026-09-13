@@ -147,7 +147,9 @@ async function child(file, mode) {
   }
 }
 
-export async function runLocalBridgeService(onCheck = () => {}) {
+export async function runLocalBridgeService(onCheck = () => {}, { restoreSnapshot } = {}) {
+  assert(restoreSnapshot === undefined || typeof restoreSnapshot === "function");
+  const recovery = [];
   const passed = [], pass = v => { passed.push(v); onCheck(v); }; let failure, failureLocation, stage = "BOOTSTRAP", solanaSends = 0, report;
   const result = await withLocalE2eInfrastructure({ repoRoot }, async context => {
     const { plan, executor, commandPaths } = context; let proxy;
@@ -216,7 +218,7 @@ export async function runLocalBridgeService(onCheck = () => {}) {
         depositTxidHex: f.inputs[0].txid, depositVout: null, feeFundingInputs: f.inputs.slice(1) };
       c.publicDeposit = { request: publicRequest, operationId: quote.operationId, scriptPubKeyHex: quote.scriptPubKeyHex,
         depositTxidHex: request.depositTxidHex, feeFundingInputs: request.feeFundingInputs };
-      const file = validateRuntimeFile(path.join(plan.runRoot, "local-service-private-test-context.json"), repoRoot);
+      let file = validateRuntimeFile(path.join(plan.runRoot, "local-service-private-test-context.json"), repoRoot);
       writeFileSync(file, JSON.stringify(c), { flag: "wx", mode: 0o600 });
       const useLedger = fn => { const ledger = AuthenticatedLocalDepositLedger.openLocal(ledgerOptions(c)); try { return fn(ledger); } finally { ledger.close(); } };
       stage = "SERVICE_JOURNAL_SETUP";
@@ -224,6 +226,18 @@ export async function runLocalBridgeService(onCheck = () => {}) {
       created.close();
       const once = async mode => { diskGuard(); const r = await promisify(execFile)(process.execPath, [self, "--service-child", file, mode ?? "tick"],
         { cwd: repoRoot, timeout: 90000, maxBuffer: 65536, windowsHide: true }); return JSON.parse(r.stdout); };
+      // Optional manual recovery drill: every child has exited and every state
+      // writer is closed here. The normal service/transfer engines are unchanged.
+      const recover = async boundary => {
+        if (!restoreSnapshot) return;
+        const restored = await restoreSnapshot({ context: c, contextFile: file, repoRoot, runRoot: plan.runRoot, sourceSha, boundary });
+        Object.assign(c, restored.context); file = validateRuntimeFile(restored.contextFile, repoRoot);
+        assert.equal(useLedger(l => l.status().state), "PAUSED");
+        const priorSends = solanaSends, status = await once();
+        assert.equal(status.status.state, "PAUSED"); assert.equal(status.signingRequests, 0); assert.equal(status.sends, 0);
+        assert.equal(solanaSends, priorSends);
+        recovery.push({ ...restored.evidence, liveChainCatchUp: "PASS", resumedPaused: true, newSigningOrBroadcast: false });
+      };
       const cli = async (command, parameters = [], wallet) => {
         assert(["generatetoaddress", "getnewaddress", "getaddressinfo"].includes(command));
         const r = await executor.runOneShot({ step: "LOCAL_SERVICE_TEST_" + command.toUpperCase(), executable: commandPaths.get("kingpepe-cli"),
@@ -248,6 +262,8 @@ export async function runLocalBridgeService(onCheck = () => {}) {
       pass("NATIVE_SWEEP_RESPONSE_LOST_SIGNED_OPERATION_RETAINED");
       const restarted = await once(); assert.equal(restarted.sends, 0); assert.equal(restarted.signingRequests, 0);
       pass("PENDING_DEPOSIT_PROCESS_RESTART_NO_DOUBLE_SWEEP_OR_RESIGN");
+      await recover("PENDING_NATIVE_SWEEP");
+      if (restoreSnapshot) useLedger(l => l.resumeAfterReview()); // Reviewed, known quiescent TEST cut only.
       await cli("generatetoaddress", [String(config.depositFinalityBlocks), f.miningAddress]);
       await assert.rejects(once("crash-after-credit-accounting"), e => e.code === 74);
       useLedger(l => { assert.equal(l.serviceAccountingPending(), true); assert.equal(l.accountedReserveInputs().length, 0);
@@ -280,6 +296,7 @@ export async function runLocalBridgeService(onCheck = () => {}) {
       assert(mintRecordCrash, "TEST_MINT_RECORD_CRASH_NOT_REACHED");
       pass("EXPIRED_PACKET_REBUILT_SAME_CREDIT_AFTER_LIVE_ABSENCE_CHECK");
       useLedger(l => { assert.equal(l.bridgeSnapshot().bridgeIssuedOutstandingAtomic, "0"); l.pause(); });
+      await recover("FINALIZED_MINT_PENDING_ACCOUNTING");
       const mintPaused = await once(); assert.equal(mintPaused.status.state, "PAUSED"); assert.equal(mintPaused.sends, 0);
       assert.equal(mintPaused.status.accounting.bridgeIssuedOutstandingAtomic, config.amountAtomic);
       pass("PAUSED_RESTART_RETAINS_ALREADY_FINALIZED_MINT_WITHOUT_REMINT");
@@ -338,6 +355,7 @@ export async function runLocalBridgeService(onCheck = () => {}) {
       const pending = await once(); assert.equal(pending.sends, 0); assert.equal(pending.signingRequests, 0);
       pass("PENDING_WITHDRAWAL_RESTART_LOST_RESPONSE_NO_DOUBLE_PAYOUT");
       assert.equal(pending.status.accounting.pendingWithdrawalAtomic, "20000000"); pass("BURN_REMAINS_PENDING_LIABILITY");
+      await recover("PENDING_NATIVE_PAYOUT");
       await cli("generatetoaddress", [String(config.depositFinalityBlocks), f.miningAddress]);
       useLedger(l => l.pause()); const paidPaused = await once();
       assert.equal(paidPaused.status.withdrawals[0].state, "PAID"); assert.equal(paidPaused.sends, 0); assert.equal(paidPaused.signingRequests, 0);
@@ -366,8 +384,9 @@ export async function runLocalBridgeService(onCheck = () => {}) {
     }
     finally { if (proxy) { proxy.closeAllConnections(); await new Promise(resolve => proxy.close(resolve)); } diskGuard(); }
   });
-  const complete = result.state === "LOCAL_E2E_BOOTSTRAP_READY" && report?.nativeToSolana === "COMPLETED" && report?.solanaToNative === "COMPLETED" && !failure && passed.length === 25;
+  const complete = result.state === "LOCAL_E2E_BOOTSTRAP_READY" && report?.nativeToSolana === "COMPLETED" && report?.solanaToNative === "COMPLETED" && !failure && passed.length === 25 && (!restoreSnapshot || recovery.length === 3);
   return { ...report, state: complete ? "COMPLETED" : "BLOCKED", stage, reason: failure ?? result.reason, failureLocation,
+    ...(restoreSnapshot ? { recoveryProcedure: complete ? "TESTED" : "NOT_TESTED", recovery } : {}),
     checks: { pass: passed.length, fail: complete ? 0 : 1, passed }, productionReady: false, mainnetActivation: "DISABLED" };
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === self) {

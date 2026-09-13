@@ -244,14 +244,14 @@ jobs:
             }
           '
 
-      - name: Real bidirectional service, response loss and process restarts (regtest only)
+      - name: Real bidirectional service, response loss and encrypted restore (regtest only)
         shell: bash
         run: |
           set -euo pipefail
           export PATH="${KINGPEPE_CI_TOOL_ROOT}/solana-release/bin:${KINGPEPE_CI_TOOL_ROOT}/native-build/bin:${PATH}"
           export KINGPEPE_LOCAL_E2E_ROOT="${KINGPEPE_CI_TOOL_ROOT}/service-run"
           export KINGPEPE_LOCAL_BUILD_ROOT="${KINGPEPE_CI_TOOL_ROOT}/build"
-          node solana/tests/local-bridge-service.mjs > "${KINGPEPE_CI_TOOL_ROOT}/service-result.json"
+          node solana/tests/local-service-recovery.mjs > "${KINGPEPE_CI_TOOL_ROOT}/service-result.json"
           node --input-type=module -e '
             import {readFileSync} from "node:fs";
             const r = JSON.parse(readFileSync(process.env.KINGPEPE_CI_TOOL_ROOT + "/service-result.json", "utf8"));
@@ -259,6 +259,16 @@ jobs:
             if (r.sourceSha !== process.env.GITHUB_SHA || r.worktreeDirty !== false || r.state !== "COMPLETED" ||
                 r.nativeToSolana !== "COMPLETED" || r.solanaToNative !== "COMPLETED" ||
                 r.noPerTransferKingPepeTeamApproval !== true || r.checks?.pass !== 25 || r.checks?.fail !== 0) process.exit(1);
+            if (r.recoveryProcedure !== "TESTED" || r.recovery?.length !== 3) process.exit(1);
+            for (const restore of r.recovery) {
+              for (const field of ["encryptedCapture", "fileHashesMatched", "sourceStateUnchanged",
+                "originalJournalIdentityRetained", "consumedSignerStateRetained", "wrongPassphraseRejected",
+                "corruptArchiveRejectedBeforeExtraction", "missingExpectedOperationKeptPaused",
+                "ambiguousPostSnapshotActivityKeptPaused", "resumedPaused"]) {
+                if (restore[field] !== true) process.exit(1);
+              }
+              if (restore.liveChainCatchUp !== "PASS" || restore.newSigningOrBroadcast !== false) process.exit(1);
+            }
             for (const check of ["CREDIT_APPEND_CRASH_AND_RPC_OUTAGE_WAIT_NOT_FALSE_DEFICIT",
               "RPC_RECOVERY_RETAINS_EXACT_CREDIT_AND_CANONICAL_RESERVE",
               "SDK_HTTP_DEPOSIT_INTAKE_IDEMPOTENT_EXISTING_JOURNAL",

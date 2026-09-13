@@ -5,13 +5,38 @@
   "mainnetActivation": "DISABLED",
   "productionSigningAuthorized": false,
   "productionBroadcastAuthorized": false,
-  "recoveryProcedure": "NOT_TESTED",
+  "recoveryProcedure": "TESTED",
   "signerTopology": "SINGLE_HOST",
   "commonHostRiskDecision": "ACCEPTED_BY_KINGPEPE_TEAM",
   "lastUpdated": "2026-09-13",
-  "sourceStatus": "PHASE_13_LOCALLY_VALIDATED_MATCHING_PUBLICATION_CI_REQUIRED",
+  "sourceStatus": "PHASE_14_LOCAL_RECOVERY_MILESTONE_FRESH_CLONE_AND_MATCHING_CI_PENDING",
+  "phase14": {
+    "status": "IN_PROGRESS",
+    "milestone": "ISOLATED_ENCRYPTED_RESTORE_DRILL",
+    "sourceBaseSha": "eb105cba5276f99e76572c824fe5c190b1fe1a75",
+    "validationScope": "REVIEWED_MILESTONE_WORKTREE_NOT_CERTIFICATION_OF_PARENT_COMMIT",
+    "recoveryProcedure": "TESTED",
+    "recoveryScope": "CLOSED_LOCALNET_REGTEST_JOURNAL_SIGNER_STATE_AND_CONFIG_KNOWN_QUIESCENT_GAP_NOT_PRODUCTION_DPAPI_OR_FULL_HOST_RECOVERY",
+    "snapshots": ["PENDING_NATIVE_SWEEP", "FINALIZED_MINT_PENDING_ACCOUNTING", "PENDING_NATIVE_PAYOUT"],
+    "archiveTools": "GNU tar 1.35 and GnuPG 2.4.4",
+    "encryptedCapture": true,
+    "restoredIntoNewDirectories": true,
+    "originalStatePreserved": true,
+    "fileHashesAndJournalIdentityMatched": true,
+    "consumedSignerStateRetained": true,
+    "corruptionAndWrongPassphraseRejectedBeforeExtraction": true,
+    "manualExpectedOperationMismatchKeptPaused": true,
+    "manualDeclaredActivityGapKeptPaused": true,
+    "restoredPausedLiveChainCatchUpWithoutNewSigningOrBroadcast": true,
+    "serviceChecks": { "pass": 25, "fail": 0 },
+    "nativeToSolana": "COMPLETED",
+    "solanaToNative": "COMPLETED",
+    "reconciliation": "MATCH",
+    "freshClone": "NOT_RUN_AT_THIS_MILESTONE",
+    "exactShaCi": "VERIFY_MATCHING_GITHUB_ACTIONS_RUN"
+  },
   "phase13": {
-    "status": "PASS_LOCAL_VALIDATION_CI_PENDING",
+    "status": "PASS",
     "sourceBaseSha": "71c68af9e8ec01737a52b6ab48a54e32263d0554",
     "scope": "RETAINED_CORE_FAILURE_PATHS_AND_BOUNDED_CANONICAL_MESSAGE_CORRUPTION_TESTS",
     "runtimeArchitectureChanged": false,
@@ -42,7 +67,7 @@
       "npmAuditVulnerabilities": 0,
       "testLedgerDatabases": "REMOVED_AFTER_SHUTDOWN_KEYS_AND_EVIDENCE_PRESERVED"
     },
-    "exactShaCi": "VERIFY_MATCHING_GITHUB_ACTIONS_RUN"
+    "exactShaCi": { "sourceSha": "eb105cba5276f99e76572c824fe5c190b1fe1a75", "runId": "34730712772", "requiredJobsPassed": 4, "skippedJobs": 0, "status": "PASS" }
   },
   "phase12": {
     "status": "PASS",
@@ -276,7 +301,7 @@
     "backupConfiguration": "NOT_CONFIGURED_LOCAL_PRIVATE_VALUES_ONLY",
     "backupSchedule": "OPTIONAL_NOT_INSTALLED",
     "recoveryRunbook": "docs/security/deposit-operation-recovery.md",
-    "snapshotRestoreDrillBeforeDevnet": "NOT_TESTED_REQUIRED_BEFORE_PHASE_15",
+    "snapshotRestoreDrillBeforeDevnet": "TESTED_LOCALNET_PHASE_14_MATCHING_COMMIT_CI_REQUIRED",
     "devnetRecoveryDrill": "NOT_TESTED_REQUIRED_IN_PHASE_17",
     "signerTopology": "SINGLE_HOST",
     "signerSeparation": "SEPARATE_PARTICIPANTS_PROCESSES_PROTECTED_SHARES_AND_NONCE_STATE_EXACT_2_OF_2",
@@ -296,5 +321,5 @@
     "status": "VERIFY_MATCHING_GITHUB_ACTIONS_RUN",
     "scope": "Local results do not substitute for the workflow run at this exact commit"
   },
-  "next": "COMPLETE_PHASE_13_CORE_HARDENING_THEN_PHASE_14_FRESH_CLONE"
+  "next": "COMPLETE_PHASE_14_FRESH_CLONE_AND_EXACT_SHA_CI_BEFORE_PHASE_15_DEVNET"
 }
