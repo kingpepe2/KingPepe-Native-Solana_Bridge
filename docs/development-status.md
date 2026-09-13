@@ -105,17 +105,45 @@ process-restart results alone did not certify it.
 
 See [user access](user-access.md) for the local-only API and CLI contract.
 
-## Phase 14 recovery milestone and fresh-clone gate
+## Phase 14 fresh-clone validation and recovery
 
-The isolated encrypted snapshot/chain-resume drill passes on the reviewed
-Phase-14 milestone worktree based on eb105cba5276f99e76572c824fe5c190b1fe1a75.
-This is not certification of that parent commit. The existing service harness
-passes all 25 checks and both directions reach COMPLETED after three restores:
+PASS at clean source 1f8ce111f10f31e6984c25d02903071d2f893076, cloned
+independently from the public repository. Locked dependencies were installed and
+project build directories were new; pinned tools and download caches were reused.
+Source and lockfiles remained unchanged. No legacy source directory was required.
+Matching [CI run 34732975925](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34732975925)
+passed all four required jobs, with no skipped jobs or steps. Later status-only
+publication commits require their own exact-SHA CI before Phase 15.
+
+- Windows and WSL Node: 991 PASS each, zero failures/skips. Windows CurrentUser
+  security: 139 PASS with a freshly built verifier; four real-browser checks PASS.
+- Rust: 101 PASS with locked check, formatting and Clippy across four workspaces.
+  Both languages pass 53 fixed Borsh vectors and reject 12,336 single-bit message
+  corruptions. Borsh V2 is the only bridge wire format; external consensus/SDK
+  serialization is unchanged.
+- Both SBF programs build from new output directories. Binary hashes match the
+  independent exact-SHA CI builds and Phase-11 evidence in BRIDGE-READINESS.json.
+- Real-chain deposit 55, acceptance-checkpoint 13, reconciliation 10 plus claim
+  14, withdrawal-record 29 plus subsequent-deposit accounting five, round-trip
+  25, service 25, deployment-integrity 18 and Native-reorg eight checks PASS.
+  Both directions reach COMPLETED without per-transfer KingPepe Team approval.
+- Fresh-tree/full-history secret scans, 270-file provenance, guardrails and
+  dependency-license checks PASS; npm reports zero vulnerabilities. Bincode is
+  still required by the non-bridge Solana SDK/System-instruction path and its
+  maintenance warning is unsuppressed.
+
+The first Windows verifier command named a nonexistent binary and was rejected
+before compilation or tests. The corrected existing target built from the clone
+and all security tests passed; the failed invocation's log remains local.
+
+The existing service harness passes all 25 checks after three encrypted restores:
 pending Native sweep, finalized mint awaiting accounting, and pending Native
 payout. Restored services start PAUSED, query real chain state, and issue no new
 signing or broadcast during catch-up. Original state, journal identity, consumed
 signer records and exact file hashes are preserved. Final reserve/outstanding
 supply is 80,000,000 atomic units with zero pending liabilities and MATCH.
+The three restore procedures took 3.605, 4.740 and 5.964 seconds respectively;
+these timings exclude the surrounding chain finality waits.
 
 GNU tar 1.35 and GnuPG 2.4.4 provide encrypted capture without a plaintext disk
 archive. Wrong passphrases and corrupted ciphertext fail before extraction.
@@ -127,11 +155,14 @@ control sockets; no existing ACLs, production keys or system configuration chang
 production DPAPI recovery, a cold-backup policy or the required Phase-17 Devnet
 drill. See [the recovery runbook](security/deposit-operation-recovery.md).
 
-No transfer engine, database, codec, economics or signing topology changes.
-The temporary validator database is removed after shutdown; original test keys,
-encrypted snapshots and useful evidence remain outside Git. Matching milestone
-CI and complete fresh-clone validation remain required before Phase 15. Devnet
-and production are not started by this milestone.
+No transfer engine, database, codec, economics or signing topology changed.
+All eight test runs stopped their processes and removed temporary validator
+databases: 4,057,631,222 bytes total, not a claim of equivalent Windows-volume
+space recovery or VHD compaction. No ledger is retained for debugging. Original
+test keys, encrypted snapshots and useful evidence remain outside Git; reusable
+SBF caches, wallets, backups, production state and WSL are untouched.
+After this status publication's exact-SHA CI passes, Phase 15 follows
+automatically. Devnet and production have not started here.
 
 ## Phase 13 core hardening
 
@@ -315,8 +346,9 @@ Historical Phase 09 evidence remains bound to
 ## Limits
 
 This remains LOCALNET/REGTEST software, not production Windows service integration
-or deployment approval. Phase 11 is locally validated and requires matching
-exact-SHA CI; Devnet and Mainnet have not started here.
+or deployment approval. Phase 14 validates its named source from a clean clone
+and matching CI; each later publication needs its own exact-SHA CI. Devnet and
+Mainnet have not started here.
 Common-host compromise/availability, unaudited Noble FROST, CurrentUser-only Windows
 coverage, no full-host rollback guarantee, configured RPC/attester trust and upgrade
 authority remain explicit limitations. Cargo reports the unsuppressed bincode

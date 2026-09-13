@@ -9,12 +9,13 @@
   "signerTopology": "SINGLE_HOST",
   "commonHostRiskDecision": "ACCEPTED_BY_KINGPEPE_TEAM",
   "lastUpdated": "2026-09-13",
-  "sourceStatus": "PHASE_14_LOCAL_RECOVERY_MILESTONE_FRESH_CLONE_AND_MATCHING_CI_PENDING",
+  "sourceStatus": "PHASE_14_FRESH_CLONE_VALIDATION_PASS_CURRENT_PUBLICATION_CI_REQUIRED",
   "phase14": {
-    "status": "IN_PROGRESS",
-    "milestone": "ISOLATED_ENCRYPTED_RESTORE_DRILL",
+    "status": "PASS",
+    "milestone": "FULL_FRESH_CLONE_VALIDATION_AND_ISOLATED_ENCRYPTED_RESTORE",
     "sourceBaseSha": "eb105cba5276f99e76572c824fe5c190b1fe1a75",
-    "validationScope": "REVIEWED_MILESTONE_WORKTREE_NOT_CERTIFICATION_OF_PARENT_COMMIT",
+    "sourceSha": "1f8ce111f10f31e6984c25d02903071d2f893076",
+    "validationScope": "EXACT_CLEAN_CLONE_AND_MATCHING_CI_LATER_STATUS_ONLY_PUBLICATION_REQUIRES_ITS_OWN_MATCHING_CI",
     "recoveryProcedure": "TESTED",
     "recoveryScope": "CLOSED_LOCALNET_REGTEST_JOURNAL_SIGNER_STATE_AND_CONFIG_KNOWN_QUIESCENT_GAP_NOT_PRODUCTION_DPAPI_OR_FULL_HOST_RECOVERY",
     "snapshots": ["PENDING_NATIVE_SWEEP", "FINALIZED_MINT_PENDING_ACCOUNTING", "PENDING_NATIVE_PAYOUT"],
@@ -32,8 +33,59 @@
     "nativeToSolana": "COMPLETED",
     "solanaToNative": "COMPLETED",
     "reconciliation": "MATCH",
-    "freshClone": "NOT_RUN_AT_THIS_MILESTONE",
-    "exactShaCi": "VERIFY_MATCHING_GITHUB_ACTIONS_RUN"
+    "freshClone": {
+      "status": "PASS",
+      "sourceClean": true,
+      "lockedDependenciesInstalled": true,
+      "lockfilesUnchanged": true,
+      "freshProjectBuildDirectories": true,
+      "existingPinnedToolsAndDownloadCachesReused": true,
+      "legacySourceDirectoryRequired": false,
+      "obsoleteBridgeEncoding": "REMOVED_SINGLE_BORSH_V2_FORMAT",
+      "bincode": "STILL_REQUIRED_FOR_NON_BRIDGE_SDK_SERIALIZATION"
+    },
+    "validation": {
+      "nodeWindows": { "pass": 991, "fail": 0, "skip": 0 },
+      "nodeWsl": { "pass": 991, "fail": 0, "skip": 0 },
+      "windowsSecurity": { "pass": 139, "fail": 0, "skip": 0, "scope": "CURRENT_USER_WITH_FRESH_SOURCE_BUILT_VERIFIER_NOT_CROSS_SERVICE_OR_FULL_HOST_RECOVERY" },
+      "browserUi": { "pass": 4, "fail": 0, "skip": 0, "scope": "USER_INTERFACE_NOT_CHAIN_PROOF" },
+      "rust": { "pass": 101, "lockedCheck": true, "format": true, "clippy": true },
+      "canonicalVectorsPerLanguage": 53,
+      "singleBitCorruptionsRejectedPerLanguage": 12336,
+      "sbf": "PASS_NEW_BUILD_DIRECTORIES_AND_INDEPENDENT_EXACT_SHA_CI_BINARY_HASHES_MATCH",
+      "programBinarySha256": {
+        "manager": "d3a0749bd0cdeb6bac00962085e8db8391dbfa2ead56b46d8243c6f953630c8b",
+        "transceiver": "2195e545809dcc4ceaf577fb34cd0176949a5e2c30910aa7e4bc96d941553b96"
+      },
+      "realChainChecks": {
+        "deposit": 55,
+        "acceptanceCheckpoint": 13,
+        "reconciliation": 10,
+        "claim": 14,
+        "withdrawalRecord": 29,
+        "subsequentDepositAccounting": 5,
+        "roundTrip": 25,
+        "service": 25,
+        "deploymentIntegrity": 18,
+        "nativeReorg": 8,
+        "fail": 0
+      },
+      "encryptedRestoreCheckpoints": 3,
+      "restoreMilliseconds": [3605, 4740, 5964],
+      "serviceReserveAndOutstandingAtomic": "80000000",
+      "pendingMintAndWithdrawalAtomic": "0",
+      "sourceProvenance": { "status": "PASS", "files": 270 },
+      "guardrails": "PASS",
+      "secretScan": "PASS_FRESH_WORKTREE_AND_ALL_209_COMMITS_THROUGH_VALIDATED_SOURCE",
+      "dependencyLicenseAudit": "PASS",
+      "npmAuditVulnerabilities": 0,
+      "rustDependencyAudit": "PASS_WITH_UNSUPPRESSED_BINCODE_MAINTENANCE_WARNING",
+      "localTestStorage": "EXTERNAL_HEAVY_OUTPUTS_TEMPORARY_NATIVE_LINUX_LEDGER_DATABASES_REMOVED_KEYS_AND_EVIDENCE_PRESERVED",
+      "removedTemporaryLedgerBytes": 4057631222,
+      "ledgersRetainedForDebug": false,
+      "windowsVerifierInvocation": "INITIAL_WRONG_BINARY_TARGET_REJECTED_BEFORE_COMPILATION_CORRECT_EXISTING_TARGET_BUILD_AND_TESTS_PASSED_FAILURE_LOG_RETAINED"
+    },
+    "exactShaCi": { "sourceSha": "1f8ce111f10f31e6984c25d02903071d2f893076", "runId": "34732975925", "requiredJobsPassed": 4, "skippedJobs": 0, "skippedSteps": 0, "status": "PASS" }
   },
   "phase13": {
     "status": "PASS",
@@ -301,7 +353,7 @@
     "backupConfiguration": "NOT_CONFIGURED_LOCAL_PRIVATE_VALUES_ONLY",
     "backupSchedule": "OPTIONAL_NOT_INSTALLED",
     "recoveryRunbook": "docs/security/deposit-operation-recovery.md",
-    "snapshotRestoreDrillBeforeDevnet": "TESTED_LOCALNET_PHASE_14_MATCHING_COMMIT_CI_REQUIRED",
+    "snapshotRestoreDrillBeforeDevnet": "TESTED_LOCALNET_PHASE_14_EXACT_SOURCE_FRESH_CLONE_AND_CI",
     "devnetRecoveryDrill": "NOT_TESTED_REQUIRED_IN_PHASE_17",
     "signerTopology": "SINGLE_HOST",
     "signerSeparation": "SEPARATE_PARTICIPANTS_PROCESSES_PROTECTED_SHARES_AND_NONCE_STATE_EXACT_2_OF_2",
@@ -321,5 +373,5 @@
     "status": "VERIFY_MATCHING_GITHUB_ACTIONS_RUN",
     "scope": "Local results do not substitute for the workflow run at this exact commit"
   },
-  "next": "COMPLETE_PHASE_14_FRESH_CLONE_AND_EXACT_SHA_CI_BEFORE_PHASE_15_DEVNET"
+  "next": "VERIFY_CURRENT_PUBLICATION_CI_THEN_PHASE_15_FIRST_TEST_DEVNET_DEPLOYMENT"
 }
