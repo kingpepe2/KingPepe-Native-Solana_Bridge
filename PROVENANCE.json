@@ -62,7 +62,7 @@
     {
       "path": "docs/deployment/devnet.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original test-only Devnet enrollment/deployment procedure using retained Borsh and protected storage, with links to official CLI/RPC documentation; no operational credentials or private paths.",
+      "notes": "Original test-only Devnet procedure and scoped Phase-17 observation/recovery results, with explicit source/CI and accumulated-time evidence. No operational credentials or private paths.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "KEEP_LEGAL_AND_CURRENT_CONTRACT"
     },
@@ -356,7 +356,7 @@
     {
       "path": "BRIDGE-READINESS.json",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Source-bound local validation metadata and disabled production flags.",
+      "notes": "Source-bound local/Devnet validation, scoped Phase-17 accumulated monitoring and recovery evidence, explicit limitations and disabled production flags. No secret or runtime state.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "SIMPLIFY"
     },

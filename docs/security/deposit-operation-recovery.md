@@ -71,9 +71,9 @@ be observed and accounted. All production activation remains disabled.
 ## Minimal encrypted backup and manual restore
 
 Status: `recoveryProcedure = TESTED` for the isolated Phase-14 localnet/regtest
-drill described below, not production DPAPI or full-host recovery. Process-restart
-tests alone are not a snapshot/chain-resume drill. Repeat this procedure during
-the Phase-17 Devnet soak and require its recorded result before Phase 19.
+drill and the Phase-17 same-account Devnet drill described below, not replacement
+host/account or full-host recovery. Process-restart tests alone are not a
+snapshot/chain-resume drill. Retain the scoped result before Phase 19.
 No production backup job has been installed. Manual
 capture is allowed; an existing OS scheduler may be used but is not required.
 
@@ -226,4 +226,25 @@ state and logs stay on the development-data volume; no key or operational path i
 published. The random TEST archive passphrase is held only for the drill, not
 provisioned as a production recovery credential. Production backup configuration,
 off-host/cold custody and DPAPI account/machine recovery remain separate untested
-deployment responsibilities. The Devnet drill must still run during Phase 17.
+deployment responsibilities.
+
+### Phase-17 Devnet drill result
+
+On 2026-09-14, two closed Windows CurrentUser DPAPI snapshots restored a pending
+Native sweep and a pending Native payout into separate restricted locations.
+Both transactions had been accepted before the test caller lost their replies.
+Authenticated inventories, journal checkpoints and signed packets matched;
+the original snapshots/state remained untouched. Root-bound protected envelopes
+needed the manual OS reprotection described above, preserving their complete
+revision, consumed-nonce state and payload. The matching test temporary root
+and an explicit review of the quiescent gap were also required. Failed starts
+remained stopped/paused; no state reset or binding bypass was used.
+
+Archive verification/extraction took 5.746 and 3.920 seconds. Including manual
+steps, stop-to-completion took about 18m44s and 3m42s. Real-chain catch-up and
+reviewed resume completed the same operations without new signing or another
+broadcast of either saved Native transaction; reconciliation returned MATCH.
+Corrupt ciphertext failed before extraction. No plaintext archive was written.
+Public operation/transaction IDs and exact timings are in BRIDGE-READINESS.json.
+This is known-gap, same-account recovery, not production cold custody, DPAPI
+portability or proof that an arbitrary older snapshot is safe to resume.

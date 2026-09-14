@@ -180,70 +180,93 @@ zero new submissions/signing and reconciliation MATCH. Read-only decoding of the
 finalized claim, withdrawal and Transceiver verification instructions confirmed
 exact canonical Borsh bytes and digests. Phase 16 is PASS.
 
-Phase 17 now covers Devnet edge checks, the recovery drill and sustained soak.
-Neither a short check nor observation of completed transfers alone certifies the
-required five monitored hours with both-direction traffic or the recovery drill.
-This is not a long-term soak. Native blocks were mined by
-the regtest driver, not observed on a public Native network. External review and
-production authorization remain outstanding; Mainnet stays disabled.
+## Phase 17 scoped Devnet observation and recovery: PASS
 
-The controlled Phase-17 same-account Windows recovery drill passed on
-2026-09-14. A new regtest/Devnet deposit and withdrawal each stopped after an
-accepted Native broadcast whose reply was deliberately lost. Closed encrypted
-snapshots restored into separate restricted locations, retaining the original
-files. Journal checkpoints, complete signer envelopes and exact signed packets
-matched; read-only real-chain catch-up reconciled before reviewed resume.
-Both operations reached COMPLETED without signing or broadcasting either saved
-Native transaction again. The new finalized claim, receipt and withdrawal
-instructions also matched exact canonical Borsh bytes and digests.
-Archive verification/extraction took 5.746 and 3.920 seconds; the complete manual
-stop-to-completion intervals were about 18m44s and 3m42s. The first drill exposed
-the documented path binding and test temporary-root requirement; failed starts
-remained stopped/paused until the isolated configuration was reviewed. No nonce
-state or revision was reset. The runbook records these manual steps; production
-DPAPI portability and off-host backup custody remain untested. Five monitored
-hours and the remaining real-network edge cases are still outstanding.
+The validated runtime is `e54a53160b09809d838b6388c67844186e70db02`, with
+exact-SHA [CI 34837775528](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34837775528):
+four required jobs and every step passed, none skipped. The preceding traffic/
+recovery milestone `cd11982dba8ed9c728b03e4a39a53c67e96c57c4` also passed all
+jobs/steps in CI `34835285166`. This evidence publication requires its own
+matching CI before automatic progression to Phase 18; an older run cannot
+certify a newer commit. The public interval/operation evidence is in
+`BRIDGE-READINESS.json`, with usage in [Devnet deployment](deployment/devnet.md).
 
-The approved scoped network edge checks subsequently passed on 2026-09-14:
-a new deposit waited without signing/mint at two confirmations and after a
-two-block pre-finality regtest fork, then completed on the replacement chain.
-Devnet rejected a fresh-signed replay of a completed withdrawal and a duplicate
-claim, with no token CPI or economic account changes. The new valid burn
-finalized in 11.944 seconds despite a deliberately lost reply, with one send
-attempt; its Native payout completed and reconciliation returned MATCH.
-A wallet-signed, CSV-mature conflicting recovery spend of the already-swept
-deposit was rejected by the actual Native node. All new finalized claim,
-receipt and withdrawal Borsh bytes/digests matched. The driver exposed two
-test-only integration errors (a wrong context method and empty CLI null
-parsing); both were corrected using existing adapters, with stopped intervals
-excluded. The current five-hour monitored duration remains IN_PROGRESS, not
-PASS. Public transaction identities and precise scope are in BRIDGE-READINESS.
+The final KingPepe Team requirement is **five actual monitored hours**,
+accumulated across interruptions with downtime excluded. The audit conservatively
+credits 20,280 seconds (5h38m): a preserved 18,132-second MATCH span from
+2026-09-13 20:09:43.201 UTC to 2026-09-14 01:11:55.849 UTC, plus 2,148 seconds
+of post-compaction traffic/recovery intervals ending at 11:15:47.113 UTC.
+The historical span used source `b8326497bbef21d3cbcbacb0687b46616ccb8898`
+with exact-SHA CI `34777214469` (four jobs, no skipped steps), and contains 221
+additional observations with no WAIT. Preserved artifact hashes matched the
+pre-compaction inventory. Requested future runtime is not credited.
 
-The initial Phase 17 Devnet smoke check passed policy pause/reviewed resume,
-an injected RPC outage with real reconnection, and completed-withdrawal
-rediscovery. Its requested 60-second observation lasted 82 seconds and produced
-two MATCH observations, no new signing, unchanged accounting and clean shutdown.
-The first test attempt used an invalid digit-bearing pause reason; the test label
-was corrected without weakening the journal. This is not a completed soak or
-Devnet restore drill. The optional bounded observation mode in the same runner
-is documented in [Devnet deployment](deployment/devnet.md).
+The original run stopped at 01:15:53.898 UTC in the disk guard; six earlier
+WAIT samples and the tail after its last MATCH are excluded, as are all stopped,
+restore and maintenance gaps. The old run omitted the exact failing free-space
+sample; that value remains unknown. The later diagnostic fix retains it without
+lowering the guard. Historical completed-operation monitoring is combined with
+subsequent new both-direction traffic under the approved accumulation rule.
+This is not an uninterrupted calendar window, long-term soak or load test.
 
-The clean-source observation of `b8326497bbef21d3cbcbacb0687b46616ccb8898`
-started on 2026-09-13 at 19:23:05 UTC and stopped in its disk-headroom guard on
-2026-09-14 at 01:15:53 UTC (21,168 elapsed seconds). It recorded 258 checks,
-including six temporary WAIT observations followed by MATCH. The last published
-MATCH was at 01:11:55 UTC. No new economic operation was requested; retained
-accounting was unchanged and cleanup preserved protected state. This run did
-not retain the failing free-space sample, so its exact value is unknown. The
-runner now retains that sample and an interrupted duration without changing
-the storage floors or exposing RPC details. The final KingPepe Team decision is
-five actual monitored hours; stopped intervals are excluded and the end time is
-extended around documented interruptions. This historical run is not a new
-both-direction transfer test, or the still-required Devnet recovery drill.
-The focused fix passed 1,012 retained Node tests on both Windows and WSL,
-including three disk-floor regressions, and full-tree secret scanning. A
-60-second Devnet restart smoke check returned MATCH with unchanged transaction
-identities, no new signing and clean shutdown. Phase 17 remains uncertified.
+Two NEW regtest/Devnet round trips completed after compaction. Together with
+the retained Phase-16 round trip, the journal recognizes three completed deposits
+and three completed withdrawals, with zero pending operations and reconciliation
+MATCH. Restarts/retries did not create additional economic operations. Finalized
+claim, receipt and withdrawal instructions matched exact canonical Borsh V2
+bytes/digests. Native blocks were mined by the isolated regtest driver; this is
+not public Native-network timing evidence.
+
+The same-account Windows recovery drill stopped a new sweep and payout after
+accepted Native broadcasts whose replies were deliberately lost. Two encrypted,
+closed-state snapshots restored into restricted isolated locations. Complete
+inventories, journal checkpoints and signed packets matched; original snapshots
+were retained. Read-only real-chain catch-up and reviewed resume completed both
+operations without signing or broadcasting either saved transaction again.
+Archive verification/extraction took 5.746 and 3.920 seconds; manual stop-to-
+completion took about 18m44s and 3m42s. The documented path rebinding and matching
+test temporary root required explicit manual steps, preserving complete protected
+envelopes, revisions and consumed nonces. Failed starts stayed stopped/paused.
+`recoveryProcedure = TESTED` is scoped to this known-gap, same-account drill;
+production DPAPI portability, cold custody and arbitrary stale snapshots are not
+certified. See the [recovery runbook](security/deposit-operation-recovery.md).
+
+Approved edge checks passed: two-confirmation and pre-finality reorg WAIT without
+signing/mint; fresh-signed Devnet withdrawal replay and duplicate-claim rejection
+without token CPI/account changes; mature wallet-signed conflicting Native spend
+rejected; accepted Solana reply lost with one send and finalized in 11.944 seconds;
+pending-operation restart, RPC outage/reconnect, pause/reviewed resume, no double
+mint/payout and reconciliation MATCH. Two test-driver errors (wrong context method
+and CLI empty-null parsing) were fixed with existing adapters and focused tests;
+their downtime is excluded. No core bridge or signing algorithm was redesigned.
+
+Published historical resident-memory samples were 165.8-266.1 MB. The resumed
+observer was approximately 266-299 MB; the journal remained 184,320 bytes with
+no pending queue, and the current observation log was 7,942 bytes at review.
+WSL VHD size remained stable, C: retained more than 21 GiB in bounded samples,
+and heavy retained evidence stayed on the development-data volume. No guard was
+bypassed, unknown data deleted or demonstrated memory leak concealed. These
+short measurements do not prove long-term memory/log behavior.
+
+The recovery milestone passed 1,015 Node tests on Windows and WSL. The final
+edge change passed 23 focused checks on each, followed by exact-SHA CI including
+the retained suites, 142 Windows CurrentUser security checks, 102 Rust tests,
+both SBF builds, real local-chain/reorg tests and the encrypted three-boundary
+local recovery flow. Source/history/staged secret scans, exact 276-file provenance,
+guardrails and dependency/license checks passed; npm reported zero vulnerabilities.
+The evidence-only publication passed 14 focused checks per platform. Its first
+WSL run had two 20-second subprocess-startup timeouts while a 399.92 MB tree
+scan ran concurrently; the identical sequential rerun passed in 9.142 seconds.
+Failure diagnostics are retained. Contention is suspected, not proven by a
+profiler; no timeout, test or core behavior was changed to obtain the pass.
+No unresolved Critical/High operational defect was observed in the exercised
+scope. This is NOT independent security review.
+
+Phase 18 follows matching publication CI. Its production upgrade-authority
+model is UNDECIDED and must be selected by the KingPepe Team; the existing
+Devnet test key is not an implicit production choice. Independent review is
+also outstanding. Mainnet, production signing/broadcast and activation remain
+disabled. Common-host risk and full-host rollback limitations remain explicit.
 
 ## Final simplification
 
@@ -554,10 +577,10 @@ Historical Phase 09 evidence remains bound to
 
 ## Limits
 
-This remains LOCALNET/REGTEST software, not production Windows service integration
-or deployment approval. Phase 14 validates its named source from a clean clone
-and matching CI; each later publication needs its own exact-SHA CI. Devnet and
-Mainnet have not started here.
+The exercised environments are LOCALNET/REGTEST and the explicit Solana Devnet
+test deployment, not production Windows service integration or deployment
+approval. Phase 14 validates its named source from a clean clone and matching
+CI; each later publication needs its own exact-SHA CI. Mainnet has not started.
 Common-host compromise/availability, unaudited Noble FROST, CurrentUser-only Windows
 coverage, no full-host rollback guarantee, configured RPC/attester trust and upgrade
 authority remain explicit limitations. Cargo reports the unsuppressed bincode

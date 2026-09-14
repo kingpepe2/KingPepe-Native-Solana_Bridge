@@ -44,7 +44,10 @@ Phase 15 TEST-only Devnet enrollment is PASS using canonical Borsh V2. Publicati
 all four required jobs and every step, none skipped. Phase 16 real regtest/Devnet
 flows in both directions are PASS at e8f282fbe34975f96f4e0a1271072bbd7de5982e,
 with exact-SHA CI 34774289824: all four jobs and every step, none skipped.
-Current phase: 17, scoped Devnet edge checks, recovery drill and sustained soak.
+Phase 17 scoped validation passed on runtime e54a53160b09809d838b6388c67844186e70db02
+with exact-SHA CI 34837775528 (four jobs, no skipped steps). Its evidence-only
+publication also requires matching CI before Phase 18. The next gate is the
+Phase-18 Team upgrade-authority decision and independent external review.
 Public deployment identities, source, build hashes and
 transactions are in docs/deployment/devnet.json. Both programs and the Mint
 already exist; do not redeploy them or recreate enrollment on a routine restart.
@@ -75,8 +78,12 @@ The final KingPepe Team Phase 17 decision requires five actual monitored hours,
 excluding stopped intervals, with both-direction traffic and the Devnet recovery
 drill. This is not a long-term soak. The controlled same-account Devnet drill
 passed for pending sweep and payout; it does not certify production DPAPI
-portability or arbitrary stale snapshots. Duration is not yet certified;
-observation of completed operations alone cannot substitute for either requirement.
+portability or arbitrary stale snapshots. The retained audit credits 20,280
+monitored seconds across explicit intervals, excluding downtime: a preserved
+18,132-second MATCH span plus 2,148 seconds of new traffic/recovery observations.
+Two new round trips and the scoped network edge checks passed. Do not describe
+this accumulated short test as a long-term soak or uninterrupted calendar window.
+Per-run observation flags alone cannot certify the aggregate Phase-17 gate.
 The pinned compiler's supported --arch v3 builds reproduce the deployed bytes;
 do not confuse them with default v0 local-test binaries or enable experimental ABI.
 Devnet test state must not enable Mainnet. Existing local callers stay local-only.

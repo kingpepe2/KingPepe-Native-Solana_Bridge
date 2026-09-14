@@ -182,3 +182,30 @@ transfer traffic, reorg testing, external review or production readiness. A shor
 run reports `SMOKE_PASS_NOT_SOAK_COMPLETE`; even a completed observation window
 is not a Phase 17 PASS. Record the actual duration, interruptions and remaining
 edge/recovery work rather than treating the requested duration as elapsed time.
+
+## Phase 17 result: scoped PASS
+
+The validated runtime is `e54a53160b09809d838b6388c67844186e70db02`, with all
+four jobs and every step passing in exact-SHA CI `34837775528`. Its preceding
+traffic/recovery milestone `cd11982dba8ed9c728b03e4a39a53c67e96c57c4` passed
+CI `34835285166`. Later evidence publications still require their own matching CI.
+
+The KingPepe Team gate is **five monitored hours**, not 14 days. The audit in
+`BRIDGE-READINESS.json` credits 20,280 seconds (5h38m): 18,132 seconds of preserved
+MATCH monitoring plus 2,148 seconds of post-compaction traffic/recovery intervals.
+Every gap is excluded, including the disk-guard interruption and manual restore
+time. The six earlier WAIT samples and unobserved tail are not credited. This
+is accumulated observation, not an uninterrupted calendar window or long-term
+soak. Preserved artifact hashes and interval timestamps make the count auditable.
+
+Two new regtest/Devnet round trips completed, in addition to the retained
+Phase-16 round trip. Finalized claim, receipt and withdrawal Borsh bytes/digests
+matched. Real Devnet replay/duplicate-claim rejection, test Native pre-finality
+reorg/conflicting-spend rejection, lost responses, restart, pause/resume and
+reconciliation passed. Both encrypted pending-operation restores passed within
+the [same-account recovery scope](../security/deposit-operation-recovery.md).
+No deployment, authority, Mint, production configuration or bridge engine changed.
+
+The next Phase-18 gate requires the KingPepe Team's explicit production upgrade-
+authority decision and independent review. The current Devnet test authority
+is not that production decision. Production readiness and Mainnet remain disabled.

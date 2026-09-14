@@ -9,12 +9,22 @@
   "signerTopology": "SINGLE_HOST",
   "commonHostRiskDecision": "ACCEPTED_BY_KINGPEPE_TEAM",
   "lastUpdated": "2026-09-14",
-  "sourceStatus": "PHASE_16_PASS_PHASE_17_SOAK_IN_PROGRESS",
+  "sourceStatus": "PHASE_17_PASS_VALIDATED_RUNTIME_PUBLICATION_REQUIRES_MATCHING_CI",
   "phase17": {
-    "status": "IN_PROGRESS_NOT_CERTIFIED",
+    "status": "PASS",
     "soakRequirement": { "requiredMonitoredSeconds": 18000, "decision": "KINGPEPE_TEAM_5_MONITORED_HOURS", "stoppedTimeCounts": false,
       "interruptions": "DOCUMENT_AND_EXTEND", "longTermSoakClaimed": false, "newBothDirectionTrafficRequired": true },
-    "milestone": "REAL_DEVNET_TRAFFIC_RECOVERY_AND_EDGE_CHECKS_SOAK_PENDING",
+    "milestone": "FIVE_MONITORED_HOURS_REAL_DEVNET_TRAFFIC_RECOVERY_AND_SCOPED_EDGES_PASS",
+    "validatedRuntimeExactShaCi": { "sourceSha": "e54a53160b09809d838b6388c67844186e70db02", "runId": "34837775528",
+      "requiredJobsPassed": 4, "skippedJobs": 0, "skippedSteps": 0, "status": "PASS",
+      "executedHarnessSha256": "337ca5eef5fef8fd83f6fb92c13eba4ffdf1544a7be5bfde611804b7b86759d2" },
+    "recoveryMilestoneExactShaCi": { "sourceSha": "cd11982dba8ed9c728b03e4a39a53c67e96c57c4", "runId": "34835285166",
+      "requiredJobsPassed": 4, "skippedJobs": 0, "skippedSteps": 0, "status": "PASS" },
+    "publicationPolicy": "The PASS certifies the named runtime and retained evidence. This evidence-only publication must also pass its own exact-SHA CI before Phase 18; do not inherit an older run.",
+    "publicationValidation": { "windowsFocused": "14_PASS", "wslFocusedSequentialRerun": "14_PASS",
+      "initialWslFocusedRun": "12_PASS_2_CHILD_STARTUP_TIMEOUTS_DURING_CONCURRENT_TREE_SCAN",
+      "timeoutsUnchanged": true, "failedEvidenceRetained": true,
+      "scope": "Identical 20-second subprocess checks passed sequentially after the 399.92 MB source scan. Contention is suspected, not a profiler-established root cause; no code or acceptance check was weakened." },
     "milestoneValidation": { "focusedWindowsNode": "23_PASS", "focusedWslNode": "23_PASS", "failedOrSkippedTests": 0,
       "secretScan": "PASS", "provenance": "276_FILES_PASS", "guardrails": "PASS", "dependencyLicenseMetadata": "PASS", "npmVulnerabilities": 0 },
     "edgeSmoke": {
@@ -55,7 +65,52 @@
       "restartSmoke": "60_SECONDS_ONE_MATCH_NO_NEW_SIGNING_CLEAN_SHUTDOWN",
       "scope": "DISK_STOP_DIAGNOSTICS_AND_COMPLETED_OPERATION_RESTART_NOT_PENDING_RECOVERY_OR_SOAK_COMPLETION"
     },
-    "sustainedDevnetSoak": "NOT_COMPLETE",
+    "sustainedDevnetSoak": "COMPLETE_SCOPED_FIVE_MONITORED_HOURS_NOT_LONG_TERM",
+    "monitoredTimeAudit": {
+      "requiredMonitoredSeconds": 18000, "creditedMonitoredSeconds": 20280, "stoppedSecondsCredited": 0,
+      "soakDuration": "5 monitored hours", "actualCreditedDuration": "5h38m00s",
+      "firstCreditedAt": "2026-09-13T20:09:43.201Z", "lastCreditedAt": "2026-09-14T11:15:47.113Z",
+      "decision": "ACCUMULATE_VERIFIED_MONITORED_INTERVALS_EXCLUDE_ALL_GAPS",
+      "historicalMatchSpan": {
+        "sourceSha": "b8326497bbef21d3cbcbacb0687b46616ccb8898", "exactShaCiRun": "34777214469", "ci": "4_REQUIRED_JOBS_PASS_NO_SKIPS",
+        "startedAt": "2026-09-13T20:09:43.201Z", "endedAt": "2026-09-14T01:11:55.849Z",
+        "creditedSeconds": 18132, "additionalObservations": 221, "waitingObservationsWithinCreditedSpan": 0,
+        "artifactSha256": [
+          { "observedAt": "2026-09-13T20:09:43.201Z", "sha256": "9ffea06148f98f6d6a25b56f9c80d9d8bc9336b2c9a33f88bcc649cebba0db99" },
+          { "observedAt": "2026-09-13T21:09:51.789Z", "sha256": "33f231ca39bcee30e8b3932903f0ebc34abffeeaf63a132e866a687e7642fb19" },
+          { "observedAt": "2026-09-13T22:11:05.751Z", "sha256": "e53ef4374f3a7c4c9141170c6dbe05695f362bd3ab5f1ca02a06fc0ffaf928d7" },
+          { "observedAt": "2026-09-13T23:11:18.655Z", "sha256": "cb23478262592062c5d40620f98fa6a919e2aa7a4027ddba59c3ae4d495d2765" },
+          { "observedAt": "2026-09-14T00:11:33.458Z", "sha256": "8829193b36c4c8463f513aa6f1d38c184ea22c1218b5f6f06bd4e6bd2aaf8d2f" },
+          { "observedAt": "2026-09-14T01:11:55.849Z", "sha256": "66edcf501649c1691ae6ec4414f2004f92436a6ab99781a927ec880b6a0b08e3" }
+        ],
+        "scope": "Completed-operation service monitoring; no new traffic in this historical span. Six earlier WAIT samples and the tail after the last MATCH are not credited. Preserved artifact hashes matched the pre-compaction inventory."
+      },
+      "postCompactionIntervals": [
+        { "startedAt": "2026-09-14T10:01:00.581Z", "endedAt": "2026-09-14T10:02:00.581Z", "seconds": 60, "endedBy": "SMOKE_COMPLETE" },
+        { "startedAt": "2026-09-14T10:08:58.658Z", "endedAt": "2026-09-14T10:10:33.910Z", "seconds": 95, "endedBy": "PLANNED_SWEEP_RECOVERY_CHECKPOINT" },
+        { "startedAt": "2026-09-14T10:27:56.227Z", "endedAt": "2026-09-14T10:33:23.524Z", "seconds": 327, "endedBy": "PLANNED_PAYOUT_RECOVERY_CHECKPOINT" },
+        { "startedAt": "2026-09-14T10:36:17.095Z", "endedAt": "2026-09-14T10:38:10.641Z", "seconds": 113, "endedBy": "RESTORED_OPERATION_AND_SMOKE_COMPLETE" },
+        { "startedAt": "2026-09-14T10:41:44.856Z", "endedAt": "2026-09-14T10:56:44.837Z", "seconds": 900, "endedBy": "BOUNDED_OBSERVATION_COMPLETE" },
+        { "startedAt": "2026-09-14T10:59:00.486Z", "endedAt": "2026-09-14T11:02:41.077Z", "seconds": 220, "endedBy": "TEST_DRIVER_CONTEXT_METHOD_ERROR_FIXED" },
+        { "startedAt": "2026-09-14T11:05:37.755Z", "endedAt": "2026-09-14T11:08:48.164Z", "seconds": 190, "endedBy": "TEST_DRIVER_CLI_NULL_PARSE_ERROR_FIXED" },
+        { "startedAt": "2026-09-14T11:11:43.806Z", "endedAt": "2026-09-14T11:15:47.113Z", "seconds": 243, "endedBy": "CREDIT_CUTOFF_AT_PUBLISHED_MATCH_RUNTIME_CONTINUES" }
+      ],
+      "postCompactionCreditedSeconds": 2148,
+      "scope": "Historical monitoring plus subsequent new both-direction traffic and recovery intervals under the approved accumulation rule. Not an uninterrupted calendar window, long-term soak or sustained-load test. All gaps are excluded; requested future runtime is never credited."
+    },
+    "operationCounts": { "newNativeToSolana": 2, "newSolanaToNative": 2, "totalKnownCompletedNativeToSolana": 3,
+      "totalKnownCompletedSolanaToNative": 3, "scope": "Totals include the retained Phase-16 round trip; retries and restored operations are not new operations." },
+    "acceptance": { "nativeToSolana": "COMPLETED", "solanaToNative": "COMPLETED", "liveBorshMatch": "PASS",
+      "restart": "PASS", "rpcReconnect": "PASS", "lostResponseRecovery": "PASS", "replayRejection": "PASS",
+      "noDoubleMint": "PASS", "noDoublePayout": "PASS", "nativePreFinalityReorg": "PASS", "pauseReviewedResume": "PASS",
+      "reconciliation": "MATCH", "recoveryProcedure": "TESTED", "unresolvedCriticalHighOperationalDefectsObserved": 0,
+      "externalSecurityReview": "NOT_RUN_NOT_IMPLIED_BY_OPERATIONAL_TESTS" },
+    "resourceObservation": { "historicalPublishedResidentBytesMin": 165826560, "historicalPublishedResidentBytesMax": 266117120,
+      "postCompactionMainProcessResidentBytesObserved": "266280960_TO_APPROXIMATELY_299_MB", "journalBytes": 184320,
+      "currentRunLogBytesAtReview": 7942, "pendingOperationsAtReview": 0, "unexpectedPauseAtReview": false,
+      "windowsCFreeAtReviewBytes": "24528945152", "windowsDFreeAtReviewBytes": "770614427648",
+      "wslVhdBytesUnchangedDuringObservation": "92791635968",
+      "scope": "Minute service checks with hourly/status-change evidence plus bounded process/disk samples. No demonstrated leak or stuck operation in this short test. Transient Windows free-space fluctuations are not attributed to a proven process; VHD size remained stable and the guard was not lowered." },
     "liveBorshRecheck": {
       "status": "PASS",
       "observedAt": "2026-09-14T03:21:43.883Z",
@@ -121,8 +176,8 @@
         "Used the existing Native RPC null-aware UTXO adapter instead of parsing empty CLI output; matched the pinned Native missing-inputs RPC label."],
       "limitations": "Regtest-controlled Native timing and pre-finality fork; real Devnet finality observation, not a forced public consensus stall. Replay packets used unchanged canonical messages, fresh signatures and a funded token account. No production or post-mint economic reversal."
     },
-    "remainingNetworkEdgeCases": "APPROVED_SCOPED_CASES_PASS_DURATION_STILL_PENDING",
-    "phase17Certified": false
+    "remainingNetworkEdgeCases": "APPROVED_SCOPED_CASES_PASS",
+    "phase17Certified": true
   },
   "phase16": {
     "status": "PASS",
@@ -612,7 +667,7 @@
   "production": {
     "configuration": "NOT_CONFIGURED",
     "deployment": "NOT_DEPLOYED",
-    "devnet": "PHASE_15_DEPLOYED_ZERO_SUPPLY_VERIFIED_PHASE_16_TRANSFERS_NOT_RUN",
+    "devnet": "PHASE_15_DEPLOYED_PHASE_16_BOTH_DIRECTIONS_PHASE_17_SCOPED_VALIDATION_PASS",
     "externalReview": "NOT_RUN",
     "activationApproval": false,
     "backupMethod": "MANUAL_OR_EXISTING_OS_SCHEDULER_NO_CUSTOM_DAEMON",
@@ -620,7 +675,7 @@
     "backupSchedule": "OPTIONAL_NOT_INSTALLED",
     "recoveryRunbook": "docs/security/deposit-operation-recovery.md",
     "snapshotRestoreDrillBeforeDevnet": "TESTED_LOCALNET_PHASE_14_EXACT_SOURCE_FRESH_CLONE_AND_CI",
-    "devnetRecoveryDrill": "NOT_TESTED_REQUIRED_IN_PHASE_17",
+    "devnetRecoveryDrill": "TESTED_SAME_ACCOUNT_ISOLATED_RESTORE_NOT_PRODUCTION_HOST_RECOVERY",
     "signerTopology": "SINGLE_HOST",
     "signerSeparation": "SEPARATE_PARTICIPANTS_PROCESSES_PROTECTED_SHARES_AND_NONCE_STATE_EXACT_2_OF_2",
     "commonHostRiskDecision": "EXPLICITLY_ACCEPTED_BY_KINGPEPE_TEAM_PRESENT_TO_PHASE_18_REVIEWER",
@@ -639,5 +694,5 @@
     "status": "VERIFY_MATCHING_GITHUB_ACTIONS_RUN",
     "scope": "Local results do not substitute for the workflow run at this exact commit"
   },
-  "next": "PHASE_16_REGTEST_DEVNET_SERVICE_INTEGRATION_AND_BOTH_DIRECTION_E2E"
+  "next": "PHASE_18_AFTER_PUBLICATION_EXACT_SHA_CI_TEAM_UPGRADE_AUTHORITY_DECISION_AND_EXTERNAL_REVIEW_REQUIRED"
 }
