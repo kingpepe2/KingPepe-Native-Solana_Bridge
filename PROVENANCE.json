@@ -25,6 +25,13 @@
   },
   "trackedFiles": [
     {
+      "path": "docs/deployment/production-plan.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original non-secret production preparation/deployment plan: separate public upgrade/fee-payer identities, variable names, zero-supply Mint properties, existing runtime/recovery boundaries, current blockers and explicit activation gate. Official Solana documentation referenced without source copying. No private configuration or production action.",
+      "purpose": "REQUIRED_DOCUMENTATION",
+      "reviewDisposition": "KEEP_LEGAL_AND_CURRENT_CONTRACT"
+    },
+    {
       "path": "docs/security/program-upgrades.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
       "notes": "Final Team dedicated single-key production upgrade procedure: review/testing, exact artifact and specific approval, no fixed delay. External review is not a mandatory Team gate; no audit or production authorization claimed. Official Solana API documentation referenced, no source copied.",
@@ -41,7 +48,7 @@
     {
       "path": "config/examples/production-readiness.example.json",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Original unconfigured planning checklist, explicitly not a loadable runtime config. Final Team single-key review/no-delay and no mandatory external audit decisions, retained readiness/activation gates, public placeholders only; no production secret provisioned.",
+      "notes": "Original unconfigured planning checklist, explicitly not a loadable runtime config. Separate protected role and local variable references, paused existing-journal preparation, final Team upgrade/audit policy, retained runtime/readiness/activation gates and public placeholders only; the template provisions no secret.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "KEEP_LEGAL_AND_CURRENT_CONTRACT"
     },

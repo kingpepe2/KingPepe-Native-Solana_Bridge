@@ -11,7 +11,7 @@
   "externalSecurityReview": "NOT_REQUIRED_BY_TEAM",
   "externalSecurityAuditCompleted": false,
   "lastUpdated": "2026-09-14",
-  "sourceStatus": "PHASE_19_LOCAL_UPGRADE_AUTHORITY_PREPARED_REMAINING_PRODUCTION_CONFIGURATION_UNVERIFIED",
+  "sourceStatus": "PHASE_19_LOCAL_IDENTITIES_AND_REFERENCES_PREPARED_RPC_AND_MAINNET_RUNTIME_BINDINGS_BLOCKED",
   "phase18": {
     "status": "PASS",
     "publicationExactShaCi": { "sourceSha": "d616b67f8b8601388e3533730b8b251839eab60d", "runId": "34855692775",
@@ -32,9 +32,11 @@
     "publicationPolicy": "The named Phase-18 publication passed its own exact-SHA CI. Later publications require their own matching run. No external review gate; retain all other readiness and explicit activation gates."
   },
   "phase19": {
-    "status": "LOCAL_UPGRADE_AUTHORITY_PREPARED_REMAINING_CONFIGURATION_UNVERIFIED",
+    "status": "BLOCKED_RPC_VALUES_AND_MAINNET_RUNTIME_BINDINGS_NOT_CONFIGURED",
     "scope": "EXPLICIT_TEAM_AUTHORIZED_LOCAL_PREPARATION_ONLY_NO_PRODUCTION_TRANSACTIONS",
-    "baselineSourceSha": "d616b67f8b8601388e3533730b8b251839eab60d",
+    "baselineSourceSha": "3a19e20f127e40225238c879602ee8dd5ed76ce4",
+    "precedingPreparationExactShaCi": { "sourceSha": "3a19e20f127e40225238c879602ee8dd5ed76ce4", "runId": "34862576154",
+      "requiredJobsPassed": 4, "passedSteps": 99, "skippedSteps": 0, "status": "PASS" },
     "dedicatedUpgradeAuthority": {
       "publicKey": "4C6VWWdS7CPx7Rdv6iJpB3bfpabr8Tq1dnFDCgMc8qzY",
       "generatedNew": true,
@@ -47,22 +49,65 @@
       "existingKeyReplacementRejected": true,
       "distinctFromKnownDevnetPublicIdentities": "PASS_15_IDENTITIES",
       "distinctFromRetainedRuntimeFeePayerAndFrostPublicKey": "PASS_PUBLIC_METADATA_ONLY_NO_PRIVATE_SHARES_READ",
-      "otherProductionRoleComparison": "PENDING_THOSE_ROLES_ARE_NOT_CONFIGURED",
+      "otherProductionRoleComparison": "PASS_SEPARATE_PRODUCTION_FEE_PAYER_OTHER_ROLES_NOT_CONFIGURED",
       "reuseAsFeePayerRelayerAttesterOrFrost": false,
       "plaintextKeyFileWritten": false,
       "privateStatePublished": false,
-      "localConfiguration": "UPGRADE_AUTHORITY_ONLY_CONSISTENT_NOT_LOADABLE_BRIDGE_RUNTIME_CONFIG"
+      "localConfiguration": "PROTECTED_IDENTITY_CONSISTENT_NOT_LOADABLE_BRIDGE_RUNTIME_CONFIG"
     },
+    "dedicatedFeePayer": {
+      "publicKey": "47EPgcpqc11Bo3ghi22LrTA2AERFLnuXccnZhTqoEkFb",
+      "logicalReference": "SOLANA_MAINNET_FEE_PAYER",
+      "role": "SOLANA_PRODUCTION_FEE_PAYER_ONLY",
+      "generatedNew": true,
+      "protection": "LOCAL_WINDOWS_DPAPI_CURRENT_USER",
+      "privateAcl": "PASS_CURRENT_ACCOUNT_ONLY",
+      "encryptedRoundTrip": "PASS",
+      "independentPublicDerivation": "PASS",
+      "contextAndTamperRejection": "PASS",
+      "existingKeyReplacementRejected": true,
+      "distinctFromUpgradeAuthorityAndKnownDevnetIdentities": "PASS",
+      "distinctFromRetainedRuntimeFeePayerAndFrostPublicKey": "PASS_PUBLIC_METADATA_ONLY_NO_PRIVATE_SHARES_READ",
+      "otherProductionRoleComparison": "REQUIRED_AS_REMAINING_ROLES_ARE_CONFIGURED",
+      "reuseAsOtherRole": false,
+      "fundingPerformed": false,
+      "plaintextKeyFileWritten": false,
+      "privateStatePublished": false
+    },
+    "localReferences": {
+      "solanaRpcVariable": "SOLANA_MAINNET_RPC_URL",
+      "nativeRpcVariable": "KINGPEPE_NATIVE_MAINNET_RPC_URL",
+      "rpcValuesPresent": false,
+      "rpcNetworkVerification": "NOT_RUN_NO_CONFIGURED_VALUES",
+      "nativeReserveReference": "KINGPEPE_NATIVE_RESERVE_CONFIG",
+      "nativeRuntimeRootReference": "KINGPEPE_NATIVE_RUNTIME_ROOT",
+      "runtimeRootReference": "KINGPEPE_PRODUCTION_RUNTIME_ROOT",
+      "logRootReference": "KINGPEPE_PRODUCTION_LOG_ROOT",
+      "backupRootReference": "KINGPEPE_PRODUCTION_BACKUP_ROOT",
+      "directoriesExist": true,
+      "privateAcl": "PASS_CURRENT_ACCOUNT_ONLY",
+      "pathAndRoleReferences": "INTERNALLY_CONSISTENT_PAUSED_PREPARATION_ONLY",
+      "runtimeCompatibility": "NOT_CONFIGURED_EXISTING_SIGNING_AND_CHAIN_ADMISSION_ARE_TEST_NETWORK_ONLY",
+      "existingJournal": "AuthenticatedLocalDepositLedger",
+      "journalInitialized": false,
+      "newDatabaseIntroduced": false,
+      "productionSnapshotCreated": false,
+      "productionRecoveryTestPerformed": false,
+      "backupScope": "PRIVATE_LOCAL_REFERENCE_TO_EXISTING_ENCRYPTED_RUNBOOK_NOT_HOST_LOSS_RECOVERY",
+      "servicesStarted": false
+    },
+    "deploymentPlan": "docs/deployment/production-plan.md",
+    "deploymentPlanStatus": "READY_AS_NON_SECRET_PLAN_NOT_EXECUTION_AUTHORIZATION",
     "remainingConfiguration": [
-      "PRODUCTION_RPC_AND_NATIVE_NETWORK_RESERVE_REFERENCES_NOT_CONFIGURED",
-      "SEPARATE_PRODUCTION_FEE_PAYER_AND_OTHER_OPERATIONAL_ROLE_REFERENCES_NOT_CONFIGURED",
-      "PRODUCTION_RUNTIME_AND_PRIVATE_BACKUP_CONFIGURATION_NOT_VERIFIED",
-      "FINAL_REVIEWED_DEPLOYMENT_SOURCE_ARTIFACT_AND_PUBLIC_IDENTITY_PLAN_NOT_SELECTED"
+      "SOLANA_MAINNET_RPC_URL_AND_KINGPEPE_NATIVE_MAINNET_RPC_URL_VALUES_MISSING_NETWORKS_UNVERIFIED",
+      "PRODUCTION_NATIVE_RESERVE_FROST_ATTESTER_AND_JOURNAL_BINDINGS_NOT_CONFIGURED",
+      "EXISTING_RUNTIME_ACCEPTS_LOCALNET_REGTEST_OR_EXPLICIT_DEVNET_NOT_MAINNET",
+      "FINAL_PRODUCTION_ARTIFACTS_AND_DEPLOYMENT_IDENTITIES_REQUIRE_EXACT_SOURCE_REVIEW_AND_BINDING"
     ],
     "activationApprovalRequested": false,
     "productionTransactionsSubmitted": 0,
     "executableRepositoryCodeChanged": false,
-    "publicationPolicy": "This preparation milestone requires source/staged/history secret scans, provenance, reviewed commit/push and its own exact-SHA CI. A provisioned upgrade key alone is not a full Phase-19 PASS."
+    "publicationPolicy": "This local identity/reference and public-plan milestone requires source/staged/history secret scans, provenance, reviewed commit/push and its own exact-SHA CI. Prepared keys/directories or a passing CI run do not certify production RPC or Mainnet runtime readiness."
   },
   "phase17": {
     "status": "PASS",
@@ -721,14 +766,14 @@
     "exactShaFreshClone": "PASS"
   },
   "production": {
-    "configuration": "LOCAL_UPGRADE_AUTHORITY_ONLY_REMAINING_CONFIGURATION_UNVERIFIED",
+    "configuration": "LOCAL_IDENTITIES_AND_REFERENCES_PREPARED_RPC_AND_MAINNET_RUNTIME_BINDINGS_UNVERIFIED",
     "deployment": "NOT_DEPLOYED",
     "devnet": "PHASE_15_DEPLOYED_PHASE_16_BOTH_DIRECTIONS_PHASE_17_SCOPED_VALIDATION_PASS",
     "externalSecurityReview": "NOT_REQUIRED_BY_TEAM",
     "externalSecurityAuditCompleted": false,
     "activationApproval": false,
     "backupMethod": "MANUAL_OR_EXISTING_OS_SCHEDULER_NO_CUSTOM_DAEMON",
-    "backupConfiguration": "NOT_CONFIGURED_LOCAL_PRIVATE_VALUES_ONLY",
+    "backupConfiguration": "PRIVATE_LOCAL_ROOT_AND_ENCRYPTED_RUNBOOK_REFERENCE_CONFIGURED_NO_PRODUCTION_SNAPSHOT_CREATED",
     "backupSchedule": "OPTIONAL_NOT_INSTALLED",
     "recoveryRunbook": "docs/security/deposit-operation-recovery.md",
     "snapshotRestoreDrillBeforeDevnet": "TESTED_LOCALNET_PHASE_14_EXACT_SOURCE_FRESH_CLONE_AND_CI",
@@ -745,9 +790,12 @@
     "dedicatedUpgradeAuthorityPublicKey": "4C6VWWdS7CPx7Rdv6iJpB3bfpabr8Tq1dnFDCgMc8qzY",
     "upgradeAuthorityConfiguration": "LOCAL_PROTECTED_KEY_AND_PREPARATION_METADATA_VERIFIED_NOT_DEPLOYED",
     "upgradeAuthorityReuseAsFeePayer": false,
+    "dedicatedFeePayerPublicKey": "47EPgcpqc11Bo3ghi22LrTA2AERFLnuXccnZhTqoEkFb",
+    "feePayerConfiguration": "LOCAL_PROTECTED_IDENTITY_VERIFIED_NOT_FUNDED_OR_ACTIVATED",
     "specificTeamApprovalRequiredForEachProductionUpgrade": true,
     "normalTransfersHaveUpgradePolicyDelay": false,
-    "planningChecklist": "config/examples/production-readiness.example.json"
+    "planningChecklist": "config/examples/production-readiness.example.json",
+    "deploymentPlan": "docs/deployment/production-plan.md"
   },
   "limitations": [
     "Single-host compromise/availability affects both FROST participants",

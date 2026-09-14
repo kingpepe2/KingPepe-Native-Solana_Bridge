@@ -21,12 +21,35 @@ Devnet enrollment record and from the retained runtime fee payer and Native
 FROST aggregate public key. No private test shares were read and no production
 transaction was submitted.
 
-This is an upgrade-authority-only preparation milestone, not a production runtime
-configuration or full Phase-19 PASS. Production RPC/Native reserve, separate fee
-payer and other role references, runtime/backup configuration, and final reviewed
-deployment identity/artifact plan remain unconfigured or unverified. There is no
-claim of comparison against unconfigured production roles or replacement-host
-recovery. Do not reuse Devnet credentials or the upgrade key as fee payer.
+That preparation publication `3a19e20f127e40225238c879602ee8dd5ed76ce4` passed
+exact-SHA CI `34862576154`: four required jobs, 99 passed steps, none skipped.
+
+The next explicitly authorized local milestone prepares a separate, unfunded
+production fee payer with the same DPAPI/ACL, independent public derivation,
+round-trip, negative-context/tamper and existing-key preservation checks. Its
+public address is in `BRIDGE-READINESS.json`. It differs from the dedicated
+upgrade authority, known Devnet identities and retained runtime fee/FROST public
+metadata. The existing upgrade key is unchanged. Comparisons against other
+production roles remain required when those roles are configured.
+
+Private Native/runtime/log/backup directories and consistent local reference
+files now exist with current-account-only ACLs. RPC references contain variable
+names only. The local profile loads configured environment values without
+printing them or starting services. No production journal/database, wallet,
+reserve transaction or backup snapshot was created. The backup reference uses
+the existing encrypted manual/OS-scheduled runbook; it does not certify host-loss
+recovery or perform a destructive production restore. See the single non-secret
+[production deployment plan](deployment/production-plan.md).
+
+Phase 19 is still **BLOCKED**, not ready for activation approval. Both
+`SOLANA_MAINNET_RPC_URL` and `KINGPEPE_NATIVE_MAINNET_RPC_URL` are missing from
+the checked local environment. Production reserve, FROST/attester and journal
+bindings are also unconfigured. The retained Native signing policy explicitly
+requires localnet/regtest, and Solana admission permits only localnet or pinned
+Devnet. Prepared references cannot make those adapters Mainnet-capable. This
+configuration milestone does not remove guards, relabel test state, fund a key,
+or start a production service. Exact production artifacts/identities still need
+review and binding before deployment.
 
 The policy remains `SINGLE_KEY_WITH_REVIEW_CONTROL`, `upgradeReviewWindow = NONE`,
 `fixedTimelock = false`. All retained readiness gates must pass before requesting

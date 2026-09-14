@@ -92,10 +92,14 @@ Per-run observation flags alone cannot certify the aggregate Phase-17 gate.
 The pinned compiler's supported --arch v3 builds reproduce the deployed bytes;
 do not confuse them with default v0 local-test binaries or enable experimental ABI.
 Devnet test state must not enable Mainnet. Existing local callers stay local-only.
-The Team authorized one new local-only dedicated production upgrade-authority
-key and private preparation configuration. Neither belongs in Git or logs.
-The key must never be reused as fee payer, relayer, attester or FROST material.
-Other production configuration remains unverified; do not reuse test credentials.
+The Team authorized local-only dedicated production upgrade-authority and
+separate fee-payer identities, plus private Native/runtime/log/backup references.
+Keys and real configuration never belong in Git or logs. Neither key may be
+reused as relayer, attester or FROST material; the fee payer remains unfunded.
+Production RPC values and Native/runtime bindings remain unverified. Existing
+signing/network admission is test-only; directories and reference metadata do
+not make it Mainnet-capable. Do not relabel test configuration or remove guards
+as part of local preparation. Do not reuse test credentials.
 No production transactions, funds, deployment or activation are authorized.
 Preserve the completed transfer engines, accounting, lifecycle, replay semantics,
 FROST topology, authorities and existing journal/inbox. Recovery is TESTED only
