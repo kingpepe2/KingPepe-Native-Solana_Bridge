@@ -204,6 +204,21 @@ state or revision was reset. The runbook records these manual steps; production
 DPAPI portability and off-host backup custody remain untested. Five monitored
 hours and the remaining real-network edge cases are still outstanding.
 
+The approved scoped network edge checks subsequently passed on 2026-09-14:
+a new deposit waited without signing/mint at two confirmations and after a
+two-block pre-finality regtest fork, then completed on the replacement chain.
+Devnet rejected a fresh-signed replay of a completed withdrawal and a duplicate
+claim, with no token CPI or economic account changes. The new valid burn
+finalized in 11.944 seconds despite a deliberately lost reply, with one send
+attempt; its Native payout completed and reconciliation returned MATCH.
+A wallet-signed, CSV-mature conflicting recovery spend of the already-swept
+deposit was rejected by the actual Native node. All new finalized claim,
+receipt and withdrawal Borsh bytes/digests matched. The driver exposed two
+test-only integration errors (a wrong context method and empty CLI null
+parsing); both were corrected using existing adapters, with stopped intervals
+excluded. The current five-hour monitored duration remains IN_PROGRESS, not
+PASS. Public transaction identities and precise scope are in BRIDGE-READINESS.
+
 The initial Phase 17 Devnet smoke check passed policy pause/reviewed resume,
 an injected RPC outage with real reconnection, and completed-withdrawal
 rediscovery. Its requested 60-second observation lasted 82 seconds and produced

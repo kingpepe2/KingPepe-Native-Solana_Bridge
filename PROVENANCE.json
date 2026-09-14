@@ -27,7 +27,7 @@
     {
       "path": "solana/tests/devnet-bridge-service.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original explicit regtest/Devnet E2E harness over retained workers and protected A/B test processes. Explicit test cycles retain unique operations in the existing journal; accepted-response-loss checks and closed-writer recovery checkpoints preserve their identities. Live finalized Borsh instructions are re-encoded exactly. Five monitored hours exclude downtime and do not alone certify traffic/recovery. No production, deployment or airdrops; credentials and recovery state stay outside source.",
+      "notes": "Original explicit regtest/Devnet E2E harness over retained workers and protected A/B test processes. Test cycles retain unique operations; response-loss and closed-writer recovery preserve identities. Scoped pre-finality reorg, on-chain replay and spent-input checks use existing adapters and transaction builders. Live finalized Borsh instructions are re-encoded exactly. Five monitored hours exclude downtime. No production, deployment or airdrops; credentials and recovery state stay outside source.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },

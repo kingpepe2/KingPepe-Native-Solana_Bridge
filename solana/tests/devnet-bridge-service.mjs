@@ -26,6 +26,7 @@ import { NativeRpcClient } from "../../native/node/native-rpc-client.mjs";
 import { LocalNativeEvidenceVerifier, REGTEST_GENESIS } from "../../native/node/native-raw-evidence.mjs";
 import { witnessAddressFromScript } from "../../native/node/witness-address.mjs";
 import { parseNativeTransactionHex } from "../../native/node/native-taproot-transaction.mjs";
+import { prepareRegtestRecoveryPsbt } from "../../native/recovery/recovery-psbt.mjs";
 import { AuthenticatedLocalDepositLedger } from "../../services/bridge-validator/local-deposit-ledger.mjs";
 import { AutomaticNativeToSolanaDeposit } from "../../services/bridge-validator/automatic-native-deposit.mjs";
 import { AutomaticSolanaToNativeWithdrawal } from "../../services/bridge-validator/automatic-withdrawal.mjs";
@@ -35,7 +36,7 @@ import { ProjectAttester } from "../../services/attesters/attestation-service.mj
 import { LocalBridgeService } from "../../services/relayer/withdrawal-service.mjs";
 import { BridgeUserApi } from "../../services/bridge-validator/user-api.mjs";
 import { SolanaLocalRpcClient, sanitizedRpcDiagnostic } from "../../services/bridge-validator/solana-deposit-claim-submitter.mjs";
-import { base58Decode, base58DecodeInstruction, base58Encode, shortvecEncode } from "../../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs";
+import { base58Decode, base58DecodeInstruction, base58Encode, shortvecEncode, prepareSignedLocalnetSolanaDepositClaimTransaction } from "../../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs";
 import { encodeCanonicalBridgeMessage, decodeCanonicalBridgeMessage } from "../../shared/protocol/canonical-message.mjs";
 import { decodeBridgeAbi, encodeBridgeAbi } from "../../shared/protocol/solana-bridge-abi.mjs";
 import { createNativeDepositRequest, createSolanaWithdrawalRequest } from "../ts/sdk/bridge.mjs";
@@ -145,6 +146,9 @@ try {
   assert(loseResponse === undefined || loseResponse === "1" && cycle !== undefined, "TestLostResponseConfigurationRejected");
   const restoreReviewFile = process.env.KINGPEPE_DEVNET_TEST_RESTORE_REVIEW;
   assert(restoreReviewFile === undefined || cycle !== undefined, "TestRestoreReviewRejected");
+  const networkEdges = process.env.KINGPEPE_DEVNET_TEST_EDGES;
+  assert(networkEdges === undefined || networkEdges === "1" && Number(cycle) >= 2 && checkpoint === undefined && restoreReviewFile === undefined,
+    "TestNetworkEdgesRequireSeparateTrafficCycle");
   let restoreReview;
   if (soakSeconds) evidence.phase = 17;
   const record = JSON.parse(readFileSync(path.join(repoRoot, "docs/deployment/devnet.json")));
@@ -245,6 +249,7 @@ try {
   assert.equal(fundingKey, manifest.manager.upgradeAuthority); assert.equal(userPublicKey, record.recipient);
   const userSigner = { publicKeyBase58: userPublicKey, sign: bytes => Buffer.from(ed25519.sign(bytes, userSeed)) };
   closers.push(() => userSeed.fill(0));
+  let lostSolanaReply = false;
   async function submitRetained(packet) {
     const bytes = Buffer.from(packet.signedTransactionBase64 ?? packet.packet, "base64");
     assert.equal(base58Encode(bytes.subarray(1, 65)), packet.signature, "RetainedTestSignatureMismatch");
@@ -259,6 +264,11 @@ try {
         try {
           attempts += 1;
           assert.equal(await rpc.sendTransaction(bytes.toString("base64"), { maxRetries: 3 }), packet.signature);
+          if (networkEdges && packet.operationId && !lostSolanaReply) {
+            lostSolanaReply = true;
+            event("TEST_SOLANA_RESPONSE_LOST_AFTER_ACCEPTANCE", { signature: packet.signature, operationId: packet.operationId });
+            throw new Error("TEST_INJECTED_LOST_SOLANA_RESPONSE");
+          }
         } catch (error) {
           // Retrying these exact signed bytes cannot create a second action.
           // Preserve a safe diagnostic instead of swallowing a preflight error.
@@ -443,6 +453,8 @@ try {
     const recovery = JSON.parse(await nativeCli("getaddressinfo", [recoveryAddress], wallet));
     assert(recovery.ismine && /^(02|03)[0-9a-f]{64}$/u.test(recovery.pubkey), "NativeUserRecoveryPublicKeyRequired");
     request = { amountAtomic: "100000000", recipient: record.recipientSplAccount, userRecoveryPublicKeyHex: recovery.pubkey.slice(2), nonceHex: randomBytes(32).toString("hex") };
+    if (networkEdges) retainFlow("user-recovery-public-origin.json", { address: recoveryAddress, masterFingerprintHex: recovery.hdmasterfingerprint,
+      derivationPath: recovery.hdkeypath, publicKeyHex: recovery.pubkey });
   }
   const quote = createNativeDepositRequest({ policy, ...request }); retainFlow("deposit-request.json", quote);
   const history = JSON.parse(await nativeCli("listtransactions", ["*", "1000"], wallet));
@@ -462,6 +474,35 @@ try {
   const feeOutput = feeTx.vout.find(v => v.scriptPubKey.hex === reserveScriptHex); assert(feeOutput, "TestFeeOutputMissing");
   feeFundingInputs = [{ txid: feeTxid, vout: feeOutput.n, amountAtomic: "1000", scriptPubKeyHex: reserveScriptHex, minimumConfirmations: policy.minimumConfirmations }];
   retainFlow("deposit-observation-bound.json", { depositTxidHex, feeFundingInputs });
+  if (networkEdges) {
+    stage = "NATIVE_PREFINALITY_REORG";
+    const savedEdge = path.join(flowRoot, "native-prefinality-reorg.json");
+    if (existsSync(savedEdge)) evidence.nativeReorg = JSON.parse(readFileSync(savedEdge));
+    else {
+      assert(!priorFunding, "InterruptedReorgTestRequiresManualReview");
+      const before = service.status().accounting, signedBefore = signingRequests;
+      const baseHeight = Number(await nativeCli("getblockcount")), baseHash = await nativeCli("getblockhash", [String(baseHeight)]);
+      const branch = JSON.parse(await nativeCli("generatetoaddress", ["2", miner], wallet));
+      await api.submitNativeDeposit({ request, depositTxidHex, depositVout: null });
+      await service.tick();
+      assert.equal(api.getOperationStatus(quote.operationId).state, "OBSERVED");
+      assert.equal(signingRequests, signedBefore); assert.deepEqual(service.status().accounting, before);
+      // Only the two newly generated, unaccepted TEST blocks may be removed.
+      assert.equal(await nativeCli("getblockhash", [String(baseHeight)]), baseHash);
+      assert.equal((await nativeRpc.getRawTransaction(depositTxidHex, true)).confirmations, 2);
+      await nativeCli("invalidateblock", [branch[0]]);
+      assert.equal(Number(await nativeCli("getblockcount")), baseHeight);
+      assert.equal(await nativeCli("getblockhash", [String(baseHeight)]), baseHash);
+      await service.tick();
+      assert.equal(api.getOperationStatus(quote.operationId).state, "OBSERVED");
+      assert.equal(signingRequests, signedBefore); assert.deepEqual(service.status().accounting, before);
+      evidence.nativeReorg = { operationId: quote.operationId, oldBranch: branch, acceptedBaseUnchanged: baseHash,
+        insufficientFinality: "WAIT_NO_MINT", reorgBeforeFinality: "WAIT_NO_MINT", newSigning: 0, status: "PASS" };
+      retainFlow("native-prefinality-reorg.json", evidence.nativeReorg);
+    }
+    assert.equal(evidence.nativeReorg.operationId, quote.operationId);
+    event("NATIVE_PREFINALITY_REORG_PASSED", evidence.nativeReorg);
+  }
   await nativeCli("generatetoaddress", ["6", miner], wallet);
   await api.submitNativeDeposit({ request, depositTxidHex, depositVout: null });
   let last;
@@ -504,6 +545,76 @@ try {
     evidence.recovery.recoveryProcedure = "TESTED";
     evidence.soak.requiredRecoveryDrill = "TESTED_PENDING_DEPOSIT_THIS_RESTORE";
     event("ISOLATED_PENDING_DEPOSIT_RECOVERY_PASSED", evidence.recovery);
+  }
+
+  if (networkEdges) {
+    stage = "DEVNET_REPLAY_REJECTION";
+    // Use valid, funded canonical messages with a fresh transaction signature.
+    // Same-signature deduplication or an empty token account would not prove
+    // that the program's economic-operation replay check rejected the request.
+    const replayEvidence = path.join(flowRoot, "devnet-replay-rejection.json");
+    if (existsSync(replayEvidence)) evidence.replay = JSON.parse(readFileSync(replayEvidence));
+    else {
+      const previous = JSON.parse(readFileSync(path.join(root, "phase17-cycle-" + (Number(cycle) - 1), "withdrawal-user-packet.json")));
+      const message = decodeCanonicalBridgeMessage(previous.encodedMessageHex);
+      const context = await service.userTransactionContext({ tokenAccount: record.recipientSplAccount,
+        authority: userPublicKey, amountAtomic: message.amountAtomic.toString() });
+      assert(BigInt(context.unixTimestamp) < message.validUntil, "ReplayTestMessageExpiredRequiresFreshCompletedCycle");
+      assert.equal(ledger.withdrawal(previous.operationId)?.state, "COMPLETED");
+      async function rejected(name, prepare, accounts, canonical) {
+        const packetFile = path.join(flowRoot, name + "-packet.json");
+        const packet = existsSync(packetFile) ? JSON.parse(readFileSync(packetFile)) : await prepare();
+        retainFlow(name + "-packet.json", packet);
+        assert.equal(packet.encodedMessageHex, canonical);
+        const before = await Promise.all(accounts.map(a => rpc.getAccountInfo(a)));
+        assert(before.every(Boolean), "ReplayTestAccountsMissing");
+        let sent = false, status, until = Date.now() + 180000;
+        for (;;) {
+          diskGuard(); status = await rpc.getSignatureStatus(packet.signature);
+          if (status?.confirmationStatus === "finalized") break;
+          if (!status && !sent) {
+            assert(await rpc.getBlockHeight() <= BigInt(packet.lastValidBlockHeight), "ReplayTestPacketExpiredNeedsReview");
+            sent = true;
+            // A negative TEST transaction must reach the program, not merely
+            // fail local/preflight simulation. The live Devnet guard still runs.
+            assert.equal(await rpc.sendTransaction(packet.signedTransactionBase64, { skipPreflight: true, maxRetries: 0 }), packet.signature);
+          }
+          assert(Date.now() < until, "ReplayTestFinalityTimeout"); await delay(2000);
+        }
+        const tx = await solana.finalizedTransaction(packet.signature), failure = tx?.meta?.err?.InstructionError;
+        assert(Array.isArray(failure) && failure[1] === "InvalidAccountData", "ReplayTestUnexpectedFailure");
+        const ix = tx.transaction.message.instructions[failure[0]];
+        assert.equal(tx.transaction.message.accountKeys[ix.programIdIndex], manifest.manager.id);
+        assert(!tx.meta.innerInstructions?.some(i => i.instructions.some(call =>
+          tx.transaction.message.accountKeys[call.programIdIndex] === manifest.mint.tokenProgram)), "ReplayInvokedTokenProgram");
+        const after = await Promise.all(accounts.map(a => rpc.getAccountInfo(a)));
+        assert.deepEqual(after, before, "ReplayChangedEconomicAccounts");
+        return { signature: packet.signature, slot: tx.slot, status: "REJECTED_ON_CHAIN", error: failure,
+          canonicalMessageUnchanged: true, tokenCpiCount: 0, economicAccountsUnchanged: true };
+      }
+      const duplicateWithdrawal = await rejected("replay-withdrawal", async () => {
+        const latest = await rpc.getLatestBlockhash();
+        const unsigned = createSolanaWithdrawalRequest({ policy, amountAtomic: message.amountAtomic.toString(), feeAtomic: message.feeAtomic.toString(),
+          destination: previous.destination, userAuthority: userPublicKey, sourceTokenAccount: record.recipientSplAccount,
+          withdrawalIdHex: message.withdrawalIdHex, nonceHex: Buffer.from(message.nonce).toString("hex"),
+          validFrom: message.validFrom.toString(), validUntil: message.validUntil.toString(), recentBlockhash: latest.blockhash });
+        const packet = Buffer.from(unsigned.transactionBase64, "base64"); userSigner.sign(packet.subarray(65)).copy(packet, 1);
+        return { encodedMessageHex: unsigned.encodedMessageHex, lastValidBlockHeight: String(latest.lastValidBlockHeight),
+          signature: base58Encode(packet.subarray(1, 65)), signedTransactionBase64: packet.toString("base64") };
+      }, [manifest.mint.id, record.recipientSplAccount, previous.instruction.accounts[0].key, previous.instruction.accounts[1].key], previous.encodedMessageHex);
+      const duplicateClaim = await rejected("replay-claim", async () => {
+        const latest = await rpc.getLatestBlockhash();
+        const signed = await prepareSignedLocalnetSolanaDepositClaimTransaction({ environment: "devnet", cluster: "devnet", solanaGenesis: DEVNET_SOLANA_GENESIS,
+          managerProgramIdBase58: manifest.manager.id, transceiverProgramIdBase58: manifest.transceiver.id, mintBase58: manifest.mint.id,
+          tokenProgramIdBase58: manifest.mint.tokenProgram, feePayerBase58: feePayer.publicKeyBase58, recipientTokenAccountBase58: record.recipientSplAccount,
+          recentBlockhashBase58: latest.blockhash, lastValidBlockHeight: String(latest.lastValidBlockHeight), encodedMessageHex: credit.encodedMessageHex, feePayerSigner: feePayer });
+        return { encodedMessageHex: credit.encodedMessageHex, lastValidBlockHeight: String(latest.lastValidBlockHeight),
+          signature: signed.signatures[0].signatureBase58, signedTransactionBase64: signed.preparedTransactionBase64 };
+      }, [manifest.mint.id, record.recipientSplAccount, previous.instruction.accounts[0].key], credit.encodedMessageHex);
+      evidence.replay = { status: "PASS", duplicateWithdrawal, duplicateClaim };
+      retainFlow("devnet-replay-rejection.json", evidence.replay);
+    }
+    event("DEVNET_REPLAY_REJECTED_WITHOUT_ECONOMIC_CHANGE", evidence.replay);
   }
 
   stage = "USER_WITHDRAWAL";
@@ -562,6 +673,44 @@ try {
   assert.equal(observedWithdrawal.encodedMessageHex, withdrawal.encodedMessageHex);
   retainFlow("withdrawal-borsh-message.json", { encodedMessageHex: withdrawal.encodedMessageHex, messageDigestHex: withdrawal.messageDigestHex });
   event("SOLANA_DEVNET_TO_NATIVE_COMPLETED", evidence.solanaToNative);
+  if (networkEdges) {
+    stage = "NATIVE_SPENT_DEPOSIT_CONFLICT";
+    const savedEdge = path.join(flowRoot, "native-spent-deposit-conflict.json");
+    if (existsSync(savedEdge)) evidence.nativeConflict = JSON.parse(readFileSync(savedEdge));
+    else {
+      const origin = JSON.parse(readFileSync(path.join(flowRoot, "user-recovery-public-origin.json")));
+      const info = JSON.parse(await nativeCli("getaddressinfo", [origin.address], wallet));
+      assert(info.ismine && info.pubkey === origin.publicKeyHex && info.pubkey.slice(2) === request.userRecoveryPublicKeyHex);
+      const funding = parseNativeTransactionHex(await nativeRpc.getRawTransaction(depositTxidHex, false));
+      const vout = funding.outputs.findIndex(o => o.scriptPubKeyHex === quote.scriptPubKeyHex && o.amountAtomic === request.amountAtomic);
+      assert(vout >= 0);
+      assert.equal((await nativeRpc.getUtxoObservation({ txid: depositTxidHex, vout, includeMempool: true })).unspent, false);
+      const destination = await nativeCli("getnewaddress", ["conflict-test", "bech32m"], wallet);
+      const destinationInfo = JSON.parse(await nativeCli("getaddressinfo", [destination], wallet));
+      const psbt = prepareRegtestRecoveryPsbt({ depositPolicy: quote.recovery, fundingTransactionHex: await nativeRpc.getRawTransaction(depositTxidHex, false),
+        outputIndex: vout, amountAtomic: request.amountAtomic, destinationScriptPubKeyHex: destinationInfo.scriptPubKey,
+        feeAtomic: "1000", maximumFeeAtomic: "1000", userKeyOrigin: origin });
+      const signed = JSON.parse(await nativeCli("walletprocesspsbt", [psbt.psbtBase64, "true", "DEFAULT", "true", "true"], wallet));
+      assert.equal(signed.complete, true);
+      const finalized = JSON.parse(await nativeCli("finalizepsbt", [signed.psbt, "true"])); assert.equal(finalized.complete, true);
+      const confirmations = (await nativeRpc.getRawTransaction(depositTxidHex, true)).confirmations;
+      if (confirmations < policy.csvDelayBlocks) await nativeCli("generatetoaddress", [String(policy.csvDelayBlocks - confirmations), miner], wallet);
+      const result = JSON.parse(await nativeCli("testmempoolaccept", [JSON.stringify([finalized.hex])]))[0];
+      // Pinned Native rpc/mempool.cpp maps TX_MISSING_INPUTS to this RPC label.
+      assert.equal(result.allowed, false); assert.equal(result["reject-reason"], "missing-inputs");
+      let rejected = false;
+      try { await nativeRpc.sendRawTransaction(finalized.hex); } catch (error) {
+        assert(/^NativeRpcRejected:sendrawtransaction:-(25|26)$/u.test(error.message)); rejected = true;
+      }
+      assert(rejected, "SpentDepositConflictWasAccepted");
+      const txid = parseNativeTransactionHex(finalized.hex).txidHex;
+      assert(!JSON.parse(await nativeCli("getrawmempool")).includes(txid));
+      evidence.nativeConflict = { status: "PASS", originalDeposit: depositTxidHex, conflictTxid: txid,
+        walletFinalized: true, csvMature: true, nodeRejectedSpentInput: true, newMint: 0, newPayout: 0 };
+      retainFlow("native-spent-deposit-conflict.json", evidence.nativeConflict);
+    }
+    event("NATIVE_SPENT_DEPOSIT_CONFLICT_REJECTED", evidence.nativeConflict);
+  }
   if (evidence.recovery?.boundary === "NATIVE_PAYOUT_BROADCAST") {
     assert.equal(signingRequests, 0, "RestoredPayoutSignedAgain");
     assert.equal(nativeBroadcasts.length, 0, "RestoredPayoutBroadcastAgain");

@@ -164,6 +164,19 @@ that pending transaction again. This option cannot clear an integrity stop.
 Live finalized claim, receipt and withdrawal instructions are decoded and
 re-encoded to compare exact Borsh bytes/digests against the operation records.
 
+`KINGPEPE_DEVNET_TEST_EDGES=1` requires an explicit cycle numbered at least 2,
+following a completed cycle. It uses only regtest and the prepared Devnet
+deployment: remove two newly generated pre-finality test blocks, require no
+signing/mint, then complete the normal flow. Fresh-signed duplicate withdrawal
+and claim requests must fail on Devnet without token CPI or economic account
+changes. The previous withdrawal message must still be within its validity
+window, and the test-user token account must be funded so an insufficient
+balance cannot masquerade as replay protection. A separate mature wallet-signed
+recovery spend of the already-swept deposit must be rejected by the Native node.
+The test user's accepted Solana submission reply is deliberately lost; retry
+checks the original signature. Retained evidence skips already-passed cases on
+restart. These are test-driver checks, not new bridge capabilities.
+
 Neither elapsed time nor completed-transfer observation certifies pending-operation restore, sustained
 transfer traffic, reorg testing, external review or production readiness. A short
 run reports `SMOKE_PASS_NOT_SOAK_COMPLETE`; even a completed observation window
