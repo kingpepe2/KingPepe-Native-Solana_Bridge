@@ -135,8 +135,10 @@ It checks policy pause/reviewed resume, a simulated RPC outage followed by real
 reconnection, and completed-withdrawal rediscovery before observing the service.
 Each check preserves accounting and forbids new signing for completed operations.
 
-Use 60 seconds for a smoke check or 1209600 seconds for a planned 14-day
-observation window. The runner checks disk headroom, budgets the retained
+Use 60 seconds for a smoke check or 18000 seconds for the KingPepe Team's
+five-monitored-hour Phase 17 window. Stopped time never counts; record each
+interruption and extend the window until five actual monitored hours accumulate.
+This is a short operational observation, not a long-term soak. The runner checks disk headroom, budgets the retained
 regtest verifier's 4096-header limit, and issues test certificates covering the
 requested window. It samples live sources and service state every minute;
 unavailable health is recorded as WAIT, not fabricated success. Test-only mining
@@ -144,8 +146,25 @@ is limited to one block per ten minutes. Reports go to the external run director
 hourly or on status changes, with bounded in-memory events. Shutdown preserves
 the protected test state needed for recovery; it creates no local Solana ledger.
 
-This mode observes the two retained completed transfers. It does not generate
-new user transactions and does not certify pending-operation restore, sustained
+By default this mode observes retained completed transfers. An explicit local
+`KINGPEPE_DEVNET_TEST_CYCLE` (1-999) adds one test-user round trip using a separate
+artifact subdirectory and the SAME journal, deployment and protected signers.
+Reusing a cycle resumes its recorded operations; it never creates new identities
+for an already completed transfer. Optional `KINGPEPE_DEVNET_TEST_LOST_RESPONSE=1`
+discards accepted Native broadcast replies in the test caller, while the retained
+workers must discover the original transactions. `KINGPEPE_DEVNET_TEST_CHECKPOINT`
+may close the runtime at `NATIVE_SWEEP_BROADCAST` or `NATIVE_PAYOUT_BROADCAST` for
+the manual encrypted recovery drill. A checkpoint is not a completed recovery.
+For an isolated restored copy, `KINGPEPE_DEVNET_TEST_RESTORE_REVIEW` selects the
+private manual-review record: exact restored runtime, authenticated journal
+checkpoint, pending transaction and signed-packet digest. The test driver pauses
+the copy, verifies the already-broadcast transaction on Native, catches up both
+chains and requires MATCH before reviewed resume. It must not sign or broadcast
+that pending transaction again. This option cannot clear an integrity stop.
+Live finalized claim, receipt and withdrawal instructions are decoded and
+re-encoded to compare exact Borsh bytes/digests against the operation records.
+
+Neither elapsed time nor completed-transfer observation certifies pending-operation restore, sustained
 transfer traffic, reorg testing, external review or production readiness. A short
 run reports `SMOKE_PASS_NOT_SOAK_COMPLETE`; even a completed observation window
 is not a Phase 17 PASS. Record the actual duration, interruptions and remaining

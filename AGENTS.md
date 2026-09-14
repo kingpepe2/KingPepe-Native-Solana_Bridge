@@ -71,16 +71,20 @@ exact Borsh message and operation ID after live absence/expiry checks. The test
 runner checks history capability before opening signers or spending test fees.
 A clean-source restart at that Phase-16 publication recognized both completed
 operations without new signing or submissions; reconciliation remained MATCH.
-The multi-week soak and Devnet recovery drill are not yet certified. A short
-observation of completed operations cannot substitute for either requirement.
+The final KingPepe Team Phase 17 decision requires five actual monitored hours,
+excluding stopped intervals, with both-direction traffic and the Devnet recovery
+drill. This is not a long-term soak. The controlled same-account Devnet drill
+passed for pending sweep and payout; it does not certify production DPAPI
+portability or arbitrary stale snapshots. Duration is not yet certified;
+observation of completed operations alone cannot substitute for either requirement.
 The pinned compiler's supported --arch v3 builds reproduce the deployed bytes;
 do not confuse them with default v0 local-test binaries or enable experimental ABI.
 Devnet test state must not enable Mainnet. Existing local callers stay local-only.
 No production configuration, keys, funds or deployment.
 Preserve the completed transfer engines, accounting, lifecycle, replay semantics,
 FROST topology, authorities and existing journal/inbox. Recovery is TESTED only
-for closed localnet/regtest state with a known quiescent gap, not production
-DPAPI portability or full-host rollback. Repeat the drill during Phase 17.
+for closed localnet/regtest and the controlled Devnet same-account drill with
+a known quiescent gap, not production DPAPI portability or full-host rollback.
 Use external build directories and locked dependencies. No new security platform.
 User wallets sign their own transactions; no user-facing signing, minting or
 administrative API.

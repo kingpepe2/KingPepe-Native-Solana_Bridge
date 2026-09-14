@@ -128,6 +128,19 @@ material and an actually tested restore. Missing decryption capability must
 fail closed; never substitute plaintext or silently create a replacement key.
 Keep participants' secret recovery material separate from the coordinator.
 
+Windows protected records also bind their exact state-root path. A verified byte
+copy into a different root therefore must fail to open. In a controlled,
+same-account isolated drill, use the approved OS decryption/encryption mechanism
+to re-protect the complete authenticated envelope for the new path. Keep its
+revision, consumed nonces, attempts and payload exactly unchanged; compare the
+complete decrypted envelope before and after, in bounded memory only. Do not
+reset revisions, initialize new signer state, weaken path binding, or overwrite
+the original records. Restrict every new directory to the same authorized
+principal and use its matching local temporary root for the test actors.
+Record this manual path-rebinding step and any failed startup in the drill
+evidence. This is not portable production or replacement-account recovery.
+See [Windows DPAPI protection](https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.protecteddata.protect).
+
 ### Manual restore after loss or corruption
 
 1. Isolate the failed host and all its writers. Retain evidence and surviving

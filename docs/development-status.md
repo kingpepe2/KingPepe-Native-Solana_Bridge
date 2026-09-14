@@ -182,9 +182,27 @@ exact canonical Borsh bytes and digests. Phase 16 is PASS.
 
 Phase 17 now covers Devnet edge checks, the recovery drill and sustained soak.
 Neither a short check nor observation of completed transfers alone certifies the
-required multi-week operation or recovery drill. Native blocks were mined by
+required five monitored hours with both-direction traffic or the recovery drill.
+This is not a long-term soak. Native blocks were mined by
 the regtest driver, not observed on a public Native network. External review and
 production authorization remain outstanding; Mainnet stays disabled.
+
+The controlled Phase-17 same-account Windows recovery drill passed on
+2026-09-14. A new regtest/Devnet deposit and withdrawal each stopped after an
+accepted Native broadcast whose reply was deliberately lost. Closed encrypted
+snapshots restored into separate restricted locations, retaining the original
+files. Journal checkpoints, complete signer envelopes and exact signed packets
+matched; read-only real-chain catch-up reconciled before reviewed resume.
+Both operations reached COMPLETED without signing or broadcasting either saved
+Native transaction again. The new finalized claim, receipt and withdrawal
+instructions also matched exact canonical Borsh bytes and digests.
+Archive verification/extraction took 5.746 and 3.920 seconds; the complete manual
+stop-to-completion intervals were about 18m44s and 3m42s. The first drill exposed
+the documented path binding and test temporary-root requirement; failed starts
+remained stopped/paused until the isolated configuration was reviewed. No nonce
+state or revision was reset. The runbook records these manual steps; production
+DPAPI portability and off-host backup custody remain untested. Five monitored
+hours and the remaining real-network edge cases are still outstanding.
 
 The initial Phase 17 Devnet smoke check passed policy pause/reviewed resume,
 an injected RPC outage with real reconnection, and completed-withdrawal
@@ -203,8 +221,9 @@ MATCH was at 01:11:55 UTC. No new economic operation was requested; retained
 accounting was unchanged and cleanup preserved protected state. This run did
 not retain the failing free-space sample, so its exact value is unknown. The
 runner now retains that sample and an interrupted duration without changing
-the storage floors or exposing RPC details. This material observation gap
-requires a new uninterrupted 14-day window. It is not a completed soak, a new
+the storage floors or exposing RPC details. The final KingPepe Team decision is
+five actual monitored hours; stopped intervals are excluded and the end time is
+extended around documented interruptions. This historical run is not a new
 both-direction transfer test, or the still-required Devnet recovery drill.
 The focused fix passed 1,012 retained Node tests on both Windows and WSL,
 including three disk-floor regressions, and full-tree secret scanning. A

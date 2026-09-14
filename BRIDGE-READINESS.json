@@ -12,6 +12,8 @@
   "sourceStatus": "PHASE_16_PASS_PHASE_17_EDGE_CHECKS_IN_PROGRESS",
   "phase17": {
     "status": "IN_PROGRESS_NOT_CERTIFIED",
+    "soakRequirement": { "requiredMonitoredSeconds": 18000, "decision": "KINGPEPE_TEAM_5_MONITORED_HOURS", "stoppedTimeCounts": false,
+      "interruptions": "DOCUMENT_AND_EXTEND", "longTermSoakClaimed": false, "newBothDirectionTrafficRequired": true },
     "milestone": "DEVNET_EDGE_SMOKE_AND_BOUNDED_OBSERVATION_RUNNER",
     "milestoneValidation": { "windowsNode": "1009_PASS", "wslNode": "1009_PASS", "failedOrSkippedTests": 0,
       "secretScan": "PASS", "provenance": "276_FILES_PASS", "guardrails": "PASS", "dependencyLicenseMetadata": "PASS", "npmVulnerabilities": 0 },
@@ -41,7 +43,7 @@
       "newEconomicOperations": 0,
       "accountingUnchanged": true,
       "cleanup": "TEST_PROCESSES_STOPPED_PROTECTED_STATE_PRESERVED",
-      "continuity": "INTERRUPTED_REQUIRES_NEW_14_DAY_WINDOW_NOT_A_PHASE17_PASS",
+      "continuity": "INTERRUPTED_DOWNTIME_EXCLUDED_NOT_A_PHASE17_PASS",
       "diagnosticFix": "Retain the exact failing disk sample and interrupted duration; keep the existing storage floors and secret redaction."
     },
     "interruptionDiagnosticsValidation": {
@@ -65,7 +67,35 @@
       "scope": "LIVE_READ_OF_FINALIZED_DEVNET_MESSAGES_OF_TWO_RETAINED_COMPLETED_OPERATIONS",
       "newTransactionsSubmitted": 0
     },
-    "devnetRecoveryDrill": "NOT_RUN",
+    "devnetRecoveryDrill": "TESTED",
+    "recoveryMilestoneValidation": {
+      "wslNode": "1015_PASS", "windowsNode": "1015_PASS",
+      "secretScan": "FULL_CURRENT_TREE_AND_221_COMMIT_HISTORY_PASS",
+      "provenance": "276_FILES_PASS", "guardrails": "PASS",
+      "dependencyLicenseMetadata": "PASS", "npmVulnerabilities": 0,
+      "soakDurationCertified": false, "remainingNetworkEdgesCertified": false
+    },
+    "recoveryValidation": {
+      "scope": "CLOSED_REGTEST_DEVNET_SAME_WINDOWS_ACCOUNT_ISOLATED_RESTORE_KNOWN_QUIESCENT_GAP",
+      "sourceBaseSha": "58671c946b4e51b7f2a83b809527f43679adb102", "sourceWorktreeClean": false,
+      "encryptedSnapshots": 2, "encryption": "WINDOWS_DPAPI_CURRENT_USER",
+      "plaintextArchiveWritten": false, "corruptArchiveRejectedBeforeExtraction": true,
+      "originalFilesUnchangedAtRestore": true, "restoredInventoryHashesMatched": true,
+      "protectedPathRebinding": "OS_REPROTECTION_PRESERVED_COMPLETE_ENVELOPE_REVISION_AND_NONCE_STATE",
+      "sweep": { "snapshotFiles": 164, "archiveRestoreMilliseconds": 5746,
+        "stoppedAt": "2026-09-14T10:10:33.911Z", "completedAt": "2026-09-14T10:29:18.260Z",
+        "operationId": "1c7255dda0853a9b97b6a046a81e3bb7d12c38c06758917b022df974ec78874a",
+        "nativeTransaction": "3112cbd8e559c845dd74e5c1ca1b5e5d8b65ecc3b72df763ebe235dffb6a2511",
+        "newSigningAfterRestore": 0, "newNativeBroadcastAfterRestore": 0, "reconciliation": "MATCH" },
+      "payout": { "snapshotFiles": 183, "archiveRestoreMilliseconds": 3920,
+        "stoppedAt": "2026-09-14T10:33:23.524Z", "completedAt": "2026-09-14T10:37:05.870Z",
+        "operationId": "157aa22ec057fb249b834457ab920e06a59c5e1432ad0f9e964cc6303130f0a5",
+        "nativeTransaction": "c6fce639ee006f8bf7b4e0ffe0c26c10587b5caad32e00be3f73e7a18196ac70",
+        "newSigningAfterRestore": 0, "newNativeBroadcastAfterRestore": 0, "reconciliation": "MATCH" },
+      "issues": ["Raw protected copies correctly rejected changed roots; manual OS reprotection was required without resetting state.",
+        "The restored test authority required the matching temporary root; its failed startup left the journal paused until explicit reviewed retry."],
+      "limitations": "Not replacement-host/account DPAPI recovery, production backup custody or an arbitrary stale-snapshot rollback guarantee. Stopped intervals do not count toward monitored hours."
+    },
     "remainingNetworkEdgeCases": "NOT_COMPLETE",
     "phase17Certified": false
   },

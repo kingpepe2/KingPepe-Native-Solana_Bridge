@@ -25,6 +25,7 @@ import { ProtectedCoordinatorSigningJournal, initialCoordinatorSigningState } fr
 import { NativeRpcClient } from "../../native/node/native-rpc-client.mjs";
 import { LocalNativeEvidenceVerifier, REGTEST_GENESIS } from "../../native/node/native-raw-evidence.mjs";
 import { witnessAddressFromScript } from "../../native/node/witness-address.mjs";
+import { parseNativeTransactionHex } from "../../native/node/native-taproot-transaction.mjs";
 import { AuthenticatedLocalDepositLedger } from "../../services/bridge-validator/local-deposit-ledger.mjs";
 import { AutomaticNativeToSolanaDeposit } from "../../services/bridge-validator/automatic-native-deposit.mjs";
 import { AutomaticSolanaToNativeWithdrawal } from "../../services/bridge-validator/automatic-withdrawal.mjs";
@@ -34,15 +35,16 @@ import { ProjectAttester } from "../../services/attesters/attestation-service.mj
 import { LocalBridgeService } from "../../services/relayer/withdrawal-service.mjs";
 import { BridgeUserApi } from "../../services/bridge-validator/user-api.mjs";
 import { SolanaLocalRpcClient, sanitizedRpcDiagnostic } from "../../services/bridge-validator/solana-deposit-claim-submitter.mjs";
-import { base58Decode, base58Encode, shortvecEncode } from "../../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs";
+import { base58Decode, base58DecodeInstruction, base58Encode, shortvecEncode } from "../../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs";
 import { encodeCanonicalBridgeMessage, decodeCanonicalBridgeMessage } from "../../shared/protocol/canonical-message.mjs";
+import { decodeBridgeAbi, encodeBridgeAbi } from "../../shared/protocol/solana-bridge-abi.mjs";
 import { createNativeDepositRequest, createSolanaWithdrawalRequest } from "../ts/sdk/bridge.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "../.."), exec = promisify(execFile);
 const hash = v => createHash("sha256").update(v).digest("hex"), keyHex = v => Buffer.from(base58Decode(v)).toString("hex");
 const json = v => JSON.stringify(v, (_, value) => typeof value === "bigint" ? value.toString() : value);
 const required = name => { assert(process.env[name], "DevnetTestSettingMissing:" + name); return process.env[name]; };
-let interrupted = false, failedDiskSample;
+let interrupted = false, failedDiskSample, observationBegan, observationClock, plannedCheckpoint;
 for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => { interrupted = true; });
 function diskGuard({ allowInterrupted = false } = {}) {
   assert(allowInterrupted || !interrupted, "TestInterrupted");
@@ -111,9 +113,10 @@ function startSigner(configuration) {
 let stage = "PREFLIGHT", root, fixture, ledger, nativeChild, nativeCli, miner, stopHealth = false, healthTask, phaseError;
 let activeActors = [], activeTransports = [], signingJournal;
 const closers = [], evidence = { phase: 16, status: "IN_PROGRESS", productionReady: false, mainnetActivation: "DISABLED", events: [] };
-function retain(name, value) {
+function retain(name, value, directory = root) {
   assert(/^[a-z0-9-]+\.json$/u.test(name));
-  const file = path.join(root, name), bytes = json(value) + "\n";
+  assert(directory === root || path.dirname(directory) === root && /^phase17-cycle-[1-9][0-9]{0,2}$/u.test(path.basename(directory)), "TestArtifactDirectoryRejected");
+  const file = path.join(directory, name), bytes = json(value) + "\n";
   if (existsSync(file)) { assert.equal(readFileSync(file, "utf8"), bytes, "RetainedTestRecordChanged"); return; }
   writeFileSync(file, bytes, { mode: 0o600, flag: "wx" });
 }
@@ -134,6 +137,15 @@ try {
   const soakSeconds = soakOption === undefined ? 0 : Number(soakOption);
   assert(soakOption === undefined || /^[1-9][0-9]*$/u.test(soakOption) && Number.isSafeInteger(soakSeconds) &&
     soakSeconds >= 60 && soakSeconds <= 28 * 86400 && process.env.KINGPEPE_DEVNET_TEST_RUN, "TestSoakConfigurationRejected");
+  const cycle = process.env.KINGPEPE_DEVNET_TEST_CYCLE;
+  assert(cycle === undefined || /^[1-9][0-9]{0,2}$/u.test(cycle) && soakSeconds > 0, "TestTrafficCycleRejected");
+  const checkpoint = process.env.KINGPEPE_DEVNET_TEST_CHECKPOINT;
+  assert(checkpoint === undefined || cycle !== undefined && ["NATIVE_SWEEP_BROADCAST", "NATIVE_PAYOUT_BROADCAST"].includes(checkpoint), "TestRecoveryCheckpointRejected");
+  const loseResponse = process.env.KINGPEPE_DEVNET_TEST_LOST_RESPONSE;
+  assert(loseResponse === undefined || loseResponse === "1" && cycle !== undefined, "TestLostResponseConfigurationRejected");
+  const restoreReviewFile = process.env.KINGPEPE_DEVNET_TEST_RESTORE_REVIEW;
+  assert(restoreReviewFile === undefined || cycle !== undefined, "TestRestoreReviewRejected");
+  let restoreReview;
   if (soakSeconds) evidence.phase = 17;
   const record = JSON.parse(readFileSync(path.join(repoRoot, "docs/deployment/devnet.json")));
   const manifest = devnetTestManifest(record), endpoint = required("SOLANA_DEVNET_RPC_URL");
@@ -161,7 +173,16 @@ try {
     assert(retainedRuntime, "ExistingEconomicStateRequiresRetainedAuthority");
     const store = new WindowsProtectedStore(saved.keyOptions);
     try { ledger = AuthenticatedLocalDepositLedger.fromProtectedLocalKey(saved.ledgerOptions, store); } finally { store.close(); }
-    assert.equal(ledger.status().state, "OPEN_LOCAL_ACCOUNTING_ONLY", "RetainedPauseRequiresManualReview");
+    if (restoreReviewFile) {
+      restoreReview = JSON.parse(readFileSync(validateRuntimeFile(restoreReviewFile, repoRoot)));
+      assert.equal(restoreReview.scope, "CLOSED_DEVNET_REGTEST_SAME_USER_TEST_ONLY");
+      assert.equal(restoreReview.sourceFilesUnchanged, true);
+      assert.equal(restoreReview.restoredFilesMatch, true);
+      assert.equal(path.resolve(restoreReview.runtimeRoot), root);
+      assert.deepEqual(ledger.checkpoint(), restoreReview.checkpoint.journal, "RestoredJournalCheckpointMismatch");
+      if (ledger.status().state === "OPEN_LOCAL_ACCOUNTING_ONLY") ledger.pause("DEVNET_TEST_ISOLATED_RESTORE_REVIEW");
+      else assert.deepEqual(ledger.status(), { state: "PAUSED", reason: "DEVNET_TEST_ISOLATED_RESTORE_REVIEW" }, "RetainedPauseRequiresManualReview");
+    } else assert.equal(ledger.status().state, "OPEN_LOCAL_ACCOUNTING_ONLY", "RetainedPauseRequiresManualReview");
   }
   evidence.sourceSha = (await exec("git", ["rev-parse", "HEAD"], { cwd: repoRoot, windowsHide: true })).stdout.trim();
   evidence.sourceWorktreeClean = (await exec("git", ["status", "--porcelain=v1"], { cwd: repoRoot, windowsHide: true })).stdout.trim() === "";
@@ -303,6 +324,18 @@ try {
   if (height < 21) await nativeCli("generatetoaddress", [String(21 - height), miner], wallet);
   const rpcOptions = { endpoint: "http://127.0.0.1:" + rpcPort, authCookieFile: path.join(dataDir, "regtest/.cookie"), repoRoot };
   const nativeRpc = new NativeRpcClient(rpcOptions), executable = validateRuntimeFile(required("KINGPEPE_NATIVE_EVIDENCE_EXE"), repoRoot);
+  const nativeBroadcasts = [];
+  const broadcast = nativeRpc.sendRawTransaction.bind(nativeRpc);
+  nativeRpc.sendRawTransaction = async raw => {
+    const txid = await broadcast(raw); nativeBroadcasts.push(txid);
+    if (loseResponse) {
+      event("TEST_NATIVE_RESPONSE_LOST_AFTER_ACCEPTANCE", { txid });
+      // Only the TEST caller loses the reply. The real transaction was sent
+      // once; normal workers must query its identity before another action.
+      throw new Error("TEST_INJECTED_LOST_NATIVE_RESPONSE");
+    }
+    return txid;
+  };
   const executableSha256 = required("KINGPEPE_NATIVE_EVIDENCE_SHA256").toLowerCase();
   assert(/^[0-9a-f]{64}$/u.test(executableSha256) && hash(readFileSync(executable)) === executableSha256, "PinnedNativeVerifierRequired");
   const nativeVerifier = new LocalNativeEvidenceVerifier({ rpc: nativeRpc, executable });
@@ -365,11 +398,45 @@ try {
   const service = new LocalBridgeService({ ledger, worker, depositWorker: deposits });
   let feeFundingInputs;
   const api = new BridgeUserApi({ service, ledger, depositFeeInputs: async () => feeFundingInputs });
+  if (restoreReview) {
+    stage = "ISOLATED_RESTORE_REVIEW";
+    const boundary = restoreReview.checkpoint;
+    const pending = boundary.boundary === "NATIVE_SWEEP_BROADCAST" ? ledger.serviceDeposit(boundary.operationId)?.operation : ledger.withdrawal(boundary.operationId);
+    assert(pending?.signedTransactionHex, "RestoredPendingPacketMissing");
+    assert.equal(hash(Buffer.from(pending.signedTransactionHex, "hex")), boundary.signedPacketSha256);
+    assert.equal(parseNativeTransactionHex(pending.signedTransactionHex).txidHex, boundary.nativeTxid);
+    const actual = await nativeRpc.getRawTransaction(boundary.nativeTxid, true);
+    assert.equal(actual.txid, boundary.nativeTxid, "RestoredBroadcastNotFoundOnChain");
+    // TEST mining confirms the previously accepted packet; no new send/sign.
+    if (!(actual.confirmations >= policy.minimumConfirmations)) await nativeCli("generatetoaddress", ["6", miner], wallet);
+    await service.resumeAfterReview();
+    assert.equal(signingRequests, 0); assert.equal(nativeBroadcasts.length, 0);
+    assert.equal((await worker.reconcile()).state, "MATCH");
+    evidence.recovery = { boundary: boundary.boundary, operationId: boundary.operationId, nativeTxid: boundary.nativeTxid,
+      checkpointMatched: true, signedPacketUnchanged: true, observedRealChain: true, reconciledBeforeResume: "MATCH",
+      scope: restoreReview.scope, recoveryProcedure: "PENDING_OPERATION_COMPLETION" };
+    event("ISOLATED_RESTORE_CHAIN_REVIEW_PASSED", evidence.recovery);
+  }
   await health();
   healthTask = (async () => { while (!stopHealth) { await delay(stage === "DEVNET_SOAK" ? 60000 : 5000); if (!stopHealth) try { await health(); } catch { /* Next check must obtain fresh evidence; no synthetic health. */ } } })();
 
+  const flowRoot = cycle ? path.join(root, "phase17-cycle-" + cycle) : root;
+  if (!existsSync(flowRoot)) mkdirSync(flowRoot);
+  validateRuntimeStateRoot(flowRoot, repoRoot);
+  const retainFlow = (name, value) => retain(name, value, flowRoot);
+  const completedBefore = { deposits: ledger.serviceDeposits().filter(v => v.state === "COMPLETED").map(v => v.operationId),
+    withdrawals: ledger.knownWithdrawalIds().filter(id => ledger.withdrawal(id).state === "COMPLETED") };
+  if (soakSeconds) {
+    observationBegan = Date.now(); observationClock = performance.now();
+    evidence.soak = { startedAt: new Date(observationBegan).toISOString(), requestedSeconds: soakSeconds,
+      targetEndAt: new Date(observationBegan + soakSeconds * 1000).toISOString(), requiredMonitoredSeconds: 5 * 3600,
+      observations: 0, waitingObservations: 0, scope: cycle ? "LIVE_SERVICE_AND_EXPLICIT_TEST_TRAFFIC" : "RETAINED_COMPLETED_TRANSFERS_ONLY",
+      requiredRecoveryDrill: "NOT_CERTIFIED_BY_OBSERVATION_ALONE", phase17Certified: false };
+    event("DEVNET_SOAK_STARTED", evidence.soak);
+  }
+
   stage = "NATIVE_DEPOSIT";
-  const oldQuote = existsSync(path.join(root, "deposit-request.json")) ? JSON.parse(readFileSync(path.join(root, "deposit-request.json"))) : undefined;
+  const oldQuote = existsSync(path.join(flowRoot, "deposit-request.json")) ? JSON.parse(readFileSync(path.join(flowRoot, "deposit-request.json"))) : undefined;
   let request = oldQuote?.request;
   if (!request) {
     const recoveryAddress = await nativeCli("getnewaddress", ["recovery", "bech32"], wallet);
@@ -377,23 +444,25 @@ try {
     assert(recovery.ismine && /^(02|03)[0-9a-f]{64}$/u.test(recovery.pubkey), "NativeUserRecoveryPublicKeyRequired");
     request = { amountAtomic: "100000000", recipient: record.recipientSplAccount, userRecoveryPublicKeyHex: recovery.pubkey.slice(2), nonceHex: randomBytes(32).toString("hex") };
   }
-  const quote = createNativeDepositRequest({ policy, ...request }); retain("deposit-request.json", quote);
+  const quote = createNativeDepositRequest({ policy, ...request }); retainFlow("deposit-request.json", quote);
   const history = JSON.parse(await nativeCli("listtransactions", ["*", "1000"], wallet));
   const oldDeposit = history.filter(tx => tx.category === "send" && tx.address === quote.depositAddress);
   const reserveAddress = witnessAddressFromScript(reserveScriptHex);
-  const oldFee = history.filter(tx => tx.category === "send" && tx.address === reserveAddress);
+  const feeComment = cycle ? "kingpepe-test-fee-" + quote.operationId : undefined;
+  const oldFee = history.filter(tx => tx.category === "send" && tx.address === reserveAddress && (cycle ? tx.comment === feeComment : !tx.comment));
   assert(oldDeposit.length <= 1 && oldFee.length <= 1, "AmbiguousNativeTestFundingHistory");
-  const retainedObservation = path.join(root, "deposit-observation-bound.json");
+  const retainedObservation = path.join(flowRoot, "deposit-observation-bound.json");
   const priorFunding = existsSync(retainedObservation) ? JSON.parse(readFileSync(retainedObservation)) : undefined;
   // Prefer durable transaction identities even if a later wallet-history page
   // no longer includes the original user funding. Never fund it again on resume.
+  assert(priorFunding || history.length < 1000, "IncompleteTestFundingHistoryRequiresReview");
   const depositTxidHex = priorFunding?.depositTxidHex ?? oldDeposit[0]?.txid ?? await nativeCli("sendtoaddress", [quote.depositAddress, "1.00000000"], wallet);
-  const feeTxid = priorFunding?.feeFundingInputs[0]?.txid ?? oldFee[0]?.txid ?? await nativeCli("sendtoaddress", [reserveAddress, "0.00001000"], wallet);
-  await nativeCli("generatetoaddress", ["6", miner], wallet);
+  const feeTxid = priorFunding?.feeFundingInputs[0]?.txid ?? oldFee[0]?.txid ?? await nativeCli("sendtoaddress", [reserveAddress, "0.00001000", ...(feeComment ? [feeComment] : [])], wallet);
   const feeTx = JSON.parse(await nativeCli("getrawtransaction", [feeTxid, "true"]));
   const feeOutput = feeTx.vout.find(v => v.scriptPubKey.hex === reserveScriptHex); assert(feeOutput, "TestFeeOutputMissing");
   feeFundingInputs = [{ txid: feeTxid, vout: feeOutput.n, amountAtomic: "1000", scriptPubKeyHex: reserveScriptHex, minimumConfirmations: policy.minimumConfirmations }];
-  retain("deposit-observation-bound.json", { depositTxidHex, feeFundingInputs });
+  retainFlow("deposit-observation-bound.json", { depositTxidHex, feeFundingInputs });
+  await nativeCli("generatetoaddress", ["6", miner], wallet);
   await api.submitNativeDeposit({ request, depositTxidHex, depositVout: null });
   let last;
   async function tickUntil(direction, id) {
@@ -406,6 +475,16 @@ try {
       assert.equal(state.state, "ACTIVE", "DevnetServicePausedRequiresReview");
       const operation = api.getOperationStatus(id);
       if (operation?.state === "COMPLETED") return operation;
+      const pendingBoundary = direction === "NativeToSolana" ? "NATIVE_SWEEP_BROADCAST" : "NATIVE_PAYOUT_BROADCAST";
+      const pending = direction === "NativeToSolana" ? ledger.serviceDeposit(id)?.operation : ledger.withdrawal(id);
+      const raw = pending?.signedTransactionHex;
+      if (checkpoint === pendingBoundary && raw && JSON.parse(await nativeCli("getrawmempool")).includes(parseNativeTransactionHex(raw).txidHex)) {
+        // Exit through finally before taking a closed-writer encrypted snapshot.
+        plannedCheckpoint = { boundary: checkpoint, operationId: id, nativeTxid: parseNativeTransactionHex(raw).txidHex,
+          signedPacketSha256: hash(Buffer.from(raw, "hex")), journal: ledger.checkpoint() };
+        retainFlow("recovery-boundary-" + checkpoint.toLowerCase().replaceAll("_", "-") + ".json", plannedCheckpoint);
+        throw new Error("TEST_PLANNED_RECOVERY_CHECKPOINT");
+      }
       // Mining belongs to this isolated USER test harness, never the service.
       if (JSON.parse(await nativeCli("getrawmempool")).length) await nativeCli("generatetoaddress", ["6", miner], wallet);
       await delay(2000);
@@ -414,12 +493,21 @@ try {
   evidence.nativeToSolana = await tickUntil("NativeToSolana", quote.operationId);
   const depositRecord = ledger.serviceDeposit(quote.operationId), credit = depositRecord.operation.finalizedCredit;
   const depositMessage = decodeCanonicalBridgeMessage(credit.encodedMessageHex);
-  retain("deposit-borsh-message.json", { encodedMessageHex: credit.encodedMessageHex, messageDigestHex: depositMessage.messageDigestHex });
+  retainFlow("deposit-borsh-message.json", { encodedMessageHex: credit.encodedMessageHex, messageDigestHex: depositMessage.messageDigestHex });
   assert.equal(Buffer.from(encodeCanonicalBridgeMessage(depositMessage)).toString("hex"), credit.encodedMessageHex);
   event("NATIVE_TO_SOLANA_DEVNET_COMPLETED", evidence.nativeToSolana);
+  if (evidence.recovery?.boundary === "NATIVE_SWEEP_BROADCAST") {
+    assert.equal(signingRequests, 0, "RestoredSweepSignedAgain");
+    assert.equal(nativeBroadcasts.length, 0, "RestoredSweepBroadcastAgain");
+    assert.equal(depositRecord.operation.signedTransactionHex && parseNativeTransactionHex(depositRecord.operation.signedTransactionHex).txidHex,
+      evidence.recovery.nativeTxid);
+    evidence.recovery.recoveryProcedure = "TESTED";
+    evidence.soak.requiredRecoveryDrill = "TESTED_PENDING_DEPOSIT_THIS_RESTORE";
+    event("ISOLATED_PENDING_DEPOSIT_RECOVERY_PASSED", evidence.recovery);
+  }
 
   stage = "USER_WITHDRAWAL";
-  const withdrawalFile = path.join(root, "withdrawal-user-packet.json");
+  const withdrawalFile = path.join(flowRoot, "withdrawal-user-packet.json");
   let withdrawal;
   if (existsSync(withdrawalFile)) withdrawal = JSON.parse(readFileSync(withdrawalFile));
   else {
@@ -430,14 +518,14 @@ try {
     assert(userPacket[0] === 1 && userPacket.subarray(1, 65).equals(Buffer.alloc(64)), "TestUserPacketRejected");
     userSigner.sign(userPacket.subarray(65)).copy(userPacket, 1);
     withdrawal = { ...unsigned, signedTransactionBase64: userPacket.toString("base64"), signature: base58Encode(userPacket.subarray(1, 65)) };
-    retain("withdrawal-user-packet.json", withdrawal);
+    retainFlow("withdrawal-user-packet.json", withdrawal);
   }
   // A TEST user may replace an expired *unlanded* packet, not the withdrawal.
   // Keep every old signed packet and the exact Borsh message/operation ID.
   let retry = 1;
-  while (existsSync(path.join(root, `withdrawal-user-packet-${retry}.json`))) {
+  while (existsSync(path.join(flowRoot, `withdrawal-user-packet-${retry}.json`))) {
     assert(retry <= 8, "TestWithdrawalRetryLimit");
-    const next = JSON.parse(readFileSync(path.join(root, `withdrawal-user-packet-${retry}.json`)));
+    const next = JSON.parse(readFileSync(path.join(flowRoot, `withdrawal-user-packet-${retry}.json`)));
     assert.equal(next.encodedMessageHex, withdrawal.encodedMessageHex, "RetainedWithdrawalMessageChanged");
     assert.equal(next.operationId, withdrawal.operationId, "RetainedWithdrawalOperationChanged");
     withdrawal = next; retry += 1;
@@ -461,7 +549,7 @@ try {
     userSigner.sign(packet.subarray(65)).copy(packet, 1);
     withdrawal = { ...unsigned, lastValidBlockHeight: String(context.lastValidBlockHeight),
       signedTransactionBase64: packet.toString("base64"), signature: base58Encode(packet.subarray(1, 65)) };
-    retain(`withdrawal-user-packet-${retry}.json`, withdrawal); // persist BEFORE send
+    retainFlow(`withdrawal-user-packet-${retry}.json`, withdrawal); // persist BEFORE send
     event("EXPIRED_TEST_USER_PACKET_REPLACED", { oldSignature: old.signature, signature: withdrawal.signature,
       operationId: withdrawal.operationId, canonicalMessageUnchanged: true, priorSignatureAbsent: true, withdrawalRecordAbsent: true });
   }
@@ -472,8 +560,15 @@ try {
   evidence.solanaToNative = await tickUntil("SolanaToNative", withdrawal.operationId);
   const observedWithdrawal = await reader.read(withdrawalSignature, withdrawal.encodedMessageHex);
   assert.equal(observedWithdrawal.encodedMessageHex, withdrawal.encodedMessageHex);
-  retain("withdrawal-borsh-message.json", { encodedMessageHex: withdrawal.encodedMessageHex, messageDigestHex: withdrawal.messageDigestHex });
+  retainFlow("withdrawal-borsh-message.json", { encodedMessageHex: withdrawal.encodedMessageHex, messageDigestHex: withdrawal.messageDigestHex });
   event("SOLANA_DEVNET_TO_NATIVE_COMPLETED", evidence.solanaToNative);
+  if (evidence.recovery?.boundary === "NATIVE_PAYOUT_BROADCAST") {
+    assert.equal(signingRequests, 0, "RestoredPayoutSignedAgain");
+    assert.equal(nativeBroadcasts.length, 0, "RestoredPayoutBroadcastAgain");
+    evidence.recovery.recoveryProcedure = "TESTED";
+    evidence.soak.requiredRecoveryDrill = "TESTED_PENDING_WITHDRAWAL_THIS_RESTORE";
+    event("ISOLATED_PENDING_WITHDRAWAL_RECOVERY_PASSED", evidence.recovery);
+  }
   evidence.reconciliation = await worker.reconcile(); assert.equal(evidence.reconciliation.state, "MATCH");
   const finalState = service.status();
   assert.equal(finalState.accounting.pendingMintAtomic, "0"); assert.equal(finalState.accounting.pendingWithdrawalAtomic, "0");
@@ -481,6 +576,33 @@ try {
   evidence.status = "PASS"; evidence.finalAccounting = finalState.accounting;
   evidence.protectedFrost = "SEPARATE_A_B_PROCESSES_CURRENT_PRINCIPAL_DPAPI_PINNED_MTLS_EXACT_2_OF_2";
   evidence.nativeEnvironment = "REGTEST_TEST_VALUE_ONLY"; evidence.runtimeFeePayer = feePayer.publicKeyBase58;
+  if (soakSeconds) {
+    evidence.traffic = { nativeToSolanaCount: Number(!completedBefore.deposits.includes(quote.operationId)),
+      solanaToNativeCount: Number(!completedBefore.withdrawals.includes(withdrawal.operationId)),
+      depositOperationId: quote.operationId, withdrawalOperationId: withdrawal.operationId };
+    assert.equal(new Set(nativeBroadcasts).size, nativeBroadcasts.length, "DuplicateNativeBroadcastAfterLostReply");
+    evidence.nativeLostResponse = { injectedAcceptedReplies: nativeBroadcasts.length, distinctTransactions: new Set(nativeBroadcasts).size };
+    const receipt = ledger.solanaServiceJournal("RECEIPT").get(depositMessage.operationIdHex);
+    const receiptSignature = base58Encode(Buffer.from(receipt.prepared.preparedTransactionBase64, "base64").subarray(1, 65));
+    const live = [];
+    for (const [type, program, signature, encoded] of [
+      ["AcceptDepositClaim", manifest.manager.id, evidence.nativeToSolana.transactionIds.solanaClaim, credit.encodedMessageHex],
+      ["VerifyMessage", manifest.transceiver.id, receiptSignature, credit.encodedMessageHex],
+      ["RecordWithdrawal", manifest.manager.id, withdrawalSignature, withdrawal.encodedMessageHex],
+    ]) {
+      const tx = await solana.finalizedTransaction(signature); assert.equal(tx?.meta?.err, null);
+      const candidates = tx.transaction.message.instructions.filter(ix => tx.transaction.message.accountKeys[ix.programIdIndex] === program);
+      assert.equal(candidates.length, 1, "LiveBorshInstructionAmbiguous");
+      const bytes = Buffer.from(base58DecodeInstruction(candidates[0].data)), decoded = decodeBridgeAbi(type, bytes);
+      assert(Buffer.from(encodeBridgeAbi(type, decoded)).equals(bytes), "LiveBorshAbiBytesDiffer");
+      assert.equal(Buffer.from(decoded.message).toString("hex"), encoded, "LiveBorshMessageBytesDiffer");
+      const message = decodeCanonicalBridgeMessage(encoded);
+      assert.equal(Buffer.from(encodeCanonicalBridgeMessage(message)).toString("hex"), encoded);
+      live.push({ type, signature, messageDigestHex: message.messageDigestHex, exactBytes: true });
+    }
+    evidence.liveBorsh = { status: "PASS", schemaVersion: 2, transactions: live };
+    event("DEVNET_LIVE_BORSH_MATCH", evidence.liveBorsh);
+  }
   if (soakSeconds) {
     stage = "DEVNET_EDGE_CHECKS";
     const settled = service.status().accounting;
@@ -499,26 +621,21 @@ try {
     } finally { solana.snapshot = originalSnapshot; }
     await health();
     const reconnected = await service.tick(); assert.equal(reconnected.reconciliation.state, "MATCH");
-    assert.deepEqual(await reader.discover([withdrawal.operationId]), [], "CompletedWithdrawalRediscovered");
+    assert.deepEqual(await reader.discover(ledger.knownWithdrawalIds()), [], "CompletedWithdrawalRediscovered");
     evidence.edgeChecks = { pauseReviewedResume: "PASS", injectedRpcOutageAndRealReconnect: "PASS",
       completedWithdrawalRediscovery: "PASS", noNewSigning: signingRequests === signingCount,
       scope: "RETAINED_COMPLETED_OPERATIONS_NOT_A_PENDING_OPERATION_RESTORE_DRILL" };
     event("DEVNET_EDGE_CHECKS_PASSED", evidence.edgeChecks);
 
     stage = "DEVNET_SOAK";
-    const began = Date.now(), end = began + soakSeconds * 1000;
+    const remaining = () => Math.max(0, soakSeconds * 1000 - (performance.now() - observationClock));
     const miningIntervalMs = 600000, startHeight = Number(await nativeCli("getblockcount"));
     // The retained regtest verifier deliberately accepts at most 4096 headers.
     // Budget this TEST window up front; never reset its chain or weaken the bound.
     assert(Number.isSafeInteger(startHeight) && startHeight + Math.ceil(soakSeconds * 1000 / miningIntervalMs) <= 4096,
       "ObservationWindowExceedsRetainedRegtestHeaderBound");
-    evidence.soak = { startedAt: new Date(began).toISOString(), requestedSeconds: soakSeconds,
-      targetEndAt: new Date(end).toISOString(), observations: 0, waitingObservations: 0,
-      scope: "LIVE_SERVICE_OBSERVATION_OF_RETAINED_COMPLETED_TRANSFERS_NO_NEW_USER_TRANSFERS",
-      requiredRecoveryDrill: "NOT_RUN_ON_DEVNET", phase17Certified: false };
-    event("DEVNET_SOAK_STARTED", evidence.soak);
     let previousState, lastReport = 0, lastMined = 0;
-    while (Date.now() < end) {
+    while (remaining() > 0) {
       diskGuard();
       // Keep isolated regtest fresh. This is TEST-driver mining, not a bridge
       // runtime capability or a claim about public Native confirmation timing.
@@ -535,23 +652,24 @@ try {
       evidence.soak.observations++; if (state !== "MATCH") evidence.soak.waitingObservations++;
       if (state !== previousState || Date.now() - lastReport >= 3600000) {
         const observation = { sourceSha: evidence.sourceSha, ...evidence.soak, observedAt: new Date().toISOString(),
-          elapsedSeconds: Math.floor((Date.now() - began) / 1000), state, residentBytes: process.memoryUsage().rss, ...diskGuard() };
+          elapsedSeconds: Math.floor((performance.now() - observationClock) / 1000), state, residentBytes: process.memoryUsage().rss, ...diskGuard() };
         retain("soak-observation-" + Date.now() + ".json", observation);
         event("DEVNET_SOAK_OBSERVATION", observation); previousState = state; lastReport = Date.now();
       }
-      await delay(Math.min(60000, Math.max(1, end - Date.now())));
+      await delay(Math.min(60000, Math.max(1, remaining())));
     }
-    evidence.soak.elapsedSeconds = Math.floor((Date.now() - began) / 1000);
+    evidence.soak.elapsedSeconds = Math.floor((performance.now() - observationClock) / 1000);
+    evidence.soak.endedAt = new Date().toISOString();
     // Even a complete observation window does not certify traffic/recovery,
     // reorg, external-review or production readiness requirements by itself.
-    evidence.status = soakSeconds < 14 * 86400 ? "SMOKE_PASS_NOT_SOAK_COMPLETE" : "OBSERVATION_WINDOW_COMPLETE_NOT_PHASE17_PASS";
+    evidence.status = evidence.soak.elapsedSeconds < 5 * 3600 ? "SMOKE_PASS_NOT_SOAK_COMPLETE" : "OBSERVATION_WINDOW_COMPLETE_NOT_PHASE17_PASS";
     event("DEVNET_SOAK_WINDOW_ENDED", { ...evidence.soak, status: evidence.status });
   }
 } catch (error) {
   phaseError = error; evidence.status = failedDiskSample || stage === "RPC_CAPABILITIES" && !error?.integrityCode ? "BLOCKED" : "FAIL"; evidence.failureStage = stage;
   if (evidence.soak) {
     evidence.soak.endedAt = new Date().toISOString();
-    evidence.soak.elapsedSeconds = Math.floor((Date.now() - Date.parse(evidence.soak.startedAt)) / 1000);
+    evidence.soak.elapsedSeconds = Math.floor((performance.now() - observationClock) / 1000);
     evidence.soak.status = "INTERRUPTED_NOT_COMPLETE";
   }
   // Do not include provider errors, process argv, private paths, buffers or keys.
@@ -559,7 +677,12 @@ try {
     ...(failedDiskSample ? { reason: "TEST_DISK_HEADROOM_REQUIRED", disk: failedDiskSample } : {}),
     sourceFrames: [...String(error?.stack ?? "").matchAll(/[/\\]([a-z0-9-]+\.mjs):(\d+):(\d+)/gu)]
       .slice(0, 6).map(match => ({ file: match[1], line: Number(match[2]), column: Number(match[3]) })) };
-  event("DEVNET_TEST_FAILED", { stage, diagnostic: evidence.failure });
+  if (plannedCheckpoint && error.message === "TEST_PLANNED_RECOVERY_CHECKPOINT") {
+    phaseError = undefined; evidence.status = "PLANNED_RECOVERY_CHECKPOINT_NOT_PHASE17_PASS";
+    evidence.recoveryCheckpoint = plannedCheckpoint;
+    delete evidence.failure; delete evidence.failureStage;
+    event("DEVNET_RECOVERY_CHECKPOINT_REACHED", plannedCheckpoint);
+  } else event("DEVNET_TEST_FAILED", { stage, diagnostic: evidence.failure });
 } finally {
   stopHealth = true; await healthTask;
   try { await closeSigning(); } catch { evidence.cleanupFailure = "SIGNER_SHUTDOWN"; }
