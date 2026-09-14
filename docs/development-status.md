@@ -5,6 +5,20 @@ Production readiness, signing and broadcasting remain false; Mainnet is disabled
 
 ## Phase 19 local preparation
 
+Phase 19 is now **PAUSED_FOR_MANUAL_UI_APPROVAL** by the KingPepe Team.
+The current milestone is the public Explorer TEST interface for Native REGTEST
+and Solana DEVNET. No Mainnet configuration, funding, deployment, activation or
+activation-approval request is authorized by this milestone. The private
+preparation and unresolved production bindings described below remain unchanged.
+
+The reused UI quote checker accepts an explicit `solana:devnet` selection while
+existing local callers retain `solana:localnet`. Authenticated user status now
+names REGTEST. An explicit retained-state mode in the existing Devnet TEST runner
+can host the same authenticated loopback user listener and transfer workers for
+the Explorer gateway. It excludes the runner's automated user transfers,
+deployment-key access and fee-payer funding. Public UI/wallet acceptance is
+separate from the historical Phase-16/17 flow evidence.
+
 Phase 18's final Devnet report/policy publication
 `d616b67f8b8601388e3533730b8b251839eab60d` passed exact-SHA CI `34855692775`,
 attempt 2: four required jobs, 99 passed steps, none skipped. The initial pinned

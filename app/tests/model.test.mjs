@@ -17,6 +17,11 @@ test("displayed request cannot silently change direction, amount, recipient or f
   const input = { amountAtomic: "100", feeAtomic: "1", destination: "PUBLIC_TEST_DESTINATION" };
   const quote = { operationId: "ab".repeat(32), direction: "SolanaToNative", ...input, netAtomic: "99", chain: "solana:localnet", transactionBase64: "PUBLIC_UNIT_FIXTURE" };
   assert.equal(checkQuote(quote, input, "SolanaToNative"), quote);
+  const devnet = { ...quote, chain: "solana:devnet" };
+  assert.equal(checkQuote(devnet, input, "SolanaToNative", { chain: "solana:devnet" }), devnet);
+  assert.throws(() => checkQuote(devnet, input, "SolanaToNative"));
+  assert.throws(() => checkQuote(quote, input, "SolanaToNative", { chain: "solana:devnet" }));
+  assert.throws(() => checkQuote(devnet, input, "SolanaToNative", { chain: "solana:mainnet" }));
   for (const change of [{ direction: "NativeToSolana" }, { amountAtomic: "101" }, { feeAtomic: "2" }, { destination: "OTHER" }, { chain: "solana:mainnet" }, { netAtomic: "98" }]) {
     assert.throws(() => checkQuote({ ...quote, ...change }, input, "SolanaToNative"));
   }

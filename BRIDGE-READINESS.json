@@ -11,7 +11,7 @@
   "externalSecurityReview": "NOT_REQUIRED_BY_TEAM",
   "externalSecurityAuditCompleted": false,
   "lastUpdated": "2026-09-14",
-  "sourceStatus": "PHASE_19_LOCAL_IDENTITIES_AND_REFERENCES_PREPARED_RPC_AND_MAINNET_RUNTIME_BINDINGS_BLOCKED",
+  "sourceStatus": "PUBLIC_TEST_UI_MILESTONE_PHASE_19_PAUSED_FOR_MANUAL_UI_APPROVAL",
   "phase18": {
     "status": "PASS",
     "publicationExactShaCi": { "sourceSha": "d616b67f8b8601388e3533730b8b251839eab60d", "runId": "34855692775",
@@ -32,7 +32,7 @@
     "publicationPolicy": "The named Phase-18 publication passed its own exact-SHA CI. Later publications require their own matching run. No external review gate; retain all other readiness and explicit activation gates."
   },
   "phase19": {
-    "status": "BLOCKED_RPC_VALUES_AND_MAINNET_RUNTIME_BINDINGS_NOT_CONFIGURED",
+    "status": "PAUSED_FOR_MANUAL_UI_APPROVAL",
     "scope": "EXPLICIT_TEAM_AUTHORIZED_LOCAL_PREPARATION_ONLY_NO_PRODUCTION_TRANSACTIONS",
     "baselineSourceSha": "3a19e20f127e40225238c879602ee8dd5ed76ce4",
     "precedingPreparationExactShaCi": { "sourceSha": "3a19e20f127e40225238c879602ee8dd5ed76ce4", "runId": "34862576154",

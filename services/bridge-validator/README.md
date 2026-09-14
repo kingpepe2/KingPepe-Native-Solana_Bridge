@@ -1,5 +1,48 @@
 # Bridge service
 
+## Explorer public TEST interface
+
+The Explorer serves its own `/bridge` page and a narrow `/api/v1/bridge/*`
+gateway. This repository's user listener stays authenticated on loopback;
+neither the listener nor administrative, signer, attester or raw journal APIs
+are public. The Explorer keeps its separate service-auth credential in Windows
+protected storage and uses `solana/ts/sdk/client.mjs` only on the server.
+Wallet Standard user transactions select `solana:devnet`. The UI's quote checker
+requires that explicit chain; existing local callers still default to localnet.
+
+For this TEST milestone, `KINGPEPE_DEVNET_PUBLIC_UI_CONFIG` enables a serving
+branch in the existing `solana/tests/devnet-bridge-service.mjs` runner. It requires
+the final retained Devnet/regtest run and its original protected authority,
+shares, nonce state, wallet and journal. The normal prepared runtime and private
+process configuration, including the restored run's matching temporary root,
+must be supplied. The serving branch cannot run with soak, traffic-cycle or
+recovery-injection options and does not deploy, airdrop, load the deployment/user
+signing seeds, or submit the harness's test-user transfers. It reuses the existing
+workers, Borsh encoding, verification, A+B processes and persist-before-broadcast
+ordering. SIGINT/SIGTERM initiates the existing scoped shutdown.
+
+The private serving configuration binds `kingpepeNetwork=REGTEST`,
+`solanaNetwork=DEVNET`, `productionReady=false`, `mainnetActivation=DISABLED`,
+the exact retained policy, a loopback endpoint, a protected `service-auth`
+reference and bounded operator-prepared `depositFeeFundingInputs`. It contains
+no plaintext credential. These configuration files and references remain outside
+every checkout. The public API cannot fund the operator fee pool. Test mining
+only confirms pending transactions in the isolated regtest mempool, within the
+existing verifier's header limit. Exhausted fee inputs or unavailable evidence
+do not authorize another economic action.
+
+The Explorer displays Bridge fee 0 separately from the existing Native miner
+fee. Users supply their Native recovery public key and initialized Devnet KPEPE
+token account; their wallets sign their transactions. The public operation ID
+supports journal tracking. Before Native submission, the saved public request
+retains its original nonce and recovery context for exact request restoration.
+Refreshing never signs, broadcasts or creates another request. Browser fixture
+tests do not certify real public-wallet flows.
+
+This remains the accepted SINGLE_HOST TEST topology: common-host compromise or
+outage can affect both FROST participants. Upstream FROST is unaudited, no
+independent security audit is claimed, and production readiness remains false.
+
 ## Local operational loop
 
 `LocalBridgeService` (exported from `services/relayer/withdrawal-service.mjs`)

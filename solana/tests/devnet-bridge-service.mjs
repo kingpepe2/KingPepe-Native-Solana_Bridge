@@ -35,6 +35,7 @@ import { LocalDeploymentRpc, verifyDeploymentSnapshot, devnetTestManifest } from
 import { ProjectAttester } from "../../services/attesters/attestation-service.mjs";
 import { LocalBridgeService } from "../../services/relayer/withdrawal-service.mjs";
 import { BridgeUserApi } from "../../services/bridge-validator/user-api.mjs";
+import { listenBridgeUserApi } from "../../services/bridge-validator/user-http.mjs";
 import { SolanaLocalRpcClient, sanitizedRpcDiagnostic } from "../../services/bridge-validator/solana-deposit-claim-submitter.mjs";
 import { base58Decode, base58DecodeInstruction, base58Encode, shortvecEncode, prepareSignedLocalnetSolanaDepositClaimTransaction } from "../../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs";
 import { encodeCanonicalBridgeMessage, decodeCanonicalBridgeMessage } from "../../shared/protocol/canonical-message.mjs";
@@ -42,6 +43,7 @@ import { decodeBridgeAbi, encodeBridgeAbi } from "../../shared/protocol/solana-b
 import { createNativeDepositRequest, createSolanaWithdrawalRequest } from "../ts/sdk/bridge.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "../.."), exec = promisify(execFile);
+const publicUiMode = process.env.KINGPEPE_DEVNET_PUBLIC_UI_CONFIG !== undefined;
 const hash = v => createHash("sha256").update(v).digest("hex"), keyHex = v => Buffer.from(base58Decode(v)).toString("hex");
 const json = v => JSON.stringify(v, (_, value) => typeof value === "bigint" ? value.toString() : value);
 const required = name => { assert(process.env[name], "DevnetTestSettingMissing:" + name); return process.env[name]; };
@@ -165,6 +167,15 @@ try {
   stage = "PREPARATION";
   const local = JSON.parse(readFileSync(validateRuntimeFile(required("KINGPEPE_DEVNET_TEST_CONTEXT"), repoRoot)));
   const resumeRoot = process.env.KINGPEPE_DEVNET_TEST_RUN;
+  // Explicit TEST serving mode uses the final retained state. It cannot perform
+  // the harness's deployment funding, test-user transfers or a new ceremony.
+  const publicUi = publicUiMode ? JSON.parse(readFileSync(validateRuntimeFile(required("KINGPEPE_DEVNET_PUBLIC_UI_CONFIG"), repoRoot))) : null;
+  if (publicUi) {
+    assert(resumeRoot && !soakOption && !cycle && !checkpoint && !loseResponse && !restoreReviewFile && !networkEdges, "PublicTestModeRequiresPlainRetainedRestart");
+    assert.equal(publicUi.kingpepeNetwork, "REGTEST"); assert.equal(publicUi.solanaNetwork, "DEVNET");
+    assert.equal(publicUi.productionReady, false); assert.equal(publicUi.mainnetActivation, "DISABLED");
+    assert(Array.isArray(publicUi.depositFeeFundingInputs) && publicUi.depositFeeFundingInputs.length <= 64, "PublicTestFeePoolRequired");
+  }
   const e2eRoot = validateRuntimeStateRoot(required("KINGPEPE_E2E_ROOT"), repoRoot);
   root = resumeRoot ? validateRuntimeStateRoot(resumeRoot, repoRoot) : path.join(e2eRoot, "devnet-service-" + randomBytes(8).toString("hex"));
   assert(path.dirname(root) === path.resolve(e2eRoot) && /^devnet-service-[0-9a-f]{16}$/u.test(path.basename(root)), "TestRunRootRejected");
@@ -197,7 +208,7 @@ try {
   const partial = { environment: "localnet", nativeGenesis: REGTEST_GENESIS, solanaDeployment: manifest.solanaDeploymentHex,
     managerProgramId: keyHex(manifest.manager.id), transceiverProgramId: keyHex(manifest.transceiver.id), mint: keyHex(manifest.mint.id), keyEpoch: manifest.config.keyEpoch };
   fixture = await createLocalSecurityFixture({ repoRoot, policy: partial, authorityOptions: retainedRuntime?.authorityOptions,
-    testCertificateDays: Math.ceil(soakSeconds / 86400) + 1 });
+    testCertificateDays: publicUi ? 7 : Math.ceil(soakSeconds / 86400) + 1 });
   if (!retainedRuntime) retain("local-runtime-context.json", { authorityOptions: fixture.authorityOptions });
   // Only the test ceremony initializes private shares. Runtime receives the
   // public package and references to separate OS-protected A/B stores.
@@ -242,13 +253,13 @@ try {
   if (!saved) retain("local-recovery-context.json", { policy, ledgerOptions, keyOptions, coordinatorOptions, feeOptions, signerMaterial: material, publicPackage, fixtureRoot: fixture.root });
 
   stage = "TEST_FEE_FUNDING";
-  const deploymentStore = new WindowsProtectedStore(local.deployment), deployment = deploymentStore.read();
-  assert.equal(deployment.payload.length, 256, "PreparedDevnetCredentialsRejected");
-  const deploymentSeed = deployment.payload.subarray(0, 32), userSeed = Buffer.from(deployment.payload.subarray(224, 256));
-  const fundingKey = base58Encode(ed25519.getPublicKey(deploymentSeed)), userPublicKey = base58Encode(ed25519.getPublicKey(userSeed));
-  assert.equal(fundingKey, manifest.manager.upgradeAuthority); assert.equal(userPublicKey, record.recipient);
-  const userSigner = { publicKeyBase58: userPublicKey, sign: bytes => Buffer.from(ed25519.sign(bytes, userSeed)) };
-  closers.push(() => userSeed.fill(0));
+  const deploymentStore = publicUi ? null : new WindowsProtectedStore(local.deployment), deployment = deploymentStore?.read();
+  if (!publicUi) assert.equal(deployment.payload.length, 256, "PreparedDevnetCredentialsRejected");
+  const deploymentSeed = deployment?.payload.subarray(0, 32), userSeed = publicUi ? null : Buffer.from(deployment.payload.subarray(224, 256));
+  const fundingKey = publicUi ? null : base58Encode(ed25519.getPublicKey(deploymentSeed)), userPublicKey = publicUi ? null : base58Encode(ed25519.getPublicKey(userSeed));
+  if (!publicUi) { assert.equal(fundingKey, manifest.manager.upgradeAuthority); assert.equal(userPublicKey, record.recipient); }
+  const userSigner = publicUi ? null : { publicKeyBase58: userPublicKey, sign: bytes => Buffer.from(ed25519.sign(bytes, userSeed)) };
+  if (userSeed) closers.push(() => userSeed.fill(0));
   let lostSolanaReply = false;
   async function submitRetained(packet) {
     const bytes = Buffer.from(packet.signedTransactionBase64 ?? packet.packet, "base64");
@@ -282,6 +293,7 @@ try {
     }
   }
   try {
+    if (!publicUi) {
     const balance = async address => BigInt((await rpc.call("getAccountInfo", [address, { encoding: "base64", commitment: "finalized" }])).value?.lamports ?? 0);
     const available = await balance(fundingKey);
     assert(available >= 80000000n, "ExistingDevnetTestFundingInsufficient");
@@ -303,7 +315,8 @@ try {
       retain(label + ".json", funding);
       event("TEST_FEE_FUNDING_FINALIZED", { signature, recipient: address, ...await submitRetained(funding) });
     }
-  } finally { deployment.payload.fill(0); deploymentStore.close(); }
+    }
+  } finally { deployment?.payload.fill(0); deploymentStore?.close(); }
 
   stage = "NATIVE_REGTEST";
   const binaryRoot = required("KINGPEPE_NATIVE_TEST_BINARY_ROOT"); assert(/^\/[A-Za-z0-9/._-]+$/u.test(binaryRoot));
@@ -407,7 +420,16 @@ try {
     solanaRpc: solana, solanaEndpoint: endpoint, createCoordinator, attesters, feePayerSigner: feePayer });
   const service = new LocalBridgeService({ ledger, worker, depositWorker: deposits });
   let feeFundingInputs;
-  const api = new BridgeUserApi({ service, ledger, depositFeeInputs: async () => feeFundingInputs });
+  const api = new BridgeUserApi({ service, ledger, depositFeeInputs: async () => {
+    if (!publicUi) return feeFundingInputs;
+    // Existing operator-prepared TEST inputs only. No public wallet-spending API
+    // or automatic fee funding. Admission still uses the retained Native verifier.
+    const used = new Set([...ledger.serviceDepositRequests().flatMap(r => r.feeFundingInputs),
+      ...ledger.serviceDeposits({ registeredOnly: true }).flatMap(r => ledger.serviceDeposit(r.operationId).operation.plan.inputs),
+      ...ledger.accountedReserveInputs()].map(i => i.txid + ":" + i.vout));
+    const candidate = publicUi.depositFeeFundingInputs.find(i => !used.has(i.txid + ":" + i.vout));
+    assert(candidate, "PreparedTestFeePoolExhausted"); return [candidate];
+  } });
   if (restoreReview) {
     stage = "ISOLATED_RESTORE_REVIEW";
     const boundary = restoreReview.checkpoint;
@@ -430,6 +452,39 @@ try {
   await health();
   healthTask = (async () => { while (!stopHealth) { await delay(stage === "DEVNET_SOAK" ? 60000 : 5000); if (!stopHealth) try { await health(); } catch { /* Next check must obtain fresh evidence; no synthetic health. */ } } })();
 
+  if (publicUi) {
+    stage = "PUBLIC_TEST_UI";
+    assert.deepEqual(publicUi.policy, policy, "PublicTestPolicyMismatch");
+    const address = new URL(publicUi.endpoint);
+    assert(address.protocol === "http:" && address.hostname === "127.0.0.1" && address.port && address.pathname === "/" &&
+      !address.username && !address.password && !address.search && !address.hash, "PublicTestLoopbackRequired");
+    const options = publicUi.accessTokenStore;
+    assert(options.context.role === "BRIDGE_VALIDATOR" && options.context.purpose === "service-auth" &&
+      options.context.environment === "devnet" && options.context.nativeGenesis === policy.nativeGenesis &&
+      options.context.solanaDeployment === policy.solanaDeployment, "PublicTestCredentialContextRejected");
+    const store = new WindowsProtectedStore(options), token = store.read().payload;
+    let listener;
+    try { listener = await listenBridgeUserApi({ api, accessToken: token, port: Number(address.port) }); }
+    finally { token.fill(0); store.close(); }
+    closers.push(async () => { listener.closeAllConnections(); await new Promise(resolve => listener.close(resolve)); });
+    event("PUBLIC_TEST_USER_API_READY", { nativeNetwork: "REGTEST", solanaNetwork: "DEVNET", authenticatedLoopback: true,
+      reconciliation: "MATCH", productionReady: false, mainnetActivation: "DISABLED" });
+    let lastMined = 0, lastState;
+    while (!interrupted) {
+      diskGuard();
+      const pending = ledger.serviceDeposits({ pendingOnly: true }).length + ledger.withdrawalRequests({ pendingOnly: true }).length;
+      if (pending && Date.now() - lastMined >= 10000 && JSON.parse(await nativeCli("getrawmempool")).length > 0) {
+        const height = Number(await nativeCli("getblockcount"));
+        assert(height + 6 <= 4096, "PublicTestRegtestHeaderBudgetExhausted");
+        await nativeCli("generatetoaddress", ["6", miner], wallet); lastMined = Date.now();
+      }
+      const result = await service.tick();
+      const state = result.reconciliation?.state ?? result.state;
+      if (state !== lastState) { event("PUBLIC_TEST_SERVICE_OBSERVATION", { state, bridgeState: service.status().state }); lastState = state; }
+      await delay(5000);
+    }
+    evidence.status = "PUBLIC_TEST_UI_STOPPED";
+  } else {
   const flowRoot = cycle ? path.join(root, "phase17-cycle-" + cycle) : root;
   if (!existsSync(flowRoot)) mkdirSync(flowRoot);
   validateRuntimeStateRoot(flowRoot, repoRoot);
@@ -813,6 +868,7 @@ try {
     // reorg, external-review or production readiness requirements by itself.
     evidence.status = evidence.soak.elapsedSeconds < 5 * 3600 ? "SMOKE_PASS_NOT_SOAK_COMPLETE" : "OBSERVATION_WINDOW_COMPLETE_NOT_PHASE17_PASS";
     event("DEVNET_SOAK_WINDOW_ENDED", { ...evidence.soak, status: evidence.status });
+  }
   }
 } catch (error) {
   phaseError = error; evidence.status = failedDiskSample || stage === "RPC_CAPABILITIES" && !error?.integrityCode ? "BLOCKED" : "FAIL"; evidence.failureStage = stage;

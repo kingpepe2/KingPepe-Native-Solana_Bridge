@@ -11,12 +11,13 @@ export function fromAtomic(text) {
   if (typeof text !== "string" || !/^(0|[1-9][0-9]{0,19})$/u.test(text) || BigInt(text) > 0xffffffffffffffffn) throw new Error("AMOUNT_RANGE");
   const n = BigInt(text); return `${n / 100000000n}.${(n % 100000000n).toString().padStart(8, "0")}`;
 }
-export function checkQuote(quote, input, direction) {
+export function checkQuote(quote, input, direction, { chain = "solana:localnet" } = {}) {
+  if (!["solana:localnet", "solana:devnet"].includes(chain)) throw new Error("REQUEST_CHANGED");
   if (!quote || !/^[0-9a-f]{64}$/u.test(quote.operationId) || quote.direction !== direction || quote.amountAtomic !== input.amountAtomic) throw new Error("REQUEST_CHANGED");
   if (direction === "NativeToSolana") {
     if (quote.recipient !== input.recipient || quote.request?.nonceHex !== input.nonceHex ||
         quote.request?.userRecoveryPublicKeyHex !== input.userRecoveryPublicKeyHex || typeof quote.depositAddress !== "string") throw new Error("REQUEST_CHANGED");
-  } else if (quote.destination !== input.destination || quote.feeAtomic !== input.feeAtomic || quote.chain !== "solana:localnet" ||
+  } else if (quote.destination !== input.destination || quote.feeAtomic !== input.feeAtomic || quote.chain !== chain ||
       quote.netAtomic !== (BigInt(input.amountAtomic) - BigInt(input.feeAtomic)).toString() || typeof quote.transactionBase64 !== "string") throw new Error("REQUEST_CHANGED");
   return quote;
 }
