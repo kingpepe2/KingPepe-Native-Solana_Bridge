@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -12,6 +13,43 @@ import {
 } from "../local-e2e-readiness.mjs";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../..");
+
+for (const [label, cFree, dFree, blocked] of [
+  ["C below floor", 8n * 1024n ** 3n - 1n, 4n * 1024n ** 3n, true],
+  ["D below floor", 8n * 1024n ** 3n, 4n * 1024n ** 3n - 1n, true],
+  ["exact floors", 8n * 1024n ** 3n, 4n * 1024n ** 3n, false],
+]) test(`Devnet observation disk guard retains a safe failing sample: ${label}`, () => {
+  // Exercise the actual entrypoint before any RPC/state access, without filling
+  // a disk. The child-only Windows/statfs substitution is not a Windows storage
+  // certificate. Even the accepted-floor case stops at the production guard.
+  const entry = new URL("../../solana/tests/devnet-bridge-service.mjs", import.meta.url).href;
+  const child = spawnSync(process.execPath, ["--input-type=module", "-e", `
+    import fs from "node:fs";
+    import { syncBuiltinESMExports } from "node:module";
+    Object.defineProperty(process, "platform", { value: "win32" });
+    fs.statfsSync = drive => ({ bavail: drive === "C:/" ? ${cFree}n : ${dFree}n, bsize: 1n });
+    syncBuiltinESMExports();
+    globalThis.fetch = () => { throw new Error("UNEXPECTED_NETWORK_ACCESS"); };
+    await import(${JSON.stringify(entry)});
+  `], { cwd: REPO_ROOT, encoding: "utf8", timeout: 20000, windowsHide: true,
+    env: { ...process.env, TEMP: "D:/test-output", TMP: "D:/test-output", KINGPEPE_E2E_ROOT: "D:/test-output",
+      KINGPEPE_PRODUCTION_ACTIVATION: "1", SOLANA_DEVNET_RPC_URL: "https://example.invalid/PRIVATE_RPC_SENTINEL" } });
+  assert.equal(child.error, undefined); assert.equal(child.status, 1);
+  assert(!child.stdout.includes("PRIVATE_RPC_SENTINEL") && !child.stderr.includes("PRIVATE_RPC_SENTINEL"));
+  const events = child.stdout.trim().split(/\r?\n/u).map(line => JSON.parse(line));
+  const failure = events.find(value => value.name === "DEVNET_TEST_FAILED");
+  assert.equal(failure.stage, "PREFLIGHT");
+  assert.equal(events.at(-1).evidenceRetained, false);
+  assert.equal(events.at(-1).status, blocked ? "BLOCKED" : "FAIL");
+  if (blocked) {
+    assert.equal(failure.diagnostic.reason, "TEST_DISK_HEADROOM_REQUIRED");
+    assert.equal(failure.diagnostic.disk.cFree, cFree.toString());
+    assert.equal(failure.diagnostic.disk.dFree, dFree.toString());
+    assert.equal(failure.diagnostic.disk.minimumCFree, (8n * 1024n ** 3n).toString());
+    assert.equal(failure.diagnostic.disk.minimumDFree, (4n * 1024n ** 3n).toString());
+    assert(Number.isFinite(Date.parse(failure.diagnostic.disk.observedAt)));
+  } else assert.equal(failure.diagnostic.disk, undefined);
+});
 
 test("current repository readiness gate remains blocked without local E2E executables", () => {
   const result = evaluateLocalE2eReadiness({
