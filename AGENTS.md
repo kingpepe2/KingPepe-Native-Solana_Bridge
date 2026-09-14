@@ -14,7 +14,7 @@ required third-party notices and historical licensing facts.
 - Software FROST A+B: exact 2-of-2, separate processes/services, protected private
   shares and nonce state; no fallback or coordinator private share. SINGLE_HOST
   is the final KingPepe Team decision. Common-host compromise/outage may affect
-  both participants; record that accepted risk for Phase 13 and external review.
+  both participants; keep that accepted risk explicit in readiness and reports.
   Do not require another physical host, HSM or hardware signer.
 - Preserve @noble/curves 2.3.0 schnorr_FROST secp256k1/BIP340/BIP342.
   Upstream FROST is UNAUDITED. Ed25519 is for attestations/Solana identities.
@@ -46,8 +46,12 @@ flows in both directions are PASS at e8f282fbe34975f96f4e0a1271072bbd7de5982e,
 with exact-SHA CI 34774289824: all four jobs and every step, none skipped.
 Phase 17 scoped validation passed on runtime e54a53160b09809d838b6388c67844186e70db02
 with exact-SHA CI 34837775528 (four jobs, no skipped steps). Its evidence-only
-publication also requires matching CI before Phase 18. The next gate is the
-Phase-18 Team upgrade-authority decision and independent external review.
+publication 424089ec1e344d2732ed58160b33fd18a24f71f1 passed matching CI
+34841406825 (four jobs and every step, none skipped). Phase 18 consolidates
+the final Devnet report and the final Team upgrade policy. Independent external
+review is NOT_REQUIRED_BY_TEAM; externalSecurityAuditCompleted=false. This
+removes the auditor/package/external-finding-clearance gates, not known unsafe
+production blockers. Never claim that an independent audit was performed.
 Public deployment identities, source, build hashes and
 transactions are in docs/deployment/devnet.json. Both programs and the Mint
 already exist; do not redeploy them or recreate enrollment on a routine restart.
@@ -101,9 +105,9 @@ exact-SHA CI; do not accumulate the entire phase or commit trivial edits.
 Encoding changes and their callers must land together without mixed formats.
 After required validation, scans,
 publication and exact-SHA CI pass, continue automatically to the next approved
-roadmap phase. Stop on a real blocker, concurrent writer, incomplete soak or
-external review, missing Team upgrade-authority decision, or the Phase 19
-activation approval gate. No Devnet before Borsh and fresh-clone validation.
+roadmap phase. Stop on a real blocker, concurrent writer or the Phase 19
+activation approval gate. No mandatory external-review gate remains. Retain
+all other readiness gates; no Devnet before Borsh and fresh-clone validation.
 Remove obsolete encoding and bincode
 paths/dependencies only when no retained code genuinely requires them. Do not
 suppress a remaining upstream advisory or change Native/Solana consensus encoding.
@@ -112,9 +116,16 @@ backup service. Keep recoveryProcedure NOT_TESTED until the actual snapshot
 restore/chain-resume drill passes, before Phase 15; repeat in Phase 17 and require
 TESTED before Phase 19. Do not power off the host or recreate WSL for the drill.
 Keep full-host rollback, accepted same-host risk and upgrade-authority trust
-explicit in readiness. At Phase 18 stop for a KingPepe Team authority-model
-decision if undecided. At Phase 19 stop for KINGPEPE_TEAM_ACTIVATION_APPROVAL
-before production deployment. Do not choose either decision for the Team.
+explicit in readiness. Final Team upgrade policy: SINGLE_KEY_WITH_REVIEW_CONTROL,
+upgradeReviewWindow=NONE, fixedTimelock=false. One dedicated private upgrade key;
+reviewed source/diff/build/hash, required tests, exact-SHA CI, secret scan and
+target/authority verification, then specific Team approval for each production
+upgrade. No fixed wait, automatic scheduler, on-chain timelock or multisig.
+This changes no normal transfer timing or approvals. Follow
+docs/security/program-upgrades.md. Production authority configuration is not
+provisioned/verified by a template. After all retained Phase-19 gates pass, stop
+for KINGPEPE_TEAM_ACTIVATION_APPROVAL before production deployment. Never infer
+that approval from the upgrade-model or external-review decisions.
 
 Source-bound status and evidence: docs/development-status.md and
 BRIDGE-READINESS.json. Historical validation certifies only its named source.

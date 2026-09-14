@@ -52,4 +52,6 @@ Protected local storage, authenticated IPC and durable operation recovery are
 implemented separately from the lightweight test adapters. Full-host snapshot
 freshness and distinct service-principal certification are not claimed. Current
 executed results belong in development-status.md. Production observation is
-NOT_CONFIGURED and external review is NOT_RUN.
+NOT_CONFIGURED. External review is NOT_REQUIRED_BY_TEAM and
+externalSecurityAuditCompleted=false; this decision does not remove the
+project-attester, configured-source or common-host trust assumptions.

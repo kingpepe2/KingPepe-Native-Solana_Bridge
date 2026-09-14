@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "generatedAt": "2026-09-13T00:00:00Z",
+  "generatedAt": "2026-09-14T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
   "purpose": "Exact file-by-file origin and retained bridge-purpose classification; implementation evidence is recorded separately.",
   "provenancePolicy": {
@@ -24,6 +24,27 @@
     "importedSource": "None during simplification; prior file-origin notes retained except corrected obsolete implementation descriptions."
   },
   "trackedFiles": [
+    {
+      "path": "docs/security/program-upgrades.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Final Team dedicated single-key production upgrade procedure: review/testing, exact artifact and specific approval, no fixed delay. External review is not a mandatory Team gate; no audit or production authorization claimed. Official Solana API documentation referenced, no source copied.",
+      "purpose": "REQUIRED_DOCUMENTATION",
+      "reviewDisposition": "KEEP_LEGAL_AND_CURRENT_CONTRACT"
+    },
+    {
+      "path": "docs/deployment/devnet-report.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Single consolidated public Devnet report from retained exact-source Phase-15/16/17 identities, Borsh/operation, accumulated short-soak and scoped recovery evidence; final Team upgrade/audit decisions and known limitations. No private runtime or recovery contents.",
+      "purpose": "REQUIRED_DOCUMENTATION",
+      "reviewDisposition": "KEEP_LEGAL_AND_CURRENT_CONTRACT"
+    },
+    {
+      "path": "config/examples/production-readiness.example.json",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Original unconfigured planning checklist, explicitly not a loadable runtime config. Final Team single-key review/no-delay and no mandatory external audit decisions, retained readiness/activation gates, public placeholders only; no production secret provisioned.",
+      "purpose": "REQUIRED_DOCUMENTATION",
+      "reviewDisposition": "KEEP_LEGAL_AND_CURRENT_CONTRACT"
+    },
     {
       "path": "solana/tests/devnet-bridge-service.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",

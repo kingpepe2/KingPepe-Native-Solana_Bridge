@@ -8,8 +8,27 @@
   "recoveryProcedure": "TESTED",
   "signerTopology": "SINGLE_HOST",
   "commonHostRiskDecision": "ACCEPTED_BY_KINGPEPE_TEAM",
+  "externalSecurityReview": "NOT_REQUIRED_BY_TEAM",
+  "externalSecurityAuditCompleted": false,
   "lastUpdated": "2026-09-14",
-  "sourceStatus": "PHASE_17_PASS_VALIDATED_RUNTIME_PUBLICATION_REQUIRES_MATCHING_CI",
+  "sourceStatus": "PHASE_18_FINAL_DEVNET_REPORT_PUBLICATION_REQUIRES_MATCHING_CI",
+  "phase18": {
+    "status": "FINAL_DEVNET_REPORT_PREPARED_REQUIRES_PUBLICATION_EXACT_SHA_CI",
+    "report": "docs/deployment/devnet-report.md",
+    "validatedBaselineSourceSha": "424089ec1e344d2732ed58160b33fd18a24f71f1",
+    "upgradeAuthorityModel": "SINGLE_KEY_WITH_REVIEW_CONTROL",
+    "upgradeReviewWindow": "NONE",
+    "fixedTimelock": false,
+    "upgradeProcedure": "docs/security/program-upgrades.md",
+    "productionChecklist": "config/examples/production-readiness.example.json",
+    "externalSecurityReview": "NOT_REQUIRED_BY_TEAM",
+    "externalSecurityAuditCompleted": false,
+    "externalReviewDecision": "EXPLICIT_KINGPEPE_TEAM_DECISION_REMOVES_AUDITOR_PACKAGE_AND_EXTERNAL_FINDING_CLEARANCE_AS_ROADMAP_GATES_NO_AUDIT_CLAIMED",
+    "knownUnsafeBlockersMayBeIgnored": false,
+    "executableCodeChanged": false,
+    "productionKeyProvisioned": false,
+    "publicationPolicy": "Required scans, provenance, reviewed commit/push and this publication's own exact-SHA CI must pass before proceeding to Phase 19. No external review gate; retain all other readiness and explicit activation gates."
+  },
   "phase17": {
     "status": "PASS",
     "soakRequirement": { "requiredMonitoredSeconds": 18000, "decision": "KINGPEPE_TEAM_5_MONITORED_HOURS", "stoppedTimeCounts": false,
@@ -20,7 +39,9 @@
       "executedHarnessSha256": "337ca5eef5fef8fd83f6fb92c13eba4ffdf1544a7be5bfde611804b7b86759d2" },
     "recoveryMilestoneExactShaCi": { "sourceSha": "cd11982dba8ed9c728b03e4a39a53c67e96c57c4", "runId": "34835285166",
       "requiredJobsPassed": 4, "skippedJobs": 0, "skippedSteps": 0, "status": "PASS" },
-    "publicationPolicy": "The PASS certifies the named runtime and retained evidence. This evidence-only publication must also pass its own exact-SHA CI before Phase 18; do not inherit an older run.",
+    "publicationExactShaCi": { "sourceSha": "424089ec1e344d2732ed58160b33fd18a24f71f1", "runId": "34841406825",
+      "requiredJobsPassed": 4, "skippedJobs": 0, "skippedSteps": 0, "status": "PASS" },
+    "publicationPolicy": "The PASS certifies the named runtime and retained evidence. Publication 424089ec1e344d2732ed58160b33fd18a24f71f1 passed its own exact-SHA CI; later publications require their own matching run.",
     "publicationValidation": { "windowsFocused": "14_PASS", "wslFocusedSequentialRerun": "14_PASS",
       "initialWslFocusedRun": "12_PASS_2_CHILD_STARTUP_TIMEOUTS_DURING_CONCURRENT_TREE_SCAN",
       "timeoutsUnchanged": true, "failedEvidenceRetained": true,
@@ -321,7 +342,7 @@
       "provenance": "271_FILES_PASS",
       "dependencyAudit": "NPM_ZERO_VULNERABILITIES_RETAINED_NON_BRIDGE_BINCODE_ADVISORY_UNCHANGED"
     },
-    "productionUpgradeAuthorityDecision": "UNDECIDED_KINGPEPE_TEAM_DECISION_REQUIRED_IN_PHASE_18"
+    "productionUpgradeAuthorityDecision": "UNDECIDED_AT_PHASE_15_ENROLLMENT_CURRENT_DECISION_IN_PRODUCTION_SECTION"
   },
   "phase14": {
     "status": "PASS",
@@ -668,7 +689,8 @@
     "configuration": "NOT_CONFIGURED",
     "deployment": "NOT_DEPLOYED",
     "devnet": "PHASE_15_DEPLOYED_PHASE_16_BOTH_DIRECTIONS_PHASE_17_SCOPED_VALIDATION_PASS",
-    "externalReview": "NOT_RUN",
+    "externalSecurityReview": "NOT_REQUIRED_BY_TEAM",
+    "externalSecurityAuditCompleted": false,
     "activationApproval": false,
     "backupMethod": "MANUAL_OR_EXISTING_OS_SCHEDULER_NO_CUSTOM_DAEMON",
     "backupConfiguration": "NOT_CONFIGURED_LOCAL_PRIVATE_VALUES_ONLY",
@@ -678,8 +700,18 @@
     "devnetRecoveryDrill": "TESTED_SAME_ACCOUNT_ISOLATED_RESTORE_NOT_PRODUCTION_HOST_RECOVERY",
     "signerTopology": "SINGLE_HOST",
     "signerSeparation": "SEPARATE_PARTICIPANTS_PROCESSES_PROTECTED_SHARES_AND_NONCE_STATE_EXACT_2_OF_2",
-    "commonHostRiskDecision": "EXPLICITLY_ACCEPTED_BY_KINGPEPE_TEAM_PRESENT_TO_PHASE_18_REVIEWER",
-    "upgradeAuthorityDecision": "UNDECIDED_TEAM_DECISION_REQUIRED_BEFORE_PHASE_18_REVIEW"
+    "commonHostRiskDecision": "EXPLICITLY_ACCEPTED_BY_KINGPEPE_TEAM_DOCUMENTED_IN_DEVNET_REPORT_AND_READINESS",
+    "upgradeAuthorityDecision": "EXPLICIT_KINGPEPE_TEAM_SINGLE_KEY_REVIEW_CONTROL_NO_FIXED_DELAY",
+    "upgradeAuthorityModel": "SINGLE_KEY_WITH_REVIEW_CONTROL",
+    "upgradeReviewWindow": "NONE",
+    "fixedTimelock": false,
+    "upgradeProcedure": "docs/security/program-upgrades.md",
+    "emergencyUpgradeProcedure": "DOCUMENTED_NO_REVIEW_TEST_CI_OR_SPECIFIC_APPROVAL_BYPASS",
+    "dedicatedUpgradeAuthorityPublicKey": null,
+    "upgradeAuthorityConfiguration": "NOT_PROVISIONED_NOT_VERIFIED",
+    "specificTeamApprovalRequiredForEachProductionUpgrade": true,
+    "normalTransfersHaveUpgradePolicyDelay": false,
+    "planningChecklist": "config/examples/production-readiness.example.json"
   },
   "limitations": [
     "Single-host compromise/availability affects both FROST participants",
@@ -688,11 +720,13 @@
     "No full-host/snapshot rollback guarantee",
     "Project-attested and configured chain-source trust remain",
     "Upgrade authority can change program behavior",
+    "Single-key upgrade review is an operational procedure with no enforced time delay",
+    "No independent external security audit completed; removed as a gate by explicit KingPepe Team decision",
     "Cargo reports bincode 1.3.3 unmaintained: RUSTSEC-2025-0141"
   ],
   "ci": {
     "status": "VERIFY_MATCHING_GITHUB_ACTIONS_RUN",
     "scope": "Local results do not substitute for the workflow run at this exact commit"
   },
-  "next": "PHASE_18_AFTER_PUBLICATION_EXACT_SHA_CI_TEAM_UPGRADE_AUTHORITY_DECISION_AND_EXTERNAL_REVIEW_REQUIRED"
+  "next": "PHASE_19_READINESS_AFTER_PHASE_18_PUBLICATION_EXACT_SHA_CI_THEN_EXPLICIT_ACTIVATION_APPROVAL_BEFORE_DEPLOYMENT"
 }

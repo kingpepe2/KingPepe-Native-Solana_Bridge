@@ -2,7 +2,10 @@
 
 Phase 15 uses canonical Borsh V2 and fresh TEST credentials. Production remains
 disabled. No production upgrade-authority model is selected by this test.
-The independent-review and KingPepe Team activation gates still apply.
+The KingPepe Team activation gate and all retained readiness checks still apply.
+External review is NOT_REQUIRED_BY_TEAM; no independent audit is claimed. The
+enrollment record's undecided production-model label is historical; see the
+current [upgrade policy](../security/program-upgrades.md).
 
 ## Finalized test deployment
 
@@ -206,6 +209,12 @@ reconciliation passed. Both encrypted pending-operation restores passed within
 the [same-account recovery scope](../security/deposit-operation-recovery.md).
 No deployment, authority, Mint, production configuration or bridge engine changed.
 
-The next Phase-18 gate requires the KingPepe Team's explicit production upgrade-
-authority decision and independent review. The current Devnet test authority
-is not that production decision. Production readiness and Mainnet remain disabled.
+The [final Devnet report](devnet-report.md) consolidates the source-bound evidence.
+The Team selected SINGLE_KEY_WITH_REVIEW_CONTROL, review window NONE and
+fixedTimelock=false; the [procedure](../security/program-upgrades.md) requires
+specific Team approval for each production upgrade, not normal transfers.
+The current Devnet test authority is not a production key selection.
+Independent external review is NOT_REQUIRED_BY_TEAM and
+externalSecurityAuditCompleted=false. After Phase-18 publication CI passes,
+proceed to the retained Phase-19 readiness gates and mandatory activation
+approval. Production readiness and Mainnet remain disabled.

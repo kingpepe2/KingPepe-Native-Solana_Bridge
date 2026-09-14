@@ -262,11 +262,24 @@ profiler; no timeout, test or core behavior was changed to obtain the pass.
 No unresolved Critical/High operational defect was observed in the exercised
 scope. This is NOT independent security review.
 
-Phase 18 follows matching publication CI. Its production upgrade-authority
-model is UNDECIDED and must be selected by the KingPepe Team; the existing
-Devnet test key is not an implicit production choice. Independent review is
-also outstanding. Mainnet, production signing/broadcast and activation remain
-disabled. Common-host risk and full-host rollback limitations remain explicit.
+Phase-17 publication `424089ec1e344d2732ed58160b33fd18a24f71f1` passed matching
+CI `34841406825`: all four jobs and every step, none skipped. Phase 18 uses that
+verified baseline for the [single final Devnet report](deployment/devnet-report.md).
+The Team's final upgrade policy is SINGLE_KEY_WITH_REVIEW_CONTROL, review window
+NONE, fixedTimelock=false. The [manual procedure](security/program-upgrades.md)
+requires testing/review and specific Team approval for each production upgrade,
+without changing normal transfer behavior. The existing Devnet test key is not
+an implicit production key choice; production authority configuration remains
+unprovisioned/unverified.
+
+The Team removed independent external review, a review package and external
+Critical/High clearance as mandatory roadmap gates. Record
+externalSecurityReview=NOT_REQUIRED_BY_TEAM and externalSecurityAuditCompleted=false;
+no audit or zero-finding conclusion is claimed. After Phase-18 scans, provenance,
+reviewed publication and its own exact-SHA CI pass, proceed to Phase 19. All other
+readiness gates and the explicit activation approval remain. Mainnet, production
+signing/broadcast and activation stay disabled; known unsafe blockers cannot be
+ignored. Common-host and full-host rollback limitations remain explicit.
 
 ## Final simplification
 
@@ -545,14 +558,16 @@ review. Do not power off the physical host or recreate WSL for the runtime drill
 software participants, processes/services, protected shares and nonce state;
 exact A+B 2-of-2, no fallback and no coordinator share. Common-host compromise
 or outage may affect both, and that risk is explicitly accepted by the Team.
-Record this decision at Phase 13 and present it honestly to external review;
+Record this decision at Phase 13 and preserve it honestly in the Devnet report;
 do not require a second physical host or hardware signer.
-Phase 18 requires a recorded KingPepe Team upgrade-authority decision
-(multisig, single-key with timelock, or explicitly justified single-key without
-timelock). If not selected, stop and ask the Team; no choice or deployment is made
-here. Phase 19 separately requires explicit KINGPEPE_TEAM_ACTIVATION_APPROVAL
-before production deployment. Accepted common-host risk and full-host rollback
-limits remain visible; documentation does not claim either has been eliminated.
+Phase 18 records the final Team single-key review-control policy with no fixed
+delay and the explicit removal of the mandatory external-review gate. The
+[production checklist](../config/examples/production-readiness.example.json)
+is planning-only, not loaded runtime configuration or proof of key custody.
+Phase 19 retains all other readiness gates, including verified production
+upgrade-authority configuration and no known unsafe activation blocker, then
+requires explicit KINGPEPE_TEAM_ACTIVATION_APPROVAL before deployment. Accepted
+common-host and full-host rollback limits remain visible; neither is eliminated.
 
 ## Prior baseline validation
 
