@@ -3,6 +3,38 @@
 The repository is PUBLIC. Original KingPepe code is All Rights Reserved.
 Production readiness, signing and broadcasting remain false; Mainnet is disabled.
 
+## Phase 19 local preparation
+
+Phase 18's final Devnet report/policy publication
+`d616b67f8b8601388e3533730b8b251839eab60d` passed exact-SHA CI `34855692775`,
+attempt 2: four required jobs, 99 passed steps, none skipped. The initial pinned
+audit-tool download returned HTTP 504 before audit execution; the unchanged
+failed job passed on retry. No code, tool pin or CI requirement was weakened.
+
+Under explicit Team authorization, one new dedicated production upgrade-authority
+key was prepared in private local storage. Current-account DPAPI encryption,
+private ACL, encrypted round trip, two independent public derivations, wrong-context
+and tamper rejection, and refusal to replace an existing key passed. Its public
+address is in `BRIDGE-READINESS.json`; private material/configuration and local
+paths remain outside Git. It is distinct from the 15 public identities in the
+Devnet enrollment record and from the retained runtime fee payer and Native
+FROST aggregate public key. No private test shares were read and no production
+transaction was submitted.
+
+This is an upgrade-authority-only preparation milestone, not a production runtime
+configuration or full Phase-19 PASS. Production RPC/Native reserve, separate fee
+payer and other role references, runtime/backup configuration, and final reviewed
+deployment identity/artifact plan remain unconfigured or unverified. There is no
+claim of comparison against unconfigured production roles or replacement-host
+recovery. Do not reuse Devnet credentials or the upgrade key as fee payer.
+
+The policy remains `SINGLE_KEY_WITH_REVIEW_CONTROL`, `upgradeReviewWindow = NONE`,
+`fixedTimelock = false`. All retained readiness gates must pass before requesting
+`KINGPEPE_TEAM_ACTIVATION_APPROVAL`. This publication requires its own exact-SHA
+CI; the preceding run does not certify a later commit. Bridge behavior, normal
+transfer approval/timing, SINGLE_HOST topology and scoped TESTED recovery are
+unchanged. External review is NOT_REQUIRED_BY_TEAM; no audit is claimed.
+
 ## Current bridge
 
 Phase 10 composes both retained workers in `LocalBridgeService`, with one

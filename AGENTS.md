@@ -28,7 +28,8 @@ required third-party notices and historical licensing facts.
 - No per-transfer Team approval; users sign their wallets. Missing evidence
   never authorizes minting or payment. Serious contradiction pauses the bridge;
   read-only monitoring may continue. No automatic economic repair.
-- No production systems, keys, wallets, funds or deployment now.
+- Only explicitly authorized local production configuration/key preparation is
+  permitted; no production transactions, funds, deployment or activation now.
   productionReady=false; mainnetActivation=DISABLED;
   productionSigningAuthorized=false; productionBroadcastAuthorized=false.
 - Use KingPepe Team terminology; preserve official account.owner/API terms.
@@ -91,7 +92,11 @@ Per-run observation flags alone cannot certify the aggregate Phase-17 gate.
 The pinned compiler's supported --arch v3 builds reproduce the deployed bytes;
 do not confuse them with default v0 local-test binaries or enable experimental ABI.
 Devnet test state must not enable Mainnet. Existing local callers stay local-only.
-No production configuration, keys, funds or deployment.
+The Team authorized one new local-only dedicated production upgrade-authority
+key and private preparation configuration. Neither belongs in Git or logs.
+The key must never be reused as fee payer, relayer, attester or FROST material.
+Other production configuration remains unverified; do not reuse test credentials.
+No production transactions, funds, deployment or activation are authorized.
 Preserve the completed transfer engines, accounting, lifecycle, replay semantics,
 FROST topology, authorities and existing journal/inbox. Recovery is TESTED only
 for closed localnet/regtest and the controlled Devnet same-account drill with

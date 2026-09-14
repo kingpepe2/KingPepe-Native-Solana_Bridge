@@ -11,9 +11,11 @@
   "externalSecurityReview": "NOT_REQUIRED_BY_TEAM",
   "externalSecurityAuditCompleted": false,
   "lastUpdated": "2026-09-14",
-  "sourceStatus": "PHASE_18_FINAL_DEVNET_REPORT_PUBLICATION_REQUIRES_MATCHING_CI",
+  "sourceStatus": "PHASE_19_LOCAL_UPGRADE_AUTHORITY_PREPARED_REMAINING_PRODUCTION_CONFIGURATION_UNVERIFIED",
   "phase18": {
-    "status": "FINAL_DEVNET_REPORT_PREPARED_REQUIRES_PUBLICATION_EXACT_SHA_CI",
+    "status": "PASS",
+    "publicationExactShaCi": { "sourceSha": "d616b67f8b8601388e3533730b8b251839eab60d", "runId": "34855692775",
+      "attempt": 2, "requiredJobsPassed": 4, "passedSteps": 99, "skippedSteps": 0, "status": "PASS" },
     "report": "docs/deployment/devnet-report.md",
     "validatedBaselineSourceSha": "424089ec1e344d2732ed58160b33fd18a24f71f1",
     "upgradeAuthorityModel": "SINGLE_KEY_WITH_REVIEW_CONTROL",
@@ -27,7 +29,40 @@
     "knownUnsafeBlockersMayBeIgnored": false,
     "executableCodeChanged": false,
     "productionKeyProvisioned": false,
-    "publicationPolicy": "Required scans, provenance, reviewed commit/push and this publication's own exact-SHA CI must pass before proceeding to Phase 19. No external review gate; retain all other readiness and explicit activation gates."
+    "publicationPolicy": "The named Phase-18 publication passed its own exact-SHA CI. Later publications require their own matching run. No external review gate; retain all other readiness and explicit activation gates."
+  },
+  "phase19": {
+    "status": "LOCAL_UPGRADE_AUTHORITY_PREPARED_REMAINING_CONFIGURATION_UNVERIFIED",
+    "scope": "EXPLICIT_TEAM_AUTHORIZED_LOCAL_PREPARATION_ONLY_NO_PRODUCTION_TRANSACTIONS",
+    "baselineSourceSha": "d616b67f8b8601388e3533730b8b251839eab60d",
+    "dedicatedUpgradeAuthority": {
+      "publicKey": "4C6VWWdS7CPx7Rdv6iJpB3bfpabr8Tq1dnFDCgMc8qzY",
+      "generatedNew": true,
+      "role": "PROGRAM_UPGRADE_AUTHORITY_ONLY",
+      "protection": "LOCAL_WINDOWS_DPAPI_CURRENT_USER",
+      "privateAcl": "PASS_CURRENT_ACCOUNT_ONLY",
+      "encryptedRoundTrip": "PASS",
+      "independentPublicDerivation": "PASS",
+      "contextAndTamperRejection": "PASS",
+      "existingKeyReplacementRejected": true,
+      "distinctFromKnownDevnetPublicIdentities": "PASS_15_IDENTITIES",
+      "distinctFromRetainedRuntimeFeePayerAndFrostPublicKey": "PASS_PUBLIC_METADATA_ONLY_NO_PRIVATE_SHARES_READ",
+      "otherProductionRoleComparison": "PENDING_THOSE_ROLES_ARE_NOT_CONFIGURED",
+      "reuseAsFeePayerRelayerAttesterOrFrost": false,
+      "plaintextKeyFileWritten": false,
+      "privateStatePublished": false,
+      "localConfiguration": "UPGRADE_AUTHORITY_ONLY_CONSISTENT_NOT_LOADABLE_BRIDGE_RUNTIME_CONFIG"
+    },
+    "remainingConfiguration": [
+      "PRODUCTION_RPC_AND_NATIVE_NETWORK_RESERVE_REFERENCES_NOT_CONFIGURED",
+      "SEPARATE_PRODUCTION_FEE_PAYER_AND_OTHER_OPERATIONAL_ROLE_REFERENCES_NOT_CONFIGURED",
+      "PRODUCTION_RUNTIME_AND_PRIVATE_BACKUP_CONFIGURATION_NOT_VERIFIED",
+      "FINAL_REVIEWED_DEPLOYMENT_SOURCE_ARTIFACT_AND_PUBLIC_IDENTITY_PLAN_NOT_SELECTED"
+    ],
+    "activationApprovalRequested": false,
+    "productionTransactionsSubmitted": 0,
+    "executableRepositoryCodeChanged": false,
+    "publicationPolicy": "This preparation milestone requires source/staged/history secret scans, provenance, reviewed commit/push and its own exact-SHA CI. A provisioned upgrade key alone is not a full Phase-19 PASS."
   },
   "phase17": {
     "status": "PASS",
@@ -686,7 +721,7 @@
     "exactShaFreshClone": "PASS"
   },
   "production": {
-    "configuration": "NOT_CONFIGURED",
+    "configuration": "LOCAL_UPGRADE_AUTHORITY_ONLY_REMAINING_CONFIGURATION_UNVERIFIED",
     "deployment": "NOT_DEPLOYED",
     "devnet": "PHASE_15_DEPLOYED_PHASE_16_BOTH_DIRECTIONS_PHASE_17_SCOPED_VALIDATION_PASS",
     "externalSecurityReview": "NOT_REQUIRED_BY_TEAM",
@@ -707,8 +742,9 @@
     "fixedTimelock": false,
     "upgradeProcedure": "docs/security/program-upgrades.md",
     "emergencyUpgradeProcedure": "DOCUMENTED_NO_REVIEW_TEST_CI_OR_SPECIFIC_APPROVAL_BYPASS",
-    "dedicatedUpgradeAuthorityPublicKey": null,
-    "upgradeAuthorityConfiguration": "NOT_PROVISIONED_NOT_VERIFIED",
+    "dedicatedUpgradeAuthorityPublicKey": "4C6VWWdS7CPx7Rdv6iJpB3bfpabr8Tq1dnFDCgMc8qzY",
+    "upgradeAuthorityConfiguration": "LOCAL_PROTECTED_KEY_AND_PREPARATION_METADATA_VERIFIED_NOT_DEPLOYED",
+    "upgradeAuthorityReuseAsFeePayer": false,
     "specificTeamApprovalRequiredForEachProductionUpgrade": true,
     "normalTransfersHaveUpgradePolicyDelay": false,
     "planningChecklist": "config/examples/production-readiness.example.json"
@@ -728,5 +764,5 @@
     "status": "VERIFY_MATCHING_GITHUB_ACTIONS_RUN",
     "scope": "Local results do not substitute for the workflow run at this exact commit"
   },
-  "next": "PHASE_19_READINESS_AFTER_PHASE_18_PUBLICATION_EXACT_SHA_CI_THEN_EXPLICIT_ACTIVATION_APPROVAL_BEFORE_DEPLOYMENT"
+  "next": "PHASE_19_REMAINING_LOCAL_PRODUCTION_CONFIGURATION_AND_READINESS_THEN_EXPLICIT_ACTIVATION_APPROVAL_BEFORE_DEPLOYMENT"
 }

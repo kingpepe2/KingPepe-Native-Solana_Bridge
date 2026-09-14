@@ -18,8 +18,8 @@ describes the upgrade authority and Program/ProgramData relationship.
 This policy applies only to future production program upgrades. It does not
 introduce any waiting period or Team approval into normal deposits, withdrawals,
 FROST signing, minting or payouts. Existing verification/finality requirements
-remain unchanged. No production key has been provisioned or deployment authorized
-by this documentation change. The existing Devnet authority is a test identity,
+remain unchanged. This policy does not itself provision a key or authorize a
+deployment. The existing Devnet authority is a test identity,
 not an implicit production key selection.
 
 ## Dedicated key boundary
@@ -27,10 +27,17 @@ not an implicit production key selection.
 Keep the private key in protected local/private storage, outside Git, build
 artifacts, reports, command output and logs. Never publish its contents
 or operational storage path. Only its public authority address may be recorded.
-Do not reuse it for the relayer, FROST participants or attesters. Use a separate
-fee payer where possible; document any unavoidable fee-payer exception locally
-for Team review. Do not generate, migrate or expose keys as part of documentation
-updates. Recovery and custody material remain private.
+Do not reuse it for the fee payer, relayer, FROST participants or attesters. A
+separate fee payer is required; there is no fee-payer reuse exception. Generate
+or migrate private material only under explicit local provisioning authorization,
+never as a side effect of a template or documentation update. Recovery and
+custody material remain private.
+
+The Phase-19 local preparation record is in `BRIDGE-READINESS.json`. Its public
+authority address may be published; its protected key, local configuration and
+storage paths must not be. Successful local key/permission checks do not certify
+the remaining production RPC, reserve, runtime, backup or deployment configuration.
+CurrentUser DPAPI custody is account-bound, not proof of replacement-host recovery.
 
 ## Required procedure for each upgrade
 
