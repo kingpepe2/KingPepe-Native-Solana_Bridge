@@ -70,13 +70,14 @@ for (const settings of [
   { KINGPEPE_DEVNET_TEST_CYCLE: "../another-run" },
   { KINGPEPE_DEVNET_TEST_CYCLE: "1", KINGPEPE_DEVNET_TEST_CHECKPOINT: "UNKNOWN_BOUNDARY" },
   { KINGPEPE_DEVNET_TEST_RESTORE_REVIEW: "unreviewed.json" },
+  { KINGPEPE_DEVNET_TEST_CYCLE: "1", KINGPEPE_DEVNET_TEST_EDGES: "1" },
 ]) test(`Devnet test lifecycle rejects invalid opt-in before network/state: ${Object.keys(settings).at(-1)}`, () => {
   const entry = new URL("../../solana/tests/devnet-bridge-service.mjs", import.meta.url).href;
   const env = { ...process.env, TEMP: "D:/test-output", TMP: "D:/test-output", KINGPEPE_E2E_ROOT: "D:/test-output",
     KINGPEPE_DEVNET_TEST_RUN: "D:/test-output/devnet-service-0000000000000000", KINGPEPE_DEVNET_SOAK_SECONDS: "60",
     SOLANA_DEVNET_RPC_URL: "https://example.invalid/PRIVATE_RPC_SENTINEL" };
   for (const name of ["KINGPEPE_PRODUCTION_ACTIVATION", "KINGPEPE_DEVNET_TEST_CYCLE", "KINGPEPE_DEVNET_TEST_CHECKPOINT",
-    "KINGPEPE_DEVNET_TEST_RESTORE_REVIEW", "KINGPEPE_DEVNET_TEST_LOST_RESPONSE"]) delete env[name];
+    "KINGPEPE_DEVNET_TEST_RESTORE_REVIEW", "KINGPEPE_DEVNET_TEST_LOST_RESPONSE", "KINGPEPE_DEVNET_TEST_EDGES"]) delete env[name];
   Object.assign(env, settings);
   const child = spawnSync(process.execPath, ["--input-type=module", "-e", `
     import fs from "node:fs";
