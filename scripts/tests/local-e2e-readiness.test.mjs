@@ -66,6 +66,34 @@ test("current repository readiness gate remains blocked without local E2E execut
   assert(!result.blockers.includes("SOLANA_PROGRAM_EXECUTION_NOT_READY:kingpepe-transceiver"));
 });
 
+for (const settings of [
+  { KINGPEPE_DEVNET_TEST_CYCLE: "../another-run" },
+  { KINGPEPE_DEVNET_TEST_CYCLE: "1", KINGPEPE_DEVNET_TEST_CHECKPOINT: "UNKNOWN_BOUNDARY" },
+  { KINGPEPE_DEVNET_TEST_RESTORE_REVIEW: "unreviewed.json" },
+]) test(`Devnet test lifecycle rejects invalid opt-in before network/state: ${Object.keys(settings).at(-1)}`, () => {
+  const entry = new URL("../../solana/tests/devnet-bridge-service.mjs", import.meta.url).href;
+  const env = { ...process.env, TEMP: "D:/test-output", TMP: "D:/test-output", KINGPEPE_E2E_ROOT: "D:/test-output",
+    KINGPEPE_DEVNET_TEST_RUN: "D:/test-output/devnet-service-0000000000000000", KINGPEPE_DEVNET_SOAK_SECONDS: "60",
+    SOLANA_DEVNET_RPC_URL: "https://example.invalid/PRIVATE_RPC_SENTINEL" };
+  for (const name of ["KINGPEPE_PRODUCTION_ACTIVATION", "KINGPEPE_DEVNET_TEST_CYCLE", "KINGPEPE_DEVNET_TEST_CHECKPOINT",
+    "KINGPEPE_DEVNET_TEST_RESTORE_REVIEW", "KINGPEPE_DEVNET_TEST_LOST_RESPONSE"]) delete env[name];
+  Object.assign(env, settings);
+  const child = spawnSync(process.execPath, ["--input-type=module", "-e", `
+    import fs from "node:fs";
+    import { syncBuiltinESMExports } from "node:module";
+    Object.defineProperty(process, "platform", { value: "win32" });
+    fs.statfsSync = () => ({ bavail: 20n * 1024n ** 3n, bsize: 1n });
+    syncBuiltinESMExports();
+    globalThis.fetch = () => { process.stderr.write("UNEXPECTED_NETWORK_ACCESS"); throw new Error("UNEXPECTED_NETWORK_ACCESS"); };
+    await import(${JSON.stringify(entry)});
+  `], { cwd: REPO_ROOT, encoding: "utf8", timeout: 20000, windowsHide: true, env });
+  assert.equal(child.error, undefined); assert.equal(child.status, 1);
+  assert.equal(child.stderr, ""); assert(!child.stdout.includes("PRIVATE_RPC_SENTINEL"));
+  const events = child.stdout.trim().split(/\r?\n/u).map(line => JSON.parse(line));
+  assert.equal(events.find(v => v.name === "DEVNET_TEST_FAILED").stage, "PREFLIGHT");
+  assert.equal(events.at(-1).evidenceRetained, false);
+});
+
 test("executable discovery is path-delimited and does not inspect unrelated environment data", () => {
   const root = mkdtempSync(path.join(os.tmpdir(), "kingpepe-local-e2e-tools-"));
   try {
