@@ -27,7 +27,7 @@
     {
       "path": "solana/tests/devnet-bridge-service.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original explicit regtest/Devnet E2E harness over retained bridge workers and protected A/B test processes; bounded retries preserve canonical operation identity. Optional pause/RPC/rediscovery checks and a bounded observation window do not certify a complete soak or recovery drill. No production, deployment or airdrops; credentials and recovery state stay outside source.",
+      "notes": "Original explicit regtest/Devnet E2E harness over retained bridge workers and protected A/B test processes; bounded retries preserve canonical operation identity. Optional pause/RPC/rediscovery checks and a bounded observation window do not certify a complete soak or recovery drill. Disk interruptions retain non-secret failing samples and elapsed time. No production, deployment or airdrops; credentials and recovery state stay outside source.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
@@ -979,7 +979,7 @@
     {
       "path": "scripts/tests/local-e2e-readiness.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 readiness-gate tests using temporary fake toolchain and manifest fixtures only, including validate-only ABI classification.",
+      "notes": "Readiness-gate tests using temporary fake toolchain and manifest fixtures, including validate-only ABI classification; child-isolated Devnet disk-floor regressions verify safe diagnostics before any network/state access. Substituted filesystem samples are not Windows storage certification.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },

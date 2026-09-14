@@ -195,6 +195,22 @@ was corrected without weakening the journal. This is not a completed soak or
 Devnet restore drill. The optional bounded observation mode in the same runner
 is documented in [Devnet deployment](deployment/devnet.md).
 
+The clean-source observation of `b8326497bbef21d3cbcbacb0687b46616ccb8898`
+started on 2026-09-13 at 19:23:05 UTC and stopped in its disk-headroom guard on
+2026-09-14 at 01:15:53 UTC (21,168 elapsed seconds). It recorded 258 checks,
+including six temporary WAIT observations followed by MATCH. The last published
+MATCH was at 01:11:55 UTC. No new economic operation was requested; retained
+accounting was unchanged and cleanup preserved protected state. This run did
+not retain the failing free-space sample, so its exact value is unknown. The
+runner now retains that sample and an interrupted duration without changing
+the storage floors or exposing RPC details. This material observation gap
+requires a new uninterrupted 14-day window. It is not a completed soak, a new
+both-direction transfer test, or the still-required Devnet recovery drill.
+The focused fix passed 1,012 retained Node tests on both Windows and WSL,
+including three disk-floor regressions, and full-tree secret scanning. A
+60-second Devnet restart smoke check returned MATCH with unchanged transaction
+identities, no new signing and clean shutdown. Phase 17 remains uncertified.
+
 ## Final simplification
 
 Review baseline: ab15b2f38084f024e49d8fae9a13182dfe85721d.

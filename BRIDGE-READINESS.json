@@ -8,7 +8,7 @@
   "recoveryProcedure": "TESTED",
   "signerTopology": "SINGLE_HOST",
   "commonHostRiskDecision": "ACCEPTED_BY_KINGPEPE_TEAM",
-  "lastUpdated": "2026-09-13",
+  "lastUpdated": "2026-09-14",
   "sourceStatus": "PHASE_16_PASS_PHASE_17_EDGE_CHECKS_IN_PROGRESS",
   "phase17": {
     "status": "IN_PROGRESS_NOT_CERTIFIED",
@@ -27,7 +27,44 @@
       "initialHarnessFailure": "Invalid digit-bearing test pause label rejected by the existing journal; corrected test label, journal validation unchanged."
     },
     "observationScope": "RETAINED_COMPLETED_OPERATIONS_NO_NEW_USER_TRANSFERS_NOT_A_PENDING_RESTORE_DRILL",
+    "interruptedObservation": {
+      "sourceSha": "b8326497bbef21d3cbcbacb0687b46616ccb8898",
+      "sourceWorktreeClean": true,
+      "startedAt": "2026-09-13T19:23:05.328Z",
+      "stoppedAt": "2026-09-14T01:15:53.898Z",
+      "elapsedSeconds": 21168,
+      "observations": 258,
+      "waitingObservations": 6,
+      "lastPublishedMatchAt": "2026-09-14T01:11:55.849Z",
+      "reason": "TEST_DISK_HEADROOM_GUARD",
+      "failingDiskSample": "NOT_RETAINED_BY_THAT_RUN",
+      "newEconomicOperations": 0,
+      "accountingUnchanged": true,
+      "cleanup": "TEST_PROCESSES_STOPPED_PROTECTED_STATE_PRESERVED",
+      "continuity": "INTERRUPTED_REQUIRES_NEW_14_DAY_WINDOW_NOT_A_PHASE17_PASS",
+      "diagnosticFix": "Retain the exact failing disk sample and interrupted duration; keep the existing storage floors and secret redaction."
+    },
+    "interruptionDiagnosticsValidation": {
+      "sourceBaseSha": "b8326497bbef21d3cbcbacb0687b46616ccb8898",
+      "executedHarnessSha256": "64aae78c65312e094f7e50790e622630f2bcd1f9b074737a7cf8118ddad929d6",
+      "sourceWorktreeClean": false,
+      "windowsNode": "1012_PASS", "wslNode": "1012_PASS", "failedOrSkippedTests": 0,
+      "diskFloorRegressions": "3_PASS", "fullTreeSecretScan": "PASS",
+      "restartSmoke": "60_SECONDS_ONE_MATCH_NO_NEW_SIGNING_CLEAN_SHUTDOWN",
+      "scope": "DISK_STOP_DIAGNOSTICS_AND_COMPLETED_OPERATION_RESTART_NOT_PENDING_RECOVERY_OR_SOAK_COMPLETION"
+    },
     "sustainedDevnetSoak": "NOT_COMPLETE",
+    "liveBorshRecheck": {
+      "status": "PASS",
+      "observedAt": "2026-09-14T03:21:43.883Z",
+      "schemaVersion": 2,
+      "canonicalMessageBytes": 514,
+      "types": ["AcceptDepositClaim", "RecordWithdrawal", "VerifyMessage"],
+      "exactReencodedBytesAndDigestsMatch": true,
+      "transactions": "The finalized deposit/withdrawal in phase16.realRoundTrip and the corresponding Transceiver verification.",
+      "scope": "LIVE_READ_OF_FINALIZED_DEVNET_MESSAGES_OF_TWO_RETAINED_COMPLETED_OPERATIONS",
+      "newTransactionsSubmitted": 0
+    },
     "devnetRecoveryDrill": "NOT_RUN",
     "remainingNetworkEdgeCases": "NOT_COMPLETE",
     "phase17Certified": false

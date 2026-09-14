@@ -42,14 +42,20 @@ const repoRoot = path.resolve(import.meta.dirname, "../.."), exec = promisify(ex
 const hash = v => createHash("sha256").update(v).digest("hex"), keyHex = v => Buffer.from(base58Decode(v)).toString("hex");
 const json = v => JSON.stringify(v, (_, value) => typeof value === "bigint" ? value.toString() : value);
 const required = name => { assert(process.env[name], "DevnetTestSettingMissing:" + name); return process.env[name]; };
-let interrupted = false;
+let interrupted = false, failedDiskSample;
 for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => { interrupted = true; });
 function diskGuard({ allowInterrupted = false } = {}) {
   assert(allowInterrupted || !interrupted, "TestInterrupted");
   assert.equal(process.platform, "win32", "DevnetProtectedTestRequiresWindows");
   const free = drive => { const v = statfsSync(drive, { bigint: true }); return v.bavail * v.bsize; };
   const space = { cFree: free("C:/").toString(), dFree: free("D:/").toString() };
-  assert(BigInt(space.cFree) >= 8n * 1024n ** 3n && BigInt(space.dFree) >= 4n * 1024n ** 3n, "TestDiskHeadroomRequired");
+  if (BigInt(space.cFree) < 8n * 1024n ** 3n || BigInt(space.dFree) < 4n * 1024n ** 3n) {
+    // Retain the failing sample, not just a later sample after shutdown. The
+    // overnight observation showed that host free space can recover meanwhile.
+    failedDiskSample ??= { observedAt: new Date().toISOString(), ...space,
+      minimumCFree: (8n * 1024n ** 3n).toString(), minimumDFree: (4n * 1024n ** 3n).toString() };
+    throw new Error("TestDiskHeadroomRequired");
+  }
   for (const name of ["TEMP", "TMP", "KINGPEPE_E2E_ROOT"]) assert(/^D:[\\/]/iu.test(required(name)), "TestHeavyOutputMustUseDataDrive");
   return space;
 }
@@ -542,9 +548,15 @@ try {
     event("DEVNET_SOAK_WINDOW_ENDED", { ...evidence.soak, status: evidence.status });
   }
 } catch (error) {
-  phaseError = error; evidence.status = stage === "RPC_CAPABILITIES" && !error?.integrityCode ? "BLOCKED" : "FAIL"; evidence.failureStage = stage;
+  phaseError = error; evidence.status = failedDiskSample || stage === "RPC_CAPABILITIES" && !error?.integrityCode ? "BLOCKED" : "FAIL"; evidence.failureStage = stage;
+  if (evidence.soak) {
+    evidence.soak.endedAt = new Date().toISOString();
+    evidence.soak.elapsedSeconds = Math.floor((Date.now() - Date.parse(evidence.soak.startedAt)) / 1000);
+    evidence.soak.status = "INTERRUPTED_NOT_COMPLETE";
+  }
   // Do not include provider errors, process argv, private paths, buffers or keys.
   evidence.failure = { ...sanitizedRpcDiagnostic(error), nativeCode: error?.nativeCode,
+    ...(failedDiskSample ? { reason: "TEST_DISK_HEADROOM_REQUIRED", disk: failedDiskSample } : {}),
     sourceFrames: [...String(error?.stack ?? "").matchAll(/[/\\]([a-z0-9-]+\.mjs):(\d+):(\d+)/gu)]
       .slice(0, 6).map(match => ({ file: match[1], line: Number(match[2]), column: Number(match[3]) })) };
   event("DEVNET_TEST_FAILED", { stage, diagnostic: evidence.failure });
