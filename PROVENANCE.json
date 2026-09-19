@@ -19,7 +19,7 @@
   "cleanup": {
     "scope": "TEAM_AUTHORIZED_ONE_WAY_CONVERSION",
     "status": "VALIDATION_IN_PROGRESS",
-    "filesAfter": 289,
+    "filesAfter": 290,
     "removed": "Retired economic direction and obsolete implementation/fixtures. Forward signing, proof, recovery, accounting, legal notices and original file-origin classifications remain.",
     "importedSource": "No third-party source imported during conversion."
   },
@@ -1188,6 +1188,13 @@
       "path": "services/bridge-validator/tests/localnet-solana-setup-submitter.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Phase 08 tests for localnet Solana setup submission, account verification, idempotent already-present setup, partial/conflicting account hard stops, dependency waits, and sanitized result boundaries using fake local RPC only.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "services/bridge-validator/tests/mainnet-claim-submission.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated Mainnet claim admission, canonical execution, pause race, lost-response and restart tests with ephemeral signatures and mocked RPC. No live Mainnet transaction evidence.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },

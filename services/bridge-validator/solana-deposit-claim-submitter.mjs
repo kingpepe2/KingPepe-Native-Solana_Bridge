@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { devnetRpcEndpoint, assertDevnetGenesis, isTestSolanaCluster } from "../../shared/solana-test-network.mjs";
-import { mainnetRpcEndpoint, assertMainnetSolanaGenesis } from "../../shared/network-identity.mjs";
+import { mainnetRpcEndpoint, assertMainnetSolanaGenesis, assertMainnetDeploymentFields, SOLANA_MAINNET_GENESIS } from "../../shared/network-identity.mjs";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { validateRuntimeFile, validateRuntimeStateRoot as validateStateRootOutsideRepo } from "../../shared/runtime-path-boundary.mjs";
@@ -19,6 +19,7 @@ import {
 import { DEPOSIT_STATES } from "./automatic-deposit-pipeline.mjs";
 import { verifySignedLocalnetSolanaDepositClaimTransaction } from "./solana-deposit-claim-transaction-plan.mjs";
 import { preserveOperationHardStop, readOperationHardStop } from "../../shared/operation-hard-stop.mjs";
+import { SolanaDepositClaimObserver } from "../solana-observer/solana-deposit-claim-observer.mjs";
 
 export const SOLANA_DEPOSIT_CLAIM_SUBMITTER_PROTOCOL =
   "KINGPEPE_NATIVE_SOLANA_BRIDGE/SOLANA_DEPOSIT_CLAIM_SUBMITTER/V1";
@@ -72,6 +73,21 @@ export class SolanaDepositClaimSubmitter {
   #rpcClient;
   #claimObserver;
   #journal;
+  #beforeMainnetBroadcast;
+
+  static createMainnet(options) {
+    const config = normalizeSubmitterConfig(options?.config);
+    normalizeMainnetClaimConfig(config);
+    if (!(options.rpcClient instanceof SolanaLocalRpcClient) || typeof options.beforeBroadcast !== "function" ||
+        !options.journal || options.journal instanceof InMemorySolanaDepositClaimJournal || options.productionBroadcastAuthorized !== true ||
+        !(options.claimObserver instanceof SolanaDepositClaimObserver))
+      throw new Error("MainnetClaimSubmissionAdmissionRequired");
+    options.rpcClient.assertMainnetBroadcastAdmission();
+    options.claimObserver.assertMainnetBinding(config);
+    const submitter = new SolanaDepositClaimSubmitter({ ...options, config });
+    submitter.#beforeMainnetBroadcast = options.beforeBroadcast;
+    return submitter;
+  }
 
   constructor(options) {
     const value = requireObject(options, "options");
@@ -83,7 +99,7 @@ export class SolanaDepositClaimSubmitter {
 
   async submitDepositClaim(request) {
     const normalized = normalizeDepositClaimRequest(this.#config, request);
-    if (!isTestSolanaCluster(this.#config)) {
+    if (!isTestSolanaCluster(this.#config) && !this.#beforeMainnetBroadcast) {
       return submitterDecision(DEPOSIT_STATES.HARD_STOP, "SOLANA_DEPOSIT_SUBMITTER_LOCALNET_ONLY", normalized);
     }
 
@@ -142,6 +158,15 @@ export class SolanaDepositClaimSubmitter {
 
     // Persist before exposing bytes to RPC. A crash here may only lead to a
     // rebroadcast of these identical bytes, never a new blockhash/operation.
+    // The owning service checks its durable operation, live pause state and
+    // controlled-activation admission at this last boundary. A plain prepared
+    // packet or an RPC connection is never production authorization.
+    if (this.#beforeMainnetBroadcast && await this.#beforeMainnetBroadcast(Object.freeze({
+      operationIdHex: normalized.operationIdHex, messageDigestHex: normalized.messageDigestHex,
+      encodedMessageHex: normalized.encodedMessageHex, solanaSignature,
+    })) !== true) throw new Error("MainnetClaimBroadcastNotAdmitted");
+    const admissionTerminal = this.#terminal(normalized);
+    if (admissionTerminal !== undefined) return admissionTerminal;
     this.#journal.recordSubmitted(normalized.operationIdHex, solanaSignature);
     let signature;
     try {
@@ -225,7 +250,10 @@ export class SolanaDepositClaimSubmitter {
 
     let observation;
     try {
-      observation = await this.#claimObserver.observeFinalizedDepositClaim({
+      const observe = this.#beforeMainnetBroadcast
+        ? input => this.#claimObserver.observeProtectedFinalizedDepositClaim(input, this.#config.solanaGenesis)
+        : input => this.#claimObserver.observeFinalizedDepositClaim(input);
+      observation = await observe({
         operationIdHex: normalized.operationIdHex,
         messageDigestHex: normalized.messageDigestHex,
         solanaSignature,
@@ -298,6 +326,9 @@ export class SolanaLocalRpcClient {
   static createMainnet(options) {
     if (options?.environment !== undefined && options.environment !== "mainnet") throw new Error("SolanaRpcEnvironmentRejected");
     return new SolanaLocalRpcClient({ ...options, environment: "mainnet" }, MAINNET_RPC);
+  }
+  assertMainnetBroadcastAdmission() {
+    if (!this.#mainnet || !this.#broadcastAuthorized) throw new Error("MainnetBroadcastNotAuthorized");
   }
   constructor(options, capability) {
     const value = requireObject(options, "options");
@@ -724,6 +755,7 @@ function normalizeSubmitterConfig(config) {
     environment: value.environment ?? "localnet",
     cluster: value.cluster ?? "localnet",
     solanaGenesis: value.solanaGenesis,
+    ...(value.environment === "mainnet" ? normalizeMainnetClaimConfig(value) : {}),
     solanaDeploymentHex: normalizeHash32(value.solanaDeploymentHex, "solanaDeploymentHex"),
     managerProgramIdHex: normalizeHash32(value.managerProgramIdHex, "managerProgramIdHex"),
     transceiverProgramIdHex: normalizeHash32(value.transceiverProgramIdHex, "transceiverProgramIdHex"),
@@ -732,6 +764,18 @@ function normalizeSubmitterConfig(config) {
     keyEpoch: checkedU32(value.keyEpoch, "keyEpoch"),
     acceptedObservationTrust: Object.freeze([...(value.acceptedObservationTrust ?? ["LOCAL_VALIDATION"])]),
   });
+}
+
+function normalizeMainnetClaimConfig(config) {
+  const value = requireObject(config, "config");
+  if (value.environment !== "mainnet" || value.cluster !== "mainnet" || value.solanaGenesis !== SOLANA_MAINNET_GENESIS)
+    throw new Error("MainnetClaimNetworkRejected");
+  const domain = { protocolId: value.protocolId, nativeNetwork: value.nativeNetwork, nativeGenesis: value.nativeGenesis,
+    solanaDeployment: value.solanaDeploymentHex, managerProgramId: value.managerProgramIdHex,
+    transceiverProgramId: value.transceiverProgramIdHex, mint: value.mintHex };
+  assertMainnetDeploymentFields(domain);
+  return Object.freeze({ protocolId: domain.protocolId, nativeNetwork: domain.nativeNetwork,
+    nativeGenesis: domain.nativeGenesis, solanaDeployment: domain.solanaDeployment });
 }
 
 function normalizeDepositClaimRequest(config, request) {

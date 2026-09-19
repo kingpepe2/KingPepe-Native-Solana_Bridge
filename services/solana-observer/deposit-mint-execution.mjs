@@ -34,7 +34,10 @@ export function verifyDepositMintExecution(result, observation, config) {
       message.action === "DepositClaim" && message.direction === "NativeToSolana" && message.feeAtomic === 0n);
     stage = "SIGNED_PACKET";
     const verified = verifySignedLocalnetSolanaDepositClaimTransaction({
-      environment: "localnet", cluster: "localnet", managerProgramIdHex: config.managerProgramIdHex,
+      environment: config.environment ?? "localnet", cluster: config.cluster ?? "localnet", solanaGenesis: config.solanaGenesis,
+      ...(config.environment === "mainnet" ? { protocolId: config.protocolId, nativeNetwork: config.nativeNetwork,
+        nativeGenesis: config.nativeGenesis, solanaDeployment: config.solanaDeployment } : {}),
+      managerProgramIdHex: config.managerProgramIdHex,
       transceiverProgramIdHex: config.transceiverProgramIdHex, mintHex: config.mintHex,
       recipientTokenAccountHex: message.destinationHex, encodedMessageHex: bytes.toString("hex"),
       recentBlockhashHex: packet.subarray(485, 517).toString("hex"), lastValidBlockHeight: "0",

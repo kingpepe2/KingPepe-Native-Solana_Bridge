@@ -36,18 +36,27 @@ export class SolanaDepositClaimObserver {
   #mainnet;
 
   static createMainnet(options) { return new SolanaDepositClaimObserver(options, MAINNET_OBSERVER); }
+  assertMainnetBinding(expected) {
+    const fields = ["environment", "cluster", "solanaGenesis", "protocolId", "nativeNetwork", "nativeGenesis",
+      "solanaDeployment", "managerProgramIdHex", "transceiverProgramIdHex", "mintHex"];
+    if (!this.#mainnet || fields.some(key => this.#config[key] !== expected[key]))
+      throw new Error("MainnetClaimObserverBindingRejected");
+  }
   constructor(options = {}, capability) {
     if (!options || typeof options !== "object") {
       throw new Error("MissingSolanaDepositClaimObserverOptions");
     }
-    this.#config = normalizeSolanaDepositClaimObserverConfig(options.config);
+    const inputConfig = structuredClone(options.config);
+    this.#config = normalizeSolanaDepositClaimObserverConfig(inputConfig);
     this.#mainnet = capability === MAINNET_OBSERVER;
     if (this.#mainnet) {
-      const c = options.config;
+      const c = inputConfig;
       if (c.environment !== "mainnet" || c.cluster !== "mainnet" || c.solanaGenesis !== SOLANA_MAINNET_GENESIS || options.rpcClient !== undefined || c.nativeDecimals !== 8)
         throw new Error("SolanaMainnetClaimConfigurationRejected");
       assertMainnetDeploymentFields({ protocolId: c.protocolId, nativeNetwork: c.nativeNetwork, nativeGenesis: c.nativeGenesis,
         solanaDeployment: c.solanaDeployment, managerProgramId: c.managerProgramIdHex, transceiverProgramId: c.transceiverProgramIdHex, mint: c.mintHex });
+      this.#config = Object.freeze({ ...this.#config, protocolId: c.protocolId, nativeNetwork: c.nativeNetwork,
+        nativeGenesis: c.nativeGenesis, solanaDeployment: c.solanaDeployment });
       this.#rpcClient = SolanaDepositClaimRpcClient.createMainnet({ endpoint: options.endpoint, expectedGenesis: c.solanaGenesis });
       return;
     }
