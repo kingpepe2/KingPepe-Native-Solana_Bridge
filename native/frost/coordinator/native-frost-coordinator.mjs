@@ -98,6 +98,7 @@ export class NativeFrostCoordinator {
       return this.signAutomaticallyOverIpc(intent);
     }
     const snapshot = validateNativeSigningIntent(intent);
+    if (snapshot.nativeNetwork === "mainnet") throw new Error("MainnetProtectedParticipantsRequired");
     if (this.#localJournal) return this.#signLocallyWithJournal(snapshot);
     // Verification executes in each participant's configured boundary; a
     // coordinator assertion cannot populate either participant's private fence.
@@ -147,13 +148,15 @@ export class NativeFrostCoordinator {
     // Attempts are derived ONLY from the retained journal, never a caller reset.
     if (Object.keys(dataRecord(options, "FROST protected options")).length !== 0) throw new Error("ProtectedFrostAttemptManagedDurably");
     const snapshot = validateNativeSigningIntent(intent);
-    this.#integrity.assertDeployment({ environment: "localnet", nativeGenesis: snapshot.nativeGenesisHash,
-      solanaDeployment: snapshot.solanaDeployment, keyEpoch: snapshot.keyEpoch });
+    const deployment = { environment: snapshot.nativeNetwork === "mainnet" ? "mainnet" : "localnet", nativeGenesis: snapshot.nativeGenesisHash,
+      solanaDeployment: snapshot.solanaDeployment, keyEpoch: snapshot.keyEpoch };
+    this.#integrity.assertDeployment(deployment);
     const journal = this.#signingJournal;
     requireCoordinatorSigningJournal(journal, { publicPackage: this.#publicPackage,
       aggregateTweakedXOnlyPublicKey: this.#aggregateTweakedXOnlyPublicKey }, this.#integrity);
     const signers = REQUIRED_FROST_SIGNERS.map(id => this.#signers.get(id));
     if (!signers.every(isProtectedRemoteFrostPeer)) throw new Error("ProtectedRemoteSignersRequired");
+    if (deployment.environment === "mainnet") signers.forEach(signer => signer.assertDeployment(deployment));
     this.#coordinating = true;
     try {
       return await journal.runExclusive(async () => {
@@ -215,6 +218,7 @@ export class NativeFrostCoordinator {
 
   signAutomatically(intent, options = {}) {
     this.#requireReady();
+    if (validateNativeSigningIntent(intent).nativeNetwork === "mainnet") throw new Error("MainnetProtectedParticipantsRequired");
     const request = createNativeFrostSigningRequest(intent, options);
     const { requestId, intentDigest, messageHex, participantIds } = request;
     const existing = this.#completed.get(requestId);

@@ -1,6 +1,6 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 import { NativeFrostSigner } from "./native-frost-signer.mjs";
-import { validateNativeSigningIntent } from "../policy/native-signing-policy.mjs";
+import { validateNativeSigningIntent, assertNativeSigningPolicy } from "../policy/native-signing-policy.mjs";
 import { validateNativeFrostSigningRequest } from "../policy/signing-request.mjs";
 import { isProtectedServiceIpc } from "../../../shared/windows/service-ipc.mjs";
 import { requireIntegrityGuard } from "../../../services/supervisor/protected-integrity.mjs";
@@ -22,7 +22,8 @@ export async function openProtectedNativeSigner({ base, policy, integrity, nativ
   requireIntegrityGuard(integrity, role);
   integrity.assertDeployment({ environment: c.environment, nativeGenesis: c.nativeGenesis,
     solanaDeployment: c.solanaDeployment, keyEpoch: c.keyEpoch });
-  if (c.environment !== "localnet") throw new Error("ProtectedSignerStartupBindingRejected");
+  if (!["localnet", "mainnet"].includes(c.environment)) throw new Error("ProtectedSignerStartupBindingRejected");
+  if (c.environment === "mainnet") assertNativeSigningPolicy(policy); // DKG preparation cannot authorize a live signer.
   // Public domain/instance digest, never secret state or a private filesystem path.
   const operationId = createHash("sha256").update(JSON.stringify(["KINGPEPE_SIGNER_STARTUP_V1", role,
     c.instanceId, c.environment, c.nativeGenesis, c.solanaDeployment, c.keyEpoch])).digest("hex");
@@ -53,7 +54,7 @@ export function nativeFrostIpcHandler(signer, integrity) {
   if (!(signer instanceof NativeFrostSigner)) throw new Error("IpcNativeSignerRequired");
   requireIntegrityGuard(integrity, signer.signerId);
   const context = signer.dkgContext();
-  integrity.assertDeployment({ environment: "localnet", nativeGenesis: context.nativeGenesisHash,
+  integrity.assertDeployment({ environment: context.environment, nativeGenesis: context.nativeGenesisHash,
     solanaDeployment: context.solanaDeployment, keyEpoch: context.keyEpoch });
   if (!signer.hasExclusiveProtectedState()) throw new Error("IpcProtectedSignerRequired");
   return async ({ method, operationId, payload, peerRole }) => {
@@ -103,6 +104,10 @@ export class ProtectedRemoteFrostPeer {
     Object.defineProperty(this, "signerId", { value: signerId, enumerable: true }); PEERS.add(this); Object.freeze(this);
   }
   isAvailable() { return true; } // Reachability is determined by authenticated calls, never this hint.
+  assertDeployment(expected) {
+    if (Object.keys(expected).sort().join() !== "environment,keyEpoch,nativeGenesis,solanaDeployment" ||
+        !Object.entries(expected).every(([key, value]) => this.#ipc.deployment[key] === value)) throw new Error("IpcSignerDeploymentMismatch");
+  }
   async verifyNativeEvidence(intent) {
     const result = await this.#ipc.request(this.#port, { method: "verifyNativeEvidence", operationId: intent.operationId, payload: intent });
     if (result?.state !== "NATIVE_EVIDENCE_CHECKED" || result.operationId !== intent.operationId) throw new Error("IpcNativeEvidenceRejected");

@@ -5,6 +5,7 @@ export {
   REQUIRED_FROST_THRESHOLD,
   canonicalJson,
   createNativeSigningPolicy,
+  createMainnetNativeSigningPolicy,
   createLocalNativeDkgPolicy,
   createMainnetNativeDkgPolicy,
   evaluateNativeSigningPolicy,
