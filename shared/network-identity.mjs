@@ -33,6 +33,19 @@ export function mainnetDeploymentIdentity({ manager, transceiver, mint }) {
   } catch { throw new Error("MainnetDeploymentIdentityRejected"); }
 }
 
+// Exact production Borsh domain, including the Solana cluster commitment and
+// all three public account identities. A human-readable network name is insufficient.
+export function assertMainnetDeploymentFields(value) {
+  try {
+    if (value.protocolId !== 1 || value.nativeNetwork !== NATIVE_MAINNET_DOMAIN || value.nativeGenesis !== NATIVE_MAINNET_GENESIS) throw new Error();
+    const keys = [value.managerProgramId, value.transceiverProgramId, value.mint].map(key => {
+      if (typeof key !== "string" || !/^[0-9a-f]{64}$/u.test(key)) throw new Error();
+      return base58.encode(Buffer.from(key, "hex"));
+    });
+    if (mainnetDeploymentIdentity({ manager: keys[0], transceiver: keys[1], mint: keys[2] }) !== value.solanaDeployment) throw new Error();
+  } catch { throw new Error("MainnetDeploymentBindingRejected"); }
+}
+
 export function nativeIdentity(environment) {
   if (environment === "mainnet") return Object.freeze({ environment, network: "mainnet", rpcChain: "main",
     genesis: NATIVE_MAINNET_GENESIS, domain: NATIVE_MAINNET_DOMAIN, hrp: NATIVE_MAINNET_HRP, decimals: NATIVE_DECIMALS });

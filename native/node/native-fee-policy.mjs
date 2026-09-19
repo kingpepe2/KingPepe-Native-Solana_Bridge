@@ -1,7 +1,7 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 // Network miner fees are exact atomic units, separate from the zero Bridge fee.
 import { decimalCoinsToAtomic } from "./native-rpc-client.mjs";
-import { parseNativeTransactionHex } from "./native-taproot-transaction.mjs";
+import { parseNativeTransactionHex, attachTaprootWitnesses } from "./native-taproot-transaction.mjs";
 
 const U64 = 0xffff_ffff_ffff_ffffn;
 const check = (v, code = "NativeFeePolicyRejected") => { if (!v) throw new Error(code); };
@@ -14,6 +14,27 @@ export function nativeTransactionWeight(transactionHex) {
   const weight = strippedBytes * 3n + totalBytes;
   check(weight > 0n && weight <= 4_000_000n);
   return Object.freeze({ weight: weight.toString(), virtualBytes: ceil(weight, 4n).toString() });
+}
+
+// Exact size-only projection for the retained SIGHASH_DEFAULT FROST paths.
+// Placeholder witness bytes never leave this function as a transaction/packet.
+export function nativePlannedTransactionWeight({ unsignedTransactionHex, spentOutputs, tapscriptSpends }) {
+  const tx = parseNativeTransactionHex(unsignedTransactionHex);
+  check(!tx.hasWitness && tx.strippedHex === unsignedTransactionHex, "NativeFeeUnsignedPlanRequired");
+  const measured = attachTaprootWitnesses({ unsignedNativeTransactionHex: unsignedTransactionHex,
+    signatures: tx.inputs.map(() => "00".repeat(64)),
+    ...(tapscriptSpends === undefined ? {} : { tapscriptSpends, spentOutputs }) });
+  return nativeTransactionWeight(measured.rawSignedTransactionHex);
+}
+
+export function verifyNativeTransactionFee({ signedTransactionHex, inputAmountsAtomic, quote }) {
+  const tx = parseNativeTransactionHex(signedTransactionHex), measured = nativeTransactionWeight(signedTransactionHex);
+  check(tx.hasWitness && Array.isArray(inputAmountsAtomic) && inputAmountsAtomic.length === tx.inputs.length, "NativeFeeSignedTransactionRequired");
+  const inputs = inputAmountsAtomic.reduce((sum, value) => sum + amount(value), 0n);
+  const outputs = tx.outputs.reduce((sum, value) => sum + amount(value.amountAtomic), 0n);
+  check(inputs <= U64 && inputs >= outputs && quote?.policy === "DYNAMIC_NODE_ESTIMATE_WITH_CAP" &&
+    quote.virtualBytes === measured.virtualBytes && inputs - outputs === amount(quote.feeAtomic), "NativeFeeTransactionMismatch");
+  return Object.freeze({ ...measured, feeAtomic: (inputs - outputs).toString() });
 }
 
 export function validateNativeFeePolicy(value) {

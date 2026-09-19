@@ -1,14 +1,24 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
-// REGTEST-only public script construction; no secret creation or signing.
+// Explicit network-bound public script construction; no secret creation or signing.
 import { createHash } from "node:crypto";
 import { schnorr } from "@noble/curves/secp256k1.js";
 import { REGTEST_GENESIS } from "../node/native-raw-evidence.mjs";
 import { bridgeNumsPublicKeyHex, createTwoLeafTaprootOutput } from "../node/native-tapscript.mjs";
 import { parseNativeTransactionHex } from "../node/native-taproot-transaction.mjs";
 import { encodeNativeInput } from "../../shared/protocol/native-inputs.mjs";
+import { NATIVE_MAINNET_GENESIS, assertMainnetDeploymentFields } from "../../shared/network-identity.mjs";
 
 export function deriveRegtestDepositCommitment(input) {
   if (input?.nativeGenesisHex !== REGTEST_GENESIS) throw new Error("RecoveryWrongNativeNetwork");
+  return deriveDepositCommitment(input);
+}
+export function deriveMainnetDepositCommitment(input) {
+  assertMainnetDeploymentFields({ protocolId: input?.protocolId, nativeNetwork: input?.nativeNetwork, nativeGenesis: input?.nativeGenesisHex,
+    solanaDeployment: input?.solanaDeploymentHex, managerProgramId: input?.managerProgramIdHex,
+    transceiverProgramId: input?.transceiverProgramIdHex, mint: input?.mintHex });
+  return deriveDepositCommitment(input);
+}
+function deriveDepositCommitment(input) {
   const domains = ["nativeGenesisHex", "solanaDeploymentHex", "managerProgramIdHex", "transceiverProgramIdHex", "mintHex", "recipientHex", "nonceHex"];
   const amount = atomic(input.amountAtomic);
   if (amount === 0n) throw new Error("RecoveryAmountMustBePositive");
@@ -19,8 +29,15 @@ export function deriveRegtestDepositCommitment(input) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-export function buildRegtestRecoverableDeposit({ nativeGenesisHex, depositCommitmentHex, frostPublicKeyHex, userRecoveryPublicKeyHex, csvDelayBlocks }) {
-  if (nativeGenesisHex !== REGTEST_GENESIS) throw new Error("RecoveryWrongNativeNetwork");
+export function buildRegtestRecoverableDeposit(input) {
+  if (input?.nativeGenesisHex !== REGTEST_GENESIS) throw new Error("RecoveryWrongNativeNetwork");
+  return buildRecoverableDeposit(input, false);
+}
+export function buildMainnetRecoverableDeposit(input) {
+  if (input?.nativeGenesisHex !== NATIVE_MAINNET_GENESIS) throw new Error("RecoveryWrongNativeNetwork");
+  return buildRecoverableDeposit(input, true);
+}
+function buildRecoverableDeposit({ nativeGenesisHex, depositCommitmentHex, frostPublicKeyHex, userRecoveryPublicKeyHex, csvDelayBlocks }, mainnet) {
   const commitment = hash32(depositCommitmentHex).toString("hex");
   const frost = publicKey(frostPublicKeyHex);
   const recovery = publicKey(userRecoveryPublicKeyHex);
@@ -37,7 +54,8 @@ export function buildRegtestRecoverableDeposit({ nativeGenesisHex, depositCommit
     firstScriptHex: sweepScriptHex, secondScriptHex: recoveryScriptHex });
   const canonicalReserveScriptPubKeyHex = `5120${frost}`;
   if (output.scriptPubKeyHex === canonicalReserveScriptPubKeyHex) throw new Error("RecoveryReserveMustBeSeparate");
-  return Object.freeze({ protocol: "KINGPEPE_REGTEST_RECOVERABLE_DEPOSIT/V2", localOnly: true, productionReady: false,
+  return Object.freeze({ ...(mainnet ? { protocol: "KINGPEPE_MAINNET_RECOVERABLE_DEPOSIT/V2", environment: "mainnet" } :
+    { protocol: "KINGPEPE_REGTEST_RECOVERABLE_DEPOSIT/V2", localOnly: true, productionReady: false }),
     nativeGenesisHex, depositCommitmentHex: commitment, frostPublicKeyHex: frost, userRecoveryPublicKeyHex: recovery,
     csvDelayBlocks: delay, scriptPubKeyHex: output.scriptPubKeyHex, outputPublicKeyHex: output.outputPublicKeyHex,
     internalPublicKeyHex: output.internalPublicKeyHex, merkleRootHex: output.merkleRootHex,
@@ -49,9 +67,17 @@ export function buildRegtestRecoverableDeposit({ nativeGenesisHex, depositCommit
 // FROST identity. Coordinator-supplied script metadata is not authorization.
 export function validateRegtestRecoverableDepositIntent({ intent, policy, depositScriptPubKeyHex,
   reserveScriptPubKeyHex, frostPublicKeyHex, userRecoveryPublicKeyHex, csvDelayBlocks }) {
-  const rebuilt = buildRegtestRecoverableDeposit({ ...policy, nativeGenesisHex: intent.nativeGenesisHex,
-    depositCommitmentHex: deriveRegtestDepositCommitment(intent), frostPublicKeyHex, userRecoveryPublicKeyHex, csvDelayBlocks });
-  for (const field of ["protocol", "localOnly", "productionReady", "nativeGenesisHex", "depositCommitmentHex",
+  return validateRecoverableDepositIntent({ intent, policy, depositScriptPubKeyHex, reserveScriptPubKeyHex, frostPublicKeyHex, userRecoveryPublicKeyHex, csvDelayBlocks }, false);
+}
+export function validateMainnetRecoverableDepositIntent(value) { return validateRecoverableDepositIntent(value, true); }
+function validateRecoverableDepositIntent({ intent, policy, depositScriptPubKeyHex,
+  reserveScriptPubKeyHex, frostPublicKeyHex, userRecoveryPublicKeyHex, csvDelayBlocks }, mainnet) {
+  const build = mainnet ? buildMainnetRecoverableDeposit : buildRegtestRecoverableDeposit;
+  const commitment = mainnet ? deriveMainnetDepositCommitment : deriveRegtestDepositCommitment;
+  const rebuilt = build({ ...policy, nativeGenesisHex: intent.nativeGenesisHex,
+    depositCommitmentHex: commitment(intent), frostPublicKeyHex, userRecoveryPublicKeyHex, csvDelayBlocks });
+  if (mainnet && (Object.keys(policy).sort().join() !== Object.keys(rebuilt).sort().join())) throw new Error("RecoveryDepositIntentSubstituted");
+  for (const field of ["protocol", ...(mainnet ? ["environment"] : ["localOnly", "productionReady"]), "nativeGenesisHex", "depositCommitmentHex",
     "frostPublicKeyHex", "userRecoveryPublicKeyHex", "csvDelayBlocks", "scriptPubKeyHex", "outputPublicKeyHex",
     "internalPublicKeyHex", "merkleRootHex", "canonicalReserveScriptPubKeyHex"]) {
     if (rebuilt[field] !== policy[field]) throw new Error("RecoveryDepositIntentSubstituted");
