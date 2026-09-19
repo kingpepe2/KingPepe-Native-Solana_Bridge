@@ -29,7 +29,8 @@ function mainnetLookupFixture() {
   const block = height => h("bounded-mainnet-block-" + height), txHex = createUnsignedNativeTransaction({
     inputs: [{ txid: h("lookup-input"), vout: 0 }], outputs: [{ amountAtomic: "100", scriptPubKeyHex: "5120" + h("lookup-recipient") }] });
   const txid = parseNativeTransactionHex(txHex).txidHex, calls = [], control = { chain: "main", genesis: NATIVE_MAINNET_GENESIS,
-    unspent: true, mempool: false, indexed: false, substituted: false, staleBlock: false, changeTip: false, absent: false };
+    unspent: true, mempool: false, indexed: false, substituted: false, staleBlock: false, changeTip: false, absent: false,
+    scanChanged: false, scanOversized: false, scanWrongScript: false };
   let sourceReads = 0;
   const rpc = new NativeRpcClient({ endpoint: "http://127.0.0.1:18443", fetchFn: async (_url, init) => {
     const { id, method, params } = JSON.parse(init.body); calls.push({ method, params }); let result, error = null;
@@ -44,6 +45,12 @@ function mainnetLookupFixture() {
         ...(control.mempool ? {} : { blockhash: block(3), confirmations: 8, in_active_chain: true }) };
     } else if (method === "gettxout") result = control.unspent ? { bestblock: block(10), confirmations: 8, value: 0.00000100,
       scriptPubKey: { hex: "5120" + h("lookup-recipient") }, coinbase: false } : null;
+    else if (method === "scantxoutset") {
+      assert.deepEqual(params, ["start", [{ desc: "raw(5120" + h("lookup-recipient") + ")" }]]);
+      const coin = { txid, vout: 0, height: 3, scriptPubKey: "5120" + h(control.scanWrongScript ? "wrong" : "lookup-recipient") };
+      result = { success: true, bestblock: block(control.scanChanged ? 11 : 10), height: 10,
+        unspents: control.scanOversized ? Array(129).fill(coin) : control.absent ? [] : [coin] };
+    }
     else if (method === "getblock") {
       const height = Array.from({ length: 10 }, (_, n) => n + 1).find(n => block(n) === params[0]);
       result = { hash: block(height), height, tx: !control.absent && height === 3 ? [txid] : [h("irrelevant-" + height)] };
@@ -69,6 +76,24 @@ test("Mainnet historical lookup reuses a block hint or advances only a bounded r
   assert.equal(result.blockHash, f.block(3)); assert.equal(f.calls.filter(c => c.method === "getblock").length, 1);
   f.calls.length = 0; result = await f.rpc.locateMainnetTransaction({ txid: f.txid, blockHash: result.blockHash });
   assert.equal(result.state, "OBSERVED"); assert(!f.calls.some(c => c.method === "getblock" || c.method === "gettxout"));
+});
+
+test("late Mainnet deposit notification resolves its derived script without txindex or an output-index guess", async () => {
+  const f = mainnetLookupFixture(), scriptPubKeyHex = "5120" + h("lookup-recipient");
+  const found = await f.rpc.locateMainnetTransaction({ txid: f.txid, scriptPubKeyHex });
+  assert.equal(found.rawTransactionHex, f.txHex); assert.equal(found.blockHash, f.block(3));
+  assert.equal(f.calls.filter(c => c.method === "scantxoutset").length, 1);
+  assert(!f.calls.some(c => c.method === "getblock" || c.method === "sendrawtransaction"));
+  for (const condition of ["scanChanged", "scanOversized", "scanWrongScript"]) {
+    const bad = mainnetLookupFixture(); bad.control[condition] = true;
+    await assert.rejects(bad.rpc.locateMainnetTransaction({ txid: bad.txid, scriptPubKeyHex }), /LookupScan/);
+  }
+  const absent = mainnetLookupFixture(); absent.control.absent = true;
+  const missing = await absent.rpc.locateMainnetTransaction({ txid: absent.txid, scriptPubKeyHex });
+  assert.equal(missing.state, SOURCE_WAITING); assert.equal(missing.transactionAbsenceProven, false);
+  const invalid = mainnetLookupFixture();
+  await assert.rejects(invalid.rpc.locateMainnetTransaction({ txid: invalid.txid, scriptPubKeyHex: "raw(*)" }), /ScriptRejected/);
+  assert.deepEqual(invalid.calls, []);
 });
 
 test("Mainnet transaction lookup never upgrades a mempool transaction or a bounded miss into finality/absence", async () => {

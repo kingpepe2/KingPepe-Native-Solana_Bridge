@@ -45,9 +45,13 @@ test("bounded Mainnet header cache reuses a stable prefix and discards replaced 
   await collectMainnetEvidence(options); assert.equal(source.batches(), 2);
   source.height(241); const full = await collectMainnetEvidence(options); assert.equal(source.batches(), 3);
   assert.equal(createHash("sha256").update(encodeMainnetEvidence(full)).digest("hex"), vector.digest);
-  const checkpoint = { protocol: "KINGPEPE_MAINNET_ACCEPTANCE_CHECKPOINT_V1", genesis: NATIVE_MAINNET_GENESIS,
-    tipHash: full.tipHash, tipHeight: full.tipHeight, chainworkHex: full.chainworkHex, minimumConfirmations: 12, evidenceDigestHex: vector.digest };
+  const checkpoint = { protocol: "KINGPEPE_MAINNET_ACCEPTANCE_CHECKPOINT_V2", genesis: NATIVE_MAINNET_GENESIS,
+    tipHash: full.tipHash, tipHeight: full.tipHeight, chainworkHex: full.chainworkHex, minimumConfirmations: 12,
+    transactionBlockHints: { [vector.input.proofs[0].transactionIds[0]]: headerId(full.headers[0]) }, evidenceDigestHex: vector.digest };
   assert.deepEqual(encodeMainnetEvidenceAtCheckpoint(full, checkpoint), encodeMainnetEvidence(full));
+  assert.throws(() => encodeMainnetEvidenceAtCheckpoint(full, { ...checkpoint, transactionBlockHints: {} }), /BLOCK_HINT_CHANGED/);
+  assert.throws(() => encodeMainnetEvidenceAtCheckpoint(full, { ...checkpoint,
+    transactionBlockHints: { [vector.input.proofs[0].transactionIds[0]]: h(2) } }), /BLOCK_HINT_CHANGED/);
   source.replaceTip(); const changed = await collectMainnetEvidence(options); assert.equal(source.batches(), 4);
   assert.throws(() => encodeMainnetEvidenceAtCheckpoint(changed, checkpoint), /CHECKPOINT_REJECTED/);
   // Collected headers are observations, never fabricated verified capabilities.
@@ -69,6 +73,45 @@ test("optional block locations are lookup hints and cannot substitute transactio
   const options = { rpc, transactionIds: [txid], minimumConfirmations: 12 };
   await assert.rejects(collectMainnetEvidence({ ...options, transactionBlockHints: { [h(1)]: h(2) } }), /BLOCK_HINT_REJECTED/);
   await assert.rejects(collectMainnetEvidence({ ...options, transactionBlockHints: { [txid]: h(2) } }), /BLOCK_SUBSTITUTED/);
+});
+
+test("a no-index Mainnet proof rereads retained spent transaction blocks and rejects substituted membership", async () => {
+  const { rpc } = sourceModel(), txid = vector.input.proofs[0].transactionIds[0], block = headerId(vector.input.headers[0]);
+  const read = rpc.getRawTransaction, hints = { [txid]: block };
+  rpc.getRawTransaction = async (id, verbose, hint) => {
+    assert.equal(id, txid); assert.equal(verbose, true);
+    if (hint === undefined) throw new Error("NativeRpcRejected:getrawtransaction:-5");
+    assert.equal(hint, block); return read();
+  };
+  // Reopened public checkpoint hints do not need the original UTXO or txindex.
+  const options = { rpc, transactionIds: [txid], minimumConfirmations: 12 };
+  await assert.rejects(collectMainnetEvidence(options), /getrawtransaction:-5/);
+  const first = await collectMainnetEvidence({ ...options, transactionBlockHints: hints });
+  const reopened = await collectMainnetEvidence({ ...options, transactionBlockHints: JSON.parse(JSON.stringify(hints)) });
+  assert.deepEqual(encodeMainnetEvidence(first), encodeMainnetEvidence(reopened));
+  rpc.getBlock = async () => ({ height: 1, hash: block, tx: [h(3)] });
+  await assert.rejects(collectMainnetEvidence({ ...options, transactionBlockHints: hints }), /MEMBERSHIP_MISSING/);
+});
+
+test("Mainnet input and reserve paths feed lookup hints to proof collection without granting proof authority", async () => {
+  const { rpc } = sourceModel(), txid = vector.input.proofs[0].transactionIds[0], block = headerId(vector.input.headers[0]);
+  let lookups = 0, hintRead;
+  rpc.locateMainnetTransaction = async request => { lookups++; assert.deepEqual(request, { txid, vout: 0 });
+    return { state: "OBSERVED", blockHash: block }; };
+  rpc.getRawTransaction = async (id, verbose, hint) => { hintRead = hint; throw new Error("TEST_PROOF_COLLECTION_BOUNDARY"); };
+  const verifier = LocalNativeEvidenceVerifier.createMainnet({ rpc, executable: "/unused-not-proof-test" });
+  const input = { txid, vout: 0 };
+  await assert.rejects(verifier.verifyInputs({ inputs: [input], minimumConfirmations: 12 }), /TEST_PROOF_COLLECTION_BOUNDARY/);
+  assert.equal(lookups, 1); assert.equal(hintRead, block);
+  lookups = 0;
+  await assert.rejects(verifier.verifyInputs({ inputs: [input], minimumConfirmations: 12,
+    acceptedCheckpoint: { transactionBlockHints: { [txid]: block } } }), /TEST_PROOF_COLLECTION_BOUNDARY/);
+  assert.equal(lookups, 0); assert.equal(hintRead, block);
+  await assert.rejects(verifier.verifyReserve({ deposit: { txid: h(5), vout: 0 }, feeInputs: [], sweepTxid: txid,
+    reserveVout: 0, minimumConfirmations: 12, transactionBlockHints: { [h(5)]: h(6) } }), /TEST_PROOF_COLLECTION_BOUNDARY/);
+  assert.equal(lookups, 1); assert.equal(hintRead, h(6));
+  await assert.rejects(verifier.verifyInputs({ inputs: [input], minimumConfirmations: 12,
+    acceptedCheckpoint: { transactionBlockHints: { [h(7)]: h(8) } } }), /BLOCK_HINT_REJECTED/);
 });
 
 test("Native header batching is bounded, read-only, order-safe and rejects ambiguous replies", async () => {

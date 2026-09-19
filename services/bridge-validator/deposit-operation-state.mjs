@@ -53,11 +53,16 @@ export function depositOperationPolicyDigest(policy) {
   return bridgeInputDigest("DepositPolicy", { ...value, solanaGenesis: base58Decode(value.solanaGenesis) });
 }
 function checkpoint(c, policy) {
-  fields(c, ["protocol", "genesis", "tipHash", "tipHeight", "chainworkHex", "minimumConfirmations", "evidenceDigestHex"]);
   const mainnet = policy.environment === "mainnet";
-  check(c.protocol === (mainnet ? "KINGPEPE_MAINNET_ACCEPTANCE_CHECKPOINT_V1" : "KINGPEPE_REGTEST_ACCEPTANCE_CHECKPOINT_V1") && c.genesis === policy.nativeGenesis);
+  fields(c, ["protocol", "genesis", "tipHash", "tipHeight", "chainworkHex", "minimumConfirmations", "evidenceDigestHex", ...(mainnet ? ["transactionBlockHints"] : [])]);
+  check(c.protocol === (mainnet ? "KINGPEPE_MAINNET_ACCEPTANCE_CHECKPOINT_V2" : "KINGPEPE_REGTEST_ACCEPTANCE_CHECKPOINT_V1") && c.genesis === policy.nativeGenesis);
   positive(c.tipHeight, mainnet ? 1_000_000 : 4096); positive(c.minimumConfirmations, 4096); hash(c.tipHash); hash(c.chainworkHex); hash(c.evidenceDigestHex);
   check(BigInt("0x" + c.chainworkHex) > 0n);
+  if (mainnet) {
+    check(c.transactionBlockHints && !Array.isArray(c.transactionBlockHints));
+    check(Object.keys(c.transactionBlockHints).length > 0 && Object.keys(c.transactionBlockHints).length <= 16);
+    for (const [id, block] of Object.entries(c.transactionBlockHints)) { hash(id); hash(block); }
+  }
 }
 export function validateDepositOperationPlan(input, policy) {
   const p = validateDepositOperationPolicy(policy), v = structuredClone(input);
@@ -88,6 +93,8 @@ export function validateDepositOperationPlan(input, policy) {
   // Reject extra/script metadata rather than retaining an unvalidated alternate.
   check(canonicalJson(depositPolicy) === canonicalJson(v.depositPolicy));
   const ids = v.inputs.map(i => i.txid + ":" + i.vout); check(new Set(ids).size === ids.length);
+  if (p.environment === "mainnet") check(Object.keys(v.acceptedCheckpoint.transactionBlockHints).sort().join() ===
+    [...new Set(v.inputs.map(i => i.txid))].sort().join(), "DepositCheckpointInputsChanged");
   check(typeof v.unsignedTransactionHex === "string" && HEX.test(v.unsignedTransactionHex) && v.unsignedTransactionHex.length <= 32_768);
   const tx = parseNativeTransactionHex(v.unsignedTransactionHex);
   check(tx.strippedHex === v.unsignedTransactionHex && tx.inputs.length === ids.length && tx.inputs.every((i, n) => i.outpoint === ids[n]));
@@ -132,6 +139,11 @@ function validateFinalized(plan, fact, policy) {
     check(fact.acceptedCheckpoint.tipHeight - value.height + 1 >= policy.minimumConfirmations);
   }
   check(b.deposit.txid === plan.inputs[0].txid && b.deposit.vout === plan.inputs[0].vout && b.sweep.txid === tx.txidHex && b.sweep.vout === 0 && b.sweep.height >= b.deposit.height);
+  if (policy.environment === "mainnet") {
+    const hints = fact.acceptedCheckpoint.transactionBlockHints;
+    check(Object.keys(hints).sort().join() === [...new Set([...plan.inputs.map(i => i.txid), tx.txidHex])].sort().join(), "DepositCheckpointInputsChanged");
+    check(hints[b.deposit.txid] === b.deposit.blockHash && hints[b.sweep.txid] === b.sweep.blockHash, "DepositCheckpointBasisChanged");
+  }
   check(typeof fact.encodedMessageHex === "string" && /^[0-9a-f]{964}$/u.test(fact.encodedMessageHex));
   const m = decodeCanonicalBridgeMessage(Buffer.from(fact.encodedMessageHex, "hex")), d = plan.depositIntent;
   check(m.action === "DepositClaim" && m.direction === "NativeToSolana" && m.amountAtomic.toString() === d.amountAtomic && m.feeAtomic === 0n &&

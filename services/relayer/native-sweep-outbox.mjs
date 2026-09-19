@@ -138,7 +138,14 @@ export class ProtectedNativeSweepOutbox {
   }
   async #known(record) {
     let raw;
-    try { raw = await this.#rpc.getRawTransaction(parseNativeTransactionHex(record.signedTransactionHex).txidHex, false); }
+    try {
+      const txid = parseNativeTransactionHex(record.signedTransactionHex).txidHex;
+      if (this.#policy.environment === "mainnet") {
+        const located = await this.#rpc.locateMainnetTransaction({ txid, vout: 0 });
+        if (located.state !== "OBSERVED") return false;
+        raw = located.rawTransactionHex;
+      } else raw = await this.#rpc.getRawTransaction(txid, false);
+    }
     catch (error) {
       // An exact Native -5 means not found by this configured node, NOT proof
       // of non-broadcast. A retry also verifies the still-unspent exact inputs.
@@ -179,7 +186,7 @@ export class ProtectedNativeSweepOutbox {
         const p = record.plan, fee = p.inputs.reduce((n, i) => n + BigInt(i.amountAtomic), 0n) - BigInt(p.depositIntent.amountAtomic);
         // Same independent full raw-evidence verifier used by the signers.
         // A mempool spend/recovery race or missing UTXO must WAIT, not reroute.
-        const verified = await this.#verifier.verifySweepSigning({ inputs: p.inputs, minimumConfirmations: p.acceptedCheckpoint.minimumConfirmations,
+        const verified = await this.#verifier.verifySweepSigning({ inputs: p.inputs, minimumConfirmations: this.#policy.minimumConfirmations,
           unsignedTransactionHex: p.unsignedTransactionHex, reserveAmountAtomic: p.depositIntent.amountAtomic, feeAtomic: fee.toString(),
           reserveScriptHex: p.depositPolicy.canonicalReserveScriptPubKeyHex, intent: p.signingIntents[0],
           tapscriptSpends: [p.depositPolicy.sweep, ...p.inputs.slice(1).map(() => undefined)], acceptedCheckpoint: p.acceptedCheckpoint });

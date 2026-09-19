@@ -28,7 +28,8 @@ export async function mainnetDepositRequestFixture() {
     assert.deepEqual(options, { expectedNetwork: "main", expectedGenesisHash: p.nativeGenesis });
     calls.push("identity"); return { state: "READY", bestHash: h("synthetic tip") };
   };
-  rpc.getRawTransaction = async txid => { assert.equal(txid, request.depositTxidHex); calls.push("transaction"); return raw; };
+  rpc.locateMainnetTransaction = async ({ txid }) => { assert.equal(txid, request.depositTxidHex); calls.push("transaction");
+    return { state: "OBSERVED", rawTransactionHex: raw, sourceTipHash: h("synthetic tip") }; };
   rpc.getUtxoObservation = async () => ({ unspent: true, valueAtomic: input.amountAtomic, scriptPubKeyHex: quote.scriptPubKeyHex, bestBlockHash: h("synthetic tip") });
   rpc.call = async (method, params) => {
     calls.push(method); if (method === "estimatesmartfee") assert.deepEqual(params, [3, "ECONOMICAL"]);
@@ -39,8 +40,9 @@ export async function mainnetDepositRequestFixture() {
   verifier.verifyInputs = async value => {
     calls.push("finality"); assert.equal(value.minimumConfirmations, 12);
     if (!conditions.finalized) throw new Error("RAW_NATIVE_INPUT_FINALITY_INSUFFICIENT");
-    return { digestHex: h("synthetic checkpoint"), acceptedCheckpoint: { protocol: "KINGPEPE_MAINNET_ACCEPTANCE_CHECKPOINT_V1",
-      genesis: p.nativeGenesis, tipHash: h("synthetic tip"), tipHeight: 100, chainworkHex: h("synthetic work"), minimumConfirmations: 12, evidenceDigestHex: h("synthetic checkpoint") } };
+    return { digestHex: h("synthetic checkpoint"), acceptedCheckpoint: { protocol: "KINGPEPE_MAINNET_ACCEPTANCE_CHECKPOINT_V2",
+      genesis: p.nativeGenesis, tipHash: h("synthetic tip"), tipHeight: 100, chainworkHex: h("synthetic work"), minimumConfirmations: 1,
+      transactionBlockHints: Object.fromEntries(value.inputs.map(i => [i.txid, h("synthetic input block")])), evidenceDigestHex: h("synthetic checkpoint") } };
   };
   return { policy: { deliveryPolicy: delivery, creditValiditySeconds: 3600 }, quote, request, input, calls, conditions, rpc, verifier,
     feePolicy: { policy: "DYNAMIC_NODE_ESTIMATE_WITH_CAP", minimumRelayAtomicPerKvB: "1000", maximumAtomicPerKvB: "10000", maximumFeeAtomic: p.maximumFeeAtomic } };

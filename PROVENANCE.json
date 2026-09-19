@@ -25,6 +25,13 @@
   },
   "trackedFiles": [
     {
+      "path": "docs/security/native-mainnet-observation.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original description of forward Mainnet transaction lookup, retained verified block hints, unchanged proof/finality boundaries and read-only validation scope.",
+      "purpose": "REQUIRED_DOCUMENTATION",
+      "reviewDisposition": "KEEP_CORE"
+    },
+    {
       "path": ".gitattributes",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
       "notes": "Original text-only LF checkout policy for reproducible Windows/WSL source inspection; binary files are not normalized.",

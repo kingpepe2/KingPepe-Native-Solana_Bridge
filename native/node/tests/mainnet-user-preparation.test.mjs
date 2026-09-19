@@ -56,7 +56,7 @@ function observerFixture({ feeAtomic = "212", estimate = '"feerate":0.00001000,"
     assert.deepEqual(value, { expectedNetwork: "main", expectedGenesisHash: NATIVE_MAINNET_GENESIS });
     calls.push("identity"); return { state: ready ? "READY" : "REJECTED", bestHash: hash(21) };
   };
-  rpc.getRawTransaction = async () => raw;
+  rpc.locateMainnetTransaction = async () => ({ state: "OBSERVED", rawTransactionHex: raw, sourceTipHash: hash(21) });
   rpc.getUtxoObservation = async () => ({ unspent: true, valueAtomic: deposit.amountAtomic,
     scriptPubKeyHex: quote.scriptPubKeyHex, bestBlockHash: hash(21) });
   rpc.call = async (method, params) => {
@@ -69,9 +69,9 @@ function observerFixture({ feeAtomic = "212", estimate = '"feerate":0.00001000,"
   verifier.verifyInputs = async value => {
     calls.push("independent-finality"); assert.equal(value.minimumConfirmations, 12);
     if (!finality) throw new Error("BELOW_NATIVE_FINALITY");
-    return { digestHex: hash(22), acceptedCheckpoint: { protocol: "KINGPEPE_MAINNET_ACCEPTANCE_CHECKPOINT_V1",
+    return { digestHex: hash(22), acceptedCheckpoint: { protocol: "KINGPEPE_MAINNET_ACCEPTANCE_CHECKPOINT_V2",
       genesis: NATIVE_MAINNET_GENESIS, tipHash: hash(21), tipHeight: 100, chainworkHex: hash(23),
-      minimumConfirmations: 12, evidenceDigestHex: hash(22) } };
+      minimumConfirmations: 1, transactionBlockHints: Object.fromEntries(value.inputs.map(i => [i.txid, hash(24)])), evidenceDigestHex: hash(22) } };
   };
   const options = { nativeRpc: rpc, nativeVerifier: verifier, policy,
     nativeFeePolicy: { policy: "DYNAMIC_NODE_ESTIMATE_WITH_CAP", minimumRelayAtomicPerKvB: "1000",

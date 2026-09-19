@@ -63,7 +63,14 @@ export class NativeDepositObserver {
   async #fundedOutput(input) {
     const p = this.#policy, r = validateNativeDepositRequest(input, p), script = depositPolicy(r, p);
     const source = await this.assertNetwork();
-    const tx = parseNativeTransactionHex(await this.#rpc.getRawTransaction(r.depositTxidHex, false));
+    let raw;
+    if (p.environment === "mainnet") {
+      const located = await this.#rpc.locateMainnetTransaction({ txid: r.depositTxidHex,
+        ...(r.depositVout === null ? { scriptPubKeyHex: script.scriptPubKeyHex } : { vout: r.depositVout }) });
+      check(located.state === "OBSERVED" && located.sourceTipHash === source.bestHash);
+      raw = located.rawTransactionHex;
+    } else raw = await this.#rpc.getRawTransaction(r.depositTxidHex, false);
+    const tx = parseNativeTransactionHex(raw);
     check(tx.txidHex === r.depositTxidHex);
     const matches = tx.outputs.map((o, vout) => ({ ...o, vout })).filter(o =>
       (r.depositVout === null || r.depositVout === o.vout) && o.amountAtomic === r.depositIntent.amountAtomic && o.scriptPubKeyHex === script.scriptPubKeyHex);

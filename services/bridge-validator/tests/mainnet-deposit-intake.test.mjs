@@ -8,6 +8,7 @@ import { NativeDepositObserver } from "../native-deposit-observer.mjs";
 import { BridgeUserApi } from "../user-api.mjs";
 import { createRawNativeCreditAttestationVerifier } from "../native-reserve-credit.mjs";
 import { solanaDeliveryFixture } from "../../../tests/integration/solana-delivery-fixture.mjs";
+import { nativeReserveCreditEvidenceInput } from "../native-reserve-credit.mjs";
 const bytes = v => Buffer.from(JSON.stringify(v));
 test("Mainnet pending intake is bounded, forward-only and grants no credit; TEST protocol is not relabelled", async () => {
   const f = await mainnetDepositRequestFixture(), state = JSON.parse(initialDepositControllerState(f.policy));
@@ -30,6 +31,12 @@ test("pending Native intake cannot become a sweep plan before finality and moves
   assert.equal(f.calls.includes("estimatesmartfee"), false);
   f.conditions.finalized = true; const plan = await observer.observe(request);
   const state = JSON.parse(initialDepositControllerState(f.policy)); state.requests.push(request);
+  const reopened = JSON.parse(JSON.stringify(plan));
+  const read = nativeReserveCreditEvidenceInput(reopened, f.policy.deliveryPolicy.operationPolicy);
+  assert.deepEqual(read.transactionBlockHints, plan.acceptedCheckpoint.transactionBlockHints);
+  assert.equal(read.acceptedCheckpoint, undefined, "An input checkpoint must not masquerade as a sweep proof");
+  assert.equal(read.minimumConfirmations, 12);
+  assert.equal(plan.acceptedCheckpoint.minimumConfirmations, 1, "Proof packet minimum is not the signing finality policy");
   state.records.push(newDepositControllerRecord(plan, f.policy));
   assert.throws(() => decodeDepositControllerState(bytes(state), f.policy));
   state.requests = [];

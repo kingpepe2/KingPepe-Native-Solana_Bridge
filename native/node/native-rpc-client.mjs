@@ -259,12 +259,14 @@ export class NativeRpcClient {
   // is an RPC observation/block hint, never finality or mint authority.
   // A bounded miss is NOT evidence of transaction absence. Callers retain a
   // known block hint/cursor in their existing operation journal for restart.
-  async locateMainnetTransaction({ txid, vout, blockHash, startHeight, maxBlocks = 32 }) {
+  async locateMainnetTransaction({ txid, vout, blockHash, scriptPubKeyHex, startHeight, maxBlocks = 32 }) {
     txid = normalizeHash32(txid, "txid");
     if (vout !== undefined && (!Number.isSafeInteger(vout) || vout < 0 || vout > 0xffff_ffff) ||
         startHeight !== undefined && (!Number.isSafeInteger(startHeight) || startHeight < 1 || startHeight > 1_000_000) ||
         !Number.isSafeInteger(maxBlocks) || maxBlocks < 1 || maxBlocks > 128) throw new Error("NativeTransactionLookupRangeRejected");
     if (blockHash !== undefined) blockHash = normalizeHash32(blockHash, "blockHash");
+    if (scriptPubKeyHex !== undefined && (typeof scriptPubKeyHex !== "string" || !/^5120[0-9a-f]{64}$/u.test(scriptPubKeyHex)))
+      throw new Error("NativeTransactionLookupScriptRejected");
     const source = await this.getSourceSnapshot({ expectedNetwork: "main", expectedGenesisHash: NATIVE_MAINNET_GENESIS });
     if (source.state !== SOURCE_READY || source.bestHeight > 1_000_000) throw new Error("NativeTransactionLookupSourceRejected");
     const unchanged = async () => {
@@ -299,6 +301,25 @@ export class NativeRpcClient {
         if (coin.bestBlockHash !== source.bestHash || coin.confirmations > source.bestHeight) throw new Error("NativeTransactionLookupSourceChanged");
         const hint = (await this.call("getblockhash", [source.bestHeight - coin.confirmations + 1])).result;
         const located = await observe(normalizeHash32(hint, "blockHash")); if (located) return located;
+        throw new Error("NativeTransactionLookupUtxoTransactionUnavailable");
+      }
+    }
+    // A late public notification may omit the output index. Resolve only the
+    // already-derived deposit script, never a caller-supplied RPC/descriptor.
+    // This read is not finality evidence; the observer still verifies the raw
+    // transaction/output, and the proof engine independently checks inclusion.
+    if (vout === undefined && scriptPubKeyHex !== undefined) {
+      const scan = (await this.call("scantxoutset", ["start", [{ desc: `raw(${scriptPubKeyHex})` }]])).result;
+      if (scan?.success !== true || scan.bestblock !== source.bestHash || scan.height !== source.bestHeight ||
+          !Array.isArray(scan.unspents) || scan.unspents.length > 128) throw new Error("NativeTransactionLookupScanUnavailable");
+      const matches = scan.unspents.filter(coin => coin?.txid === txid);
+      if (matches.length) {
+        const height = matches[0].height;
+        if (!Number.isSafeInteger(height) || height < 1 || height > source.bestHeight || matches.some(coin =>
+          coin.height !== height || coin.scriptPubKey !== scriptPubKeyHex || !Number.isSafeInteger(coin.vout) ||
+          coin.vout < 0 || coin.vout > 0xffff_ffff)) throw new Error("NativeTransactionLookupScanRejected");
+        const hint = normalizeHash32((await this.call("getblockhash", [height])).result, "blockHash");
+        const located = await observe(hint); if (located) return located;
         throw new Error("NativeTransactionLookupUtxoTransactionUnavailable");
       }
     }

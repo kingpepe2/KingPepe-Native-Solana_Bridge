@@ -57,11 +57,25 @@ changes require their own matching CI before deployment. No Mainnet transaction
 has been submitted and private Mainnet configuration was not changed by this update.
 The maintained Native normal fee estimator reports insufficient data;
 dynamic sweep fee/cap readiness is blocked until a valid approved estimate exists.
-The maintained node also lacks a synchronized transaction index; current
-TXID-only confirmed-transaction reads fail, while explicit block-hint reads work.
-Production evidence retrieval must be bound to a supported lookup path before
-runtime readiness can pass. Neither condition is waived because SOL is unfunded.
+The maintained node also lacks a synchronized transaction index. The current
+forward observer, independent proof inputs, reserve-credit recovery and relayer
+now use explicit block locations or exact unspent-output discovery. Mainnet V2
+checkpoints retain verified locations for spent-input reads after restart. A
+read-only Mainnet check at height 289,533 passed independent headers/work/Merkle
+verification; no transaction was submitted. See
+[Mainnet observation](security/native-mainnet-observation.md). This source change
+requires its own tests and matching CI and does not clear the fee-estimate blocker.
 SOL funding must be requested only after other available readiness work is done.
+
+The retained Devnet Bridge program now includes the reviewed 21M checked-integer
+cap from source `4b2812d55dae5d69d40ab4453943591408a4d4ba` (matching CI
+`35470732577`). Its upgrade finalized at slot `501083180`; the existing Mint,
+configuration, Transceiver and represented TEST supply of 1.02 KPEPE were unchanged.
+The reviewed ELF is 206,288 bytes. The loader extended the account by its minimum
+allocation and left exactly 10,000 trailing zero bytes. Both the compiled-artifact
+hash and the complete deployed-image hash are recorded in
+[the Devnet manifest](deployment/devnet.json). The historical zero-supply enrollment
+and original deployment transaction remain separately identified there.
 
 Production flags remain false/disabled. Deployment approval and a controlled
 activation amount must be obtained at their specified boundaries. No new roadmap

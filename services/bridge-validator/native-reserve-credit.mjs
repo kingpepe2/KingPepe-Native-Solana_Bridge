@@ -24,6 +24,7 @@ export function nativeReserveCreditEvidenceInput(plan, policy, acceptedCheckpoin
     sweepTxid: parseNativeTransactionHex(operation.unsignedTransactionHex).txidHex, reserveVout: 0,
     reserveScriptHex: operation.depositPolicy.canonicalReserveScriptPubKeyHex, feeAtomic: operation.signingIntents[0].feeAtomic,
     minimumConfirmations: p.minimumConfirmations, tapscriptSpends: [operation.depositPolicy.sweep, ...operation.inputs.slice(1).map(() => undefined)],
+    ...(p.environment === "mainnet" ? { transactionBlockHints: structuredClone(operation.acceptedCheckpoint.transactionBlockHints) } : {}),
     ...(acceptedCheckpoint === undefined ? {} : { acceptedCheckpoint: structuredClone(acceptedCheckpoint) }) };
 }
 export function createVerifiedNativeReserveCredit({ plan, policy, receipt, validityWindow }) {

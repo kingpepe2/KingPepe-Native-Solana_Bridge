@@ -39,7 +39,16 @@ Measure relay floor, normal node estimate and actual representative sweep weight
 before selecting safety caps. Insufficient estimator data is a real blocker;
 there is no fixed-fee fallback. Operator funding pays sweep fees separately from
 the credited deposit. Excessive required fee holds the sweep for review.
-Unbounded issuance limits never waive reserve/finality/reconciliation checks.
+Unbounded transfer/window policy never waives the absolute Native monetary
+ceiling of 21,000,000 KPEPE, or 2,100,000,000,000,000 canonical base units at
+eight decimals. It is not a mint allocation. Resulting represented supply must
+also remain within eligible Native backing. Checked integer arithmetic, replay
+protection, finality and reconciliation remain mandatory.
+
+The public supply counter reads completed, reconciled issuance for the exact
+configured network and Mint. Pending requests do not count. TEST and Mainnet
+accounting remain separate; stale or inconsistent data cannot display a healthy
+progress bar. A critical supply/backing mismatch pauses further mint processing.
 
 Finish all non-funding readiness and freeze artifacts at the reviewed rewritten
 source. Run locked dependencies, Node/Rust/FROST/Borsh/security tests, SBF builds,

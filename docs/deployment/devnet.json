@@ -3,11 +3,11 @@
   "scope": "DEVNET_TEST_ONLY",
   "architecture": "ONE_WAY",
   "supportedDirection": "KINGPEPE_NATIVE_TO_SOLANA",
-  "sourceSha": "50d8dcb73e254cbba85fdf06c4a1f09626400d4d",
-  "sourceBinding": "IDENTICAL_PROGRAM_BYTES_REBUILT_AFTER_AUTHORIZED_HISTORY_REWRITE",
+  "sourceSha": "4b2812d55dae5d69d40ab4453943591408a4d4ba",
+  "sourceBinding": "REVIEWED_SBF_V3_ELF_WITH_VERIFIED_ZERO_FILLED_LOADER_EXTENSION",
   "rewrittenDeploymentSourceSha": "ba7f0cb8ede2d989425cfa37a906a426a23a937e",
   "sourceCi": {
-    "runId": "35464725988",
+    "runId": "35470732577",
     "requiredJobsPassed": 4,
     "skippedSteps": 0
   },
@@ -56,8 +56,11 @@
   },
   "binaries": {
     "manager": {
-      "bytes": 206048,
-      "sha256": "65a91143e0eea483a4771a5ab273c4981c02d045939b3d1e9f3ecbb2e8d41ab0"
+      "bytes": 216288,
+      "sha256": "2ca7eb885fe906273538f4df7f454541f5bd76a0fe0b612fea2783ad43951cfe",
+      "compiledArtifactBytes": 206288,
+      "compiledArtifactSha256": "238529b6273ad58edb060827adec1fefb80890fe1e9c2e0eef873f076b752b97",
+      "verifiedTrailingZeroBytes": 10000
     },
     "transceiver": {
       "bytes": 225496,
@@ -66,8 +69,9 @@
   },
   "transactions": {
     "managerDeployment": {
-      "slot": 501007470,
-      "signature": "3owPmRUh3ccsnsF9Np61tS53RGfBzizY9NauKGMa2RUoXoZxeXKm6oghyHYaQjPdgRS3SBkT7yWbnxpWUTcyAXgp"
+      "slot": 501083180,
+      "signature": "oG9NqLtcFMib4BkNxVqXinLWyxUJAAj1FxYtfswDwAzdFvuPUfghbitZtkudPToEyvYaYJ6kxxYMx6hSUmd55kS",
+      "kind": "REVIEWED_SUPPLY_CAP_UPGRADE"
     },
     "transceiverDeployment": {
       "slot": 501007634,
@@ -79,6 +83,8 @@
     }
   },
   "zeroSupplyVerification": {
+    "scope": "HISTORICAL_INITIAL_ENROLLMENT",
+    "sourceSha": "50d8dcb73e254cbba85fdf06c4a1f09626400d4d",
     "status": "PASS",
     "verifiedAt": "2026-09-19T19:20:20.056Z",
     "finalizedSlot": 501007689,
@@ -87,6 +93,28 @@
     "independentFreshBuildBytesMatch": true,
     "deploymentAndEnrollmentTransactionsFinalized": true,
     "mainnetFlagOnChain": false
+  },
+  "initialManagerDeployment": {
+    "sourceSha": "50d8dcb73e254cbba85fdf06c4a1f09626400d4d",
+    "bytes": 206048,
+    "sha256": "65a91143e0eea483a4771a5ab273c4981c02d045939b3d1e9f3ecbb2e8d41ab0",
+    "slot": 501007470,
+    "signature": "3owPmRUh3ccsnsF9Np61tS53RGfBzizY9NauKGMa2RUoXoZxeXKm6oghyHYaQjPdgRS3SBkT7yWbnxpWUTcyAXgp"
+  },
+  "supplyCapUpgradeVerification": {
+    "status": "PASS",
+    "maxSupplyAtomic": "2100000000000000",
+    "nativeDecimals": 8,
+    "solanaDecimals": 8,
+    "artifactPrefixMatchesReviewedBuild": true,
+    "remainingProgramBytesAllZero": true,
+    "mintAndConfigAccountsUnchanged": true,
+    "transceiverUnchanged": true,
+    "representedSupplyBeforeAtomic": "102000000",
+    "representedSupplyAfterAtomic": "102000000",
+    "deploymentTransactionFinalized": true,
+    "mainnetFlagOnChain": false,
+    "loaderExtensionSource": "https://github.com/anza-xyz/agave/blob/v4.2.2/cli/src/program.rs#L2803-L2866"
   },
   "productionReady": false,
   "mainnetActivation": "DISABLED"
