@@ -12,6 +12,9 @@ import { createUnsignedNativeTransaction, parseNativeTransactionHex } from "../n
 import { scriptFromWitnessAddress } from "../witness-address.mjs";
 import { decodeBridgeAbi } from "../../../shared/protocol/solana-bridge-abi.mjs";
 import { createMainnetModeInstruction } from "../../../solana/ts/sdk/mainnet-control.mjs";
+import { NativeRpcClient } from "../native-rpc-client.mjs";
+import { LocalNativeEvidenceVerifier } from "../native-raw-evidence.mjs";
+import { NativeDepositObserver } from "../../../services/bridge-validator/native-deposit-observer.mjs";
 
 const hash = n => n.toString(16).padStart(2, "0").repeat(32);
 const key = n => base58.encode(Buffer.from(hash(n), "hex"));
@@ -37,6 +40,70 @@ test("Mainnet control preparation has only the exact config and enrollment signe
   for (const mode of [undefined, "ENABLED", "mainnet", 1]) assert.throws(() => createMainnetModeInstruction({ deployment: policy, mode }));
   assert.throws(() => createMainnetModeInstruction({ deployment: { ...policy, nativeNetwork: 8000111 }, mode: "CONTROLLED" }));
   assert.throws(() => createMainnetModeInstruction({ deployment: { ...policy, mint: hash(13) }, mode: "ACTIVE" }));
+});
+
+function observerFixture({ feeAtomic = "212", estimate = '"feerate":0.00001000,"blocks":3',
+  finality = true, ready = true } = {}) {
+  const quote = createMainnetNativeDepositRequest({ policy, ...deposit });
+  const raw = createUnsignedNativeTransaction({ inputs: [{ txid: hash(12), vout: 0 }],
+    outputs: [{ amountAtomic: deposit.amountAtomic, scriptPubKeyHex: quote.scriptPubKeyHex }] });
+  const request = { operationId: quote.operationId, depositIntent: quote.depositIntent,
+    userRecoveryPublicKeyHex: recovery, depositTxidHex: parseNativeTransactionHex(raw).txidHex,
+    depositVout: 0, feeFundingInputs: [{ txid: hash(13), vout: 0, amountAtomic: feeAtomic,
+      scriptPubKeyHex: "5120" + frost, minimumConfirmations: 12 }] };
+  const calls = [], rpc = new NativeRpcClient({ endpoint: "http://127.0.0.1:18443", fetchFn: () => { throw new Error("UNEXPECTED_NETWORK_CALL"); } });
+  rpc.getSourceSnapshot = async value => {
+    assert.deepEqual(value, { expectedNetwork: "main", expectedGenesisHash: NATIVE_MAINNET_GENESIS });
+    calls.push("identity"); return { state: ready ? "READY" : "REJECTED", bestHash: hash(21) };
+  };
+  rpc.getRawTransaction = async () => raw;
+  rpc.getUtxoObservation = async () => ({ unspent: true, valueAtomic: deposit.amountAtomic,
+    scriptPubKeyHex: quote.scriptPubKeyHex, bestBlockHash: hash(21) });
+  rpc.call = async (method, params) => {
+    calls.push(method); if (method === "estimatesmartfee") assert.deepEqual(params, [3, "ECONOMICAL"]);
+    const fields = { estimatesmartfee: estimate, getnetworkinfo: '"relayfee":0.00001000', getmempoolinfo: '"mempoolminfee":0.00001000' };
+    assert(Object.hasOwn(fields, method), "No economic RPC is permitted by this observation fixture");
+    return { raw: '{"result":{' + fields[method] + '},"error":null,"id":1}' };
+  };
+  const verifier = LocalNativeEvidenceVerifier.createMainnet({ rpc, executable: "/unused-unit-fixture" });
+  verifier.verifyInputs = async value => {
+    calls.push("independent-finality"); assert.equal(value.minimumConfirmations, 12);
+    if (!finality) throw new Error("BELOW_NATIVE_FINALITY");
+    return { digestHex: hash(22), acceptedCheckpoint: { protocol: "KINGPEPE_MAINNET_ACCEPTANCE_CHECKPOINT_V1",
+      genesis: NATIVE_MAINNET_GENESIS, tipHash: hash(21), tipHeight: 100, chainworkHex: hash(23),
+      minimumConfirmations: 12, evidenceDigestHex: hash(22) } };
+  };
+  const options = { nativeRpc: rpc, nativeVerifier: verifier, policy,
+    nativeFeePolicy: { policy: "DYNAMIC_NODE_ESTIMATE_WITH_CAP", minimumRelayAtomicPerKvB: "1000",
+      maximumAtomicPerKvB: "10000", maximumFeeAtomic: policy.maximumFeeAtomic } };
+  return { options, request, calls };
+}
+
+test("Mainnet observer explicitly binds source identity, twelve-confirmation evidence and exact operator-funded sweep fee", async () => {
+  const f = observerFixture(), observer = NativeDepositObserver.createMainnet(f.options);
+  assert.throws(() => new NativeDepositObserver(f.options));
+  assert.throws(() => NativeDepositObserver.createMainnet({ ...f.options,
+    nativeVerifier: new LocalNativeEvidenceVerifier({ rpc: f.options.nativeRpc, executable: "/unused-unit-fixture" }) }));
+  assert.throws(() => NativeDepositObserver.createMainnet({ ...f.options, policy: { ...policy, csvDelayBlocks: 144 } }));
+  const plan = await observer.observe(f.request);
+  assert.equal(plan.inputs.length, 2); assert.equal(parseNativeTransactionHex(plan.unsignedTransactionHex).outputs[0].amountAtomic, deposit.amountAtomic);
+  assert(plan.signingIntents.every(i => i.nativeNetwork === "mainnet" && i.nativeGenesisHash === NATIVE_MAINNET_GENESIS &&
+    i.feeAtomic === "212" && i.purpose === "RESERVE_SWEEP" && i.amountAtomic === deposit.amountAtomic));
+  assert.deepEqual(f.calls, ["identity", "independent-finality", "estimatesmartfee", "getnetworkinfo", "getmempoolinfo"]);
+});
+
+for (const [name, options, expected] of [
+  ["wrong Native identity", { ready: false }, /NativeDepositRequestRejected/],
+  ["eleven or fewer confirmations", { finality: false }, /BELOW_NATIVE_FINALITY/],
+  ["missing normal estimate", { estimate: '"errors":["Insufficient data"],"blocks":0' }, /NativeFeeEstimateUnavailable/],
+  ["excessive normal estimate", { estimate: '"feerate":0.00010001,"blocks":3' }, /NativeFeeOperatorReviewRequired/],
+  ["underfunded operator fee", { feeAtomic: "211" }, /NativeSweepFeeFundingReviewRequired/],
+  ["overfunded operator fee", { feeAtomic: "213" }, /NativeSweepFeeFundingReviewRequired/],
+]) test("Mainnet sweep preparation holds safely on " + name, async () => {
+  const f = observerFixture(options), observer = NativeDepositObserver.createMainnet(f.options);
+  await assert.rejects(observer.observe(f.request), expected);
+  assert(!f.calls.includes("sendrawtransaction"));
+  if (options.ready === false || options.finality === false) assert(!f.calls.includes("estimatesmartfee"));
 });
 
 test("explicit Mainnet deposit request uses the approved CSV window and distinct Native address network", () => {

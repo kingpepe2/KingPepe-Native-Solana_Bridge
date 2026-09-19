@@ -5,9 +5,11 @@ import { createHash } from "node:crypto";
 import { NativeRpcClient } from "../../native/node/native-rpc-client.mjs";
 import { LocalNativeEvidenceVerifier } from "../../native/node/native-raw-evidence.mjs";
 import { createUnsignedNativeTransaction, parseNativeTransactionHex, createLocalTaprootSighashEvidences } from "../../native/node/native-taproot-transaction.mjs";
-import { buildRegtestRecoverableDeposit, deriveRegtestDepositCommitment } from "../../native/recovery/taproot-deposit.mjs";
+import { buildRegtestRecoverableDeposit, deriveRegtestDepositCommitment, buildMainnetRecoverableDeposit, deriveMainnetDepositCommitment } from "../../native/recovery/taproot-deposit.mjs";
 import { validateDepositOperationPolicy, validateDepositOperationPlan } from "./deposit-operation-state.mjs";
-import { prepareLocalNativeReserveSweepSigningIntent } from "./native-reserve-sweep-signing-intent.mjs";
+import { prepareLocalNativeReserveSweepSigningIntent, prepareMainnetNativeReserveSweepSigningIntent } from "./native-reserve-sweep-signing-intent.mjs";
+import { nativeIdentity } from "../../shared/network-identity.mjs";
+import { validateNativeFeePolicy, readNativeFeeObservation, nativePlannedTransactionWeight, quoteNativeMinerFee } from "../../native/node/native-fee-policy.mjs";
 const check = v => { if (!v) throw new Error("NativeDepositRequestRejected"); };
 const hash = v => typeof v === "string" && /^[0-9a-f]{64}$/u.test(v);
 const uint = v => { check(typeof v === "string" && /^(0|[1-9][0-9]{0,19})$/u.test(v) && BigInt(v) <= 0xffffffffffffffffn); return BigInt(v); };
@@ -34,19 +36,28 @@ export function validateNativeDepositRequest(input, policy) {
   // Validate curve points, script commitment and recovery parameters at intake.
   depositPolicy(r, p); return r;
 }
-function depositPolicy(r, p) { return buildRegtestRecoverableDeposit({ nativeGenesisHex: p.nativeGenesis,
-  depositCommitmentHex: deriveRegtestDepositCommitment(r.depositIntent), frostPublicKeyHex: p.frostPublicKeyHex,
+function depositPolicy(r, p) { return (p.environment === "mainnet" ? buildMainnetRecoverableDeposit : buildRegtestRecoverableDeposit)({ nativeGenesisHex: p.nativeGenesis,
+  depositCommitmentHex: (p.environment === "mainnet" ? deriveMainnetDepositCommitment : deriveRegtestDepositCommitment)(r.depositIntent), frostPublicKeyHex: p.frostPublicKeyHex,
   userRecoveryPublicKeyHex: r.userRecoveryPublicKeyHex, csvDelayBlocks: p.csvDelayBlocks }); }
 
+const MAINNET_OBSERVER = Symbol("mainnet-deposit-observer");
 export class NativeDepositObserver {
-  #rpc; #verifier; #policy;
-  constructor({ nativeRpc, nativeVerifier, policy }) {
+  #rpc; #verifier; #policy; #feePolicy;
+  static createMainnet(options) { return new NativeDepositObserver(options, MAINNET_OBSERVER); }
+  constructor({ nativeRpc, nativeVerifier, policy, nativeFeePolicy }, capability) {
     check(nativeRpc instanceof NativeRpcClient && nativeVerifier instanceof LocalNativeEvidenceVerifier);
     this.#rpc = nativeRpc; this.#verifier = nativeVerifier; this.#policy = validateDepositOperationPolicy(policy);
+    check(nativeVerifier.nativeGenesis === this.#policy.nativeGenesis);
+    check((this.#policy.environment === "mainnet") === (capability === MAINNET_OBSERVER));
+    if (capability === MAINNET_OBSERVER) {
+      check(this.#policy.csvDelayBlocks === 1440);
+      this.#feePolicy = validateNativeFeePolicy(nativeFeePolicy);
+      check(this.#feePolicy.maximumFeeAtomic === this.#policy.maximumFeeAtomic);
+    } else check(nativeFeePolicy === undefined);
   }
   async #fundedOutput(input) {
     const p = this.#policy, r = validateNativeDepositRequest(input, p), script = depositPolicy(r, p);
-    const source = await this.#rpc.getSourceSnapshot({ expectedNetwork: "regtest", expectedGenesisHash: p.nativeGenesis });
+    const source = await this.#rpc.getSourceSnapshot({ expectedNetwork: nativeIdentity(p.environment).rpcChain, expectedGenesisHash: p.nativeGenesis });
     check(source.state === "READY");
     const tx = parseNativeTransactionHex(await this.#rpc.getRawTransaction(r.depositTxidHex, false));
     check(tx.txidHex === r.depositTxidHex);
@@ -69,14 +80,28 @@ export class NativeDepositObserver {
     const unsignedTransactionHex = createUnsignedNativeTransaction({ inputs, outputs: [{ amountAtomic: r.depositIntent.amountAtomic,
       scriptPubKeyHex: script.canonicalReserveScriptPubKeyHex }] });
     const feeAtomic = r.feeFundingInputs.reduce((n, i) => n + BigInt(i.amountAtomic), 0n).toString();
+    if (this.#feePolicy) {
+      const estimate = await this.#rpc.call("estimatesmartfee", [3, "ECONOMICAL"]);
+      const network = await this.#rpc.call("getnetworkinfo"), pool = await this.#rpc.call("getmempoolinfo");
+      const observation = readNativeFeeObservation({ estimateRaw: estimate.raw, networkRaw: network.raw, mempoolRaw: pool.raw });
+      const weight = nativePlannedTransactionWeight({ unsignedTransactionHex,
+        spentOutputs: inputs.map(i => ({ amountAtomic: i.amountAtomic, scriptPubKeyHex: i.scriptPubKeyHex })),
+        tapscriptSpends: [script.sweep, ...r.feeFundingInputs.map(() => undefined)] });
+      const quote = quoteNativeMinerFee({ policy: this.#feePolicy, observation, virtualBytes: weight.virtualBytes });
+      // The retained one-output sweep never draws from the user's deposit.
+      // Operator inputs must fund the exact fresh quote; otherwise hold.
+      if (feeAtomic !== quote.feeAtomic) throw new Error("NativeSweepFeeFundingReviewRequired");
+    }
     const sighashes = createLocalTaprootSighashEvidences({ unsignedNativeTransactionHex: unsignedTransactionHex,
       spentOutputs: inputs.map(i => ({ amountAtomic: i.amountAtomic, scriptPubKeyHex: i.scriptPubKeyHex })),
       tapscriptSpends: [script.sweep, ...r.feeFundingInputs.map(() => undefined)], proofFingerprintHex: evidence.digestHex,
       reserveAmountAtomic: r.depositIntent.amountAtomic, nativeMinerFeeAtomic: feeAtomic,
       expectedRecipientScriptPubKeyHex: script.canonicalReserveScriptPubKeyHex, expectedChangeScriptPubKeyHex: script.canonicalReserveScriptPubKeyHex });
     const depositOutpoint = inputs[0].txid + ":" + inputs[0].vout;
-    const signingIntents = sighashes.map(nativeSighashEvidence => prepareLocalNativeReserveSweepSigningIntent({ operationIdHex: r.operationId,
-      config: { environment: "localnet", nativeNetworkName: "regtest", nativeGenesisHash: p.nativeGenesis, solanaDeployment: p.solanaDeployment,
+    const mainnet = p.environment === "mainnet", prepareIntent = mainnet ? prepareMainnetNativeReserveSweepSigningIntent : prepareLocalNativeReserveSweepSigningIntent;
+    const signingIntents = sighashes.map(nativeSighashEvidence => prepareIntent({ operationIdHex: r.operationId,
+      config: { environment: mainnet ? "mainnet" : "localnet", nativeNetworkName: mainnet ? "mainnet" : "regtest",
+        ...(mainnet ? { solanaGenesis: p.solanaGenesis } : {}), nativeGenesisHash: p.nativeGenesis, solanaDeployment: p.solanaDeployment,
         bridgeProgramId: p.managerProgramId, transceiverProgramId: p.transceiverProgramId, mint: p.mint, keyEpoch: p.keyEpoch,
         maxAmountAtomic: p.maximumAmountAtomic, maxFeeAtomic: p.maximumFeeAtomic },
       deposit: { depositOutpoint, amountAtomic: r.depositIntent.amountAtomic, proofFingerprintHex: evidence.digestHex, finalitySatisfied: true, utxoUnspent: true },

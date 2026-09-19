@@ -9,6 +9,7 @@ import {
 } from "../../native/frost/index.mjs";
 import { bridgeInputDigest } from "../../shared/protocol/bridge-inputs.mjs";
 import { isHash32Hex, normalizeHex } from "../../shared/protocol/canonical-message.mjs";
+import { NATIVE_MAINNET_DOMAIN, SOLANA_MAINNET_GENESIS, assertMainnetDeploymentFields } from "../../shared/network-identity.mjs";
 
 export const LOCAL_NATIVE_RESERVE_SWEEP_SIGNING_INTENT_PROTOCOL =
   "KINGPEPE_NATIVE_SOLANA_BRIDGE/LOCAL_NATIVE_RESERVE_SWEEP_SIGNING_INTENT/V1";
@@ -17,9 +18,16 @@ export const LOCAL_NATIVE_TAPROOT_SIGHASH_EVIDENCE_PROTOCOL =
 
 const UINT_DECIMAL = /^(0|[1-9][0-9]*)$/u;
 
-export function prepareLocalNativeReserveSweepSigningIntent(input) {
+export function prepareLocalNativeReserveSweepSigningIntent(input) { return prepareSigningIntent(input, false); }
+
+// Produces a bound unsigned plan only. Protected production signers still
+// require their own admission, current source evidence and fresh fee quote.
+export function prepareMainnetNativeReserveSweepSigningIntent(input) { return prepareSigningIntent(input, true); }
+
+function prepareSigningIntent(input, mainnet) {
   const value = requireObject(input, "input");
-  const config = normalizeLocalSigningConfig(value.config);
+  const config = mainnet ? normalizeMainnetSigningConfig(value.config) : normalizeLocalSigningConfig(value.config);
+  const protocol = mainnet ? "KINGPEPE_NATIVE_SOLANA_BRIDGE/MAINNET_NATIVE_RESERVE_SWEEP_SIGNING_INTENT/V1" : LOCAL_NATIVE_RESERVE_SWEEP_SIGNING_INTENT_PROTOCOL;
   const deposit = normalizeValidatedDeposit(value.deposit);
   const draft = normalizeUnsignedReserveSweepDraft(value.reserveSweepDraft);
   const sighashEvidence = normalizeTaprootSighashEvidence(value.nativeSighashEvidence);
@@ -64,7 +72,7 @@ export function prepareLocalNativeReserveSweepSigningIntent(input) {
   }
 
   const signingRequestId = bridgeInputDigest("SweepRequest", {
-    protocol: `${LOCAL_NATIVE_RESERVE_SWEEP_SIGNING_INTENT_PROTOCOL}/REQUEST_ID`,
+    protocol: `${protocol}/REQUEST_ID`,
     operationIdHex: operationId,
     depositOutpoint: deposit.depositOutpoint,
     unsignedNativeTransactionFingerprintHex: draft.unsignedNativeTransactionFingerprintHex,
@@ -102,6 +110,14 @@ export function prepareLocalNativeReserveSweepSigningIntent(input) {
     hardStop: false,
   });
   const authorizedOperation = signingIntent;
+  if (mainnet) {
+    if (BigInt(deposit.amountAtomic) <= 0n || BigInt(deposit.amountAtomic) > 0xffffffffffffffffn ||
+        BigInt(draft.nativeMinerFeeAtomic) > BigInt(config.maxFeeAtomic)) throw new Error("MainnetSweepAmountOrFeeRejected");
+    return Object.freeze({ protocol, state: "UNSIGNED_NOT_AUTHORIZED", productionReady: false,
+      productionSigningAuthorized: false, productionBroadcastAuthorized: false, mainnetActivation: "DISABLED",
+      nativeSweepTxidHex: sighashEvidence.nativeSweepTxidHex, signingIntent,
+      signingIntentDigestHex: nativeSigningIntentDigest(signingIntent) });
+  }
   const signerPolicy = createNativeSigningPolicy({
     environment: "localnet",
     nativeNetwork: config.nativeNetworkName,
@@ -133,6 +149,20 @@ export function prepareLocalNativeReserveSweepSigningIntent(input) {
     authorizedOperation,
     signerPolicyDecision,
   });
+}
+
+function normalizeMainnetSigningConfig(config) {
+  const value = requireObject(config, "config");
+  if (value.environment !== "mainnet" || value.nativeNetworkName !== "mainnet" ||
+      value.solanaGenesis !== SOLANA_MAINNET_GENESIS || value.maxAmountAtomic !== "18446744073709551615")
+    throw new Error("MainnetSweepBindingRequired");
+  assertMainnetDeploymentFields({ protocolId: 1, nativeNetwork: NATIVE_MAINNET_DOMAIN,
+    nativeGenesis: value.nativeGenesisHash, solanaDeployment: value.solanaDeployment,
+    managerProgramId: value.bridgeProgramId, transceiverProgramId: value.transceiverProgramId, mint: value.mint });
+  checkedPositiveSafeInteger(value.keyEpoch, "config.keyEpoch");
+  const fee = BigInt(canonicalUintDecimal(value.maxFeeAtomic, "config.maxFeeAtomic"));
+  if (fee <= 0n || fee > 0xffffffffffffffffn) throw new Error("MainnetSweepFeeCapRequired");
+  return Object.freeze({ ...value });
 }
 
 function normalizeLocalSigningConfig(config) {
