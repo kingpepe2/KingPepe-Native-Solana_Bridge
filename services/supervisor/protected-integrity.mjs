@@ -3,20 +3,27 @@ import { WindowsProtectedStore, assertWindowsProtectedStore } from "../../shared
 import { isProtectedServiceIpc } from "../../shared/windows/service-ipc.mjs";
 import { INTEGRITY_PROTOCOL, INTEGRITY_ROLES, mayPerform, mayReport } from "../../shared/service-integrity-policy.mjs";
 import { SourceHealthWindow, SOURCE_HEALTH_PROTOCOL, SOURCE_HEALTH_ROLES } from "../../shared/source-health-window.mjs";
+import { assertMainnetProtectedDeployment } from "../../shared/network-identity.mjs";
 
 const HASH = /^[0-9a-f]{64}$/u;
 const GUARDS = new WeakSet();
 const SOURCE_TICKETS = new WeakMap();
+const MAINNET_AUTHORITY = Symbol("Bound Mainnet paused authority");
 function requireValue(value, code = "IntegrityStateRejected") { if (!value) throw new Error(code); }
 function uint(value) { requireValue(typeof value === "string" && /^(0|[1-9][0-9]{0,19})$/u.test(value) && BigInt(value) <= 0xffff_ffff_ffff_ffffn); return BigInt(value); }
 function increment(value) { requireValue(uint(value) < 0xffff_ffff_ffff_ffffn); return (uint(value) + 1n).toString(); }
 function fields(value, keys) { requireValue(value && !Array.isArray(value) && Object.keys(value).sort().join() === [...keys].sort().join()); }
 
-// One explicit, exclusively leased authority. This is localnet enrollment only;
-// it does not install services, authorize production or create missing state.
+// One explicit, exclusively leased authority. Production enrollment/reopening
+// starts paused; this module does not install services or authorize activation.
 export class ProtectedIntegrityAuthority {
   #store; #lease; #generation; #health; #closed = false; #stopped = false;
-  constructor(store) { assertWindowsProtectedStore(store, "SUPERVISOR", "global-integrity"); requireValue(store.context.environment === "localnet"); this.#store = store; }
+  constructor(store, capability) {
+    assertWindowsProtectedStore(store, "SUPERVISOR", "global-integrity");
+    requireValue(store.context.environment === "localnet" ||
+      (store.context.environment === "mainnet" && capability === MAINNET_AUTHORITY), "IntegrityExplicitEnrollmentRequired");
+    this.#store = store;
+  }
   static async createLocal(options, initialState = "PAUSED_POLICY") {
     options = structuredClone(options); // One immutable enrollment input snapshot.
     requireValue(options?.context?.environment === "localnet" && options.context.role === "SUPERVISOR" && options.context.purpose === "global-integrity", "IntegrityLocalEnrollmentRequired");
@@ -27,9 +34,28 @@ export class ProtectedIntegrityAuthority {
   }
   static async openLocal(store) {
     const authority = new ProtectedIntegrityAuthority(store);
+    return ProtectedIntegrityAuthority.#open(authority);
+  }
+  static async createMainnetPaused(options, deployment) {
+    options = structuredClone(options);
+    requireValue(options?.context?.role === "SUPERVISOR" && options.context.purpose === "global-integrity", "IntegrityMainnetEnrollmentRequired");
+    assertMainnetProtectedDeployment(options.context, deployment);
+    const bytes = Buffer.from(JSON.stringify({ protocol: INTEGRITY_PROTOCOL, state: "PAUSED_POLICY", generation: "0", lastTimeMs: Date.now(), incidents: [] }));
+    let store; try { store = WindowsProtectedStore.create(options, bytes); } finally { bytes.fill(0); }
+    return ProtectedIntegrityAuthority.openMainnetPaused(store, deployment);
+  }
+  static async openMainnetPaused(store, deployment) {
+    assertWindowsProtectedStore(store, "SUPERVISOR", "global-integrity");
+    assertMainnetProtectedDeployment(store.context, deployment);
+    return ProtectedIntegrityAuthority.#open(new ProtectedIntegrityAuthority(store, MAINNET_AUTHORITY), true);
+  }
+  static async #open(authority, pause = false) {
+    const store = authority.#store;
     try {
       authority.#lease = await store.acquireLease();
       const { state, revision } = authority.#read(); state.generation = increment(state.generation);
+      // Never clear a recorded contradiction, including during preparation.
+      if (pause && state.state !== "HARD_STOP_INTEGRITY") state.state = "PAUSED_POLICY";
       authority.#write(state, revision); authority.#generation = state.generation;
       authority.#health = new SourceHealthWindow({ generation: state.generation }); return authority;
     } catch { await authority.close(); throw new Error("IntegrityAuthorityUnavailable"); }

@@ -3,6 +3,7 @@
 import tls from "node:tls";
 import { createHash, createPrivateKey, createPublicKey, randomBytes, X509Certificate } from "node:crypto";
 import { assertWindowsProtectedStore } from "./protected-store.mjs";
+import { assertMainnetProtectedDeployment } from "../network-identity.mjs";
 import { INTEGRITY_PROTOCOL, INTEGRITY_ROLES, INTEGRITY_METHODS, validateRetainedIntegrityIncidents } from "../service-integrity-policy.mjs";
 
 const VERSION = "KINGPEPE_SERVICE_IPC_V3";
@@ -19,6 +20,7 @@ const TIMEOUT = 10000;
 const EXECUTION_TIMEOUT = 30000;
 const HASH = /^[0-9a-f]{64}$/u;
 const IPC_INSTANCES = new WeakSet();
+const MAINNET_TRANSPORT = Symbol("Bound Mainnet protected transport");
 export function isProtectedServiceIpc(value) { return IPC_INSTANCES.has(value); }
 // Diagnostic codes only, never arbitrary exception text, paths or peer data.
 // They do not grant retry permission, clear integrity stops or change deadlines.
@@ -107,10 +109,17 @@ export class ProtectedServiceIpc {
   #deployment;
   #lastRejection;
   #retainedIncidents = new Set();
-  constructor(store) {
+  static fromMainnetStore(store, deployment) {
     assertWindowsProtectedStore(store, store?.context?.role, "service-auth");
-    // Only isolated localnet enrollment is implemented.
-    requireValue(store.context.environment === "localnet", "IpcLocalEnrollmentRequired");
+    assertMainnetProtectedDeployment(store.context, deployment);
+    return new ProtectedServiceIpc(store, MAINNET_TRANSPORT);
+  }
+  constructor(store, capability) {
+    assertWindowsProtectedStore(store, store?.context?.role, "service-auth");
+    // Legacy callers remain local-only. Mainnet requires the complete public
+    // deployment binding before any protected transport credential is opened.
+    requireValue(store.context.environment === "localnet" ||
+      (store.context.environment === "mainnet" && capability === MAINNET_TRANSPORT), "IpcLocalEnrollmentRequired");
     this.#store = store; this.#role = store.context.role; this.#environment = store.context.environment;
     this.#deployment = Object.freeze({ environment: store.context.environment, nativeGenesis: store.context.nativeGenesis,
       solanaDeployment: store.context.solanaDeployment, keyEpoch: store.context.keyEpoch });

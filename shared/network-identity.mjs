@@ -46,6 +46,19 @@ export function assertMainnetDeploymentFields(value) {
   } catch { throw new Error("MainnetDeploymentBindingRejected"); }
 }
 
+// Bind an existing protected role to the complete production deployment. This
+// grants neither signing permission nor source-health/activation evidence.
+export function assertMainnetProtectedDeployment(context, deployment) {
+  try {
+    deployment = structuredClone(deployment);
+    assertMainnetDeploymentFields(deployment);
+    if (deployment.environment !== "mainnet" || deployment.solanaGenesis !== SOLANA_MAINNET_GENESIS ||
+        !Number.isSafeInteger(deployment.keyEpoch) || deployment.keyEpoch < 1 ||
+        context.environment !== "mainnet" || context.nativeGenesis !== NATIVE_MAINNET_GENESIS ||
+        context.solanaDeployment !== deployment.solanaDeployment || context.keyEpoch !== deployment.keyEpoch) throw new Error();
+  } catch { throw new Error("MainnetProtectedDeploymentRejected"); }
+}
+
 export function nativeIdentity(environment) {
   if (environment === "mainnet") return Object.freeze({ environment, network: "mainnet", rpcChain: "main",
     genesis: NATIVE_MAINNET_GENESIS, domain: NATIVE_MAINNET_DOMAIN, hrp: NATIVE_MAINNET_HRP, decimals: NATIVE_DECIMALS });
