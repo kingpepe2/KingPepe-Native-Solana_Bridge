@@ -29,10 +29,10 @@ for (const [name, change] of [
 });
 for (const amount of [100, -1, "-1", "01", "1.1", "1e9", "18446744073709551616"])
   test("observed SPL amount rejects noncanonical/overflow input " + String(amount), () => assert.throws(() => compareDepositAccounting(journal, { ...observed, mintSupplyAtomic: amount })));
-test("atomic precision survives above JavaScript safe integer range", () => {
+test("amounts above JavaScript safe integer range remain exact but exceed the monetary ceiling", () => {
   const n = "18446744073709551615";
-  assert.equal(compareDepositAccounting({ canonicalReserve: n, authorizedUnmintedCredits: "0", mintedSupply: n },
-    { canonicalReserve: n, mintSupplyAtomic: n, managerMintedAtomic: n }).coverageRequired, n);
+  assert.throws(() => compareDepositAccounting({ canonicalReserve: n, authorizedUnmintedCredits: "0", mintedSupply: n },
+    { canonicalReserve: n, mintSupplyAtomic: n, managerMintedAtomic: n }), e => e.incident?.reason === "MONETARY_SUPPLY_CAP_EXCEEDED");
 });
 test("malformed or overflow journal values are not an observed deficit", () => {
   for (const n of ["340282366920938463463374607431768211456", 100, "NaN"])

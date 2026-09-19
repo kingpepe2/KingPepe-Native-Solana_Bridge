@@ -5,9 +5,11 @@ import { setTimeout as delay } from "node:timers/promises";
 import { AuthenticatedLocalDepositLedger } from "../bridge-validator/local-deposit-ledger.mjs";
 import { AutomaticNativeToSolanaDeposit } from "../bridge-validator/automatic-native-deposit.mjs";
 import { sha256Canonical } from "../../native/frost/policy/native-signing-policy.mjs";
+import { completedSupplyCounter } from "../../shared/monetary-supply.mjs";
+import { base58Encode } from "../bridge-validator/solana-deposit-claim-transaction-plan.mjs";
 const check = v => { if (!v) throw new Error("BridgeServiceConfigurationRejected"); };
 export class LocalBridgeService {
-  #ledger; #deposits; #busy = false; #running = false; #depositCursor = 0;
+  #ledger; #deposits; #busy = false; #running = false; #depositCursor = 0; #supply;
   constructor({ ledger, depositWorker }) {
     check(ledger instanceof AuthenticatedLocalDepositLedger && depositWorker instanceof AutomaticNativeToSolanaDeposit);
     depositWorker.assertLedger(ledger); this.#ledger = ledger; this.#deposits = depositWorker;
@@ -31,7 +33,14 @@ export class LocalBridgeService {
     return { state: this.#ledger.status().state === "OPEN_LOCAL_ACCOUNTING_ONLY" ? "ACTIVE" : "PAUSED", trust: "LOCAL_JOURNAL_NOT_FRESH_CHAIN_RECONCILIATION",
       pauseReason: this.#ledger.status().reason ?? null,
       accounting: this.#ledger.bridgeSnapshot(),
+      supply: this.#publicSupply(),
       ...(this.#deposits ? { deposits: this.#ledger.serviceDeposits(page) } : {}) };
+  }
+  #publicSupply() {
+    if (!this.#supply || this.#ledger.status().state !== "OPEN_LOCAL_ACCOUNTING_ONLY" ||
+      this.#ledger.checkpoint().sequence !== this.#supply.sequence || Date.now() - this.#supply.value.observedAt > 30000)
+      return { state: "UNAVAILABLE" };
+    return this.#supply.value;
   }
   async tick({ limit = 16 } = {}) {
     check(Number.isInteger(limit) && limit >= 1 && limit <= 100);
@@ -83,6 +92,20 @@ export class LocalBridgeService {
           this.#ledger.updateServiceDeposit(request.operationId, "COMPLETED", sha256Canonical(reconciliation));
           const result = operations.find(r => r.operationId === request.operationId);
           if (result) result.state = "COMPLETED";
+        }
+        const policy = this.depositPolicy();
+        if (policy.environment === "devnet") {
+          try { this.#supply = { sequence: this.#ledger.checkpoint().sequence,
+            value: completedSupplyCounter({ environment: policy.environment, mint: base58Encode(Buffer.from(policy.mint, "hex")),
+              completedAtomic: this.#ledger.completedForwardAtomic(), reconciliation, observedAt: Date.now() }) }; }
+          catch (error) {
+            this.#supply = undefined;
+            if (["SupplyMonetaryCapExceeded", "SupplyEligibleBackingExceeded"].includes(error.message)) {
+              this.#ledger.hardStop("COMPLETED_SUPPLY_CONTRADICTION");
+              return { state: "PAUSED", reason: "COMPLETED_SUPPLY_CONTRADICTION", operations };
+            }
+            throw error;
+          }
         }
       }
       return { state: this.status({ limit: 1 }).state, operations, reconciliation };

@@ -37,10 +37,10 @@ export class BridgeUserApi {
   getBridgeStatus() {
     if (this.#controller) return this.#controller.publicSnapshot().then(s => ({ state: s.state, trust: s.trust,
       environment: "mainnet", nativeNetwork: "MAINNET", productionReady: s.state === "ACTIVE", mainnetActivation: s.state === "ACTIVE" ? "ENABLED" : "DISABLED",
-      decimals: 8, symbol: "KPEPE", accounting: s.accounting, deposits: s.operations }));
+      decimals: 8, symbol: "KPEPE", accounting: s.accounting, deposits: s.operations, supply: s.supply }));
     const s = this.#service.status({ limit: 100 });
     return { state: s.state, trust: s.trust, environment: this.#policy.environment, nativeNetwork: "REGTEST", productionReady: false, mainnetActivation: "DISABLED",
-      decimals: 8, symbol: "KPEPE", accounting: s.accounting, deposits: s.deposits ?? [] };
+      decimals: 8, symbol: "KPEPE", accounting: s.accounting, deposits: s.deposits ?? [], supply: s.supply };
   }
   async createNativeDepositRequest(input) {
     exactFields(input, "amountAtomic,recipient,userRecoveryPublicKeyHex,nonceHex");

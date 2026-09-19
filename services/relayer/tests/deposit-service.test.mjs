@@ -21,6 +21,7 @@ function fixture(t) {
   let ledger = Ledger.createLocal(options);
   const calls = [], worker = Object.create(AutomaticNativeToSolanaDeposit.prototype);
   Object.assign(worker, {
+    publicPolicy: () => ({ environment: "localnet" }),
     assertLedger: value => assert.equal(value, ledger),
     catchUp: async () => { calls.push("CATCH_UP"); },
     reconcile: async () => { calls.push("MATCH"); return { state: "MATCH" }; },
@@ -41,6 +42,27 @@ test("fresh backing admission precedes new observation and is repeated each tick
   const f = fixture(t);
   await f.service.tick(); await f.service.tick();
   assert.deepEqual(f.calls, ["CATCH_UP", "MATCH", "OBSERVE", "MATCH", "CATCH_UP", "MATCH", "OBSERVE", "MATCH"]);
+});
+
+test("public supply is absent until reconciled, is invalidated by ledger changes and never survives pause", async t => {
+  const f = fixture(t);
+  f.worker.publicPolicy = () => ({ environment: "devnet", mint: '01'.repeat(32) });
+  f.worker.reconcile = async () => ({ state: 'MATCH', canonicalReserve: '0', mintedSupply: '0', unclaimedDirectBurnDifference: '0', authorizedUnmintedCredits: '0' });
+  assert.equal(f.service.status().supply.state, 'UNAVAILABLE');
+  await f.service.tick();
+  assert.equal(f.service.status().supply.bridgedSupplyAtomic, '0');
+  assert.equal(f.service.status().supply.remainingSupplyAtomic, '2100000000000000');
+  f.service.pause('REVIEW'); assert.equal(f.service.status().supply.state, 'UNAVAILABLE');
+  assert.equal(f.reopen().completedForwardAtomic(), '0');
+});
+
+test("an invalid over-cap accounting projection enters the existing persisted safe state", async t => {
+  const f = fixture(t); f.worker.publicPolicy = () => ({ environment: 'devnet', mint: '01'.repeat(32) });
+  f.worker.reconcile = async () => ({ state: 'MATCH', canonicalReserve: '2100000000000001', mintedSupply: '2100000000000001', unclaimedDirectBurnDifference: '0', authorizedUnmintedCredits: '0' });
+  assert.equal((await f.service.tick()).state, 'PAUSED');
+  assert.equal(f.service.status().supply.state, 'UNAVAILABLE');
+  assert.equal(f.reopen().status().reason, 'COMPLETED_SUPPLY_CONTRADICTION');
+  assert.throws(() => f.reopen().resumeAfterReview());
 });
 
 for (const condition of ["WAITING_FOR_DEPENDENCY", "ACCOUNTING_CONTRADICTION", "RPC_UNAVAILABLE"])

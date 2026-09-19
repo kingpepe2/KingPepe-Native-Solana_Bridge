@@ -1378,9 +1378,9 @@ test("ledger rejects alternate domains, non-deposit messages, nonzero fees and m
   assert.deepEqual(ledger.snapshot(), before);
 });
 
-test("ledger preserves u64 operation and u128 aggregate precision without Number conversions", () => {
+test("ledger reaches the monetary ceiling only with unique exact backing and cannot mint twice at the cap", () => {
   const ledger = new ExactDepositLedger();
-  const maximum = (1n << 64n) - 1n;
+  const maximum = 2100000000000000n - 3n;
   const credits = [maximum, 3n].map((amount, index) => ledgerCredit({
     deposit: { amountAtomic: amount.toString(), depositOutpoint: outpoint(`precision-${index}`) },
     reserveSweep: { reserveAllocationIdHex: h(`precision-allocation-${index}`) },
@@ -1391,6 +1391,18 @@ test("ledger preserves u64 operation and u128 aggregate precision without Number
   ledger.recordMint({ ...credits[0], mintedAmountAtomic: maximum });
   assert.equal(ledger.snapshot().mintedSupply, (maximum + 3n).toString());
   assert.equal(ledger.snapshot().surplus, "0");
+  const before = ledger.snapshot();
+  ledger.recordMint({ ...credits[0], mintedAmountAtomic: maximum });
+  assert.deepEqual(ledger.snapshot(), before);
+  assert.throws(() => ledger.recordValidatedDeposit(ledgerCredit({ deposit: { amountAtomic: '1', depositOutpoint: outpoint('above-cap') },
+    reserveSweep: { reserveAllocationIdHex: h('above-cap') } })), /CapExceeded/);
+  assert.deepEqual(ledger.snapshot(), before);
+  const replay = ledgerCredit({ deposit: { amountAtomic: maximum.toString(), depositOutpoint: outpoint('precision-0') }, messageNonceHex: h('cap-replay') });
+  assert.throws(() => ledger.recordValidatedDeposit(replay), /BackingAlreadyAllocated/);
+  assert.deepEqual(ledger.snapshot(), before);
+  const fresh = new ExactDepositLedger();
+  assert.throws(() => fresh.recordValidatedDeposit(ledgerCredit({ deposit: { amountAtomic: ((1n << 64n) - 1n).toString() } })), /CapExceeded/);
+  assert.equal(fresh.snapshot().mintedSupply, '0');
 });
 
 test("ledger snapshots and accepted credit data cannot be mutated by the caller", () => {
@@ -1412,7 +1424,7 @@ test("interleaved multi-credit retries conserve reserve and liabilities at every
   let total = 0n;
   let minted = 0n;
   const credits = Array.from({ length: 64 }, (_, index) => {
-    const amount = (1n << 53n) + BigInt(index + 1);
+    const amount = 30000000000000n + BigInt(index + 1); // All 64 unique credits fit the 21M monetary ceiling.
     const credit = ledgerCredit({
       deposit: { amountAtomic: amount.toString(), depositOutpoint: outpoint(`multi-credit-${index}`) },
       reserveSweep: { reserveAllocationIdHex: h(`multi-allocation-${index}`) },

@@ -2063,6 +2063,27 @@
       "notes": "Original real TLS/DPAPI adversarial and FROST signature tests; disposable credentials generated externally, no operational material included.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "SIMPLIFY"
+    },
+    {
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "path": "shared/monetary-supply.mjs",
+      "reviewDisposition": "KEEP_SECURITY",
+      "purpose": "CORE_BRIDGE",
+      "notes": "Original exact monetary ceiling and completed reconciled issuance projection; no signing or RPC authority."
+    },
+    {
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "path": "scripts/tests/monetary-supply.test.mjs",
+      "reviewDisposition": "KEEP_SECURITY",
+      "purpose": "CORE_BRIDGE",
+      "notes": "Original integer cap, backing, reconciliation and network-separated public supply regressions."
+    },
+    {
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "path": "docs/security/monetary-supply.md",
+      "reviewDisposition": "KEEP_SECURITY",
+      "purpose": "CORE_BRIDGE",
+      "notes": "Original consensus-source confirmation and one-way monetary ceiling, backing and public counter semantics."
     }
   ],
   "simplificationReview": {

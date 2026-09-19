@@ -440,10 +440,8 @@ impl BridgeProgram {
             return Err(BridgeError::Replay);
         }
 
-        let minted_supply = self
-            .minted_supply
-            .checked_add(message.amount_atomic as u128)
-            .ok_or(BridgeError::ArithmeticOverflow)?;
+        let minted_supply =
+            checked_issued_after_mint(self.minted_supply, 0, message.amount_atomic)?;
         transceiver
             .consume_receipt(&digest)
             .map_err(BridgeError::Transceiver)?;
@@ -886,6 +884,10 @@ fn process_accept_deposit_claim_accounts(
     Ok(())
 }
 
+// Eight decimals match the enforced Native/Mint binding. This ceiling is
+// cumulative: an ordinary holder burn does not create a new issuance allowance.
+pub const MAX_KPEPE_SUPPLY_ATOMIC: u128 = 21_000_000 * 100_000_000;
+
 fn checked_issued_after_mint(
     issued: u128,
     live_supply: u64,
@@ -894,12 +896,16 @@ fn checked_issued_after_mint(
     if u128::from(live_supply) > issued {
         return Err(BridgeError::AccountMismatch);
     }
-    live_supply
+    let live_after = live_supply
         .checked_add(amount)
         .ok_or(BridgeError::ArithmeticOverflow)?;
-    issued
+    let issued_after = issued
         .checked_add(u128::from(amount))
-        .ok_or(BridgeError::ArithmeticOverflow)
+        .ok_or(BridgeError::ArithmeticOverflow)?;
+    if u128::from(live_after) > MAX_KPEPE_SUPPLY_ATOMIC || issued_after > MAX_KPEPE_SUPPLY_ATOMIC {
+        return Err(BridgeError::MonetarySupplyCapExceeded);
+    }
+    Ok(issued_after)
 }
 
 pub fn derive_mint_authority_pda(
@@ -1671,6 +1677,8 @@ pub enum BridgeError {
     Replay,
     #[error("arithmetic overflow")]
     ArithmeticOverflow,
+    #[error("KingPepe monetary supply cap exceeded")]
+    MonetarySupplyCapExceeded,
     #[error("transceiver error: {0}")]
     Transceiver(#[from] TransceiverError),
 }
@@ -2286,6 +2294,22 @@ mod tests {
             .copy_from_slice(&encoded_state_account(&config));
 
         let mut prior_state = read_bridge_state_account(&state_account).unwrap();
+        prior_state.minted_supply = MAX_KPEPE_SUPPLY_ATOMIC - u128::from(message.amount_atomic) + 1;
+        write_account_data(
+            &state_account,
+            &encode_bridge_state_account(&prior_state).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            process_instruction_accounts_with_token_cpi(
+                &id(),
+                &accounts,
+                &deposit,
+                TokenCpiMode::SkipForTest
+            ),
+            Err(BridgeError::MonetarySupplyCapExceeded.into())
+        );
+        assert!(claim_account.data.borrow().iter().all(|byte| *byte == 0));
         prior_state.minted_supply = direct_burn;
         write_account_data(
             &state_account,
@@ -2357,7 +2381,7 @@ mod tests {
 
     #[test]
     fn issued_counter_preserves_direct_burn_difference_and_exact_boundaries() {
-        for difference in [0, 1, u128::from(u64::MAX)] {
+        for difference in [0, 1, MAX_KPEPE_SUPPLY_ATOMIC - 120] {
             let issued = 100 + difference;
             assert_eq!(checked_issued_after_mint(issued, 100, 20), Ok(issued + 20));
         }
@@ -2379,6 +2403,27 @@ mod tests {
                 Err(BridgeError::AccountMismatch)
             );
         }
+    }
+
+    #[test]
+    fn monetary_cap_checks_exact_boundary_and_does_not_reopen_after_direct_burn() {
+        let cap = MAX_KPEPE_SUPPLY_ATOMIC as u64;
+        assert_eq!(
+            checked_issued_after_mint(u128::from(cap - 2), cap - 2, 1),
+            Ok(u128::from(cap - 1))
+        );
+        assert_eq!(
+            checked_issued_after_mint(u128::from(cap - 1), cap - 1, 1),
+            Ok(u128::from(cap))
+        );
+        assert_eq!(
+            checked_issued_after_mint(u128::from(cap), cap, 1),
+            Err(BridgeError::MonetarySupplyCapExceeded)
+        );
+        assert_eq!(
+            checked_issued_after_mint(u128::from(cap), 0, 1),
+            Err(BridgeError::MonetarySupplyCapExceeded)
+        );
     }
 
     #[test]

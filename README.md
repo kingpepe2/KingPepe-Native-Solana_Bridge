@@ -3,9 +3,9 @@
 **One-way bridge.** Supported: KingPepe Native → Solana KPEPE.
 Solana KPEPE → KingPepe Native redemption is not provided.
 
-Mainnet is not deployed or activated. The one-way conversion is undergoing
-fresh validation. The public TEST interface is [KingPepe Bridge](https://kingpepe.net/bridge);
-its one-way update is pending reviewed deployment. No Mainnet Mint or program
+Mainnet is not deployed or activated. The public one-way TEST interface is
+[KingPepe Bridge](https://kingpepe.net/bridge), using REGTEST → DEVNET.
+No Mainnet Mint or program
 address is published until independently verified after deployment.
 
 ## Deposit flow
@@ -29,6 +29,11 @@ signature. Native public-address balance lookup is informational. Users retain
 their own Native wallets. Never enter a seed phrase, private key or wallet file.
 
 ## Accounting and protection
+
+KingPepe Native's monetary ceiling is **21,000,000 KPEPE**. Solana KPEPE is
+representation against eligible Native backing, not independent supply or a
+21M mint allocation. Both the monetary ceiling and the stronger backing
+invariant apply. See [source confirmation, enforcement and counter semantics](docs/security/monetary-supply.md).
 
 Native and SPL units use eight decimals and exact integers. Eligible canonical
 reserve equals authorized pending credits plus cumulative bridge-issued units.

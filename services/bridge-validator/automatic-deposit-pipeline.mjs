@@ -1,3 +1,4 @@
+import { MAX_KPEPE_SUPPLY_ATOMIC, checkedRepresentedMint } from "../../shared/monetary-supply.mjs";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { preserveOperationHardStop, readOperationHardStop } from "../../shared/operation-hard-stop.mjs";
@@ -675,7 +676,7 @@ export class ExactDepositLedger {
     const next = Object.freeze({
       ...this.#totals,
       authorizedUnmintedCredits: checkedSub(this.#totals.authorizedUnmintedCredits, amount),
-      mintedSupply: checkedAdd(this.#totals.mintedSupply, amount),
+      mintedSupply: checkedRepresentedMint(this.#totals.mintedSupply, amount, this.#totals.canonicalReserve),
       unsettledOperations: checkedSub(this.#totals.unsettledOperations, 1n),
     });
     assertLedgerCovered(next);
@@ -767,6 +768,7 @@ function isExactMintAmount(value, expected) {
 function assertLedgerCovered(totals) {
   const coverage = checkedAdd(totals.mintedSupply, totals.authorizedUnmintedCredits);
   if (coverage > totals.canonicalReserve) throw new Error("LedgerInsufficientBacking");
+  if (coverage > MAX_KPEPE_SUPPLY_ATOMIC) throw new Error("SupplyMonetaryCapExceeded");
 }
 
 export function buildDepositClaimMessage(config, operation) {

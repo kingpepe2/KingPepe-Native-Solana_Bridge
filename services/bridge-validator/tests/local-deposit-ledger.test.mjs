@@ -187,8 +187,8 @@ if (process.argv[2] === "--ledger-worker") {
     assert.deepEqual(store.checkpoint(), before); assert.equal(store.snapshot().authorizedUnmintedCredits, "100");
   });
 
-  test("u64 values and u128 totals retain precision across database reopen", t => {
-    const f = fixture(t); const store = f.create(); const maximum = (1n << 64n) - 1n;
+  test("exact monetary-ceiling accounting survives database reopen and rejects oversized credits", t => {
+    const f = fixture(t); const store = f.create(); const maximum = 1050000000000000n;
     const first = credit(0, maximum); const second = credit(1, maximum);
     store.recordValidatedDeposit(first); store.recordValidatedDeposit(second);
     store.recordMint({ ...first, mintedAmountAtomic: maximum }); store.close();
@@ -196,6 +196,10 @@ if (process.argv[2] === "--ledger-worker") {
     assert.equal(reopened.snapshot().canonicalReserve, (maximum * 2n).toString());
     assert.equal(reopened.snapshot().authorizedUnmintedCredits, maximum.toString());
     assert.equal(reopened.snapshot().mintedSupply, maximum.toString());
+    const before = reopened.checkpoint();
+    assert.throws(() => reopened.recordValidatedDeposit(credit(2, 1n)), /CapExceeded/);
+    assert.throws(() => reopened.recordValidatedDeposit(credit(3, (1n << 64n) - 1n)), /CapExceeded/);
+    assert.deepEqual(reopened.checkpoint(), before);
   });
 
   test("snapshot, pending pages and input objects cannot mutate stored authorization", t => {

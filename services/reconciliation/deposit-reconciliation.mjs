@@ -1,5 +1,6 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 // Read-only reconciliation. Results cannot sign, mint, change balances or clear a stop.
+import { MAX_KPEPE_SUPPLY_ATOMIC } from "../../shared/monetary-supply.mjs";
 import { createHash } from "node:crypto";
 import { canonicalJson, canonicalUintDecimal } from "../../native/frost/policy/native-signing-policy.mjs";
 import { LocalNativeEvidenceVerifier, requireVerifiedNativeChain, requireVerifiedNativeReserve, verifiedReserveChain, observedSpentNativeReserve } from "../../native/node/native-raw-evidence.mjs";
@@ -25,6 +26,8 @@ function contradiction(reason, evidence, affectedOperations = [], affectedReserv
 export function compareDepositAccounting(journal, observed) {
   const reserve = u128(journal.canonicalReserve), pending = u128(journal.authorizedUnmintedCredits), issued = u128(journal.mintedSupply);
   const actualReserve = u128(observed.canonicalReserve), supply = uint(observed.mintSupplyAtomic), manager = u128(observed.managerMintedAtomic);
+  if (supply > MAX_KPEPE_SUPPLY_ATOMIC || issued > MAX_KPEPE_SUPPLY_ATOMIC || manager > MAX_KPEPE_SUPPLY_ATOMIC)
+    contradiction("MONETARY_SUPPLY_CAP_EXCEEDED", { journal, observed });
   if (reserve !== pending + issued || actualReserve !== reserve || manager !== issued || supply > manager)
     contradiction("ECONOMIC_SNAPSHOT_CONTRADICTION", { journal, observed });
   const required = supply + pending;

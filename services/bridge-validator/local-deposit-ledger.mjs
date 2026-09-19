@@ -342,6 +342,14 @@ export class AuthenticatedLocalDepositLedger {
     return Object.freeze({ canonicalReserveAtomic: d.canonicalReserve,
       bridgeIssuedAtomic: d.mintedSupply, pendingMintAtomic: d.authorizedUnmintedCredits });
   }
+  completedForwardAtomic() {
+    this.#assertHead();
+    // Aggregate the complete authenticated ledger, never a paginated status page.
+    let total = 0n;
+    for (const record of this.#service.deposits.values()) if (record.completed !== null && record.operation.mintReceipt !== null)
+      total += BigInt(record.operation.plan.depositIntent.amountAtomic);
+    return total.toString();
+  }
   recordMint(input) {
     const credit = creditPayload(input);
     const value = input.mintedAmountAtomic;

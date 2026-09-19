@@ -503,6 +503,7 @@ test("Mainnet protected forward composition opens only with its exact deployment
   const api = apiFor(controller);
   const publicStatus = await api.getBridgeStatus(); assert.equal(publicStatus.nativeNetwork, "MAINNET");
   assert.equal(publicStatus.state, "PAUSED"); assert.equal(publicStatus.productionReady, false); assert.equal(publicStatus.mainnetActivation, "DISABLED");
+  assert.equal(publicStatus.supply.state, "UNAVAILABLE");
   await assert.rejects(api.createNativeDepositRequest(intake.input), /PublicActivationRequired/);
   await assert.rejects(api.submitNativeDeposit({ request: intake.input, depositTxidHex: intake.request.depositTxidHex, depositVout: 0 }), /PublicActivationRequired/);
   await assert.rejects(controller.watch(intake.request), /PublicActivationRequired/);

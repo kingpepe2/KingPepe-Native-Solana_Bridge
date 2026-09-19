@@ -19,6 +19,7 @@ import { requireIntegrityGuard } from "../supervisor/protected-integrity.mjs";
 import { requireDepositOperationJournal } from "./protected-deposit-journal.mjs";
 import { recoverNativeReserveCredit } from "./native-reserve-credit.mjs";
 import { readDepositReconciliation } from "../reconciliation/deposit-reconciliation.mjs";
+import { completedSupplyCounter } from "../../shared/monetary-supply.mjs";
 import { LocalDeploymentRpc, verifyDeploymentSnapshot } from "../solana-observer/deployment-integrity.mjs";
 import { SolanaLocalRpcClient } from "./solana-deposit-claim-submitter.mjs";
 import { SolanaDepositClaimObserver } from "../solana-observer/solana-deposit-claim-observer.mjs";
@@ -185,9 +186,33 @@ export class ProtectedDepositController {
           transactionIds: { nativeDeposit: r.plan.inputs[0].txid, nativeSweep: book?.broadcastAccepted ? parseNativeTransactionHex(r.plan.unsignedTransactionHex).txidHex : null,
             solanaClaim: book?.mintReceipt?.signature ?? claim }, trust: "JOURNAL_OBSERVATION" };
       })];
+      // Unactivated/paused production status must not initiate chain requests.
+      const supply = active ? await this.#publicSupply(state, journal) : { state: "UNAVAILABLE" };
       return { state: active ? "ACTIVE" : "PAUSED",
-        trust: "LOCAL_JOURNAL_NOT_FRESH_CHAIN_RECONCILIATION", accounting: journal.accounting, operations };
+        trust: "LOCAL_JOURNAL_NOT_FRESH_CHAIN_RECONCILIATION", accounting: journal.accounting, operations, supply };
     });
+  }
+  #supplyCache;
+  async #publicSupply(state, journal) {
+    const dp = this.#policy.deliveryPolicy, environment = dp.operationPolicy.environment;
+    if (environment !== "mainnet") return { state: "UNAVAILABLE" };
+    const revision = digest(canonicalJson([journal.revision, state.records.map(r => [r.plan.operationId, r.completed])]));
+    if (this.#supplyCache?.revision === revision && Date.now() - this.#supplyCache.value.observedAt < 12000) return this.#supplyCache.value;
+    try {
+      const match = await readDepositReconciliation({ policy: dp.operationPolicy, manifest: dp.manifest, operations: journal.operations,
+        nativeVerifier: this.#native, solanaRpc: this.#chain });
+      if (match.state !== "OBSERVED_MATCH" || (await this.#journal.snapshot()).revision !== journal.revision) return { state: "UNAVAILABLE" };
+      const completedAtomic = state.records.filter(r => r.completed !== null).reduce((sum, r) => sum + BigInt(r.plan.depositIntent.amountAtomic), 0n).toString();
+      const value = completedSupplyCounter({ environment, mint: dp.manifest.mint.id, completedAtomic,
+        reconciliation: { state: "MATCH", ...match.accounting }, observedAt: Date.now() });
+      this.#supplyCache = { revision, value }; return value;
+    } catch (error) {
+      if (error.incident || error.integrityCode) throw error; // Existing protected authority records/pauses contradictions.
+      if (["SupplyMonetaryCapExceeded", "SupplyEligibleBackingExceeded"].includes(error.message)) {
+        error.incident = { evidenceDigest: digest(error.message) }; throw error;
+      }
+      return { state: "UNAVAILABLE" };
+    }
   }
   async submit(input) {
     const plan = validateDepositOperationPlan(input, this.#policy.deliveryPolicy.operationPolicy);
