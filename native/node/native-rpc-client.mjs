@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { validateRuntimeFile } from "../../shared/runtime-path-boundary.mjs";
+import { scriptFromWitnessAddress } from "./witness-address.mjs";
 
 export const NATIVE_RPC_ADAPTER_PROTOCOL =
   "KINGPEPE_NATIVE_SOLANA_BRIDGE/NATIVE_RPC_ADAPTER/V1";
@@ -23,6 +24,7 @@ const METHOD_ALLOWLIST = new Set([
   "getblockheader",
   "getrawtransaction",
   "gettxout",
+  "scantxoutset",
   "sendrawtransaction",
   "stop",
 ]);
@@ -226,6 +228,17 @@ export class NativeRpcClient {
       (await this.call("sendrawtransaction", [normalizeHexText(rawTransactionHex, "rawTransactionHex")])).result,
       "sendrawtransaction.result",
     );
+  }
+
+  async scanAddressBalance(address) {
+    scriptFromWitnessAddress(address); // REGTEST public witness addresses only.
+    const response = await this.call("scantxoutset", ["start", [{ desc: `addr(${address.toLowerCase()})` }]]);
+    if (response.result?.success !== true) throw new Error("NativeBalanceUnavailable");
+    // Preserve the JSON numeric token before any binary floating-point conversion.
+    const exact = JSON.parse(response.raw, (_key, value, context) => typeof value === "number" ? context.source : value);
+    const amount = decimalCoinsToAtomic(exact.result.total_amount);
+    if (amount > 0xffffffffffffffffn) throw new Error("NativeBalanceOverflow");
+    return { amountAtomic: amount.toString(), bestBlockHash: normalizeHash32(response.result.bestblock, "bestblock") };
   }
 
   async stop() {
