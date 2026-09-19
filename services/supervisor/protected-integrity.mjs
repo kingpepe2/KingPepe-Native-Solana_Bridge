@@ -17,7 +17,7 @@ function fields(value, keys) { requireValue(value && !Array.isArray(value) && Ob
 // One explicit, exclusively leased authority. Production enrollment/reopening
 // starts paused; this module does not install services or authorize activation.
 export class ProtectedIntegrityAuthority {
-  #store; #lease; #generation; #health; #closed = false; #stopped = false;
+  #store; #lease; #generation; #health; #closed = false; #stopped = false; #reviewing = false;
   constructor(store, capability) {
     assertWindowsProtectedStore(store, "SUPERVISOR", "global-integrity");
     requireValue(store.context.environment === "localnet" ||
@@ -89,6 +89,41 @@ export class ProtectedIntegrityAuthority {
     return Object.freeze({ protocol: INTEGRITY_PROTOCOL,
       state: state.state === "RUNNING" && missingSources.length ? "PAUSED_POLICY" : state.state,
       policyState: state.state, missingSources, generation: state.generation, revision, incidentCount: state.incidents.length });
+  }
+  // Private supervisor-owner operations, deliberately absent from handle/IPC.
+  // They do not enroll keys, change program mode, clear incidents or authorize
+  // deployment. The reviewed launcher supplies actual live preflight checks;
+  // each signing/broadcast role still enforces its own production admission.
+  pauseMainnet(deployment) {
+    assertMainnetProtectedDeployment(this.#store.context, deployment);
+    const { state, revision } = this.#read();
+    if (state.state !== "HARD_STOP_INTEGRITY") {
+      state.state = "PAUSED_POLICY"; this.#write(state, revision);
+    }
+    return this.status();
+  }
+  async resumeMainnetAfterReview({ deployment, activation, preflight }) {
+    assertMainnetProtectedDeployment(this.#store.context, deployment);
+    activation = structuredClone(activation);
+    fields(activation, ["activationMode", "productionSigningAuthorized", "productionBroadcastAuthorized", "productionReady", "mainnetActivation"]);
+    requireValue(["CONTROLLED", "ACTIVE"].includes(activation.activationMode) &&
+      activation.productionSigningAuthorized === true && activation.productionBroadcastAuthorized === true &&
+      activation.productionReady === (activation.activationMode === "ACTIVE") &&
+      activation.mainnetActivation === (activation.activationMode === "ACTIVE" ? "ENABLED" : "DISABLED") &&
+      typeof preflight === "function", "IntegrityMainnetReviewRequired");
+    requireValue(!this.#reviewing, "IntegrityMainnetReviewBusy"); this.#reviewing = true;
+    try {
+      const before = this.#read();
+      requireValue(before.state.state === "PAUSED_POLICY" && !this.#stopped && this.#health.missing().length === 0,
+        "IntegrityMainnetResumeRejected");
+      requireValue(await preflight(Object.freeze(activation)) === true, "IntegrityMainnetPreflightRejected");
+      // A new pause, incident, close, stale source check or changed revision
+      // while preflight awaited invalidates this decision. No cached permission.
+      const { state, revision } = this.#read();
+      requireValue(revision === before.revision && state.state === "PAUSED_POLICY" && !this.#stopped &&
+        this.#health.missing().length === 0, "IntegrityMainnetResumeChanged");
+      state.state = "RUNNING"; this.#write(state, revision); return this.status();
+    } finally { this.#reviewing = false; }
   }
   handle({ method, peerRole, operationId, payload }) {
     requireValue(INTEGRITY_ROLES.includes(peerRole) && typeof operationId === "string" && HASH.test(operationId), "IntegrityRoleRejected");

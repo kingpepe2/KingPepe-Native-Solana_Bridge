@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto";
 
 export const SOURCE_HEALTH_PROTOCOL = "KINGPEPE_SOURCE_HEALTH_V1";
 export const SOURCE_HEALTH_ROLES = Object.freeze(["NATIVE_OBSERVER", "SOLANA_OBSERVER", "RECONCILIATION"]);
-export const SOURCE_HEALTH_WINDOW_MS = 30000; // Fixed localnet service bound, not production finality policy.
+export const SOURCE_HEALTH_WINDOW_MS = 30000; // Service freshness bound, not chain finality policy.
 const HASH = /^[0-9a-f]{64}$/u;
 function requireValue(value, code = "SourceHealthRejected") { if (!value) throw new Error(code); }
 function fields(value, keys) { requireValue(value && !Array.isArray(value) && Object.keys(value).sort().join() === [...keys].sort().join()); }

@@ -162,6 +162,56 @@ test("Mainnet protected supervisor starts paused, blocks signing and retains rec
   await assert.rejects(guard.assertRunning(h("must-not-sign-after-reopen"), "FROST_SIGN"));
 });
 
+test("Mainnet private reviewed resume requires fresh sources, cannot cross a pause or clear an incident, and restart pauses again", async t => {
+  // Actual isolated CurrentUser DPAPI. Source reports below are synthetic
+  // admission facts only, never evidence of Mainnet chain health or activation.
+  const d = mainnetFixtureDeployment(), root = temporary(t), opts = options(root, "mainnet-reviewed-authority", "SUPERVISOR", "global-integrity");
+  Object.assign(opts.context, { environment: "mainnet", nativeGenesis: d.nativeGenesis, solanaDeployment: d.solanaDeployment, keyEpoch: d.keyEpoch });
+  let authority = await ProtectedIntegrityAuthority.createMainnetPaused(opts, d);
+  cleanups.get(root).push(() => authority.close());
+  const activation = { activationMode: "CONTROLLED", productionSigningAuthorized: true, productionBroadcastAuthorized: true,
+    productionReady: false, mainnetActivation: "DISABLED" };
+  let calls = 0;
+  const input = { deployment: d, activation, preflight: async () => { calls++; return true; } };
+  const fresh = () => {
+    for (const peerRole of SOURCE_HEALTH_ROLES) {
+      const operationId = h("SYNTHETIC_MAINNET_ADMISSION_ONLY:" + peerRole);
+      const { check } = authority.handle({ method: "beginSourceCheck", peerRole, operationId, payload: {} });
+      authority.handle({ method: "finishSourceCheck", peerRole, operationId, payload: { generation: check.generation,
+        challenge: check.challenge, state: "OBSERVED_MATCH", evidenceDigest: h("NOT_REAL_CHAIN_EVIDENCE") } });
+    }
+  };
+  await assert.rejects(authority.resumeMainnetAfterReview(input), /ResumeRejected/); assert.equal(calls, 0);
+  fresh();
+  for (const changed of [{ productionSigningAuthorized: false }, { productionBroadcastAuthorized: false },
+    { productionReady: true }, { mainnetActivation: "ENABLED" }, { activationMode: "TEST" }])
+    await assert.rejects(authority.resumeMainnetAfterReview({ ...input, activation: { ...activation, ...changed } }), /ReviewRequired/);
+  await assert.rejects(authority.resumeMainnetAfterReview({ ...input, deployment: { ...d, mint: h("substituted-mint") } }), /DeploymentRejected/);
+  await assert.rejects(authority.resumeMainnetAfterReview({ ...input, preflight: async () => ({ ready: true }) }), /PreflightRejected/);
+  assert.equal(authority.status().state, "PAUSED_POLICY");
+  for (const method of ["pauseMainnet", "resumeMainnetAfterReview"]) assert.throws(() => authority.handle({ method,
+    peerRole: "BRIDGE_VALIDATOR", operationId: h("cannot-promote"), payload: {} }), /MethodRejected/);
+  let release;
+  const waiting = authority.resumeMainnetAfterReview({ ...input, preflight: () => new Promise(resolve => { release = resolve; }) });
+  await assert.rejects(authority.resumeMainnetAfterReview(input), /ReviewBusy/);
+  authority.pauseMainnet(d); release(true); await assert.rejects(waiting, /ResumeChanged/);
+  assert.equal(authority.status().state, "PAUSED_POLICY");
+  fresh(); assert.equal((await authority.resumeMainnetAfterReview(input)).state, "RUNNING"); assert.equal(calls, 1);
+  await authority.close(); authority = await ProtectedIntegrityAuthority.openMainnetPaused(new WindowsProtectedStore(opts), d);
+  assert.equal(authority.status().policyState, "PAUSED_POLICY"); assert.deepEqual(authority.status().missingSources, SOURCE_HEALTH_ROLES);
+  fresh();
+  await assert.rejects(authority.resumeMainnetAfterReview({ ...input, preflight: async () => {
+    const operationId = h("health-regressed"), peerRole = "RECONCILIATION";
+    const { check } = authority.handle({ method: "beginSourceCheck", peerRole, operationId, payload: {} });
+    authority.handle({ method: "finishSourceCheck", peerRole, operationId, payload: { generation: check.generation,
+      challenge: check.challenge, state: "WAITING_FOR_DEPENDENCY", evidenceDigest: h("unavailable") } }); return true;
+  } }), /ResumeChanged/);
+  fresh(); authority.handle({ method: "reportContradiction", peerRole: "RECONCILIATION", operationId: h("mismatch"),
+    payload: { code: "CONFIRMED_RESERVE_DEFICIT", evidenceDigest: h("synthetic-deficit") } });
+  assert.equal(authority.pauseMainnet(d).state, "HARD_STOP_INTEGRITY");
+  await assert.rejects(authority.resumeMainnetAfterReview(input), /ResumeRejected/); assert.equal(authority.status().incidentCount, 1);
+});
+
 async function integrityFixture(t, initialState = "RUNNING") {
   const root = temporary(t), opts = options(root, "authority", "SUPERVISOR", "global-integrity");
   let authority = await ProtectedIntegrityAuthority.createLocal(opts, initialState);
