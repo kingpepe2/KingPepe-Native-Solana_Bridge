@@ -1,5 +1,29 @@
 # Current development status
 
+The latest [86-section implementation audit](deployment/final-oneway-audit.md)
+is **BLOCKED**, not Mainnet-ready. Reviewed implementation source
+`e4fde3be722aa072051d300d50aa681a216af077` passed
+[CI 35475685890](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/35475685890)
+with all four jobs and every step passed. Its frozen v3 program artifacts and
+actual Mainnet rent/fee quote are recorded in that report. A fresh public
+forward TEST transfer completed with 1.02 → 1.03 TEST KPEPE supply, exact backing,
+canonical live Borsh, finalized claim, idempotent resume and MATCH reconciliation.
+
+Independent blockers remain: the maintained Native node has insufficient normal
+fee-estimator data; measured caps, operator sweep-fee funding, protected production
+journal/process composition and operational recovery binding are incomplete.
+GitHub still serves retired content via old unreferenced commits despite clean
+intended public refs. Complete provider-side erasure is not proven. Fee-payer
+balance is zero against the current 2.236787960 SOL quote, and real Phantom
+acceptance remains manual. Funding is not the only blocker and is not approval.
+
+Explorer Mainnet gateway/recipient preparation is locally reviewed and tested at
+`3be9a145a0fffa1b693ecef41493b7e995a71b01`; the live simple TEST interface remains
+unchanged. Its stale vendor provenance metadata was corrected to the actually
+served one-way helper without restarting services. All six served helper/license
+hashes match. Mainnet deployment, official identities and controlled activation
+remain pending. The following paragraphs preserve source-bound validation history.
+
 The KingPepe Team has authorized permanent one-way conversion and public-history
 filtering. Supported direction: KingPepe Native → Solana. Mainnet remains paused.
 

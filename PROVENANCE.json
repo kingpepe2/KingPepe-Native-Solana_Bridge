@@ -19,7 +19,7 @@
   "cleanup": {
     "scope": "TEAM_AUTHORIZED_ONE_WAY_CONVERSION",
     "status": "VALIDATION_IN_PROGRESS",
-    "filesAfter": 300,
+    "filesAfter": 301,
     "removed": "Retired economic direction and obsolete implementation/fixtures. Forward signing, proof, recovery, accounting, legal notices and original file-origin classifications remain.",
     "importedSource": "No third-party source imported during conversion."
   },
@@ -1656,7 +1656,7 @@
     {
       "path": "solana/modules/bridge-messages/vectors/canonical-borsh-v3.json",
       "classification": "GENERATED_FILE",
-      "notes": "Generated public deterministic Borsh V2 message/preimage bytes and SHA-256 values, including integer and destination bounds; cross-checked with Rust. Not operational key material.",
+      "notes": "Generated public deterministic forward Borsh V3 message/preimage bytes and SHA-256 values, including integer and destination bounds; cross-checked with Rust. Not operational key material.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
@@ -2119,6 +2119,13 @@
       "notes": "Independent Rust decoding and program initialization validation of TypeScript Mainnet setup bytes, paused zero-supply policy and existing mode instruction variants.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "docs/deployment/final-oneway-audit.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original current implementation audit, source-bound TEST evidence and explicit Mainnet and public-history blockers; no private operational data.",
+      "purpose": "CORE_BRIDGE",
+      "reviewDisposition": "KEEP_SECURITY"
     }
   ],
   "simplificationReview": {
