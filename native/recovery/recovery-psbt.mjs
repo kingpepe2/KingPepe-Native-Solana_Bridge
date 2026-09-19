@@ -1,18 +1,22 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
-// Original bounded PSBTv0/BIP371 encoding. Offline, REGTEST-only, no key access.
+// Original bounded PSBTv0/BIP371 encoding. Explicit network, offline, no key access.
 import { createHash } from "node:crypto";
-import { prepareRegtestRecoveryTransaction, buildRegtestRecoverableDeposit } from "./taproot-deposit.mjs";
+import { prepareRegtestRecoveryTransaction, buildRegtestRecoverableDeposit,
+  prepareMainnetRecoveryTransaction, buildMainnetRecoverableDeposit } from "./taproot-deposit.mjs";
 import { parseNativeTransactionHex } from "../node/native-taproot-transaction.mjs";
 import { bridgeNumsPublicKeyHex, verifyTaprootControlBlock } from "../node/native-tapscript.mjs";
 import { REGTEST_GENESIS } from "../node/native-raw-evidence.mjs";
+import { NATIVE_MAINNET_GENESIS } from "../../shared/network-identity.mjs";
 
 const MAGIC = Buffer.from("70736274ff", "hex");
 const MAX_PSBT_BYTES = 16_384;
 const DOMAIN_KEY = "fc08" + Buffer.from("KingPepe").toString("hex") + "01";
 
-export function prepareRegtestRecoveryPsbt(options) {
-  const transaction = prepareRegtestRecoveryTransaction(options);
-  const policy = buildRegtestRecoverableDeposit(options.depositPolicy);
+export function prepareRegtestRecoveryPsbt(options) { return prepareRecoveryPsbt(options, false); }
+export function prepareMainnetRecoveryPsbt(options) { return prepareRecoveryPsbt(options, true); }
+function prepareRecoveryPsbt(options, mainnet) {
+  const transaction = (mainnet ? prepareMainnetRecoveryTransaction : prepareRegtestRecoveryTransaction)(options);
+  const policy = (mainnet ? buildMainnetRecoverableDeposit : buildRegtestRecoverableDeposit)(options.depositPolicy);
   const origin = options.userKeyOrigin;
   if (typeof origin?.masterFingerprintHex !== "string" || !/^[0-9a-f]{8}$/u.test(origin.masterFingerprintHex)) {
     throw new Error("RecoveryPublicKeyOriginRequired");
@@ -56,7 +60,9 @@ export function parsePublicDerivationPath(value) {
 // Inspect only this tooling's unsigned one-input/one-output PSBT subset.
 // Reject duplicates, alternate compact lengths, trailing data and oversized maps.
 // This function never treats a wallet-returned PSBT as signing authorization.
-export function inspectUnsignedRecoveryPsbt(base64) {
+export function inspectUnsignedRecoveryPsbt(base64) { return inspectRecoveryPsbt(base64, REGTEST_GENESIS); }
+export function inspectUnsignedMainnetRecoveryPsbt(base64) { return inspectRecoveryPsbt(base64, NATIVE_MAINNET_GENESIS); }
+function inspectRecoveryPsbt(base64, expectedGenesis) {
   if (typeof base64 !== "string" || base64.length > Math.ceil(MAX_PSBT_BYTES / 3) * 4) throw new Error("RecoveryPsbtTooLarge");
   const bytes = Buffer.from(base64, "base64");
   if (bytes.length > MAX_PSBT_BYTES || bytes.toString("base64") !== base64 || !bytes.subarray(0, 5).equals(MAGIC)) throw new Error("RecoveryPsbtEncodingInvalid");
@@ -85,7 +91,7 @@ export function inspectUnsignedRecoveryPsbt(base64) {
   const leafKeys = [...input.keys()].filter((key) => /^15c[01][0-9a-f]{128}$/u.test(key));
   const originKeys = [...input.keys()].filter((key) => /^16[0-9a-f]{64}$/u.test(key));
   if (global.size !== 2 || !global.has("00") || !global.has(DOMAIN_KEY)
-    || !new RegExp(`^${REGTEST_GENESIS}[0-9a-f]{64}$`, "u").test(global.get(DOMAIN_KEY))
+    || !new RegExp(`^${expectedGenesis}[0-9a-f]{64}$`, "u").test(global.get(DOMAIN_KEY))
     || input.size !== 7 || !input.has("01") || input.get("03") !== "00000000"
     || input.get("17") !== bridgeNumsPublicKeyHex() || !/^[0-9a-f]{64}$/u.test(input.get("18") ?? "")
     || preimageKeys.length !== 1 || leafKeys.length !== 1 || originKeys.length !== 1 || output.size !== 0) {
