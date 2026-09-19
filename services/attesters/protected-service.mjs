@@ -24,9 +24,9 @@ export function attesterEvidenceVerifier({ attester, verifyNativeDeposit }) {
 export function attesterIpcHandler({ attester, verifyNativeDeposit, integrity, journal }) {
   requireIntegrityGuard(integrity, attester?.role);
   if (!(attester instanceof ProjectAttester)) throw new Error("AttesterServiceVerifierRequired");
-  attester.assertProtectedStorage();
+  const context = attester.assertProtectedStorage();
   requireAttesterAuthorizationJournal(journal, attester, integrity);
-  integrity.assertDeployment({ environment: "localnet", nativeGenesis: attester.policy.nativeGenesisHex,
+  integrity.assertDeployment({ environment: context.environment, nativeGenesis: attester.policy.nativeGenesisHex,
     solanaDeployment: attester.policy.solanaDeploymentHex, keyEpoch: attester.policy.keyEpoch });
   const verify = attesterEvidenceVerifier({ attester, verifyNativeDeposit });
   return async input => {

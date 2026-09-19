@@ -3,6 +3,7 @@ import { isTestSolanaCluster } from "../../shared/solana-test-network.mjs";
 import { REGTEST_GENESIS } from "../../native/node/native-raw-evidence.mjs";
 import { assertWindowsProtectedStore } from "../../shared/windows/protected-store.mjs";
 import { timingSafeEqual } from "node:crypto";
+import { assertMainnetProtectedDeployment, NATIVE_MAINNET_GENESIS } from "../../shared/network-identity.mjs";
 import {
   bytesToHex,
   decodeCanonicalBridgeMessage,
@@ -19,12 +20,31 @@ export const WAITING_FOR_FINALITY = "WAITING_FOR_FINALITY";
 export const WAITING_FOR_DEPENDENCY = "WAITING_FOR_DEPENDENCY";
 export const REJECTED = "REJECTED";
 export const HARD_STOP = "HARD_STOP";
+const MAINNET_ATTESTER = Symbol("Explicit protected Mainnet attester");
 
 export class ProjectAttester {
   #secretKey;
   #policy;
   #closed = false;
   #protectedStore;
+  static fromMainnetProtectedStore({ store, role, policy, deployment }) {
+    policy = normalizePolicy(structuredClone(policy)); deployment = structuredClone(deployment);
+    assertWindowsProtectedStore(store, role, "attester-seed");
+    assertMainnetProtectedDeployment(store.context, deployment);
+    const bound = { protocolId: policy.protocolId, nativeNetwork: policy.nativeNetwork, nativeGenesis: policy.nativeGenesisHex,
+      solanaDeployment: policy.solanaDeploymentHex, managerProgramId: policy.managerProgramIdHex,
+      transceiverProgramId: policy.transceiverProgramIdHex, mint: policy.mintHex, keyEpoch: policy.keyEpoch };
+    if (!Object.entries(bound).every(([key, value]) => deployment[key] === value) ||
+        !Number.isInteger(policy.policyEpoch) || policy.policyEpoch < 1 || policy.policyEpoch > 0xffff_ffff ||
+        policy.acceptedNativeTrust.length !== 1 || policy.acceptedNativeTrust[0] !== "LOCALLY_VALIDATED_CHAIN_STATE")
+      throw new Error("MainnetAttesterPolicyBindingRejected");
+    const result = store.read();
+    try {
+      if (result.payload.length !== 32) throw new Error("ProtectedAttesterKeyInvalid");
+      const attester = new ProjectAttester({ role, secretKey: result.payload, policy }, MAINNET_ATTESTER);
+      attester.#protectedStore = store; return attester;
+    } finally { result.payload.fill(0); }
+  }
   static fromWindowsProtectedStore({ store, role, policy, environment = "localnet", solanaGenesis }) {
     // Snapshot before the storage binding checks; never check one policy and
     // construct the attester from a second read of mutable/accessor input.
@@ -43,16 +63,18 @@ export class ProjectAttester {
       attester.#protectedStore = store; return attester;
     } finally { result.payload.fill(0); }
   }
-  constructor({ role, secretKey, policy }) {
+  constructor({ role, secretKey, policy }, capability) {
     if (!ATTESTATION_ROLES.includes(role)) {
       throw new Error("InvalidAttesterRole");
     }
     if (!secretKey) {
       throw new Error("MissingAttesterSecretKeyRef");
     }
+    this.#policy = normalizePolicy(structuredClone(policy));
+    if (this.#policy.nativeGenesisHex === NATIVE_MAINNET_GENESIS && capability !== MAINNET_ATTESTER)
+      throw new Error("MainnetAttesterProtectedStateRequired");
     this.#secretKey = Uint8Array.from(toBytes(secretKey, "secretKey"));
     const publicKeyHex = bytesToHex(ed25519.getPublicKey(this.#secretKey));
-    this.#policy = normalizePolicy(structuredClone(policy));
     Object.defineProperties(this, { role: { value: role, enumerable: true },
       publicKeyHex: { value: publicKeyHex, enumerable: true } });
     if (this.#policy.role !== role || this.#policy.attesterPublicKeyHex !== this.publicKeyHex) {

@@ -11,6 +11,7 @@ import {
 } from "../attestation-service.mjs";
 import { decodeCanonicalBridgeMessage, encodeCanonicalBridgeMessage, bytesToHex } from "../../../shared/protocol/canonical-message.mjs";
 import { attesterEvidenceVerifier } from "../protected-service.mjs";
+import { NATIVE_MAINNET_GENESIS } from "../../../shared/network-identity.mjs";
 
 const vectorPath = path.resolve(import.meta.dirname, "../../../solana/modules/bridge-messages/vectors/canonical-borsh-v2.json");
 const vectorFile = JSON.parse(readFileSync(vectorPath, "utf8"));
@@ -36,6 +37,15 @@ function policyFor(role, keypair, overrides = {}) {
     ...overrides,
   };
 }
+
+test("Mainnet attester policy cannot load a plaintext or simulated protected key", () => {
+  const key = createEphemeralAttesterKeypairForTestOnly(), policy = policyFor("ATTESTER_A", key, { nativeGenesisHex: NATIVE_MAINNET_GENESIS });
+  try {
+    assert.throws(() => new ProjectAttester({ role: "ATTESTER_A", secretKey: key.secretKey, policy }), /MainnetAttesterProtectedStateRequired/);
+    assert.throws(() => ProjectAttester.fromMainnetProtectedStore({ store: { context: { environment: "mainnet" }, read() { throw new Error("MustNotReadFakeStore"); } },
+      role: "ATTESTER_A", policy, deployment: {} }), /ProtectedStoreRoleMismatch/);
+  } finally { key.secretKey.fill(0); }
+});
 
 function evidence(overrides = {}) {
   return {

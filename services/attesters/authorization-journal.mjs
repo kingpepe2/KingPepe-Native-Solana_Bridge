@@ -71,7 +71,9 @@ export class ProtectedAttesterAuthorizationJournal {
     const context = attester.assertProtectedStorage();
     assertWindowsProtectedStore(store, attester.role, "attester-authorizations");
     requireIntegrityGuard(integrity, attester.role);
-    check(context.environment === "localnet", "ProtectedAttesterLocalOnly");
+    // Mainnet attesters can only be constructed through the complete protected
+    // deployment binding. The same persist-before-release and pause checks apply.
+    check(["localnet", "mainnet"].includes(context.environment), "ProtectedAttesterEnvironmentRejected");
     for (const name of ["role", "serviceSid", "environment", "nativeGenesis", "solanaDeployment", "instanceId", "keyEpoch"]) {
       check(context[name] === store.context[name], "AttesterJournalContextMismatch");
     }
