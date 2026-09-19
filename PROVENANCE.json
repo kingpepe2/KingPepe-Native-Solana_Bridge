@@ -19,7 +19,7 @@
   "cleanup": {
     "scope": "TEAM_AUTHORIZED_ONE_WAY_CONVERSION",
     "status": "VALIDATION_IN_PROGRESS",
-    "filesAfter": 292,
+    "filesAfter": 300,
     "removed": "Retired economic direction and obsolete implementation/fixtures. Forward signing, proof, recovery, accounting, legal notices and original file-origin classifications remain.",
     "importedSource": "No third-party source imported during conversion."
   },
@@ -2091,6 +2091,34 @@
       "reviewDisposition": "KEEP_SECURITY",
       "purpose": "CORE_BRIDGE",
       "notes": "Original consensus-source confirmation and one-way monetary ceiling, backing and public counter semantics."
+    },
+    {
+      "path": "services/bridge-validator/mainnet-solana-setup-plan.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original unsigned Mainnet zero-supply Mint/config and existing mode transaction preparation; pinned deployment identity, paused initial state, no keys, RPC, signatures or submission.",
+      "purpose": "CORE_BRIDGE",
+      "reviewDisposition": "KEEP_CORE"
+    },
+    {
+      "path": "services/bridge-validator/tests/mainnet-solana-setup-plan.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Unsigned Mainnet message decoding, network/domain/identity substitution, policy override, integer-bound and Rust-vector agreement regressions with synthetic public identities.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "solana/modules/bridge-messages/vectors/mainnet-setup-v1.txt",
+      "classification": "GENERATED_FILE",
+      "notes": "Five deterministic synthetic public Mainnet initialization and mode Borsh vectors, cross-checked with real Rust decoders and initialization validators. No operational signing material.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "solana/programs/kingpepe-bridge/tests/mainnet_setup.rs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Independent Rust decoding and program initialization validation of TypeScript Mainnet setup bytes, paused zero-supply policy and existing mode instruction variants.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
     }
   ],
   "simplificationReview": {

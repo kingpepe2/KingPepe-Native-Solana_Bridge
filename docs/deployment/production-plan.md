@@ -63,6 +63,19 @@ not approval. After approval deploy only the reviewed forward programs, create a
 new Mint with eight decimals, zero supply, Bridge PDA authority and no freeze
 authority, and independently verify all identities and owners on-chain.
 
+`services/bridge-validator/mainnet-solana-setup-plan.mjs` prepares unsigned
+Mainnet Mint/config initialization bytes with pinned network/domain identities.
+It creates no recipient account or initial tokens and initializes the Bridge
+paused. Its public synthetic Borsh vectors are decoded and validated by both
+the Node tests and the actual Rust program implementations. Preparation does
+not verify deployment on-chain or authorize a signature or submission.
+
+The same module prepares the existing Mainnet mode instruction. The Mint
+enrollment key must sign mode changes; this is separate from the Bridge PDA's
+SPL mint authority and the program upgrade authority. Keep that enrollment key
+protected for reviewed pause/activation operations. Creating mode bytes does
+not satisfy the funding, deployment-approval or controlled-operation gates.
+
 Start production PAUSED. Record zero-start reconciliation and a clean forward
 journal. Only then switch the existing public Explorer gateway/UI from TEST to
 the verified Mainnet identities. Keep RPC secrets server-side, Wallet Standard
