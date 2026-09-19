@@ -8,7 +8,7 @@
   "productionSigningAuthorized": false,
   "productionBroadcastAuthorized": false,
   "sourceStatus": "ONE_WAY_CONVERSION_VALIDATION_IN_PROGRESS",
-  "historyRewrite": "NOT_YET_PERFORMED",
+  "historyRewrite": "PRIVATE_CANDIDATE_UNDER_REVIEW_NOT_PUBLISHED",
   "exactShaCi": "PENDING_NEW_REWRITTEN_HEAD",
   "borsh": {
     "version": 3,
@@ -39,6 +39,7 @@
   "recoveryProcedure": "PENDING_CURRENT_ONE_WAY_EXACT_SOURCE_DRILL",
   "historicalRecoveryEvidence": "RETAINED_PRIVATELY_SOURCE_BOUND_NOT_CURRENT_SHA_CERTIFICATION",
   "publicTestUpdate": "PENDING_REVIEWED_FORWARD_DEPLOYMENT",
+  "freshForwardDevnet": "COMPLETED_MATCH_PRE_REWRITE_SOURCE",
   "mainnetDeployment": "NOT_DEPLOYED",
   "fundingRequest": "AFTER_NON_FUNDING_READINESS",
   "activationApproval": "REQUIRED_AFTER_FUNDING_AND_UNCHANGED_ARTIFACT_PREFLIGHT",
