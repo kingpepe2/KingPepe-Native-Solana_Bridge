@@ -3,6 +3,12 @@
 This procedure is for disposable KingPepe REGTEST and Solana local-validator
 testing. Mainnet activation and production signing remain disabled.
 
+The repository's .gitattributes specifies LF for text on Windows and Linux/WSL.
+An older Windows clone without that policy can show CRLF-only changes in WSL
+Git despite identical normalized source. Verify the diff and preserve work; do
+not reset a checkout to resolve line endings. New clones use the committed LF
+policy. This changes no global Git defaults or binary files.
+
 The exact development tool versions and fetched archive checksums are in
 `scripts/local-e2e-toolchain.json`. The native source commit and tree were
 confirmed against the source repository, independently of the recovery notes.
@@ -36,12 +42,35 @@ npm run local:e2e:plan
 npm run local:e2e:native-to-solana
 ```
 
+With another fresh external run root, `npm run local:e2e:service` tests the
+forward observer, protected sweep, attestation, claim, mint and reconciliation.
+`npm run local:e2e:recovery` adds encrypted restore at pending sweep and
+finalized-mint/accounting boundaries. All 16 forward service checks remain
+required, including response loss, actual blockhash expiry, persisted pause,
+no repeated signing and no second mint. These use isolated test material.
+
 Set `KINGPEPE_LOCAL_E2E_ROOT` through local configuration to a new, dedicated
 directory outside all source checkouts. It must not already exist. Its parent
 must exist and have suitable permissions. The runner creates this directory
 exclusively, refuses source-directory aliases and ancestors, and never resets an
 existing ledger. Linux directory creation requests mode 0700; dedicated Windows
 service ACL validation remains separate work.
+
+Keep the validator ledger on a filesystem that supports Linux Unix-domain
+sockets, using a short external path. The remediation validation observed both
+a socket-path-length failure and an unsupported admin socket on a Windows-
+mounted filesystem. Neither attempt reached the economic flow. A fresh run on
+the native WSL filesystem succeeded with unchanged validator/startup settings.
+Do not relocate or alter an existing WSL virtual disk to work around this.
+Monitor host free space before fresh builds and daemon runs; source checkouts,
+production data and recovery material are not disposable build caches.
+
+A short Linux tmpfs path can host explicitly disposable chain-test instances
+when disk headroom is constrained. Check memory and filesystem capacity first;
+keep build targets and test evidence on a suitable external disk. Such a ledger
+does not survive host/WSL shutdown and cannot prove host-reboot durability.
+Do not place protected signer journals or operational state there. Keep restart
+and persistence claims scoped to the storage and process faults actually tested.
 
 Build output and, by default, Cargo targets are under that external root.
 `KINGPEPE_LOCAL_BUILD_ROOT` may select a separate external Cargo cache to avoid
@@ -88,9 +117,95 @@ The SQLite API is release-candidate stability 1.2; its inclusion in the pinned
 Node runtime is not production approval. `.npmrc` requires exact engine pins.
 
 Run `node .github/scripts/dependency-license-audit.mjs` after locked installation.
-CI also verifies the pinned cargo-audit binary and audits all five Cargo.lock
+CI also verifies the pinned cargo-audit binary and audits all four Cargo.lock
 files. The retained bincode unmaintained warning remains visible. No advisory
 ignore or production activation exception is added.
+
+The core regression includes `node solana/tests/local-deposit-security.mjs`
+against fresh isolated chains. It exercises actual Native proof/sweep/finality,
+recoverable-deposit races, Solana account/domain/claim rejection, process restart,
+and exact accounting. Host fixture tests alone are not chain execution evidence.
+The explicit local compute budget does not set production fee policy.
+
+Run `node solana/tests/local-deployment-integrity.mjs` in another fresh external
+root for the 18 real deployment/authority/bytecode checks. Set
+`KINGPEPE_TEST_SOURCE_SHA` to the exact reviewed source commit being tested;
+the manifest rejects an absent or malformed SHA. CI supplies `GITHUB_SHA`.
+An uncommitted worktree may be tested, but the report must identify it as worktree
+evidence, not certification of its parent commit. This probe builds explicit
+SBPF v3 upgrade-test binaries; normal program builds remain SBPF v0. Their hashes
+identify distinct build artifacts. The V2 runtime manifest carries deployment
+identities and accepted slots, not binary hashes. The real upgrade test
+uses the required ProgramData extension and waits for a later finalized bank.
+
+Run `node solana/tests/local-native-reorg.mjs` in another fresh external root
+for the eight real post-mint regtest fork/incident tests. Fork controls apply
+only to the disposable regtest daemon; the runtime RPC adapter does not permit
+them. The completed mint and retained incident are not automatic economic repair.
+
+`node solana/tests/local-acceptance-checkpoint.mjs` uses another fresh external
+root and runs 13 real-chain checks. It advances Native blocks between preparation,
+FROST signing and attestations; current-chain/UTXO validation must still reproduce
+the original accepted proof and mint message. It also submits a forged prefix
+work/digest to the independent verifier and invalidates an accepted sweep. The
+saved checkpoint is public test evidence, not protected production recovery state.
+
+For clean-clone verification, use a new clone and new CARGO_TARGET_DIR and
+KINGPEPE_LOCAL_BUILD_ROOT outside it. Locked downloads/compiler installations may
+be reused after verification; compiled project artifacts may not. Run Node,
+vectors, all Rust workspaces/quality checks, both local daemon suites, source
+guardrails, complete history scans and license/dependency audits. A fresh clone
+that only passes host tests is not a fresh real-chain validation.
+
+`node solana/tests/local-reconciliation.mjs` runs the real deposit prerequisite
+and coherent accounting/deployment/Native-fork checks in another fresh external
+root. The Windows integration uses the separate local-chain host and
+`tests/windows/local-reconciliation.mjs`, with only external test configuration
+references in `KINGPEPE_LOCAL_WINDOWS_CHAIN_ROOT`. The independent Windows
+Native verifier is selected by `KINGPEPE_TEST_NATIVE_VERIFIER` and its verified
+`KINGPEPE_TEST_NATIVE_VERIFIER_SHA256`. Those values and all test data stay outside
+source. Current-principal DPAPI/mTLS/live-chain execution is not certification of
+separate service accounts or the complete protected deposit workflow.
+
+The complete protected controller pairs
+`solana/tests/local-windows-protected-controller-host.mjs` on Linux with
+`tests/windows/local-protected-controller.mjs` on Windows. Both use a NEW external
+`KINGPEPE_LOCAL_WINDOWS_CHAIN_ROOT`; the Linux host also needs a NEW external
+`KINGPEPE_LOCAL_E2E_ROOT` and verified external SBF output. Do not copy an old
+ledger, key, protected journal or authority into the new test setup.
+
+Windows `KINGPEPE_TEST_CONTROLLER_RESTART_GROUP` selects `NONE`, `DEPOSIT`,
+`CREDIT`, `CLAIM` or `SETTLEMENT`. Set
+`KINGPEPE_TEST_CONTROLLER_POST_MINT_REORG=1` in BOTH hosts to require the actual
+higher-work regtest fork and protected-service restart/stop test. Every selected
+kill must execute; missing coverage fails. Both hosts must exit zero, including
+independent chain rechecks and cleanup. Internal controller completion alone is
+not a passing test. These are CurrentUser tests, not distinct service principals.
+
+An installed, verified Linux GNU cross-toolchain can build the Windows Native
+verifier without installing Rust into Windows. The exercised build uses
+`nightly-2023-10-29`, installed target `x86_64-pc-windows-gnu` and installed
+`x86_64-w64-mingw32-gcc` reporting `13-posix`. With a NEW external
+`CARGO_TARGET_DIR`, run:
+
+```sh
+CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc \
+  cargo +nightly-2023-10-29 build --locked --manifest-path native/proof/Cargo.toml \
+  --bin kingpepe-native-evidence --target x86_64-pc-windows-gnu
+```
+
+Cargo may hard-link a debug executable to its dependency output. The runtime
+correctly rejects a multiply linked executable. Copy the freshly built file to
+a NEW external artifact directory, verify that the copied hash is identical and
+that it is an ordinary non-linked file, then select that standalone artifact.
+Do not relax the runtime link/path check or substitute an older executable.
+
+Verify the generated executable hash before supplying the two Windows verifier
+environment references above. A cold cross-build passed, but building alone is
+not a Windows execution/chain acceptance test or a reproducible-binary claim.
+Final clean-clone validation must rebuild from that clone and exercise that
+exact output. The external compiler/runtime retains its third-party terms;
+neither the compiler nor generated debug binaries are published in source.
 
 Tool references: [Agave 4.2.2 release](https://github.com/anza-xyz/agave/releases/tag/v4.2.2),
 [SBF builder](https://github.com/anza-xyz/cargo-build-sbf),

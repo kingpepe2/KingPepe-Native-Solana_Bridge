@@ -7,25 +7,32 @@ import { LocalDeploymentRpc, validateDeploymentManifest, verifyDeploymentSnapsho
 import { base58Decode } from "./solana-deposit-claim-transaction-plan.mjs";
 import { publicKey } from "../../solana/ts/sdk/bridge.mjs";
 import { DEVNET_SOLANA_GENESIS } from "../../shared/solana-test-network.mjs";
+import { nativeIdentity, MAINNET_WALLET_CHAIN, SOLANA_MAINNET_GENESIS } from "../../shared/network-identity.mjs";
 const check = value => { if (!value) throw new Error("UserBalanceUnavailable"); };
+const MAINNET_BALANCES = Symbol("Explicit Mainnet public balance reader");
 export class BridgeUserBalances {
-  #native; #solana; #manifest; #cache = new Map(); #busy = false; #now; #nextRead = 0;
-  constructor({ nativeRpc, solanaRpc, manifest, now = Date.now }) {
+  #native; #solana; #manifest; #identity; #cache = new Map(); #busy = false; #now; #nextRead = 0;
+  static createMainnet(options) { return new BridgeUserBalances(options, MAINNET_BALANCES); }
+  constructor({ nativeRpc, solanaRpc, manifest, now = Date.now }, capability) {
     check(nativeRpc instanceof NativeRpcClient && solanaRpc instanceof LocalDeploymentRpc && typeof now === "function");
     const m = validateDeploymentManifest(manifest);
-    check(m.environment === "devnet" && m.solanaGenesis === DEVNET_SOLANA_GENESIS && m.nativeGenesisHex === REGTEST_GENESIS);
+    if (capability === MAINNET_BALANCES) check(m.environment === "mainnet" && m.solanaGenesis === SOLANA_MAINNET_GENESIS);
+    else check(m.environment === "devnet" && m.solanaGenesis === DEVNET_SOLANA_GENESIS && m.nativeGenesisHex === REGTEST_GENESIS);
+    solanaRpc.assertEnvironment(m.environment);
+    this.#identity = nativeIdentity(m.environment);
+    check(m.nativeGenesisHex === this.#identity.genesis);
     this.#native = nativeRpc; this.#solana = solanaRpc; this.#manifest = m; this.#now = now;
   }
   assertPolicy(policy) {
     const hex = key => Buffer.from(base58Decode(key)).toString("hex"), m = this.#manifest;
-    check(policy.environment === "devnet" && policy.nativeGenesis === this.#manifest.nativeGenesisHex &&
+    check(policy.environment === m.environment && policy.nativeGenesis === this.#manifest.nativeGenesisHex &&
       policy.solanaGenesis === this.#manifest.solanaGenesis && policy.solanaDeployment === this.#manifest.solanaDeploymentHex &&
       policy.mint === hex(m.mint.id) && policy.managerProgramId === hex(m.manager.id) && policy.transceiverProgramId === hex(m.transceiver.id) &&
       ["protocolId", "nativeNetwork", "keyEpoch", "policyEpoch"].every(key => policy[key] === m.config[key]));
   }
   async read(network, address) {
     check(network === "solana" || network === "native");
-    if (network === "solana") publicKey(address); else { scriptFromWitnessAddress(address); address = address.toLowerCase(); }
+    if (network === "solana") publicKey(address); else { scriptFromWitnessAddress(address, this.#identity.hrp); address = address.toLowerCase(); }
     const key = network + ":" + address, time = this.#now(), cached = this.#cache.get(key);
     if (cached && time >= cached.time && time - cached.time < 20000) return structuredClone(cached.value);
     // One bounded lookup at a time, including after a caller times out. No
@@ -38,11 +45,12 @@ export class BridgeUserBalances {
     } finally { this.#busy = false; }
   }
   async #readNative(address) {
-    const observe = () => this.#native.getSourceSnapshot({ expectedNetwork: "regtest", expectedGenesisHash: REGTEST_GENESIS });
+    const observe = () => this.#native.getSourceSnapshot({ expectedNetwork: this.#identity.rpcChain, expectedGenesisHash: this.#identity.genesis });
     const before = await observe(); check(before.state === SOURCE_READY);
-    const balance = await this.#native.scanAddressBalance(address), after = await observe();
+    const balance = this.#identity.environment === "mainnet" ? await this.#native.scanMainnetAddressBalance(address) : await this.#native.scanAddressBalance(address);
+    const after = await observe();
     check(after.state === SOURCE_READY && before.bestHash === after.bestHash && balance.bestBlockHash === after.bestHash);
-    return { address, network: "REGTEST", decimals: 8, amountAtomic: balance.amountAtomic, kind: "CONFIRMED_UTXO" };
+    return { address, network: this.#identity.environment === "mainnet" ? "MAINNET" : "REGTEST", decimals: 8, amountAtomic: balance.amountAtomic, kind: "CONFIRMED_UTXO" };
   }
   async #readSolana(address) {
     const m = this.#manifest, discovered = await this.#solana.finalizedUserTokenAddresses(m, address);
@@ -63,7 +71,7 @@ export class BridgeUserBalances {
       const amount = bytes.readBigUInt64LE(64); total += amount; check(total <= 0xffffffffffffffffn);
       return { address: tokenAddress, amountAtomic: amount.toString() };
     });
-    return { address, chain: "solana:devnet", mint: m.mint.id, decimals: 8, solLamports: BigInt(lamports).toString(),
+    return { address, chain: m.environment === "mainnet" ? MAINNET_WALLET_CHAIN : "solana:devnet", mint: m.mint.id, decimals: 8, solLamports: BigInt(lamports).toString(),
       kpepeAtomic: total.toString(), tokenAccounts, commitment: "finalized" };
   }
 }

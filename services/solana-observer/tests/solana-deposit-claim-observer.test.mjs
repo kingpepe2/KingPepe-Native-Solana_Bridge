@@ -47,7 +47,7 @@ function depositClaimBytes({
   let cursor = 0;
   out.write("KPBCLM01", cursor, "ascii");
   cursor += 8;
-  out[cursor] = 1;
+  out[cursor] = 2;
   cursor += 1;
   Buffer.from(operationIdHex, "hex").copy(out, cursor);
   cursor += 32;
@@ -174,7 +174,7 @@ test("deposit claim account codec rejects malformed or noncanonical data", () =>
   assert.throws(() => decodeDepositClaimAccountBytes(wrongMagic), /InvalidMagic/);
 
   const wrongVersion = depositClaimBytes();
-  wrongVersion[8] = 2;
+  wrongVersion[8] = 1;
   assert.throws(() => decodeDepositClaimAccountBytes(wrongVersion), /UnsupportedVersion/);
 
   const nonZeroPadding = depositClaimBytes({ solanaRecipientHex: "aa" });

@@ -1,8 +1,10 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 import { createHash } from "node:crypto";
+import { bridgeInputDigest } from "../../../shared/protocol/bridge-inputs.mjs";
 import { schnorr, schnorr_FROST } from "@noble/curves/secp256k1.js";
 import { assertWindowsProtectedStore } from "../../../shared/windows/protected-store.mjs";
 import { requireIntegrityGuard } from "../../../services/supervisor/protected-integrity.mjs";
+import { assertMainnetProtectedDeployment } from "../../../shared/network-identity.mjs";
 import { REQUIRED_FROST_SIGNERS, assertHashHex, canonicalJson, nativeSigningIntentDigest,
   validateNativeSigningIntent } from "../policy/native-signing-policy.mjs";
 import { createNativeFrostSigningRequest, validateNativeFrostSigningRequest, validateNativeFrostAbortReceipt } from "../policy/signing-request.mjs";
@@ -10,6 +12,8 @@ import { createNativeFrostSigningRequest, validateNativeFrostSigningRequest, val
 export const COORDINATOR_JOURNAL_PROTOCOL = "KINGPEPE_COORDINATOR_SIGNING_V1";
 export const MAX_COORDINATOR_REQUESTS = 256; // Never prune consumed signing identities.
 const MAX_BYTES = 900_000, JOURNALS = new WeakSet();
+const MAINNET_JOURNAL = Symbol("Explicit Mainnet coordinator journal");
+const BRIDGE_PURPOSES = new Set(["RESERVE_SWEEP"]);
 const digest = bytes => createHash("sha256").update(bytes).digest("hex");
 function check(ok, code = "CoordinatorJournalInvalid") { if (!ok) throw new Error(code); }
 function fields(v, names) {
@@ -24,7 +28,7 @@ function identity(key) {
     key.publicPackage.commitmentsHex.every(p => typeof p === "string" && /^(02|03)[0-9a-f]{64}$/u.test(p)));
   fields(key.publicPackage.verifyingSharesHex, [1, 2].map(n => schnorr_FROST.Identifier.fromNumber(n)));
   check(Object.values(key.publicPackage.verifyingSharesHex).every(p => typeof p === "string" && /^(02|03)[0-9a-f]{64}$/u.test(p)));
-  return digest(canonicalJson([COORDINATOR_JOURNAL_PROTOCOL, key.publicPackage, key.aggregateTweakedXOnlyPublicKey]));
+  return bridgeInputDigest("CoordinatorKey", { protocol: COORDINATOR_JOURNAL_PROTOCOL, publicPackage: key.publicPackage, aggregateTweakedXOnlyPublicKey: key.aggregateTweakedXOnlyPublicKey });
 }
 function validateResult(result, request, key) {
   fields(result, ["state", "requestId", "epoch", "sessionId", "intentDigest", "messageHex", "signatureHex",
@@ -56,7 +60,7 @@ export function decodeCoordinatorSigningState(bytes, key) {
     fields(r, ["request", "state", "abortReceipts", "result"]);
     const request = validateNativeFrostSigningRequest(r.request);
     check(!ids.has(request.requestId)); ids.add(request.requestId);
-    const input = request.intent.operationId + ":" + request.intent.signingInputIndex;
+    const input = request.intent.purpose + ":" + request.intent.operationId + ":" + request.intent.signingInputIndex;
     check(!inputs.has(input)); inputs.add(input);
     check(["PREPARED", "ABORTED", "SIGNED"].includes(r.state));
     if (r.state === "ABORTED") {
@@ -70,14 +74,21 @@ export function decodeCoordinatorSigningState(bytes, key) {
 }
 
 export class ProtectedCoordinatorSigningJournal {
-  #key; #guard; #store; #lease; #revision; #pendingWrite; #closed = false; #busy = false; #stopped = false;
-  static async open({ store, integrity, publicPackage, aggregateTweakedXOnlyPublicKey }) {
+  #key; #guard; #store; #lease; #revision; #pendingWrite; #closed = false; #busy = false; #stopped = false; #deployment;
+  static async openMainnet(options) {
+    const deployment = structuredClone(options.deployment);
+    assertWindowsProtectedStore(options.store, "COORDINATOR", "coordinator-signing");
+    assertMainnetProtectedDeployment(options.store.context, deployment);
+    return ProtectedCoordinatorSigningJournal.open({ ...options, deployment }, MAINNET_JOURNAL);
+  }
+  static async open({ store, integrity, publicPackage, aggregateTweakedXOnlyPublicKey, deployment }, capability) {
     assertWindowsProtectedStore(store, "COORDINATOR", "coordinator-signing");
     requireIntegrityGuard(integrity, "COORDINATOR");
-    check(store.context.environment === "localnet", "ProtectedCoordinatorLocalOnly");
+    check(store.context.environment === "localnet" || store.context.environment === "mainnet" && capability === MAINNET_JOURNAL, "ProtectedCoordinatorExplicitEnvironmentRequired");
     const { environment, nativeGenesis, solanaDeployment, keyEpoch } = store.context;
     integrity.assertDeployment({ environment, nativeGenesis, solanaDeployment, keyEpoch });
     const self = new ProtectedCoordinatorSigningJournal();
+    self.#deployment = store.context.environment === "mainnet" ? Object.freeze(deployment) : undefined;
     self.#key = structuredClone({ publicPackage, aggregateTweakedXOnlyPublicKey });
     self.#guard = integrity; self.#store = store;
     try {
@@ -96,9 +107,8 @@ export class ProtectedCoordinatorSigningJournal {
     check(!this.#closed && !this.#stopped, "CoordinatorJournalUnavailable"); this.#lease.assertHeld();
     const read = this.#store.read();
     try {
-      const value = decodeCoordinatorSigningState(read.payload, this.#key), context = this.#store.context;
-      for (const { request } of value.records) check(request.intent.nativeNetwork === "regtest" && request.intent.purpose === "RESERVE_SWEEP" &&
-        request.intent.nativeGenesisHash === context.nativeGenesis && request.intent.solanaDeployment === context.solanaDeployment && request.epoch === context.keyEpoch);
+      const value = decodeCoordinatorSigningState(read.payload, this.#key);
+      for (const { request } of value.records) this.#intent(request.intent);
       // Accept only our exact uncertain CAS completion, never an unrelated
       // concurrent write merely because its DPAPI authentication is valid.
       if (this.#revision !== undefined && read.revision !== this.#revision) {
@@ -133,13 +143,15 @@ export class ProtectedCoordinatorSigningJournal {
   }
   #intent(intent) {
     const snapshot = validateNativeSigningIntent(intent), context = this.#store.context;
-    check(snapshot.purpose === "RESERVE_SWEEP" && snapshot.nativeNetwork === "regtest" && snapshot.nativeGenesisHash === context.nativeGenesis &&
+    check(BRIDGE_PURPOSES.has(snapshot.purpose) && snapshot.nativeNetwork === (context.environment === "mainnet" ? "mainnet" : "regtest") && snapshot.nativeGenesisHash === context.nativeGenesis &&
       snapshot.solanaDeployment === context.solanaDeployment && snapshot.keyEpoch === context.keyEpoch, "CoordinatorJournalContextMismatch");
+    if (this.#deployment) check(snapshot.bridgeProgramId === this.#deployment.managerProgramId &&
+      snapshot.transceiverProgramId === this.#deployment.transceiverProgramId && snapshot.mint === this.#deployment.mint, "CoordinatorJournalContextMismatch");
     return snapshot;
   }
   #record(value, intent) {
     const snapshot = this.#intent(intent), record = value.records.find(r => r.request.requestId === snapshot.signingRequestId);
-    const reused = value.records.find(r => r.request.intent.operationId === snapshot.operationId && r.request.intent.signingInputIndex === snapshot.signingInputIndex);
+    const reused = value.records.find(r => r.request.intent.purpose === snapshot.purpose && r.request.intent.operationId === snapshot.operationId && r.request.intent.signingInputIndex === snapshot.signingInputIndex);
     check(!reused || reused === record, "CoordinatorJournalInputAlreadyBound");
     if (record) check(record.request.intentDigest === nativeSigningIntentDigest(snapshot), "CoordinatorJournalRequestChanged");
     return record;

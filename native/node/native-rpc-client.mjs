@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { validateRuntimeFile } from "../../shared/runtime-path-boundary.mjs";
 import { scriptFromWitnessAddress } from "./witness-address.mjs";
 import { assertWindowsProtectedStore } from "../../shared/windows/protected-store.mjs";
-import { NATIVE_MAINNET_GENESIS } from "../../shared/network-identity.mjs";
+import { NATIVE_MAINNET_GENESIS, NATIVE_MAINNET_HRP } from "../../shared/network-identity.mjs";
 
 export const NATIVE_RPC_ADAPTER_PROTOCOL =
   "KINGPEPE_NATIVE_SOLANA_BRIDGE/NATIVE_RPC_ADAPTER/V1";
@@ -255,6 +255,72 @@ export class NativeRpcClient {
     return (await this.call("getrawtransaction", params)).result;
   }
 
+  // Read-only discovery for a maintained Mainnet node without txindex. A hit
+  // is an RPC observation/block hint, never finality or mint authority.
+  // A bounded miss is NOT evidence of transaction absence. Callers retain a
+  // known block hint/cursor in their existing operation journal for restart.
+  async locateMainnetTransaction({ txid, vout, blockHash, startHeight, maxBlocks = 32 }) {
+    txid = normalizeHash32(txid, "txid");
+    if (vout !== undefined && (!Number.isSafeInteger(vout) || vout < 0 || vout > 0xffff_ffff) ||
+        startHeight !== undefined && (!Number.isSafeInteger(startHeight) || startHeight < 1 || startHeight > 1_000_000) ||
+        !Number.isSafeInteger(maxBlocks) || maxBlocks < 1 || maxBlocks > 128) throw new Error("NativeTransactionLookupRangeRejected");
+    if (blockHash !== undefined) blockHash = normalizeHash32(blockHash, "blockHash");
+    const source = await this.getSourceSnapshot({ expectedNetwork: "main", expectedGenesisHash: NATIVE_MAINNET_GENESIS });
+    if (source.state !== SOURCE_READY || source.bestHeight > 1_000_000) throw new Error("NativeTransactionLookupSourceRejected");
+    const unchanged = async () => {
+      const after = await this.getSourceSnapshot({ expectedNetwork: "main", expectedGenesisHash: NATIVE_MAINNET_GENESIS });
+      if (after.state !== SOURCE_READY || after.bestHash !== source.bestHash || after.bestHeight !== source.bestHeight)
+        throw new Error("NativeTransactionLookupSourceChanged");
+    };
+    const observe = async hint => {
+      let tx;
+      try { tx = await this.getRawTransaction(txid, true, hint); }
+      catch (error) { if (error?.message === "NativeRpcRejected:getrawtransaction:-5") return null; throw error; }
+      const { parseNativeTransactionHex } = await import("./native-taproot-transaction.mjs");
+      if (!tx || tx.txid !== txid || parseNativeTransactionHex(tx.hex).txidHex !== txid) throw new Error("NativeTransactionLookupSubstituted");
+      let height = null, locatedBlock = null, confirmations = 0;
+      if (tx.blockhash !== undefined) {
+        locatedBlock = normalizeHash32(tx.blockhash, "transactionBlockHash");
+        const header = await this.getBlockHeader(locatedBlock, true);
+        if (hint !== undefined && hint !== locatedBlock || !Number.isSafeInteger(header?.height) || header.height < 1 ||
+            header.height > source.bestHeight || header.hash !== locatedBlock ||
+            (await this.call("getblockhash", [header.height])).result !== locatedBlock) throw new Error("NativeTransactionLookupBlockNotActive");
+        height = header.height; confirmations = source.bestHeight - height + 1;
+        if (tx.confirmations !== confirmations || tx.in_active_chain === false) throw new Error("NativeTransactionLookupConfirmationChanged");
+      } else if (hint !== undefined || tx.confirmations !== undefined && tx.confirmations !== 0) throw new Error("NativeTransactionLookupConfirmationChanged");
+      await unchanged();
+      return Object.freeze({ state: "OBSERVED", trust: RPC_OBSERVATION, txid, rawTransactionHex: tx.hex,
+        blockHash: locatedBlock, blockHeight: height, confirmations, sourceTipHash: source.bestHash, sourceTipHeight: source.bestHeight });
+    };
+    const indexed = await observe(blockHash); if (indexed) return indexed;
+    if (vout !== undefined) {
+      const coin = await this.getUtxoObservation({ txid, vout, includeMempool: false });
+      if (coin.unspent && coin.confirmations > 0) {
+        if (coin.bestBlockHash !== source.bestHash || coin.confirmations > source.bestHeight) throw new Error("NativeTransactionLookupSourceChanged");
+        const hint = (await this.call("getblockhash", [source.bestHeight - coin.confirmations + 1])).result;
+        const located = await observe(normalizeHash32(hint, "blockHash")); if (located) return located;
+        throw new Error("NativeTransactionLookupUtxoTransactionUnavailable");
+      }
+    }
+    let nextHeight = startHeight ?? null;
+    if (startHeight !== undefined) {
+      const end = Math.min(source.bestHeight, startHeight + maxBlocks - 1);
+      for (let height = startHeight; height <= end; height++) {
+        const hint = normalizeHash32((await this.call("getblockhash", [height])).result, "blockHash"), block = await this.getBlock(hint, 1);
+        if (block?.hash !== hint || block.height !== height || !Array.isArray(block.tx) || block.tx.length > 100_000 ||
+            block.tx.some(id => typeof id !== "string" || !/^[0-9a-f]{64}$/u.test(id))) throw new Error("NativeTransactionLookupBlockRejected");
+        if (block.tx.includes(txid)) {
+          const located = await observe(hint); if (located) return located;
+          throw new Error("NativeTransactionLookupBlockTransactionUnavailable");
+        }
+      }
+      nextHeight = end >= startHeight ? end + 1 : startHeight;
+    }
+    await unchanged();
+    return Object.freeze({ state: SOURCE_WAITING, trust: RPC_OBSERVATION, reason: "NO_TRANSACTION_IN_BOUNDED_OBSERVATION",
+      txid, nextHeight, sourceTipHash: source.bestHash, sourceTipHeight: source.bestHeight, transactionAbsenceProven: false });
+  }
+
   async getUtxoObservation(input) {
     const value = requireObject(input, "utxoInput");
     const txid = normalizeHash32(value.txid, "utxoInput.txid");
@@ -297,6 +363,21 @@ export class NativeRpcClient {
 
   async scanAddressBalance(address) {
     scriptFromWitnessAddress(address); // REGTEST public witness addresses only.
+    return this.#scanAddressBalance(address);
+  }
+
+  async scanMainnetAddressBalance(address) {
+    scriptFromWitnessAddress(address, NATIVE_MAINNET_HRP);
+    const observe = () => this.getSourceSnapshot({ expectedNetwork: "main", expectedGenesisHash: NATIVE_MAINNET_GENESIS });
+    const before = await observe();
+    if (before.state !== SOURCE_READY) throw new Error("NativeBalanceUnavailable");
+    const balance = await this.#scanAddressBalance(address), after = await observe();
+    if (after.state !== SOURCE_READY || before.bestHash !== after.bestHash || balance.bestBlockHash !== after.bestHash)
+      throw new Error("NativeBalanceUnavailable");
+    return balance;
+  }
+
+  async #scanAddressBalance(address) {
     const response = await this.call("scantxoutset", ["start", [{ desc: `addr(${address.toLowerCase()})` }]]);
     if (response.result?.success !== true) throw new Error("NativeBalanceUnavailable");
     // Preserve the JSON numeric token before any binary floating-point conversion.

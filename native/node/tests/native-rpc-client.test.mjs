@@ -5,11 +5,14 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { NATIVE_MAINNET_GENESIS, NATIVE_REGTEST_GENESIS } from "../../../shared/network-identity.mjs";
+import { createUnsignedNativeTransaction, parseNativeTransactionHex } from "../native-taproot-transaction.mjs";
 import { test } from "node:test";
 import {
   NativeRpcClient,
   RPC_OBSERVATION,
   SOURCE_READY,
+  SOURCE_WAITING,
   SOURCE_REJECTED,
   createNativeRegtestRpcClient,
   decimalCoinsToAtomic,
@@ -21,6 +24,73 @@ const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
 const GENESIS = h("kingpepe-regtest-genesis");
 const BEST_BLOCK = h("kingpepe-regtest-best-block");
 const TXID = h("kingpepe-regtest-utxo");
+
+function mainnetLookupFixture() {
+  const block = height => h("bounded-mainnet-block-" + height), txHex = createUnsignedNativeTransaction({
+    inputs: [{ txid: h("lookup-input"), vout: 0 }], outputs: [{ amountAtomic: "100", scriptPubKeyHex: "5120" + h("lookup-recipient") }] });
+  const txid = parseNativeTransactionHex(txHex).txidHex, calls = [], control = { chain: "main", genesis: NATIVE_MAINNET_GENESIS,
+    unspent: true, mempool: false, indexed: false, substituted: false, staleBlock: false, changeTip: false, absent: false };
+  let sourceReads = 0;
+  const rpc = new NativeRpcClient({ endpoint: "http://127.0.0.1:18443", fetchFn: async (_url, init) => {
+    const { id, method, params } = JSON.parse(init.body); calls.push({ method, params }); let result, error = null;
+    if (method === "getblockchaininfo") {
+      sourceReads++; result = { chain: control.chain, blocks: 10, headers: 10, bestblockhash: control.changeTip && sourceReads > 1 ? block(11) : block(10),
+        chainwork: "01", initialblockdownload: false };
+    } else if (method === "getblockhash") result = params[0] === 0 ? control.genesis : control.staleBlock && params[0] === 3 ? block(30) : block(params[0]);
+    else if (method === "getblockheader") result = { height: 3, hash: block(3) };
+    else if (method === "getrawtransaction") {
+      if (control.absent || !control.mempool && !control.indexed && params[2] !== block(3)) error = { code: -5, message: "synthetic-unindexed-node" };
+      else result = { txid: control.substituted ? h("wrong-transaction") : txid, hex: txHex,
+        ...(control.mempool ? {} : { blockhash: block(3), confirmations: 8, in_active_chain: true }) };
+    } else if (method === "gettxout") result = control.unspent ? { bestblock: block(10), confirmations: 8, value: 0.00000100,
+      scriptPubKey: { hex: "5120" + h("lookup-recipient") }, coinbase: false } : null;
+    else if (method === "getblock") {
+      const height = Array.from({ length: 10 }, (_, n) => n + 1).find(n => block(n) === params[0]);
+      result = { hash: block(height), height, tx: !control.absent && height === 3 ? [txid] : [h("irrelevant-" + height)] };
+    } else throw new Error("UnexpectedOrEconomicLookupMethod");
+    return Response.json({ id, error, result });
+  } });
+  return { rpc, calls, control, txid, txHex, block };
+}
+
+test("Mainnet no-index lookup derives an unspent transaction block without scanning or granting finality", async () => {
+  const f = mainnetLookupFixture(), observed = await f.rpc.locateMainnetTransaction({ txid: f.txid, vout: 0 });
+  assert.equal(observed.rawTransactionHex, f.txHex); assert.equal(observed.blockHash, f.block(3)); assert.equal(observed.blockHeight, 3);
+  assert.equal(observed.confirmations, 8); assert.equal(observed.state, "OBSERVED"); assert.equal(observed.trust, RPC_OBSERVATION);
+  assert(!f.calls.some(c => c.method === "getblock")); assert.equal(f.calls.filter(c => c.method === "getrawtransaction").length, 2);
+});
+
+test("Mainnet historical lookup reuses a block hint or advances only a bounded read cursor", async () => {
+  const f = mainnetLookupFixture(); f.control.unspent = false;
+  let result = await f.rpc.locateMainnetTransaction({ txid: f.txid, startHeight: 1, maxBlocks: 2 });
+  assert.equal(result.state, SOURCE_WAITING); assert.equal(result.nextHeight, 3); assert.equal(result.transactionAbsenceProven, false);
+  assert.equal(f.calls.filter(c => c.method === "getblock").length, 2);
+  f.calls.length = 0; result = await f.rpc.locateMainnetTransaction({ txid: f.txid, startHeight: result.nextHeight, maxBlocks: 2 });
+  assert.equal(result.blockHash, f.block(3)); assert.equal(f.calls.filter(c => c.method === "getblock").length, 1);
+  f.calls.length = 0; result = await f.rpc.locateMainnetTransaction({ txid: f.txid, blockHash: result.blockHash });
+  assert.equal(result.state, "OBSERVED"); assert(!f.calls.some(c => c.method === "getblock" || c.method === "gettxout"));
+});
+
+test("Mainnet transaction lookup never upgrades a mempool transaction or a bounded miss into finality/absence", async () => {
+  const f = mainnetLookupFixture(); f.control.mempool = true;
+  const seen = await f.rpc.locateMainnetTransaction({ txid: f.txid });
+  assert.equal(seen.confirmations, 0); assert.equal(seen.blockHash, null); assert.equal(seen.blockHeight, null);
+  f.control.mempool = false; f.control.absent = true; f.control.unspent = false;
+  const missing = await f.rpc.locateMainnetTransaction({ txid: f.txid });
+  assert.equal(missing.state, SOURCE_WAITING); assert.equal(missing.nextHeight, null); assert.equal(missing.transactionAbsenceProven, false);
+});
+
+test("Mainnet lookup rejects wrong identity, substituted transactions, reorg hints and tip races", async () => {
+  for (const mutation of [{ chain: "regtest" }, { genesis: NATIVE_REGTEST_GENESIS }, { substituted: true, indexed: true },
+    { staleBlock: true, indexed: true }, { changeTip: true, indexed: true }]) {
+    const f = mainnetLookupFixture(); Object.assign(f.control, mutation);
+    await assert.rejects(f.rpc.locateMainnetTransaction({ txid: f.txid, vout: 0 }), /NativeTransactionLookup/);
+  }
+  const f = mainnetLookupFixture();
+  for (const mutation of [{ maxBlocks: 0 }, { maxBlocks: 129 }, { maxBlocks: 1.5 }, { startHeight: -1 }, { startHeight: 1_000_001 }, { vout: -1 }])
+    await assert.rejects(f.rpc.locateMainnetTransaction({ txid: f.txid, ...mutation }), /RangeRejected/);
+  assert.deepEqual(f.calls, []);
+});
 
 for (const method of ["getblockchaininfo", "sendrawtransaction"]) test("Native RPC refuses redirected " + method + " without contacting another endpoint", async () => {
   let forwarded = 0;

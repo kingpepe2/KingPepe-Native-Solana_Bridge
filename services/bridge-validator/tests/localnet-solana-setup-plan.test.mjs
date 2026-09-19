@@ -243,7 +243,7 @@ test("localnet setup plan initializes mint, recipient token account, transceiver
   assert.equal(transceiver.readUInt32LE(234), 1);
 
   const bridge = dataFor(plan, "bridgeInitialize");
-  assert.equal(bridge.length, 208);
+  assert.equal(bridge.length, 207);
   assert.equal(bridge[0], BRIDGE_INSTRUCTION_INITIALIZE);
   assert.equal(bridge[1], 0);
   assert.equal(base58Encode(bridge.subarray(2, 34)), LOCALNET_MANAGER_PROGRAM_ID_BASE58);
@@ -256,7 +256,7 @@ test("localnet setup plan initializes mint, recipient token account, transceiver
   assert.equal(bridge[195], 8);
   assert.equal(bridge.readUInt32LE(196), 1);
   assert.equal(bridge.readUInt32LE(200), 1);
-  assert.deepEqual([...bridge.subarray(204, 208)], [0, 0, 0, 0]);
+  assert.deepEqual([...bridge.subarray(204, 207)], [0, 0, 0]);
 });
 
 test("localnet setup planner signs with fee payer, mint, and recipient token account signers in account order", async () => {

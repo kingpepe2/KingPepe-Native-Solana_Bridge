@@ -1,52 +1,41 @@
-# KingPepe Native - Solana Bridge Development Status
+# Current development status
 
-## Current phase
+The KingPepe Team has authorized permanent one-way conversion and public-history
+filtering. Supported direction: KingPepe Native → Solana. Mainnet remains paused.
 
-- `PHASE 03` - Canonical protocol messages and accounting model
-- Branch: `main`
-- Repository: private by policy
-- `productionReady = false`
-- `mainnetActivation = DISABLED`
+Current worktree: canonical forward Borsh V3, forward-only Solana ABI, journal,
+SDK, API, CLI and recipient UI. FROST remains necessary for reserve sweeps.
+This is work in progress, not a completed deployment or security certification.
 
-## Phase 02 result
+Working-tree validation passed the retained Node suite, Rust checks/tests/fmt/
+Clippy, SBF v0/v3 builds, Windows protected-state checks, Explorer unit/browser
+tests, source secret scan, guardrails and provenance review. The isolated forward
+chain runs passed security/recovery, service restart and encrypted restore,
+acceptance checkpoints, supply accounting, deployment identity, reconciliation
+and Native reorg checks. A stale test expectation and retired test selector were
+corrected; the affected checks passed again. REGTEST setup mining uses a bounded
+longer test-only timeout on mounted Windows storage.
 
-- Added root and workspace toolchain pins:
-  - `rust-toolchain.toml`
-  - `solana/rust-toolchain.toml`
-  - Dependency pins in `solana/*/Cargo.toml` and `native/frost/Cargo.toml`
-- Created non-empty structural scaffolding directories with policy-safe placeholders:
-  - `solana/ts/{idl,lib,sdk,scripts}`
-  - `solana/tests`, `solana/fuzz`, `solana/scripts`
-  - `native/proof`, `native/reserve`, `native/recovery`
-  - `config/schemas`, `config/examples`
-  - `deployment/{localnet,devnet,mainnet,windows,manifests}`
-  - `shared`, `cli`, `app`, `db-backup`, `scripts`, `monitoring`, `tests`
-- Updated comparison and toolchain governance docs:
-  - `docs/architecture/ntt-comparison.md`
-  - `UPSTREAM-REFERENCES.json`
-  - `PROVENANCE.json` (coverage updated to include all tracked files)
-- Updated CI action pins in `.github/workflows/ci.yml`
-- Added `solana/Cargo.lock` and tightened CI Rust commands to `--locked`.
-- Removed the phase-02 Ed25519 signing placeholder dependency from `native/frost`; the current deterministic test-share model is build scaffolding only and is not final Native-compatible FROST.
-- Confirmed secret scan remains clean via `python .github/scripts/guardrails.py`.
-- Confirmed repository remains private.
-- Corrective commit: `218cff1dacea2a2f6ba0564fc49593c85b3f4f9f`
-- CI URL: `https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/34276946620`
-- CI status: PASS
+These are conversion worktree results, not a clean rewritten-SHA certification.
+Fresh one-way Devnet deployment/traffic, public cutover, history filtering and
+new exact-SHA CI remain required. The fresh Devnet harness uses 12 Native
+confirmations and the approved 1,440-block recoverable-deposit delay.
 
-## Current blockers
+The live Explorer remains on its retained TEST deployment until reviewed
+forward changes and a fresh compatible Devnet deployment/journal are ready.
+Do not reinterpret the historical deployment as Borsh V3.
 
-- Canonical message encoding and accounting model are not complete yet.
-- Real Native-compatible FROST remains a Phase 04 requirement.
-- Native proof validation, Solana programs, local end-to-end flows, Devnet, production configuration, external review, and activation remain later phases.
+A verified private mirror and pre-conversion working-tree evidence preserve
+rollback/provenance. History filtering has not yet run. Old source/CI references
+do not validate the new source. New current evidence must identify the rewritten
+HEAD, artifact hashes and exact matching CI.
 
-## Latest local validation
+Phase 19 continues without Mainnet spending. Native/Solana identity and protected
+roles were prepared locally, but complete one-way runtime binding/revalidation is
+pending. The maintained Native normal fee estimator reports insufficient data;
+dynamic sweep fee/cap readiness is blocked until a valid approved estimate exists.
+SOL funding must be requested only after other available readiness work is done.
 
-- `python .github/scripts/guardrails.py`: PASS
-- `cd solana && cargo check --locked --workspace --all-targets`: PASS under WSL
-- `cargo check --locked --manifest-path native/frost/Cargo.toml`: PASS under WSL
-- `cargo test --locked --manifest-path native/frost/Cargo.toml`: PASS under WSL, 7 tests
-
-## Next phase
-
-- Implement canonical messages, golden vectors, operation identities, state machines, and reserve/liability accounting primitives.
+Production flags remain false/disabled. Deployment approval and a controlled
+activation amount must be obtained at their specified boundaries. No new roadmap
+phase, external audit claim or automatic economic repair is introduced.

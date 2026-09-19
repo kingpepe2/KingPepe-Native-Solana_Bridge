@@ -1,12 +1,12 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
 import { DEVNET_SOLANA_GENESIS, isTestSolanaCluster, devnetRpcEndpoint } from "../../../shared/solana-test-network.mjs";
 import { SolanaLocalRpcClient } from "../../bridge-validator/solana-deposit-claim-submitter.mjs";
 import { SolanaDepositClaimRpcClient } from "../solana-deposit-claim-observer.mjs";
 import { LocalDeploymentRpc, devnetTestManifest, validateDeploymentManifest, verifyDeploymentSnapshot } from "../deployment-integrity.mjs";
 import { deploymentFixture } from "../../../tests/integration/deployment-fixture.mjs";
+
 
 const endpoint = "https://rpc.example.invalid/configured-locally";
 const options = { endpoint, environment: "devnet", expectedGenesis: DEVNET_SOLANA_GENESIS };
@@ -69,10 +69,21 @@ test("Devnet snapshot binds the existing Borsh DevnetTesting state and rejects l
 });
 
 test("runtime manifest comes from the reviewed public deployment record, not RPC enrollment", () => {
-  const record = JSON.parse(readFileSync(new URL("../../../docs/deployment/devnet.json", import.meta.url)));
+  const { manifest: m } = deploymentFixture();
+  // Synthetic enrollment parser fixture, never evidence of a real deployment.
+  const record = { schema: "KINGPEPE_ONE_WAY_DEVNET_DEPLOYMENT/V1", scope: "DEVNET_TEST_ONLY",
+    borshSchemaVersion: 3, canonicalMagic: "KPEPBRG3", initialSupplyAtomic: "0", freezeAuthority: null,
+    productionReady: false, mainnetActivation: "DISABLED", sourceSha: m.sourceSha,
+    nativeGenesis: m.nativeGenesisHex, solanaGenesis: DEVNET_SOLANA_GENESIS, solanaDeploymentHex: m.solanaDeploymentHex,
+    managerProgram: m.manager.id, transceiverProgram: m.transceiver.id, mint: m.mint.id, tokenProgram: m.mint.tokenProgram,
+    decimals: m.mint.decimals, upgradeAuthority: m.manager.upgradeAuthority, protocolId: 1, nativeNetwork: 8_000_111,
+    policyEpoch: 1, keyEpoch: 1, attesters: m.config.attesters,
+    pdas: { managerProgramData: m.manager.programData, transceiverProgramData: m.transceiver.programData,
+      mintAuthority: m.mint.authority, bridgePda: m.config.bridgePda, transceiverPda: m.config.transceiverPda },
+    transactions: { managerDeployment: { slot: 1 }, transceiverDeployment: { slot: 1 }, mintAndConfigEnrollment: { slot: 2 } } };
   const manifest = devnetTestManifest(record);
   assert.equal(manifest.environment, "devnet"); assert.equal(manifest.manager.id, record.managerProgram);
   assert.equal(manifest.sourceSha, record.sourceSha); assert.equal(manifest.config.protocolId, 1);
-  for (const change of [{ productionReady: true }, { mainnetActivation: "ENABLED" }, { borshSchemaVersion: 1 },
+  for (const change of [{ productionReady: true }, { mainnetActivation: "ENABLED" }, { borshSchemaVersion: 1 }, { borshSchemaVersion: 2 }, { canonicalMagic: "KPEPBRG2" },
     { freezeAuthority: record.upgradeAuthority }, { solanaGenesis: "1".repeat(32) }]) assert.throws(() => devnetTestManifest({ ...record, ...change }));
 });

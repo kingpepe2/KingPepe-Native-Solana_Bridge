@@ -20,7 +20,14 @@
     "onChainReviewEnforcement": false,
     "automaticUpgradeExecution": false,
     "specificTeamApprovalRequiredForEachProductionUpgrade": true,
-    "approvalBoundTo": ["reviewedSourceSha", "targetProgramIds", "bytecodeHashes", "tests", "exactShaCi", "secretScan"]
+    "approvalBoundTo": [
+      "reviewedSourceSha",
+      "targetProgramIds",
+      "bytecodeHashes",
+      "tests",
+      "exactShaCi",
+      "secretScan"
+    ]
   },
   "dedicatedFeePayer": {
     "provisioning": "NOT_PROVISIONED_BY_TEMPLATE",
@@ -52,7 +59,10 @@
     "reserveAndProtectedRoleBindings": "MUST_BE_CONFIGURED_WITH_PRODUCTION_ONLY_IDENTITIES",
     "newDatabaseRequired": false
   },
-  "normalTransfers": { "perTransferTeamApproval": false, "additionalUpgradePolicyDelay": false },
+  "normalTransfers": {
+    "perTransferTeamApproval": false,
+    "additionalUpgradePolicyDelay": false
+  },
   "signerTopology": "SINGLE_HOST",
   "signerRequirements": "SEPARATE_PARTICIPANTS_PROCESSES_PROTECTED_SHARES_AND_NONCE_STATE_EXACT_2_OF_2_NO_FALLBACK_NO_COORDINATOR_SHARE",
   "commonHostRiskDecision": "ACCEPTED_BY_KINGPEPE_TEAM",
@@ -79,5 +89,21 @@
   "externalSecurityAuditCompleted": false,
   "knownUnsafeProductionBlockers": "MUST_BE_RESOLVED_BEFORE_ACTIVATION",
   "activationApproval": false,
-  "phase19": "REQUIRES_ALL_RETAINED_READINESS_GATES_AND_EXPLICIT_ACTIVATION_APPROVAL"
+  "phase19": "REQUIRES_ALL_RETAINED_READINESS_GATES_AND_EXPLICIT_ACTIVATION_APPROVAL",
+  "productionLimitPolicy": "UNBOUNDED_BY_TEAM_DECISION",
+  "productionLimits": {
+    "maxMintPerTransfer": "UNBOUNDED",
+    "maxMintPerWindow": "UNBOUNDED",
+    "windowDuration": "NOT_APPLICABLE"
+  },
+  "nativeFinalityPolicy": {
+    "nativeDepositConfirmations": 12,
+    "nativeReserveSweepConfirmations": 12,
+    "solanaCommitment": "finalized"
+  },
+  "nativeMinerFeePolicy": "DYNAMIC_NODE_ESTIMATE_WITH_CAP",
+  "nativeMinerFeeBudget": "NOT_CONFIGURED_REQUIRES_LIVE_NODE_ESTIMATE_AND_TRANSACTION_SIZE_MEASUREMENT",
+  "reconciliationMismatchAction": "AUTOMATIC_PAUSE_REQUIRES_EXPLICIT_RESOLVED_RESUME",
+  "architecture": "ONE_WAY",
+  "supportedDirection": "KINGPEPE_NATIVE_TO_SOLANA"
 }

@@ -1,8 +1,8 @@
+import { bridgeInputDigest } from "../../shared/protocol/bridge-inputs.mjs";
 import { createHash } from "node:crypto";
 import { tapLeafHashHex, verifyTaprootControlBlock } from "./native-tapscript.mjs";
 import {
   bytesToHex,
-  hashJson,
   hexToBytes,
 } from "../../shared/protocol/canonical-message.mjs";
 
@@ -13,6 +13,25 @@ export const LOCAL_NATIVE_TAPROOT_SIGHASH_EVIDENCE_PROTOCOL =
 export const LOCAL_NATIVE_TAPROOT_SIGHASH_VALIDATED =
   "LOCALLY_VALIDATED_NATIVE_SIGHASH";
 export const SIGHASH_DEFAULT = 0x00;
+
+// Deterministic transaction serialization for forward deposits, sweeps and recovery. No signing key or RPC.
+export function createUnsignedNativeTransaction({ inputs, outputs }) {
+  if (!Array.isArray(inputs) || inputs.length < 1 || inputs.length > 8 ||
+      !Array.isArray(outputs) || outputs.length < 1 || outputs.length > 2) throw new Error("NativeTransactionShapeRejected");
+  const ids = new Set();
+  const nativeInputs = inputs.map(input => {
+    if (!/^[0-9a-f]{64}$/u.test(input?.txid ?? "") || !Number.isInteger(input.vout) || input.vout < 0 || input.vout > 0xffffffff ||
+        ids.has(`${input.txid}:${input.vout}`)) throw new Error("NativeTransactionInputRejected");
+    ids.add(`${input.txid}:${input.vout}`);
+    return { serializedOutpoint: Buffer.concat([Buffer.from(input.txid, "hex").reverse(), uint32LE(input.vout)]), scriptSig: Buffer.alloc(0), sequence: 0xffffffff };
+  });
+  for (const output of outputs) {
+    canonicalUintDecimal(output.amountAtomic, "transaction output");
+    if (BigInt(output.amountAtomic) === 0n || !/^(?:0014[0-9a-f]{40}|0020[0-9a-f]{64}|5120[0-9a-f]{64})$/u.test(output.scriptPubKeyHex)) throw new Error("NativeTransactionOutputRejected");
+  }
+  const raw = serializeNativeTransactionParts({ version: 2, inputs: nativeInputs, outputs, lockTime: 0 });
+  return parseNativeTransactionHex(raw.toString("hex")).rawHex;
+}
 
 const MAX_NATIVE_TRANSACTION_BYTES = 4_000_000;
 const MAX_NATIVE_TRANSACTION_INPUTS = 100_000;
@@ -67,7 +86,7 @@ export function createLocalTaprootSighashEvidence(input) {
     ...(tapscriptSpend === undefined ? {} : { scriptHex: tapscriptSpend.scriptHex }),
   });
   const outputCommitments = transaction.outputs.map((output, index) =>
-    sha256Hex(Buffer.concat([uint32LE(index), serializeTransactionOutput(output)])),
+    bridgeInputDigest("IndexedOutput", { index, amountAtomic: output.amountAtomic, scriptPubKeyHex: output.scriptPubKeyHex }),
   );
 
   return Object.freeze({
@@ -76,7 +95,7 @@ export function createLocalTaprootSighashEvidence(input) {
     unsignedNativeTransactionFingerprintHex: sha256Hex(transaction.raw),
     nativeSweepTxidHex: transaction.txidHex,
     unsignedNativeTransactionId: transaction.txidHex,
-    transactionCommitment: hashJson({
+    transactionCommitment: bridgeInputDigest("TransactionCommitment", {
       protocol: `${LOCAL_NATIVE_TAPROOT_TRANSACTION_PROTOCOL}/TRANSACTION_COMMITMENT`,
       txidHex: transaction.txidHex,
       inputOutpoints: transaction.inputs.map((entry) => entry.outpoint),
@@ -103,13 +122,7 @@ export function createLocalTaprootSighashEvidence(input) {
     inputOutpoints: Object.freeze(transaction.inputs.map((entry) => entry.outpoint)),
     spentOutputCommitments: Object.freeze(
       spentOutputs.map((output, index) =>
-        sha256Hex(
-          Buffer.concat([
-            uint32LE(index),
-            uint64LE(BigInt(output.amountAtomic)),
-            serializeScript(output.scriptPubKey),
-          ]),
-        ),
+        bridgeInputDigest("IndexedOutput", { index, amountAtomic: output.amountAtomic, scriptPubKeyHex: output.scriptPubKey }),
       ),
     ),
     outputCommitments: Object.freeze(outputCommitments),

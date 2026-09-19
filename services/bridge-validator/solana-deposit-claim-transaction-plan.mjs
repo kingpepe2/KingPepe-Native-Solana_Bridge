@@ -686,7 +686,7 @@ function encodeEd25519VerifierInstruction({
   const signatureOffset = ED25519_INSTRUCTION_HEADER_LENGTH;
   const publicKeyOffset = signatureOffset + ED25519_SIGNATURE_LENGTH;
   // Both verifiers sign the exact canonical bytes starting after the tag of
-  // transceiver instruction 2. Do not duplicate the 514-byte message per key.
+  // transceiver instruction 2. Do not duplicate the 482-byte message per key.
   const messageOffset = 1;
   return concatBytes([
     Uint8Array.of(1, 0),

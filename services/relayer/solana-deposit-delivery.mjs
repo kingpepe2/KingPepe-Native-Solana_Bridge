@@ -40,7 +40,7 @@ export function validateSolanaDepositSigningIntent(input, policy) {
   const p = validateSolanaDeliveryPolicy(policy), v = structuredClone(input);
   fields(v, ["operationId", "kind", "encodedMessageHex", "attestations", "recentBlockhash", "lastValidBlockHeight", "minimumSlot"]);
   hash(v.operationId); check(["RECEIPT", "CLAIM"].includes(v.kind));
-  check(typeof v.encodedMessageHex === "string" && /^[0-9a-f]{1028}$/u.test(v.encodedMessageHex) && Buffer.byteLength(JSON.stringify(v)) <= 12000);
+  check(typeof v.encodedMessageHex === "string" && /^[0-9a-f]{964}$/u.test(v.encodedMessageHex) && Buffer.byteLength(JSON.stringify(v)) <= 12000);
   const m = decodeCanonicalBridgeMessage(Buffer.from(v.encodedMessageHex, "hex")), op = p.operationPolicy, d = m.deployment;
   check(m.action === "DepositClaim" && m.direction === "NativeToSolana" && m.feeAtomic === 0n && m.amountAtomic > 0n && m.amountAtomic <= deliveryUint(op.maximumAmountAtomic));
   for (const [field, expected] of [["nativeGenesis", op.nativeGenesis], ["solanaDeployment", op.solanaDeployment],

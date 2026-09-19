@@ -239,7 +239,7 @@ export async function runLocalDepositSecurityE2e(repoRoot) {
     const ledger = openLocalnetDepositCreditLedger({ ...accountingInput, minimumCheckpoint: accounting.checkpoint });
     try {
       assert.equal(ledger.checkpoint().sequence, "3"); // Plus finalized mint.
-      assert.equal(ledger.availableReserveInputs().length, 1);
+      assert.equal(ledger.accountedReserveInputs().length, 1);
       assert.equal(ledger.pendingCredits().length, 0);
       assert.deepEqual(ledger.snapshot(), accounting.snapshot);
       accountingChecks.push("FINALIZED_MINT_REPLAYED_AFTER_CLOSE");
@@ -266,8 +266,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const result = await runLocalDepositSecurityE2e(process.argv[2] ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../.."));
     console.log(JSON.stringify(result));
     if (result.state !== "COMPLETED" || result.localSecurity.fail !== 0 || result.localAccounting.fail !== 0) process.exitCode = 1;
-  } catch {
-    console.error("LOCAL_DEPOSIT_SECURITY_RUN_FAILED");
+  } catch (error) {
+    const source = String(error?.stack ?? "").match(/(?:scripts|solana\/tests|services|native)\/[A-Za-z0-9_./-]+\.(?:mjs|js):[0-9]+:[0-9]+/u)?.[0];
+    console.error(JSON.stringify({ status: "LOCAL_DEPOSIT_SECURITY_RUN_FAILED", source: source ?? "UNAVAILABLE" }));
     process.exitCode = 1;
   }
 }

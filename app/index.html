@@ -1,0 +1,36 @@
+<!doctype html>
+<!-- Copyright (c) 2026 KingPepe Team. All Rights Reserved. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>KingPepe Bridge</title>
+  <link rel="stylesheet" href="/app/style.css">
+  <script type="module" src="/app/bridge.mjs"></script>
+</head>
+<body>
+  <header><a class="brand" href="/"><span class="mark">K</span> KingPepe <span class="muted">Bridge</span></a><span class="badge">LOCALNET / REGTEST ONLY</span></header>
+  <main>
+    <section class="intro"><p class="eyebrow">NATIVE → SOLANA</p><h1>One asset.<br> Two networks.</h1><p>Bridge KingPepe Native deposits to Solana KPEPE.<br>Send the deposit from your Native wallet. Connect a Solana recipient wallet.</p><p class="test-warning">Development interface · Production transfers are disabled.</p></section>
+    <section class="panel transfer" aria-labelledby="transfer-title">
+      <div class="panel-heading"><h2 id="transfer-title">Bridge KPEPE</h2><span id="bridge-state" class="badge neutral">NOT CONNECTED</span></div>
+      <details id="connection" open><summary>Local service connection</summary><form id="connect-form" class="connection-form"><label for="access-code">Local user-access code</label><div class="inline"><input id="access-code" type="password" required autocomplete="off" maxlength="64" spellcheck="false"><button type="submit">Connect</button><button id="disconnect" type="button" class="secondary" disabled>Disconnect</button></div><small>Supplied by your local test service. Kept in memory only. This is not a wallet key.</small></form></details>
+      <p>FROM: KingPepe Native REGTEST → TO: Solana KPEPE</p>
+      <div class="wallet-row"><label for="wallets">Solana recipient wallet</label><div class="inline"><select id="wallets" aria-label="Available Solana wallets"></select><button id="wallet-connect" type="button">Connect Solana Wallet</button><button id="wallet-disconnect" type="button" class="secondary" disabled>Disconnect wallet</button></div><small id="wallet-state">Wallet Standard connection. Public address only.</small><p id="solana-balance"></p></div>
+      <label for="native-address">KingPepe Native public address</label><div class="inline"><input id="native-address" maxlength="90" autocomplete="off" spellcheck="false"><button id="native-balance-read" type="button" class="secondary">Check balance</button></div><p id="native-balance"></p>
+      <form id="request-form">
+        <fieldset id="request-fields" disabled>
+          <label for="amount">Amount <span>KPEPE</span></label><input id="amount" inputmode="decimal" placeholder="0.00000000" required maxlength="21" autocomplete="off">
+          <div id="deposit-fields"><label for="recipient">Recipient KPEPE token account on Solana</label><input id="recipient" required maxlength="44" spellcheck="false" autocomplete="off" placeholder="Initialized SPL token-account address"><label for="recovery-public-key">Native recovery public key</label><input id="recovery-public-key" required maxlength="64" spellcheck="false" autocomplete="off" placeholder="64 hexadecimal characters · public key only"><small>Save the returned public recovery request. Never enter a seed phrase or private key.</small></div>
+          <button id="prepare" class="primary" type="submit">Create Bridge Deposit</button>
+        </fieldset>
+      </form>
+      <p id="notice" role="alert" aria-live="polite"></p>
+      <button id="new-request" type="button" class="secondary" hidden disabled>Create another transfer</button>
+      <section id="review" class="review" hidden aria-labelledby="review-title"><h3 id="review-title">Review your request</h3><dl id="review-details"></dl><button id="download" type="button" class="secondary">Save public request</button><p id="wallet-instruction"></p><form id="notify-form"><label id="transaction-label" for="transaction-id">Native deposit transaction ID</label><input id="transaction-id" required maxlength="88" spellcheck="false" autocomplete="off"><button id="notify" type="submit" class="secondary">Notify bridge</button></form><small>Refresh or track the same operation ID to resume. Do not send another deposit to retry a status read.</small></section>
+    </section>
+    <section class="panel operations" aria-labelledby="status-title"><div class="panel-heading"><h2 id="status-title">Operation status</h2><span id="operation-state" class="badge neutral">—</span></div><form id="track-form"><label for="operation-id">Operation ID</label><div class="inline"><input id="operation-id" maxlength="64" spellcheck="false" autocomplete="off" placeholder="Paste a saved operation ID" required><button type="submit" class="secondary">Track</button></div></form><p id="operation-help">Your request ID keeps its place across service restarts.</p><dl id="operation-details"></dl><small>Status reflects the service journal. An unavailable response is not proof that a transaction failed.</small></section>
+  </main>
+  <footer><span>KingPepe Team · © 2026 · All Rights Reserved.</span><span><a href="/notices">Third-party notices</a> · <a href="/licenses/scure-base">scure-base (MIT)</a> · <a href="/licenses/wallet-standard">Wallet Standard (Apache-2.0)</a> · <a href="/license">License</a></span></footer>
+</body>
+</html>

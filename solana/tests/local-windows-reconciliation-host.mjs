@@ -53,5 +53,5 @@ try {
     assert(finished);
   });
   assert.equal(result.pass, 14);
-  console.log(JSON.stringify({ state: "COMPLETED", claimPrerequisiteChecks: result.pass, productionReady: false, phase09: "NOT_STARTED" }));
+  console.log(JSON.stringify({ state: "COMPLETED", claimPrerequisiteChecks: result.pass, productionReady: false }));
 } catch { console.error("LOCAL_WINDOWS_RECONCILIATION_HOST_FAILED"); process.exitCode = 1; }

@@ -1,116 +1,86 @@
-# Working on KingPepe Native - Solana
+# Working on KingPepe Native → Solana
 
-KingPepe Team directs a simple standard bridge. Keep core signing, finality,
-replay, exact accounting, restart safety, protected secrets and a simple pause.
-Do not recreate an experimental hardening phase.
+The KingPepe Team's final product is ONE-WAY: Native deposits become Solana
+KPEPE representation. Preserve signing, finality, replay, exact accounting,
+restart safety, protected secrets and simple pause. No new roadmap phase or
+experimental hardening platform.
 
-The repository is PUBLIC after source, history, documentation, artifact and
-license review. Original code remains proprietary All Rights Reserved. Preserve
-required third-party notices and historical licensing facts.
+## Source and operational boundaries
 
-## Safety and implementation
+- One writer per involved checkout. Stop on genuine concurrent source changes.
+  No reset, clean, restore, stash or automatic rebase of useful work.
+- Permanent reverse-function removal and a purpose-built public-history rewrite
+  are explicitly Team-authorized. Finish current forward tests first. Preserve
+  a verified private rollback mirror, inspect all intended refs/artifacts, scan
+  rewritten history, use force-with-lease where applicable and validate NEW HEAD.
+  Old SHA/CI evidence never certifies rewritten source. Do not affect other repos.
+- Original code is proprietary All Rights Reserved. Preserve third-party notices
+  and historical license grants; rewriting source history does not revoke them.
+- FROST is required for forward recoverable-deposit reserve sweeps. Retain Noble
+  curves 2.3.0 schnorr_FROST secp256k1/BIP340/BIP342, exact 2-of-2 A+B, separate
+  software processes/protected shares/nonce state, no fallback/coordinator share.
+  SINGLE_HOST is accepted; common-host compromise/outage can affect both.
+  Upstream FROST is UNAUDITED. Ed25519 is for project attestations/Solana identities.
+- Retain nonce tombstones, exact transaction binding, process exclusion, durable
+  operation IDs and persist-before-broadcast. Missing proof never authorizes mint.
+- Secrets, wallet state, ledgers, backups, RPC credentials and private paths stay
+  outside every checkout/public artifact. No plaintext production fallback.
+- No advanced clone/fence/rollback-anchor system, extra database, HSM or second-host
+  requirement. Full-host rollback and distinct Windows principals are not certified.
+- Critical contradiction pauses new economic processing. Read-only monitoring may
+  continue. No automatic economic repair; explicit reviewed resume is required.
+- Wallet Standard is a public recipient connection. No user transaction signing
+  or private-wallet material is requested by the one-way Bridge interface.
 
-- Preserve useful work; no reset/clean/restore/stash. Legacy is read-only.
-- Software FROST A+B: exact 2-of-2, separate processes/services, protected private
-  shares and nonce state; no fallback or coordinator private share. SINGLE_HOST
-  is the final KingPepe Team decision. Common-host compromise/outage may affect
-  both participants; record that accepted risk for Phase 13 and external review.
-  Do not require another physical host, HSM or hardware signer.
-- Preserve @noble/curves 2.3.0 schnorr_FROST secp256k1/BIP340/BIP342.
-  Upstream FROST is UNAUDITED. Ed25519 is for attestations/Solana identities.
-- Keep nonce tombstones, exact transaction binding, simple process exclusion,
-  durable operation IDs and persist-before-broadcast ordering.
-- Protected secrets have no plaintext production fallback. Local test material
-  is explicitly isolated outside every checkout. No keys, ledgers, databases,
-  operational paths or private configuration in source or published artifacts.
-- No advanced clone/fence/rollback-anchor frameworks. Full-host snapshot
-  rollback and distinct Windows service principals are not locally certified.
-- No per-transfer Team approval; users sign their wallets. Missing evidence
-  never authorizes minting or payment. Serious contradiction pauses the bridge;
-  read-only monitoring may continue. No automatic economic repair.
-- No production systems, keys, wallets, funds or deployment now.
-  productionReady=false; mainnetActivation=DISABLED;
-  productionSigningAuthorized=false; productionBroadcastAuthorized=false.
-- Use KingPepe Team terminology; preserve official account.owner/API terms.
+## Phase 19 boundary
 
-## Current review scope
+Complete all safe non-funding one-way Mainnet readiness. Preserve the live TEST
+interface until actual production identities exist. Local protected production
+preparation is authorized, but no Mainnet deployment/economic transaction now.
+Keep productionReady=false, mainnetActivation=DISABLED,
+productionSigningAuthorized=false, productionBroadcastAuthorized=false.
 
-Phase 14 fresh-clone validation and the isolated encrypted restore drill passed
-at 1f8ce111f10f31e6984c25d02903071d2f893076 with exact-SHA CI 34732975925.
-Its publication ddd234e0be44587b44a5d8f9b3ad4ade215b2b97 also passed matching
-CI 34735282747 (four required jobs passed, none skipped).
-Phase 15 TEST-only Devnet enrollment is PASS using canonical Borsh V2. Publication
-36f9e3a4d5af8495d8abb7fde6871894e3fec195 passed exact-SHA CI 34766210723:
-all four required jobs and every step, none skipped. Current phase: 16, explicit
-Devnet client admission followed by retained service integration and real
-regtest/Devnet flows in both directions. Public deployment identities, source, build hashes and
-transactions are in docs/deployment/devnet.json. Both programs and the Mint
-already exist; do not redeploy them or recreate enrollment on a routine restart.
-Source 5ad33201402813503d31b6d97c2e3e6fdb7908c1 passed all four jobs and every
-step in CI 34745104679. Enrollment CI 34737496362 attempt 2 also passed; its
-attempt 1 exception is not recoverable from retained diagnostics, so do not
-invent a root cause. The safe-diagnostic/pinned-verifier setup fixes are retained.
-The funded test fee payer needs no further airdrops. Preserve its prepared
-protected credentials. Read SOLANA_DEVNET_RPC_URL from local process configuration
-without exposing it in source, logs, CLI diagnostics or public evidence.
-The pinned compiler's supported --arch v3 builds reproduce the deployed bytes;
-do not confuse them with default v0 local-test binaries or enable experimental ABI.
-Devnet test state must not enable Mainnet. Existing local callers stay local-only.
-No production configuration, keys, funds or deployment.
-Preserve the completed transfer engines, accounting, lifecycle, replay semantics,
-FROST topology, authorities and existing journal/inbox. Recovery is TESTED only
-for closed localnet/regtest state with a known quiescent gap, not production
-DPAPI portability or full-host rollback. Repeat the drill during Phase 17.
-Use external build directories and locked dependencies. No new security platform.
-User wallets sign their own transactions; no user-facing signing, minting or
-administrative API.
-Keep implementation commits phase-scoped. Commit/push each meaningful,
-self-contained milestone after its tests, scans and review, then verify its
-exact-SHA CI; do not accumulate the entire phase or commit trivial edits.
-Encoding changes and their callers must land together without mixed formats.
-After required validation, scans,
-publication and exact-SHA CI pass, continue automatically to the next approved
-roadmap phase. Stop on a real blocker, concurrent writer, incomplete soak or
-external review, missing Team upgrade-authority decision, or the Phase 19
-activation approval gate. No Devnet before Borsh and fresh-clone validation.
-Remove obsolete encoding and bincode
-paths/dependencies only when no retained code genuinely requires them. Do not
-suppress a remaining upstream advisory or change Native/Solana consensus encoding.
-Recovery uses manual or existing OS-scheduled encrypted snapshots, not a custom
-backup service. Keep recoveryProcedure NOT_TESTED until the actual snapshot
-restore/chain-resume drill passes, before Phase 15; repeat in Phase 17 and require
-TESTED before Phase 19. Do not power off the host or recreate WSL for the drill.
-Keep full-host rollback, accepted same-host risk and upgrade-authority trust
-explicit in readiness. At Phase 18 stop for a KingPepe Team authority-model
-decision if undecided. At Phase 19 stop for KINGPEPE_TEAM_ACTIVATION_APPROVAL
-before production deployment. Do not choose either decision for the Team.
+Approved Native deposit/sweep finality: 12 confirmations. Approved recovery CSV:
+1,440 Native blocks. Solana commitment: finalized. Sweep miner fees require
+DYNAMIC_NODE_ESTIMATE_WITH_CAP with actual measurements, integer arithmetic,
+relay floor, operator funding and measured caps; no invented fee fallback.
+Production mint transfer/window policy: UNBOUNDED_BY_TEAM_DECISION. Accounting,
+available backing, finality, replay and mismatch pause remain mandatory.
 
-Source-bound status and evidence: docs/development-status.md and
-BRIDGE-READINESS.json. Historical validation certifies only its named source.
-GitHub Actions execution is restored. Fix actual failures; do not weaken gates.
+After frozen artifacts and all other readiness, calculate actual Mainnet SOL
+requirements. Funding is not approval. After funding and unchanged-artifact
+preflight, STOP for KINGPEPE_TEAM_ACTIVATION_APPROVAL. After approved deployment,
+Phase 20 is one controlled forward transfer; request
+CONTROLLED_ACTIVATION_TRANSFER_AMOUNT before economic action if still unset.
+Activate only after COMPLETED, exact supply delta and MATCH with all health checks.
+Normal valid forward transfers need no per-transfer Team approval.
 
-## Commands
+Upgrade model is SINGLE_KEY_WITH_REVIEW_CONTROL, upgradeReviewWindow=NONE,
+fixedTimelock=false. Follow docs/security/program-upgrades.md. Its centralized
+trust remains accepted. externalSecurityAuditCompleted=false; an external audit
+is not a Team-required gate, but known unsafe blockers are never waived.
 
-Pins: scripts/local-e2e-toolchain.json and docs/deployment/local-e2e-build.md.
-Node 24.21.0/npm 11.19.0; Solana Rust 1.89.0; Native nightly-2023-10-29;
-Linux/WSL Agave 4.2.2, SBF builder 4.1.0, platform-tools v1.54.
-Direct SBF: no Anchor CLI required. Source-built Native REGTEST 31.1.0 only.
+## Validation
+
+Use external build/runtime directories and locked dependencies. Pins are in
+scripts/local-e2e-toolchain.json: Node24.21/npm11.19, Solana Rust1.89, Native
+nightly-2023-10-29, Agave4.2.2, SBF4.1/platform-tools v1.54. Direct SBF needs no
+Anchor CLI. Native test node is source-built KingPepe31.1 REGTEST.
 
 - npm ci --ignore-scripts; npm test; npm audit --audit-level=low
-- npm run test:windows-security (CurrentUser, not distinct service-SID proof)
-- python .github/scripts/guardrails.py; node scripts/source-audit.mjs
-- node .github/scripts/dependency-license-audit.mjs
-- solana/: cargo check --locked --workspace --all-targets;
-  cargo test --locked --workspace; cargo fmt --check --all;
-  cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
-- Native proof/reserve/recovery: locked check/test/fmt/Clippy per manifest.
-- npm run local:e2e:native-to-solana
-- npm run local:e2e:round-trip
-- npm run local:e2e:service
-- Real chains require a NEW external run root, external build outputs and the
-  pinned executables. Never reuse production state or an existing test ledger.
+- npm run test:windows-security; npm run test:user-interface
+- Python guardrails, source audit, dependency license audit and secret scans
+- Solana locked workspace check/test/fmt/Clippy -D warnings and SBF builds
+- Native proof/reserve/recovery locked check/test/fmt/Clippy per manifest
+- Fresh isolated local forward/security/service/recovery tests
+- Fresh REGTEST → DEVNET with canonical-byte equality, no double mint and MATCH
+- Current/public API, SDK, CLI, UI, runtime and Solana ABI absence regressions
 
-Implement -> tests -> source/staged/outgoing scans -> review -> explicit staging
--> commit -> push -> exact-SHA CI. Clean-clone results must name their source SHA.
-Delete only reviewed obsolete source and proven disposable project test/build
-outputs. Preserve unknown wallets, backups, recovery, Native source, tools and WSL.
+Review → tests/scans/provenance → explicit staging → focused commit → authorized
+publication → new exact-SHA CI. Encoding and callers land together. Preserve
+forward tests and original Native consensus encoding. Keep required upstream
+bincode dependencies/advisories visible. Do not replace unknown state or keys.
+
+The source-bound current status is docs/development-status.md and
+BRIDGE-READINESS.json. Mainnet is not deployed. Tests and private historical
+evidence must be described at their actual scope, without certification claims.

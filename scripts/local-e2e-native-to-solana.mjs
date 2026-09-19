@@ -1,18 +1,52 @@
-import { createHash, randomUUID } from "node:crypto";
-import { mkdirSync } from "node:fs";
+import { bridgeInputDigest } from "../shared/protocol/bridge-inputs.mjs";
+import { witnessAddressFromScript } from "../native/node/witness-address.mjs";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { isSameOrInside, resolveExistingParents, validateRuntimeFile, validateRuntimeStateRoot } from "../shared/runtime-path-boundary.mjs";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { ed25519 } from "@noble/curves/ed25519.js";
+import { createLocalNativeEvidenceVerifier } from "./local-native-evidence-verifier.mjs";
+import { REGTEST_GENESIS } from "../native/node/native-raw-evidence.mjs";
+import { buildRegtestRecoverableDeposit, deriveRegtestDepositCommitment,
+  validateRegtestRecoverableDepositIntent } from "../native/recovery/taproot-deposit.mjs";
+import {
+  ATTESTATION_MODE,
+  ATTESTATION_PROTOCOL,
+  VERIFIED_READY as ATTESTATION_VERIFIED_READY,
+  combineProjectAttestations,
+  evaluateDepositCredit,
+} from "../services/attesters/attestation-service.mjs";
+import {
+  DEPOSIT_STATES,
+  buildDepositClaimMessage,
+} from "../services/bridge-validator/automatic-deposit-pipeline.mjs";
+import { LocalnetSolanaDepositClaimBridge } from "../services/bridge-validator/localnet-solana-deposit-claim-bridge.mjs";
+import { AuthenticatedLocalDepositLedger } from "../services/bridge-validator/local-deposit-ledger.mjs";
+import {
+  SolanaLocalRpcClient,
+  FileBackedSolanaDepositClaimJournal,
+} from "../services/bridge-validator/solana-deposit-claim-submitter.mjs";
+import { SolanaDepositClaimObserver } from "../services/solana-observer/solana-deposit-claim-observer.mjs";
+import {
+  SPL_TOKEN_PROGRAM_ID_BASE58,
+} from "../services/bridge-validator/localnet-solana-setup-plan.mjs";
 import {
   FileBackedFrostStateStore,
   NativeFrostCoordinator,
   NativeFrostSigner,
   REQUIRED_FROST_SIGNERS,
   createNativeSigningPolicy,
+  createLocalNativeDkgPolicy,
   runTwoPartyDkg,
 } from "../native/frost/index.mjs";
-import { bytesToHex, hashJson } from "../shared/protocol/canonical-message.mjs";
+import {
+  bytesToHex,
+  decodeCanonicalBridgeMessage,
+  hashJson,
+  hexToBytes,
+} from "../shared/protocol/canonical-message.mjs";
 import { base58Decode, base58Encode } from "../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs";
 import { prepareLocalNativeReserveSweepSigningIntent } from "../services/bridge-validator/native-reserve-sweep-signing-intent.mjs";
 import {
@@ -23,18 +57,13 @@ import {
   buildRegtestCliArguments,
   sanitizePlanForReport,
 } from "./local-e2e-orchestrator.mjs";
-import {
-  LOCAL_E2E_BOOTSTRAP_BLOCKED,
-  LOCAL_E2E_BOOTSTRAP_FAILED,
-  LOCAL_E2E_BOOTSTRAP_READY,
-  withLocalE2eInfrastructure,
-} from "./local-e2e-bootstrap.mjs";
+import { LOCAL_E2E_BOOTSTRAP_BLOCKED, LOCAL_E2E_BOOTSTRAP_FAILED, withLocalE2eInfrastructure } from "./local-e2e-bootstrap.mjs";
 import {
   RPC_OBSERVATION,
   decimalCoinsToAtomic,
 } from "../native/node/native-rpc-client.mjs";
 import {
-  attachKeyPathTaprootWitnesses,
+  attachTaprootWitnesses,
   createLocalTaprootSighashEvidences,
   parseNativeTransactionHex,
 } from "../native/node/native-taproot-transaction.mjs";
@@ -58,19 +87,26 @@ export const LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_FINALIZED =
   "LOCAL_NATIVE_RESERVE_SWEEP_FINALIZED";
 export const LOCAL_NATIVE_TO_SOLANA_SOLANA_SETUP_FINALIZED =
   "LOCAL_NATIVE_TO_SOLANA_SOLANA_SETUP_FINALIZED";
+export const LOCAL_NATIVE_TO_SOLANA_SOLANA_DEPOSIT_CLAIM_FINALIZED =
+  "LOCAL_NATIVE_TO_SOLANA_SOLANA_DEPOSIT_CLAIM_FINALIZED";
+export const LOCAL_NATIVE_TO_SOLANA_RECONCILED =
+  "LOCAL_NATIVE_TO_SOLANA_RECONCILED";
 export const LOCAL_NATIVE_RESERVE_SWEEP_FROST_SIGNATURES_PROTOCOL =
   "KINGPEPE_NATIVE_SOLANA_BRIDGE/LOCAL_NATIVE_RESERVE_SWEEP_FROST_SIGNATURES/V1";
 
 const DEFAULT_AMOUNT_NATIVE = "1.00000000";
 const DEFAULT_NATIVE_DECIMALS = 8;
 const DEFAULT_NATIVE_CHAIN_NAME = "regtest";
+const DEFAULT_LOCALNET_PROTOCOL_ID = 1;
+const DEFAULT_LOCALNET_NATIVE_NETWORK = 8_000_111;
 const DEFAULT_NATIVE_BECH32_HRP = "rkpepe";
 const DEFAULT_RESERVE_MINER_FEE_NATIVE = "0.00001000";
 const DEFAULT_COINBASE_MATURITY_BLOCKS = 20;
 const DEFAULT_DEPOSIT_FINALITY_BLOCKS = 6;
+const DEFAULT_DEPOSIT_CLAIM_VALID_FROM = "0";
+const DEFAULT_DEPOSIT_CLAIM_VALID_UNTIL = "4102444800";
 const MAX_UNSIGNED_SWEEP_BYTES = 400_000;
-const BECH32M_CONST = 0x2bc830a3;
-const BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+const ZERO_HASH = "00".repeat(32);
 
 export async function runLocalNativeToSolanaE2e(options = {}) {
   let flowResult;
@@ -96,9 +132,12 @@ export async function runLocalNativeToSolanaE2e(options = {}) {
       ...context,
       custodyFactory: options.custodyFactory,
       reserveSweepSigner: options.reserveSweepSigner,
+      nativeEvidenceVerifierFactory: options.nativeEvidenceVerifierFactory,
+      reserveAccounting: options.reserveAccounting,
       flowConfig,
       localSolanaSetupContext,
       solanaSetup: options.solanaSetup,
+      solanaDepositClaim: options.solanaDepositClaim,
     });
     return {
       fullNativeToSolanaE2e:
@@ -158,6 +197,13 @@ export function createNativeToSolanaFlowConfig(options) {
     "reserveMinerFeeNative",
   );
   const reserveMinerFeeAtomic = decimalCoinsToAtomic(reserveMinerFeeNative, nativeDecimals);
+  const protocolId = checkedInteger(value.protocolId ?? DEFAULT_LOCALNET_PROTOCOL_ID, "protocolId", 1, 0xffff_ffff);
+  const nativeNetwork = checkedInteger(
+    value.nativeNetwork ?? value.nativeNetworkCode ?? DEFAULT_LOCALNET_NATIVE_NETWORK,
+    "nativeNetwork",
+    1,
+    0xffff_ffff,
+  );
   const bridgeProgramIdHex = normalizeSolanaProgramIdHex(
     value.bridgeProgramIdHex ?? value.bridgeProgramId ?? plan.programIds?.kingpepeBridge,
     "bridgeProgramId",
@@ -187,6 +233,21 @@ export function createNativeToSolanaFlowConfig(options) {
   );
   const policyEpoch = checkedInteger(value.policyEpoch ?? 1, "policyEpoch", 1, 0xffff_ffff);
   const keyEpoch = checkedInteger(value.keyEpoch ?? 1, "keyEpoch", 1, 0xffff_ffff);
+  const depositClaimValidFrom = canonicalUintDecimal(
+    value.depositClaimValidFrom ?? DEFAULT_DEPOSIT_CLAIM_VALID_FROM,
+    "depositClaimValidFrom",
+  );
+  const depositClaimValidUntil = canonicalUintDecimal(
+    value.depositClaimValidUntil ?? DEFAULT_DEPOSIT_CLAIM_VALID_UNTIL,
+    "depositClaimValidUntil",
+  );
+  if (BigInt(depositClaimValidFrom) > BigInt(depositClaimValidUntil)) {
+    throw new Error("LocalNativeToSolanaDepositClaimValidityWindowInvalid");
+  }
+  const attestationNowUnix =
+    value.attestationNowUnix === undefined
+      ? undefined
+      : canonicalUintDecimal(String(value.attestationNowUnix), "attestationNowUnix");
 
   return Object.freeze({
     protocol: LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL,
@@ -196,8 +257,12 @@ export function createNativeToSolanaFlowConfig(options) {
     amountNative,
     amountAtomic: amountAtomic.toString(),
     nativeDecimals,
+    protocolId,
+    nativeNetwork,
     nativeChainName: sanitizeNetworkName(value.nativeChainName ?? DEFAULT_NATIVE_CHAIN_NAME),
     nativeBech32Hrp: sanitizeBech32Hrp(value.nativeBech32Hrp ?? DEFAULT_NATIVE_BECH32_HRP),
+    recoveryDelayBlocks: checkedInteger(value.recoveryDelayBlocks ?? 144, "recoveryDelayBlocks", 1, 0xffff),
+    depositNonceHex: normalizeHash32(value.depositNonceHex ?? randomBytes(32).toString("hex"), "depositNonceHex"),
     reserveMinerFeeNative,
     reserveMinerFeeAtomic: reserveMinerFeeAtomic.toString(),
     solanaDeploymentHex,
@@ -206,6 +271,9 @@ export function createNativeToSolanaFlowConfig(options) {
     mintHex,
     policyEpoch,
     keyEpoch,
+    depositClaimValidFrom,
+    depositClaimValidUntil,
+    attestationNowUnix,
     solanaFeePayerAirdropLamports: canonicalUintDecimal(
       value.solanaFeePayerAirdropLamports ?? "5000000000",
       "solanaFeePayerAirdropLamports",
@@ -236,7 +304,11 @@ export async function executeNativeDepositObservationFlow({
   localSolanaSetupContext,
   custodyFactory = createLocalFrostTaprootCustodyContext,
   reserveSweepSigner = signLocalReserveSweepWithFrost,
+  nativeEvidenceVerifierFactory = createLocalNativeEvidenceVerifier,
+  reserveAccounting = (ledger, receipt, id) => ledger.recordCanonicalReserve(receipt, id),
   solanaSetup = submitLocalnetSolanaSetup,
+  solanaDepositClaim = submitLocalnetSolanaDepositClaim,
+  protectedDepositPreparation = undefined,
 }) {
   const config = requireObject(flowConfig, "flowConfig");
   const setupContext = validateLocalSolanaSetupContext(localSolanaSetupContext, config);
@@ -254,6 +326,9 @@ export async function executeNativeDepositObservationFlow({
         parameters,
       }),
       cwd: plan.repoRoot,
+      // Creating a fresh REGTEST maturity chain can exceed the ordinary RPC
+      // deadline on mounted Windows storage. Keep this setup-only wait bounded.
+      ...(command === "generatetoaddress" ? { timeoutMs: 120_000 } : {}),
     });
     stages.push(step);
     return parseJson ? parseJsonOutput(result.output, step) : String(result.output ?? "").trim();
@@ -263,19 +338,50 @@ export async function executeNativeDepositObservationFlow({
     plan,
     flowConfig: config,
   });
-  const depositAddress = requireNonEmptyText(frostCustody.taprootAddress, "frostCustody.taprootAddress");
+  const canonicalReserveAddress = requireNonEmptyText(frostCustody.taprootAddress, "frostCustody.taprootAddress");
   const custodyScriptPubKeyHex = validateP2trScriptPubKeyHex(
     frostCustody.taprootScriptPubKeyHex,
     "frostCustody.taprootScriptPubKeyHex",
   );
   stages.push("LOCAL_E2E_INITIALIZE_EPHEMERAL_FROST_CUSTODY");
-  stages.push("LOCAL_E2E_CREATE_FROST_TAPROOT_DEPOSIT_INTENT");
 
   await cli({
     step: "LOCAL_E2E_CREATE_USER_WALLET",
     command: "createwallet",
     parameters: [config.userWalletName],
   });
+  const nativeGenesisHash = normalizeHash32(await cli({ step: "LOCAL_E2E_OBSERVE_NATIVE_GENESIS_HASH",
+    command: "getblockhash", parameters: ["0"] }), "nativeGenesisHash");
+  if (nativeGenesisHash !== REGTEST_GENESIS || config.nativeChainName !== "regtest" || config.nativeBech32Hrp !== "rkpepe") {
+    throw new Error("LocalRecoverableDepositRegtestRequired");
+  }
+  // Only a public key leaves the isolated user's Native wallet. Solana keys are
+  // never assumed to authorize the user's Native recovery branch.
+  const recoveryKeyAddress = await cli({ step: "LOCAL_E2E_GET_USER_RECOVERY_ADDRESS", wallet: config.userWalletName,
+    command: "getnewaddress", parameters: ["recovery", "bech32"] });
+  const recoveryKeyInfo = await cli({ step: "LOCAL_E2E_GET_USER_RECOVERY_PUBLIC_KEY", wallet: config.userWalletName,
+    command: "getaddressinfo", parameters: [recoveryKeyAddress], parseJson: true });
+  if (recoveryKeyInfo.ismine !== true || recoveryKeyInfo.iswatchonly === true
+    || typeof recoveryKeyInfo.pubkey !== "string" || !/^(02|03)[0-9a-f]{64}$/u.test(recoveryKeyInfo.pubkey)) {
+    throw new Error("LocalNativeUserRecoveryPublicKeyRequired");
+  }
+  const depositIntentContext = Object.freeze({ nativeGenesisHex: nativeGenesisHash, solanaDeploymentHex: config.solanaDeploymentHex,
+    managerProgramIdHex: config.bridgeProgramIdHex, transceiverProgramIdHex: config.transceiverProgramIdHex,
+    mintHex: config.mintHex, recipientHex: setupContext.recipientTokenAccountHex, nonceHex: config.depositNonceHex,
+    amountAtomic: config.amountAtomic, protocolId: config.protocolId, nativeNetwork: config.nativeNetwork,
+    policyEpoch: config.policyEpoch, keyEpoch: config.keyEpoch });
+  const depositPolicy = buildRegtestRecoverableDeposit({ nativeGenesisHex: nativeGenesisHash,
+    depositCommitmentHex: deriveRegtestDepositCommitment(depositIntentContext),
+    frostPublicKeyHex: frostCustody.aggregateTweakedXOnlyPublicKey,
+    userRecoveryPublicKeyHex: recoveryKeyInfo.pubkey.slice(2), csvDelayBlocks: config.recoveryDelayBlocks });
+  const depositAddress = taprootAddressFromXOnlyPublicKey(depositPolicy.outputPublicKeyHex, config.nativeBech32Hrp);
+  const depositScriptPubKeyHex = depositPolicy.scriptPubKeyHex;
+  const validateDepositIntent = () => validateRegtestRecoverableDepositIntent({ intent: depositIntentContext, policy: depositPolicy,
+    depositScriptPubKeyHex, reserveScriptPubKeyHex: custodyScriptPubKeyHex,
+    frostPublicKeyHex: frostCustody.aggregateTweakedXOnlyPublicKey, userRecoveryPublicKeyHex: recoveryKeyInfo.pubkey.slice(2),
+    csvDelayBlocks: config.recoveryDelayBlocks });
+  validateDepositIntent();
+  stages.push("LOCAL_E2E_CREATE_RECOVERABLE_DEPOSIT_INTENT");
   const miningAddress = requireNonEmptyText(
     await cli({
       step: "LOCAL_E2E_GET_USER_MINING_ADDRESS",
@@ -288,7 +394,8 @@ export async function executeNativeDepositObservationFlow({
     step: "LOCAL_E2E_MINE_USER_FUNDS",
     wallet: config.userWalletName,
     command: "generatetoaddress",
-    parameters: [String(config.coinbaseMaturityBlocks), miningAddress],
+    // The wallet exposes coinbase funds after maturity plus one block.
+    parameters: [String(config.coinbaseMaturityBlocks + 1), miningAddress],
   });
   const depositTxidHex = normalizeHash32(
     await cli({
@@ -310,14 +417,6 @@ export async function executeNativeDepositObservationFlow({
     command: "getblockchaininfo",
     parseJson: true,
   });
-  const nativeGenesisHash = normalizeHash32(
-    await cli({
-      step: "LOCAL_E2E_OBSERVE_NATIVE_GENESIS_HASH",
-      command: "getblockhash",
-      parameters: ["0"],
-    }),
-    "nativeGenesisHash",
-  );
   const nativeSource = validateLocalNativeSourceSnapshot({
     blockchainInfo,
     genesisHash: nativeGenesisHash,
@@ -334,7 +433,7 @@ export async function executeNativeDepositObservationFlow({
   const depositOutput = findDepositOutput({
     rawTransaction,
     depositAddress,
-    expectedScriptPubKeyHex: custodyScriptPubKeyHex,
+    expectedScriptPubKeyHex: depositScriptPubKeyHex,
     amountAtomic: config.amountAtomic,
     nativeDecimals: config.nativeDecimals,
   });
@@ -350,21 +449,24 @@ export async function executeNativeDepositObservationFlow({
     expectedConfirmations: config.depositFinalityBlocks,
     nativeDecimals: config.nativeDecimals,
   });
-  const proofFingerprintHex = localDepositProofFingerprintHex({
-    nativeSource,
-    depositTxidHex,
-    depositOutput,
-    depositUtxo,
-  });
-  const canonicalReserveAddress = depositAddress;
   stages.push("LOCAL_E2E_SELECT_FROST_CANONICAL_RESERVE");
   const feeFundingInputs = await prepareLocalReserveSweepFeeFundingInputs({
     cli,
     config,
     miningAddress,
-    feeFundingAddress: depositAddress,
+    feeFundingAddress: canonicalReserveAddress,
     expectedFeeFundingScriptPubKeyHex: custodyScriptPubKeyHex,
   });
+  const nativeVerifier = await nativeEvidenceVerifierFactory({ plan });
+  const evidenceInputs = Object.freeze([
+    Object.freeze({ txid: depositTxidHex, vout: depositOutput.vout, amountAtomic: config.amountAtomic,
+      scriptPubKeyHex: depositScriptPubKeyHex, minimumConfirmations: config.depositFinalityBlocks }),
+    ...feeFundingInputs.map((input) => Object.freeze({ txid: input.txidHex, vout: input.vout,
+      amountAtomic: input.amountAtomic, scriptPubKeyHex: input.scriptPubKeyHex, minimumConfirmations: 1 })),
+  ]);
+  const inputEvidence = await nativeVerifier.verifyInputs({ inputs: evidenceInputs, minimumConfirmations: config.depositFinalityBlocks });
+  const proofFingerprintHex = normalizeHash32(inputEvidence.digestHex, "inputEvidence.digestHex");
+  stages.push("LOCAL_E2E_VALIDATE_RAW_NATIVE_INPUT_EVIDENCE");
   const reserveSweepDraft = await draftLocalReserveSweep({
     cli,
     depositTxidHex,
@@ -376,18 +478,13 @@ export async function executeNativeDepositObservationFlow({
     feeFundingInputs,
     proofFingerprintHex,
   });
+  const spentOutputs = Object.freeze(evidenceInputs.map((input) => Object.freeze({
+    amountAtomic: input.amountAtomic, scriptPubKeyHex: input.scriptPubKeyHex })));
+  const tapscriptSpends = Object.freeze([depositPolicy.sweep, ...feeFundingInputs.map(() => undefined)]);
   const taprootSighashEvidences = createLocalTaprootSighashEvidences({
     unsignedNativeTransactionHex: reserveSweepDraft.unsignedNativeTransactionHex,
-    spentOutputs: [
-      {
-        amountAtomic: config.amountAtomic,
-        scriptPubKeyHex: custodyScriptPubKeyHex,
-      },
-      ...feeFundingInputs.map((input) => ({
-        amountAtomic: input.amountAtomic,
-        scriptPubKeyHex: input.scriptPubKeyHex,
-      })),
-    ],
+    spentOutputs,
+    tapscriptSpends,
     proofFingerprintHex,
     reserveAmountAtomic: config.amountAtomic,
     nativeMinerFeeAtomic: config.reserveMinerFeeAtomic,
@@ -395,15 +492,37 @@ export async function executeNativeDepositObservationFlow({
     expectedChangeScriptPubKeyHex: custodyScriptPubKeyHex,
   });
   stages.push("LOCAL_E2E_COMPUTE_VALIDATED_TAPROOT_SIGHASHES");
-  const operationIdHex = hashJson({
-    protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/LOCAL_RESERVE_SWEEP_OPERATION_ID/V1`,
-    nativeGenesisHash: nativeSource.nativeGenesisHash,
-    depositOutpoint: `${depositTxidHex}:${depositOutput.vout}`,
-    amountAtomic: config.amountAtomic,
-    proofFingerprintHex,
-    unsignedNativeTransactionFingerprintHex: reserveSweepDraft.unsignedNativeTransactionFingerprintHex,
-    reserveAmountAtomic: reserveSweepDraft.reserveAmountAtomic,
+  // The sweep is authorized before its finalized headers exist. Its identity
+  // is distinct from the later canonical mint claim bound to those headers.
+  const sweepOperationIdHex = deriveLocalnetDepositClaimOperationId({
+    flowConfig: config,
+    localSolanaSetupContext: setupContext,
+    nativeSource,
+    deposit: {
+      txidHex: depositTxidHex,
+      vout: depositOutput.vout,
+      amountAtomic: config.amountAtomic,
+      proofFingerprintHex,
+    },
+    reserveSweepDraft,
+    taprootSighashEvidences,
+    finalizedReserveSweep: predictedFinalizedReserveSweepForClaim({
+      reserveSweepDraft,
+      canonicalReserveScriptPubKeyHex: custodyScriptPubKeyHex,
+    }),
   });
+  if (protectedDepositPreparation !== undefined) {
+    if (typeof protectedDepositPreparation !== "function") throw new Error("ProtectedDepositPreparationCallbackRequired");
+    // TEST orchestration boundary: prepare a real user-funded regtest intent
+    // without creating ANY signature, broadcast, reserve credit or mint here.
+    // The separate protected Windows services must perform the remaining flow;
+    // this result is deliberately NOT called COMPLETED.
+    await protectedDepositPreparation({ plan, flowConfig: config, setupContext, nativeSource, depositIntentContext, depositPolicy,
+      inputs: evidenceInputs, inputEvidence, reserveSweepDraft, taprootSighashEvidences, spentOutputs, tapscriptSpends,
+      operationIdHex: sweepOperationIdHex, miningAddress, canonicalReserveAddress });
+    return Object.freeze({ state: "LOCAL_PROTECTED_DEPOSIT_PREPARED", signed: false, broadcast: false, minted: false,
+      productionReady: false, mainnetActivation: "DISABLED" });
+  }
   const signedReserveSweep = await reserveSweepSigner({
     plan,
     flowConfig: config,
@@ -421,7 +540,19 @@ export async function executeNativeDepositObservationFlow({
     },
     reserveSweepDraft,
     taprootSighashEvidences,
-    operationIdHex,
+    spentOutputs,
+    tapscriptSpends,
+    operationIdHex: sweepOperationIdHex,
+    nativeEvidenceValidator: async (intent) => {
+      validateDepositIntent();
+      return nativeVerifier.verifySweepSigning({
+        inputs: evidenceInputs, minimumConfirmations: config.depositFinalityBlocks,
+        acceptedCheckpoint: inputEvidence.acceptedCheckpoint,
+        unsignedTransactionHex: reserveSweepDraft.unsignedNativeTransactionHex,
+        reserveAmountAtomic: config.amountAtomic, feeAtomic: config.reserveMinerFeeAtomic,
+        reserveScriptHex: custodyScriptPubKeyHex, intent, tapscriptSpends,
+      });
+    },
   });
   stages.push("LOCAL_E2E_SIGN_RESERVE_SWEEP_WITH_FROST_A_B");
   stages.push("LOCAL_E2E_ATTACH_FROST_TAPROOT_WITNESSES");
@@ -433,114 +564,865 @@ export async function executeNativeDepositObservationFlow({
     reserveSweepDraft,
     canonicalReserveScriptPubKeyHex: custodyScriptPubKeyHex,
   });
-  stages.push("LOCAL_E2E_PREPARE_LOCALNET_SOLANA_SETUP");
-  const localnetSolanaSetup = await solanaSetup({
-    plan,
-    executor,
-    commandPaths,
-    flowConfig: config,
-    localSolanaSetupContext: setupContext,
-    nativeSource,
-    deposit: {
-      txidHex: depositTxidHex,
-      vout: depositOutput.vout,
-      amountAtomic: config.amountAtomic,
-      proofFingerprintHex,
-    },
-    finalizedReserveSweep,
-    operationIdHex,
-  });
-  stages.push("LOCAL_E2E_SUBMIT_AND_FINALIZE_LOCALNET_SOLANA_SETUP");
-  if (localnetSolanaSetup.state !== LOCALNET_SOLANA_SETUP_COMPLETED) {
-    return Object.freeze({
+  const reserveEvidenceInput = Object.freeze({ deposit: evidenceInputs[0], feeInputs: evidenceInputs.slice(1),
+    sweepTxid: finalizedReserveSweep.nativeSweepTxidHex, reserveVout: finalizedReserveSweep.reserveOutputVout,
+    reserveScriptHex: custodyScriptPubKeyHex, feeAtomic: config.reserveMinerFeeAtomic,
+    minimumConfirmations: config.depositFinalityBlocks, tapscriptSpends });
+  const reserveEvidence = await nativeVerifier.verifyReserve(reserveEvidenceInput);
+  validateDepositIntent();
+  const creditDeposit = Object.freeze({ txidHex: depositTxidHex, vout: depositOutput.vout,
+    amountAtomic: config.amountAtomic, proofFingerprintHex: normalizeHash32(reserveEvidence.digestHex, "reserveEvidence.digestHex") });
+  const creditMaterial = prepareLocalnetNativeToSolanaDepositClaimMaterial({ flowConfig: config, localSolanaSetupContext: setupContext,
+    nativeSource, deposit: creditDeposit, reserveSweepDraft, taprootSighashEvidences, finalizedReserveSweep,
+    signAttestations: false });
+  const operationIdHex = creditMaterial.operationIdHex;
+  const credit = Object.freeze({ encodedMessageHex: creditMaterial.request.encodedMessageHex,
+    reserveAllocationIdHex: creditMaterial.publicRequest.reserveAllocationIdHex });
+  stages.push("LOCAL_E2E_VALIDATE_RAW_NATIVE_RESERVE_EVIDENCE");
+  let creditLedger = openLocalnetDepositCreditLedger({ plan, flowConfig: config, credit, create: true });
+  try {
+    // A finalized reserve allocation is an owed credit BEFORE Solana setup,
+    // attestation or minting can fail. The journal is accounting, not evidence.
+    creditLedger.recordValidatedDeposit(credit);
+    reserveAccounting(creditLedger, reserveEvidence, operationIdHex);
+    stages.push("LOCAL_E2E_PERSIST_AUTHENTICATED_PENDING_CREDIT");
+    const pendingCheckpoint = creditLedger.checkpoint();
+    creditLedger.close();
+    creditLedger = openLocalnetDepositCreditLedger({ plan, flowConfig: config, credit, minimumCheckpoint: pendingCheckpoint });
+    stages.push("LOCAL_E2E_REOPEN_AUTHENTICATED_PENDING_CREDIT");
+    stages.push("LOCAL_E2E_PREPARE_LOCALNET_SOLANA_SETUP");
+    const localnetSolanaSetup = await solanaSetup({
+      plan,
+      executor,
+      commandPaths,
+      flowConfig: config,
+      localSolanaSetupContext: setupContext,
+      nativeSource,
+      deposit: {
+        txidHex: depositTxidHex,
+        vout: depositOutput.vout,
+        amountAtomic: config.amountAtomic,
+        proofFingerprintHex,
+      },
+      finalizedReserveSweep,
+      operationIdHex,
+      depositCredit: credit,
+      depositAccounting: localDepositAccountingReport(creditLedger),
+    });
+    stages.push("LOCAL_E2E_SUBMIT_AND_FINALIZE_LOCALNET_SOLANA_SETUP");
+    if (localnetSolanaSetup.state !== LOCALNET_SOLANA_SETUP_COMPLETED) {
+      return Object.freeze({
+        protocol: LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL,
+        state: LOCAL_NATIVE_TO_SOLANA_WAITING_FOR_DEPENDENCY,
+        reason: localnetSolanaSetup.reason,
+        completedStage: LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_FINALIZED,
+        productionReady: false,
+        mainnetActivation: "DISABLED",
+        noPerTransferKingPepeTeamApprovalState: true,
+        trustBoundary: RPC_OBSERVATION,
+        stages,
+        solanaSetup: localnetSolanaSetup,
+        depositAccounting: localDepositAccountingReport(creditLedger),
+        nextRequiredImplementation: Object.freeze([
+          "FINALIZE_LOCALNET_SOLANA_SETUP",
+          "SUBMIT_SOLANA_DEPOSIT_CLAIM",
+          "OBSERVE_FINALIZED_SOLANA_MINT",
+          "RECONCILE_RESERVE_SUPPLY_AND_LIABILITIES",
+        ]),
+      });
+    }
+
+    const attesterEvidence = {};
+    const depositClaimRequest = await prepareLocalnetNativeToSolanaDepositClaimRequest({
+      flowConfig: config,
+      localSolanaSetupContext: setupContext,
+      nativeSource,
+      deposit: creditDeposit,
+      reserveSweepDraft,
+      signedReserveSweep,
+      taprootSighashEvidences,
+      finalizedReserveSweep,
+      operationIdHex,
+      nativeEvidenceValidator: async (role) => {
+        validateDepositIntent();
+        const result = await nativeVerifier.verifyReserve({ ...reserveEvidenceInput, acceptedCheckpoint: reserveEvidence.acceptedCheckpoint });
+        attesterEvidence[role] = result;
+        return result;
+      },
+    });
+    if (depositClaimRequest.request.encodedMessageHex !== credit.encodedMessageHex ||
+        depositClaimRequest.publicRequest.reserveAllocationIdHex !== credit.reserveAllocationIdHex) {
+      creditLedger.hardStop("DEPOSIT_CREDIT_MESSAGE_CHANGED");
+      throw new Error("LocalDepositCreditMessageChanged");
+    }
+    stages.push("LOCAL_E2E_PREPARE_SOLANA_DEPOSIT_CLAIM");
+    const solanaDepositClaimResult = await solanaDepositClaim({
+      plan,
+      executor,
+      commandPaths,
+      flowConfig: config,
+      localSolanaSetupContext: setupContext,
+      nativeSource,
+      deposit: {
+        txidHex: depositTxidHex,
+        vout: depositOutput.vout,
+        amountAtomic: config.amountAtomic,
+        proofFingerprintHex,
+      },
+      reserveSweepDraft,
+      signedReserveSweep,
+      taprootSighashEvidences,
+      depositPolicy,
+      depositIntentContext,
+      finalizedReserveSweep,
+      localnetSolanaSetup,
+      depositClaimRequest,
+      operationIdHex,
+    });
+    stages.push("LOCAL_E2E_SUBMIT_SOLANA_DEPOSIT_CLAIM");
+
+    const baseFlow = Object.freeze({
       protocol: LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL,
-      state: LOCAL_NATIVE_TO_SOLANA_WAITING_FOR_DEPENDENCY,
-      reason: localnetSolanaSetup.reason,
-      completedStage: LOCAL_NATIVE_TO_SOLANA_RESERVE_SWEEP_FINALIZED,
       productionReady: false,
       mainnetActivation: "DISABLED",
       noPerTransferKingPepeTeamApprovalState: true,
       trustBoundary: RPC_OBSERVATION,
       stages,
       solanaSetup: localnetSolanaSetup,
-      nextRequiredImplementation: Object.freeze([
-        "FINALIZE_LOCALNET_SOLANA_SETUP",
-        "SUBMIT_SOLANA_DEPOSIT_CLAIM",
-        "OBSERVE_FINALIZED_SOLANA_MINT",
-        "RECONCILE_RESERVE_SUPPLY_AND_LIABILITIES",
-      ]),
+      depositClaim: depositClaimRequest.publicRequest,
+      solanaDepositClaim: solanaDepositClaimResult,
+      nativeRawEvidence: Object.freeze({ inputEvidence, reserveEvidence,
+        signers: signedReserveSweep.nativeRawEvidence, attesters: Object.freeze(attesterEvidence) }),
+      frostCustody: Object.freeze({
+        protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/LOCAL_FROST_TAPROOT_CUSTODY/V1`,
+        state: "READY",
+        localOnly: true,
+        signerIds: frostCustody.signerIds,
+        keyEpoch: frostCustody.keyEpoch,
+        aggregateTweakedXOnlyPublicKey: frostCustody.aggregateTweakedXOnlyPublicKey,
+        taprootScriptPubKeyHex: custodyScriptPubKeyHex,
+        depositAddress,
+        feeFundingAddress: canonicalReserveAddress,
+        canonicalReserveAddress,
+      }),
+      nativeSource,
+      stateRoot: config.stateRoot,
+      depositIntent: Object.freeze({
+        address: depositAddress,
+        scriptPubKeyHex: depositScriptPubKeyHex,
+        custody: "LOCAL_RECOVERABLE_TAPSCRIPT_TO_FROST_RESERVE",
+        recoverable: true,
+        recoveryAvailableAfterSweep: false,
+        policy: depositPolicy,
+        context: depositIntentContext,
+      }),
+      deposit: Object.freeze({
+        txidHex: depositTxidHex,
+        vout: depositOutput.vout,
+        amountAtomic: config.amountAtomic,
+        scriptPubKeyHex: depositOutput.scriptPubKeyHex,
+        finalityBlocks: config.depositFinalityBlocks,
+        finalitySatisfied: depositUtxo.finalitySatisfied,
+        utxoUnspent: true,
+        nativeNetwork: nativeSource.nativeNetwork,
+        nativeGenesisHash: nativeSource.nativeGenesisHash,
+        sourceBestBlockHash: nativeSource.bestBlockHash,
+        sourceBestHeight: nativeSource.bestHeight,
+        proofFingerprintHex,
+      }),
+      reserveSweep: Object.freeze({
+        ...reserveSweepDraft,
+        state: finalizedReserveSweep.state,
+        operationIdHex: sweepOperationIdHex,
+        signed: true,
+        broadcast: true,
+        finalitySatisfied: true,
+        signedNativeTransactionHex: signedReserveSweep.signedNativeTransactionHex,
+        signedNativeTransactionFingerprintHex: signedReserveSweep.signedNativeTransactionFingerprintHex,
+        nativeSweepTxidHex: signedReserveSweep.nativeSweepTxidHex,
+        nativeSweepWtxidHex: signedReserveSweep.nativeSweepWtxidHex,
+        broadcastTxidHex: finalizedReserveSweep.nativeSweepTxidHex,
+        finalizedReserveSweep,
+        frostSignatureState: signedReserveSweep.state,
+        signingIntents: signedReserveSweep.signingIntents,
+        frostResults: signedReserveSweep.frostResults,
+        witnessInputCount: signedReserveSweep.witnessInputCount,
+        taprootSighashEvidences,
+      }),
     });
-  }
 
+    if (solanaDepositClaimResult.state !== DEPOSIT_STATES.COMPLETED) {
+      if (solanaDepositClaimResult.state === DEPOSIT_STATES.HARD_STOP) creditLedger.hardStop("SOLANA_CLAIM_INTEGRITY_HARD_STOP");
+      return Object.freeze({
+        ...baseFlow,
+        state: solanaDepositClaimResult.state === DEPOSIT_STATES.HARD_STOP ? DEPOSIT_STATES.HARD_STOP : LOCAL_NATIVE_TO_SOLANA_WAITING_FOR_DEPENDENCY,
+        reason: solanaDepositClaimResult.reason,
+        completedStage: LOCAL_NATIVE_TO_SOLANA_SOLANA_SETUP_FINALIZED,
+        depositAccounting: localDepositAccountingReport(creditLedger),
+        nextRequiredImplementation: Object.freeze([
+          "FINALIZE_SOLANA_DEPOSIT_CLAIM",
+          "OBSERVE_FINALIZED_SOLANA_MINT",
+          "RECONCILE_RESERVE_SUPPLY_AND_LIABILITIES",
+        ]),
+      });
+    }
+
+    stages.push("LOCAL_E2E_OBSERVE_FINALIZED_SOLANA_MINT");
+    let reconciliation;
+    try {
+      reconciliation = reconcileLocalNativeToSolana({
+        flowConfig: config,
+        deposit: baseFlow.deposit,
+        finalizedReserveSweep,
+        solanaDepositClaim: solanaDepositClaimResult,
+        depositClaimRequest,
+      });
+    } catch (error) {
+      creditLedger.hardStop("SOLANA_MINT_RECONCILIATION_FAILED");
+      throw error;
+    }
+    creditLedger.recordMint({ ...credit, mintedAmountAtomic: solanaDepositClaimResult.mintedAmountAtomic });
+    const accounting = creditLedger.snapshot();
+    if (accounting.canonicalReserve !== reconciliation.canonicalReserve || accounting.mintedSupply !== reconciliation.mintedSupply ||
+        accounting.authorizedUnmintedCredits !== "0") {
+      creditLedger.hardStop("DEPOSIT_ACCOUNTING_CONTRADICTION");
+      throw new Error("LocalDepositAccountingContradiction");
+    }
+    stages.push("LOCAL_E2E_PERSIST_AUTHENTICATED_MINT_SETTLEMENT");
+    const settledCheckpoint = creditLedger.checkpoint();
+    creditLedger.close();
+    creditLedger = openLocalnetDepositCreditLedger({ plan, flowConfig: config, credit, minimumCheckpoint: settledCheckpoint });
+    stages.push("LOCAL_E2E_REOPEN_AUTHENTICATED_MINT_SETTLEMENT");
+    stages.push("LOCAL_E2E_RECONCILE_RESERVE_SUPPLY_AND_LIABILITIES");
+
+    return Object.freeze({
+      ...baseFlow,
+      state: LOCAL_NATIVE_TO_SOLANA_COMPLETED,
+      reason: "ALL_REQUIRED_CHECKS_PASSED",
+      completedStage: LOCAL_NATIVE_TO_SOLANA_RECONCILED,
+      reconciliation,
+      depositAccounting: localDepositAccountingReport(creditLedger),
+      nextRequiredImplementation: Object.freeze([]),
+    });
+  } finally {
+    creditLedger.close();
+  }
+}
+
+// Explicit disposable-local creation or reopen. Never called by a production
+// service: no automatic missing-key replacement, migration or plaintext fallback.
+export function openLocalnetDepositCreditLedger({ plan, flowConfig, credit, create = false, minimumCheckpoint }) {
+  if (typeof create !== "boolean" || flowConfig?.protocol !== LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL ||
+      flowConfig.nativeChainName !== "regtest") throw new Error("LocalDepositCreditRegtestRequired");
+  const message = decodeCanonicalBridgeMessage(credit?.encodedMessageHex);
+  if (message.action !== "DepositClaim" || message.direction !== "NativeToSolana" ||
+      message.deployment.protocolId !== flowConfig.protocolId || message.deployment.nativeNetwork !== flowConfig.nativeNetwork ||
+      bytesToHex(message.deployment.nativeGenesis) !== REGTEST_GENESIS ||
+      bytesToHex(message.deployment.mint) !== flowConfig.mintHex ||
+      bytesToHex(message.deployment.solanaDeployment) !== flowConfig.solanaDeploymentHex ||
+      bytesToHex(message.deployment.managerProgramId) !== flowConfig.bridgeProgramIdHex ||
+      bytesToHex(message.deployment.transceiverProgramId) !== flowConfig.transceiverProgramIdHex) {
+    throw new Error("LocalDepositCreditDeploymentRejected");
+  }
+  const root = validateRuntimeStateRoot(flowConfig.stateRoot, plan.repoRoot, "Local deposit accounting root");
+  const authenticationRoot = validateRuntimeStateRoot(path.join(root, "credit-authentication"), plan.repoRoot);
+  if (create) mkdirSync(authenticationRoot, { recursive: true, mode: 0o700 });
+  const keyFile = validateRuntimeFile(path.join(authenticationRoot, "local-test-key.bin"), plan.repoRoot);
+  let authenticationKey;
+  try {
+    if (create) {
+      authenticationKey = randomBytes(32);
+      writeFileSync(keyFile, authenticationKey, { flag: "wx", mode: 0o600, flush: true });
+    } else {
+      if (lstatSync(keyFile).size !== 32) throw new Error("LocalDepositCreditKeyRejected");
+      authenticationKey = readFileSync(keyFile);
+    }
+    const options = { environment: "localnet", root: path.join(root, "deposit-accounting"), repoRoot: plan.repoRoot,
+      deploymentHex: credit.encodedMessageHex.slice(24, 360), journalIdHex: message.operationIdHex,
+      authenticationKey, minimumCheckpoint };
+    return create ? AuthenticatedLocalDepositLedger.createLocal(options) : AuthenticatedLocalDepositLedger.openLocal(options);
+  } catch (error) {
+    if (/^(?:LocalDepositCredit|LocalLedger)[A-Za-z]+$/u.test(error.message)) throw error;
+    throw new Error("LocalDepositCreditStorageRejected");
+  } finally {
+    authenticationKey?.fill(0);
+  }
+}
+
+function localDepositAccountingReport(ledger) {
+  return Object.freeze({ scope: "AUTHENTICATED_LOCAL_SINGLE_DEPOSIT_ACCOUNTING", ...ledger.status(),
+    snapshot: ledger.snapshot(), checkpoint: ledger.checkpoint(),
+    fullServiceRestart: "NOT_IMPLEMENTED", completeRollbackDetection: "NOT_PROVEN" });
+}
+
+export function deriveLocalnetDepositClaimOperationId(options) {
+  const material = prepareLocalnetNativeToSolanaDepositClaimMaterial({
+    ...requireObject(options, "options"),
+    operationIdHex: ZERO_HASH,
+    signAttestations: false,
+  });
+  return material.operationIdHex;
+}
+
+export function prepareLocalnetNativeToSolanaDepositClaimRequest(options) {
+  return prepareLocalnetNativeToSolanaDepositClaimMaterial({
+    ...requireObject(options, "options"),
+    signAttestations: true,
+  });
+}
+
+export async function submitLocalnetSolanaDepositClaim({
+  plan,
+  flowConfig,
+  localSolanaSetupContext,
+  depositClaimRequest,
+  rpcClient,
+  claimObserver,
+  journal,
+  claimSubmitter,
+}) {
+  const config = requireObject(flowConfig, "flowConfig");
+  const setupContext = validateLocalSolanaSetupContext(localSolanaSetupContext, config);
+  const material = requireObject(depositClaimRequest, "depositClaimRequest");
+  const request = requireObject(material.request ?? material, "depositClaimRequest.request");
+  const rpc =
+    rpcClient ??
+    new SolanaLocalRpcClient({
+      endpoint: `http://127.0.0.1:${requireObject(plan, "plan").ports.solanaRpcPort}`,
+    });
+  const observer =
+    claimObserver ??
+    new SolanaDepositClaimObserver({
+      config: {
+        environment: "localnet",
+        cluster: "localnet",
+        managerProgramIdHex: config.bridgeProgramIdHex,
+        transceiverProgramIdHex: config.transceiverProgramIdHex,
+        mintHex: config.mintHex,
+        nativeDecimals: config.nativeDecimals,
+      },
+      endpoint: `http://127.0.0.1:${requireObject(plan, "plan").ports.solanaRpcPort}`,
+    });
+  const bridge = new LocalnetSolanaDepositClaimBridge({
+    config: {
+      environment: "localnet",
+      cluster: "localnet",
+      solanaDeploymentHex: config.solanaDeploymentHex,
+      managerProgramIdHex: config.bridgeProgramIdHex,
+      transceiverProgramIdHex: config.transceiverProgramIdHex,
+      mintHex: config.mintHex,
+      tokenProgramIdHex: normalizeSolanaProgramIdHex(SPL_TOKEN_PROGRAM_ID_BASE58, "splTokenProgramId"),
+      feePayerBase58: setupContext.feePayerBase58,
+      feePayerHex: setupContext.feePayerHex,
+      policyEpoch: config.policyEpoch,
+      keyEpoch: config.keyEpoch,
+      // This isolated harness trusts its own disposable validator RPC. It is
+      // explicitly RPC observation, not a production chain-verification source.
+      acceptedObservationTrust: ["RPC_OBSERVATION"],
+      maxRetries: config.solanaMaxRetries,
+    },
+    feePayerSigner: setupContext.feePayerSigner,
+    rpcClient: rpc,
+    claimObserver: observer,
+    submitter: claimSubmitter,
+    journal: journal ?? new FileBackedSolanaDepositClaimJournal({ root: path.join(config.stateRoot, "solana-claim-journal"), repoRoot: plan.repoRoot }),
+    receiptJournal: new FileBackedSolanaDepositClaimJournal({ root: path.join(config.stateRoot, "solana-receipt-journal"), repoRoot: plan.repoRoot }),
+  });
+  return bridge.submitDepositClaim(request);
+}
+
+function prepareLocalnetNativeToSolanaDepositClaimMaterial({
+  flowConfig,
+  localSolanaSetupContext,
+  nativeSource,
+  deposit,
+  reserveSweepDraft,
+  signedReserveSweep,
+  taprootSighashEvidences,
+  finalizedReserveSweep,
+  operationIdHex,
+  signAttestations,
+  nativeEvidenceValidator,
+}) {
+  const config = requireObject(flowConfig, "flowConfig");
+  const setupContext = validateLocalSolanaSetupContext(localSolanaSetupContext, config);
+  const source = requireObject(nativeSource, "nativeSource");
+  const normalizedDeposit = normalizeLocalDepositClaimDeposit(deposit);
+  const draft = requireObject(reserveSweepDraft, "reserveSweepDraft");
+  const finalized = normalizeClaimFinalizedReserveSweep(finalizedReserveSweep);
+  const evidences = requireNonEmptyArray(taprootSighashEvidences, "taprootSighashEvidences");
+  const requestedOperationId =
+    operationIdHex === undefined ? ZERO_HASH : normalizeHash32(operationIdHex, "operationIdHex");
+  const pipelineConfig = localnetDepositClaimPipelineConfig({
+    flowConfig: config,
+    setupContext,
+    nativeSource: source,
+  });
+  const initialOperation = buildLocalnetDepositClaimOperation({
+    flowConfig: config,
+    nativeSource: source,
+    deposit: normalizedDeposit,
+    reserveSweepDraft: draft,
+    signedReserveSweep,
+    taprootSighashEvidences: evidences,
+    finalizedReserveSweep: finalized,
+    operationIdHex: requestedOperationId,
+    solanaRecipientHex: setupContext.recipientTokenAccountHex,
+  });
+  const initialMessage = buildDepositClaimMessage(pipelineConfig, initialOperation);
+  const canonicalOperationId = initialMessage.decodedMessage.operationIdHex;
+  if (requestedOperationId !== ZERO_HASH && requestedOperationId !== canonicalOperationId) {
+    throw new Error("LocalNativeToSolanaDepositClaimOperationIdMismatch");
+  }
+  const operation = buildLocalnetDepositClaimOperation({
+    flowConfig: config,
+    nativeSource: source,
+    deposit: normalizedDeposit,
+    reserveSweepDraft: draft,
+    signedReserveSweep,
+    taprootSighashEvidences: evidences,
+    finalizedReserveSweep: finalized,
+    operationIdHex: canonicalOperationId,
+    solanaRecipientHex: setupContext.recipientTokenAccountHex,
+  });
+  const { encodedMessageHex, decodedMessage, evidenceDigestHex } =
+    buildDepositClaimMessage(pipelineConfig, operation);
+  if (decodedMessage.operationIdHex !== canonicalOperationId) {
+    throw new Error("LocalNativeToSolanaDepositClaimDerivedIdChanged");
+  }
+  const evidence = localnetDepositAttestationEvidence({
+    flowConfig: config,
+    nativeSource: source,
+    deposit: normalizedDeposit,
+    decodedMessage,
+    finalizedReserveSweep: finalized,
+    reserveAllocationIdHex: operation.reserveSweep.reserveAllocationIdHex,
+    evidenceDigestHex,
+  });
+  const attestationInputs = [["ATTESTER_A", setupContext.attesterASigner], ["ATTESTER_B", setupContext.attesterBSigner]]
+    .map(([role, signer]) => ({ role, signer, policy: localnetAttesterPolicy({ role, signer, pipelineConfig }),
+      encodedMessageHex, messageDigestHex: decodedMessage.messageDigestHex, evidence, nowUnix: config.attestationNowUnix }));
+  const finish = (attestations) => {
+    const combinedAttestation = signAttestations
+      ? combineProjectAttestations({ attestations, encodedMessageHex, authorizedAttesterPublicKeys: setupContext.attesterPublicKeysHex })
+      : undefined;
+    return Object.freeze({
+      protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/LOCALNET_DEPOSIT_CLAIM_REQUEST/V1`,
+      state: ATTESTATION_VERIFIED_READY,
+      productionReady: false,
+      mainnetActivation: "DISABLED",
+      operationIdHex: canonicalOperationId,
+      messageDigestHex: decodedMessage.messageDigestHex,
+      evidenceDigestHex,
+      request: Object.freeze({
+        operationIdHex: canonicalOperationId,
+        encodedMessageHex,
+        messageDigestHex: decodedMessage.messageDigestHex,
+        amountAtomic: decodedMessage.amountAtomic.toString(),
+        solanaRecipientHex: decodedMessage.destinationHex,
+        attestations,
+        combinedAttestation,
+        maxRetries: config.solanaMaxRetries,
+      }),
+      publicRequest: Object.freeze({
+        protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/PUBLIC_LOCALNET_DEPOSIT_CLAIM_REQUEST/V1`,
+        state: ATTESTATION_VERIFIED_READY,
+        operationIdHex: canonicalOperationId,
+        messageDigestHex: decodedMessage.messageDigestHex,
+        evidenceDigestHex,
+        amountAtomic: decodedMessage.amountAtomic.toString(),
+        solanaRecipientHex: decodedMessage.destinationHex,
+        encodedMessageFingerprintHex: sha256Hex(Buffer.from(encodedMessageHex, "hex")),
+        attestationMode: combinedAttestation?.mode ?? "NOT_SIGNED",
+        threshold: combinedAttestation?.threshold ?? 0,
+        attesterPublicKeysHex: Object.freeze([...setupContext.attesterPublicKeysHex]),
+        validFrom: decodedMessage.validFrom.toString(),
+        validUntil: decodedMessage.validUntil.toString(),
+        sourceTrust: evidence.trust,
+        reserveAllocationIdHex: evidence.reserveAllocationIdHex,
+      }),
+    });
+  };
+  if (signAttestations) {
+    if (typeof nativeEvidenceValidator !== "function") throw new Error("NativeAttestationVerifierRequired");
+    // Each role fetches and verifies raw evidence again before using its own
+    // distinct Ed25519 key. Common-host/source trust is not independence of hosts.
+    return Promise.all(attestationInputs.map(async (input) => {
+      const verified = await nativeEvidenceValidator(input.role);
+      if (verified?.digestHex !== normalizedDeposit.proofFingerprintHex) throw new Error("NativeAttestationEvidenceChanged");
+      return signLocalProjectDepositAttestation(input);
+    })).then((attestations) => finish(Object.freeze(attestations)));
+  }
+  // Pure message derivation does not sign or claim raw verification.
+  return finish(Object.freeze([]));
+}
+
+function localnetDepositClaimPipelineConfig({ flowConfig, setupContext, nativeSource }) {
+  const config = requireObject(flowConfig, "flowConfig");
+  const source = requireObject(nativeSource, "nativeSource");
   return Object.freeze({
-    protocol: LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL,
-    state: LOCAL_NATIVE_TO_SOLANA_WAITING_FOR_DEPENDENCY,
-    reason: "SOLANA_DEPOSIT_CLAIM_PENDING",
-    completedStage: LOCAL_NATIVE_TO_SOLANA_SOLANA_SETUP_FINALIZED,
-    productionReady: false,
-    mainnetActivation: "DISABLED",
-    noPerTransferKingPepeTeamApprovalState: true,
-    trustBoundary: RPC_OBSERVATION,
-    stages,
-    solanaSetup: localnetSolanaSetup,
-    frostCustody: Object.freeze({
-      protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/LOCAL_FROST_TAPROOT_CUSTODY/V1`,
-      state: "READY",
-      localOnly: true,
-      signerIds: frostCustody.signerIds,
-      keyEpoch: frostCustody.keyEpoch,
-      aggregateTweakedXOnlyPublicKey: frostCustody.aggregateTweakedXOnlyPublicKey,
-      taprootScriptPubKeyHex: custodyScriptPubKeyHex,
-      depositAddress,
-      feeFundingAddress: depositAddress,
-      canonicalReserveAddress,
+    deployment: Object.freeze({
+      protocolId: config.protocolId,
+      nativeNetwork: config.nativeNetwork,
+      nativeGenesis: normalizeHash32(source.nativeGenesisHash, "nativeSource.nativeGenesisHash"),
+      solanaDeployment: config.solanaDeploymentHex,
+      managerProgramId: config.bridgeProgramIdHex,
+      transceiverProgramId: config.transceiverProgramIdHex,
+      mint: config.mintHex,
     }),
-    nativeSource,
-    stateRoot: config.stateRoot,
-    depositIntent: Object.freeze({
-      address: depositAddress,
-      scriptPubKeyHex: custodyScriptPubKeyHex,
-      custody: "LOCAL_EPHEMERAL_FROST_TAPROOT",
-      recoverable: false,
+    policyEpoch: config.policyEpoch,
+    keyEpoch: config.keyEpoch,
+    acceptedNativeTrust: [RPC_OBSERVATION],
+    authorizedAttesterPublicKeys: Object.freeze([...setupContext.attesterPublicKeysHex]),
+    depositsPaused: false,
+    hardStop: false,
+  });
+}
+
+function buildLocalnetDepositClaimOperation({
+  flowConfig,
+  nativeSource,
+  deposit,
+  reserveSweepDraft,
+  signedReserveSweep,
+  taprootSighashEvidences,
+  finalizedReserveSweep,
+  operationIdHex,
+  solanaRecipientHex,
+}) {
+  const config = requireObject(flowConfig, "flowConfig");
+  const source = requireObject(nativeSource, "nativeSource");
+  const normalizedDeposit = normalizeLocalDepositClaimDeposit(deposit);
+  const draft = requireObject(reserveSweepDraft, "reserveSweepDraft");
+  const finalized = normalizeClaimFinalizedReserveSweep(finalizedReserveSweep);
+  const allSighashDigestHex = aggregateTaprootSighashDigestHex(taprootSighashEvidences);
+  const reserveAllocationIdHex = localReserveAllocationIdHex({
+    flowConfig: config,
+    deposit: normalizedDeposit,
+    reserveSweepDraft: draft,
+    finalizedReserveSweep: finalized,
+    solanaRecipientHex,
+  });
+  return Object.freeze({
+    messageNonceHex: bridgeInputDigest("LocalClaimNonce", {
+      protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/LOCAL_DEPOSIT_CLAIM_NONCE/V1`,
+      depositOutpoint: `${normalizedDeposit.txidHex}:${normalizedDeposit.vout}`,
+      reserveAllocationIdHex,
+      solanaRecipientHex,
+      mintHex: config.mintHex,
     }),
+    validFrom: config.depositClaimValidFrom,
+    validUntil: config.depositClaimValidUntil,
     deposit: Object.freeze({
-      txidHex: depositTxidHex,
-      vout: depositOutput.vout,
-      amountAtomic: config.amountAtomic,
-      scriptPubKeyHex: depositOutput.scriptPubKeyHex,
-      finalityBlocks: config.depositFinalityBlocks,
-      finalitySatisfied: depositUtxo.finalitySatisfied,
-      utxoUnspent: true,
-      nativeNetwork: nativeSource.nativeNetwork,
-      nativeGenesisHash: nativeSource.nativeGenesisHash,
-      sourceBestBlockHash: nativeSource.bestBlockHash,
-      sourceBestHeight: nativeSource.bestHeight,
-      proofFingerprintHex,
+      trust: RPC_OBSERVATION,
+      nativeNetwork: config.nativeNetwork,
+      nativeGenesisHash: normalizeHash32(source.nativeGenesisHash, "nativeSource.nativeGenesisHash"),
+      depositOutpoint: Object.freeze({
+        txid: normalizedDeposit.txidHex,
+        vout: normalizedDeposit.vout,
+      }),
+      amountAtomic: normalizedDeposit.amountAtomic,
+      projectBridgeFeeAtomic: "0",
+      solanaRecipientHex: normalizeHash32(solanaRecipientHex, "solanaRecipientHex"),
+      proofFingerprint: normalizedDeposit.proofFingerprintHex,
+      finalitySatisfied: true,
+      utxoUnspentAtDeposit: true,
+      noPriorConsumption: true,
     }),
     reserveSweep: Object.freeze({
-      ...reserveSweepDraft,
-      state: finalizedReserveSweep.state,
-      operationIdHex,
-      signed: true,
-      broadcast: true,
-      finalitySatisfied: true,
-      signedNativeTransactionHex: signedReserveSweep.signedNativeTransactionHex,
-      signedNativeTransactionFingerprintHex: signedReserveSweep.signedNativeTransactionFingerprintHex,
-      nativeSweepTxidHex: signedReserveSweep.nativeSweepTxidHex,
-      nativeSweepWtxidHex: signedReserveSweep.nativeSweepWtxidHex,
-      broadcastTxidHex: finalizedReserveSweep.nativeSweepTxidHex,
-      finalizedReserveSweep,
-      frostSignatureState: signedReserveSweep.state,
-      signingIntents: signedReserveSweep.signingIntents,
-      frostResults: signedReserveSweep.frostResults,
-      witnessInputCount: signedReserveSweep.witnessInputCount,
-      taprootSighashEvidences,
+      reserveAllocationIdHex,
+      nativeSweepTxidHex: finalized.nativeSweepTxidHex,
+      nativeMinerFeeAtomic: config.reserveMinerFeeAtomic,
+      canonicalReserveScriptPubKeyHex: finalized.canonicalReserveScriptPubKeyHex,
+      signedNativeTransactionHex:
+        signedReserveSweep?.signedNativeTransactionHex === undefined
+          ? undefined
+          : normalizeRawTransactionHex(signedReserveSweep.signedNativeTransactionHex, "signedReserveSweep.signedNativeTransactionHex"),
+      signingIntent: Object.freeze({
+        purpose: "RESERVE_SWEEP",
+        operationId: normalizeHash32(operationIdHex, "operationIdHex"),
+
+        proofFingerprint: normalizedDeposit.proofFingerprintHex,
+        unsignedNativeTransactionId: normalizeHash32(draft.unsignedNativeTransactionId, "reserveSweepDraft.unsignedNativeTransactionId"),
+        transactionCommitment: bridgeInputDigest("LocalSweepSummary", {
+          protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/LOCAL_RESERVE_SWEEP_TRANSACTION_COMMITMENT/V1`,
+          unsignedNativeTransactionFingerprintHex: normalizeHash32(
+            draft.unsignedNativeTransactionFingerprintHex,
+            "reserveSweepDraft.unsignedNativeTransactionFingerprintHex",
+          ),
+          nativeSweepTxidHex: finalized.nativeSweepTxidHex,
+          inputOutpoints: finalized.inputOutpoints,
+          reserveAmountAtomic: finalized.reserveAmountAtomic,
+          canonicalReserveScriptPubKeyHex: finalized.canonicalReserveScriptPubKeyHex,
+          nativeMinerFeeAtomic: config.reserveMinerFeeAtomic,
+          allSighashDigestHex,
+        }),
+        signingInputIndex: 0,
+        taprootSighashHex: allSighashDigestHex,
+        recipientScriptPubKeyHex: finalized.canonicalReserveScriptPubKeyHex,
+        amountAtomic: normalizedDeposit.amountAtomic,
+        feeAtomic: config.reserveMinerFeeAtomic,
+        changeScriptPubKeyHex: finalized.canonicalReserveScriptPubKeyHex,
+        changeAtomic: "0",
+        inputOutpoints: Object.freeze([...finalized.inputOutpoints]),
+        outputCommitments: Object.freeze([
+          bridgeInputDigest("LocalReserveOutput", {
+            protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/LOCAL_RESERVE_OUTPUT_COMMITMENT/V1`,
+            nativeSweepTxidHex: finalized.nativeSweepTxidHex,
+            vout: finalized.reserveOutputVout,
+            amountAtomic: finalized.reserveAmountAtomic,
+            scriptPubKeyHex: finalized.canonicalReserveScriptPubKeyHex,
+          }),
+        ]),
+        reserveCommitment: reserveAllocationIdHex,
+      }),
     }),
-    nextRequiredImplementation: Object.freeze([
-      "SUBMIT_SOLANA_DEPOSIT_CLAIM",
-      "OBSERVE_FINALIZED_SOLANA_MINT",
-      "RECONCILE_RESERVE_SUPPLY_AND_LIABILITIES",
+  });
+}
+
+function localnetDepositAttestationEvidence({
+  flowConfig,
+  nativeSource,
+  deposit,
+  decodedMessage,
+  finalizedReserveSweep,
+  reserveAllocationIdHex,
+  evidenceDigestHex,
+}) {
+  const config = requireObject(flowConfig, "flowConfig");
+  const source = requireObject(nativeSource, "nativeSource");
+  const normalizedDeposit = normalizeLocalDepositClaimDeposit(deposit);
+  const finalized = normalizeClaimFinalizedReserveSweep(finalizedReserveSweep);
+  return Object.freeze({
+    trust: RPC_OBSERVATION,
+    nativeNetwork: config.nativeNetwork,
+    nativeGenesisHash: normalizeHash32(source.nativeGenesisHash, "nativeSource.nativeGenesisHash"),
+    operationIdHex: decodedMessage.operationIdHex,
+    depositOutpoint: `${normalizedDeposit.txidHex}:${normalizedDeposit.vout}`,
+    amountAtomic: normalizedDeposit.amountAtomic,
+    solanaRecipientHex: decodedMessage.destinationHex,
+    evidenceDigestHex,
+    reserveAllocationIdHex,
+    reserveTransitionState: finalized.reserveTransitionState,
+    mintCreditState: finalized.mintCreditState,
+    finalitySatisfied: finalized.finalitySatisfied,
+    sweepFinalized: true,
+    utxoUnspentAtDeposit: true,
+    noPriorConsumption: true,
+  });
+}
+
+function localnetAttesterPolicy({ role, signer, pipelineConfig }) {
+  const config = requireObject(pipelineConfig, "pipelineConfig");
+  return Object.freeze({
+    role,
+    attesterPublicKeyHex: normalizeHash32(signer.publicKeyHex, `${role}.publicKeyHex`),
+    protocolId: config.deployment.protocolId,
+    nativeNetwork: config.deployment.nativeNetwork,
+    nativeGenesisHex: config.deployment.nativeGenesis,
+    solanaDeploymentHex: config.deployment.solanaDeployment,
+    managerProgramIdHex: config.deployment.managerProgramId,
+    transceiverProgramIdHex: config.deployment.transceiverProgramId,
+    mintHex: config.deployment.mint,
+    policyEpoch: config.policyEpoch,
+    keyEpoch: config.keyEpoch,
+    acceptedNativeTrust: [RPC_OBSERVATION],
+    depositsPaused: false,
+    hardStop: false,
+  });
+}
+
+function signLocalProjectDepositAttestation({
+  role,
+  signer,
+  policy,
+  encodedMessageHex,
+  messageDigestHex,
+  evidence,
+  nowUnix,
+}) {
+  const decoded = decodeCanonicalBridgeMessage(hexToBytes(encodedMessageHex, "encodedMessageHex"));
+  const decision = evaluateDepositCredit({
+    policy,
+    request: {
+      encodedMessageHex,
+      messageDigestHex,
+      evidence,
+    },
+    decoded,
+    nowUnix,
+  });
+  if (decision.state !== ATTESTATION_VERIFIED_READY) {
+    const error = new Error(`LocalDepositClaimAttestationNotAuthorized:${decision.reason}`);
+    error.decision = decision;
+    throw error;
+  }
+  const signature = signer.sign(decoded.encoded);
+  const publicKey = Buffer.from(normalizeHash32(signer.publicKeyHex, `${role}.publicKeyHex`), "hex");
+  if (!ed25519.verify(signature, decoded.encoded, publicKey)) {
+    throw new Error("LocalDepositClaimAttestationSignatureVerificationFailed");
+  }
+  return Object.freeze({
+    protocol: ATTESTATION_PROTOCOL,
+    mode: ATTESTATION_MODE,
+    role,
+    keyEpoch: decoded.keyEpoch,
+    policyEpoch: decoded.policyEpoch,
+    attesterPublicKeyHex: bytesToHex(publicKey),
+    messageDigestHex: decoded.messageDigestHex,
+    operationIdHex: decoded.operationIdHex,
+    signedBytes: "CANONICAL_BORSH_BRIDGE_MESSAGE_V2",
+    signatureHex: bytesToHex(signature),
+    state: ATTESTATION_VERIFIED_READY,
+  });
+}
+
+function normalizeLocalDepositClaimDeposit(deposit) {
+  const value = requireObject(deposit, "deposit");
+  return Object.freeze({
+    txidHex: normalizeHash32(value.txidHex ?? value.txid, "deposit.txidHex"),
+    vout: checkedInteger(value.vout, "deposit.vout", 0, 0xffff_ffff),
+    amountAtomic: canonicalUintDecimal(value.amountAtomic, "deposit.amountAtomic"),
+    proofFingerprintHex: normalizeHash32(value.proofFingerprintHex ?? value.proofFingerprint, "deposit.proofFingerprintHex"),
+  });
+}
+
+function normalizeClaimFinalizedReserveSweep(finalizedReserveSweep) {
+  const value = requireObject(finalizedReserveSweep, "finalizedReserveSweep");
+  return Object.freeze({
+    state: requireNonEmptyText(value.state, "finalizedReserveSweep.state"),
+    trust: value.trust ?? RPC_OBSERVATION,
+    nativeSweepTxidHex: normalizeHash32(value.nativeSweepTxidHex, "finalizedReserveSweep.nativeSweepTxidHex"),
+    inputOutpoints: normalizeOutpointTexts(value.inputOutpoints, "finalizedReserveSweep.inputOutpoints"),
+    reserveOutputVout: checkedInteger(value.reserveOutputVout, "finalizedReserveSweep.reserveOutputVout", 0, 0xffff_ffff),
+    reserveAmountAtomic: canonicalUintDecimal(value.reserveAmountAtomic, "finalizedReserveSweep.reserveAmountAtomic"),
+    canonicalReserveScriptPubKeyHex: validateP2trScriptPubKeyHex(
+      value.canonicalReserveScriptPubKeyHex,
+      "finalizedReserveSweep.canonicalReserveScriptPubKeyHex",
+    ),
+    reserveTransitionState: value.reserveTransitionState,
+    mintCreditState: value.mintCreditState,
+    finalitySatisfied: value.finalitySatisfied === true,
+  });
+}
+
+function aggregateTaprootSighashDigestHex(taprootSighashEvidences) {
+  const evidences = requireNonEmptyArray(taprootSighashEvidences, "taprootSighashEvidences").map((entry, index) => {
+    const value = requireObject(entry, `taprootSighashEvidences[${index}]`);
+    return Object.freeze({
+      signingInputIndex: checkedInteger(value.signingInputIndex, `taprootSighashEvidences[${index}].signingInputIndex`, 0, 100_000),
+      taprootSighashHex: normalizeHash32(value.taprootSighashHex, `taprootSighashEvidences[${index}].taprootSighashHex`),
+      unsignedNativeTransactionFingerprintHex: normalizeHash32(
+        value.unsignedNativeTransactionFingerprintHex,
+        `taprootSighashEvidences[${index}].unsignedNativeTransactionFingerprintHex`,
+      ),
+      nativeSweepTxidHex: normalizeHash32(value.nativeSweepTxidHex, `taprootSighashEvidences[${index}].nativeSweepTxidHex`),
+    });
+  });
+  return bridgeInputDigest("TaprootEvidenceSet", {
+    protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/AGGREGATED_TAPROOT_SIGHASH_EVIDENCE/V1`,
+    evidences,
+  });
+}
+
+function localReserveAllocationIdHex({
+  flowConfig,
+  deposit,
+  reserveSweepDraft,
+  finalizedReserveSweep,
+  solanaRecipientHex,
+}) {
+  const config = requireObject(flowConfig, "flowConfig");
+  const normalizedDeposit = normalizeLocalDepositClaimDeposit(deposit);
+  const draft = requireObject(reserveSweepDraft, "reserveSweepDraft");
+  const finalized = normalizeClaimFinalizedReserveSweep(finalizedReserveSweep);
+  return bridgeInputDigest("LocalReserveAllocation", {
+    protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/LOCAL_RESERVE_ALLOCATION_ID/V1`,
+    solanaDeploymentHex: config.solanaDeploymentHex,
+    mintHex: config.mintHex,
+    depositOutpoint: `${normalizedDeposit.txidHex}:${normalizedDeposit.vout}`,
+    unsignedNativeTransactionFingerprintHex: normalizeHash32(
+      draft.unsignedNativeTransactionFingerprintHex,
+      "reserveSweepDraft.unsignedNativeTransactionFingerprintHex",
+    ),
+    nativeSweepTxidHex: finalized.nativeSweepTxidHex,
+    inputOutpoints: finalized.inputOutpoints,
+    reserveOutputVout: finalized.reserveOutputVout,
+    reserveAmountAtomic: finalized.reserveAmountAtomic,
+    canonicalReserveScriptPubKeyHex: finalized.canonicalReserveScriptPubKeyHex,
+    solanaRecipientHex: normalizeHash32(solanaRecipientHex, "solanaRecipientHex"),
+  });
+}
+
+function predictedFinalizedReserveSweepForClaim({ reserveSweepDraft, canonicalReserveScriptPubKeyHex }) {
+  const draft = requireObject(reserveSweepDraft, "reserveSweepDraft");
+  return Object.freeze({
+    state: "FINALIZED_CANONICAL_RESERVE",
+    trust: RPC_OBSERVATION,
+    nativeSweepTxidHex: normalizeHash32(draft.unsignedNativeTransactionId, "reserveSweepDraft.unsignedNativeTransactionId"),
+    inputOutpoints: Object.freeze([
+      normalizeOutpointText(draft.depositOutpoint, "reserveSweepDraft.depositOutpoint"),
+      ...normalizeOutpointTextsAllowEmpty(draft.feeFundingOutpoints ?? [], "reserveSweepDraft.feeFundingOutpoints"),
     ]),
+    reserveOutputVout: 0,
+    reserveAmountAtomic: canonicalUintDecimal(draft.reserveAmountAtomic, "reserveSweepDraft.reserveAmountAtomic"),
+    canonicalReserveScriptPubKeyHex: validateP2trScriptPubKeyHex(canonicalReserveScriptPubKeyHex, "canonicalReserveScriptPubKeyHex"),
+    reserveTransitionState: "CANONICAL_RESERVE",
+    mintCreditState: "AUTHORIZED_UNCONSUMED",
+    finalitySatisfied: true,
+  });
+}
+
+function reconcileLocalNativeToSolana({ flowConfig, deposit, finalizedReserveSweep, solanaDepositClaim, depositClaimRequest }) {
+  const config = requireObject(flowConfig, "flowConfig");
+  const normalizedDeposit = requireObject(deposit, "deposit");
+  const finalized = normalizeClaimFinalizedReserveSweep(finalizedReserveSweep);
+  const claim = requireObject(solanaDepositClaim, "solanaDepositClaim");
+  const claimRequest = requireObject(depositClaimRequest, "depositClaimRequest");
+  const reserveAllocationIdHex = normalizeHash32(
+    claimRequest.publicRequest?.reserveAllocationIdHex ?? claimRequest.reserveAllocationIdHex,
+    "depositClaimRequest.reserveAllocationIdHex",
+  );
+  const mintedAmountAtomic = canonicalUintDecimal(claim.mintedAmountAtomic, "solanaDepositClaim.mintedAmountAtomic");
+  const depositAmountAtomic = canonicalUintDecimal(normalizedDeposit.amountAtomic, "deposit.amountAtomic");
+  if (
+    depositAmountAtomic !== config.amountAtomic ||
+    finalized.reserveAmountAtomic !== config.amountAtomic ||
+    mintedAmountAtomic !== config.amountAtomic
+  ) {
+    throw new Error("LocalNativeToSolanaReconciliationAmountMismatch");
+  }
+  if (claim.state !== DEPOSIT_STATES.COMPLETED) {
+    throw new Error("LocalNativeToSolanaReconciliationRequiresCompletedClaim");
+  }
+  const canonicalReserve = BigInt(finalized.reserveAmountAtomic);
+  // Supply is read from the finalized Mint account, never inferred from the
+  // requested credit. This harness starts from zero supply and one operation.
+  const mintedSupply = BigInt(canonicalUintDecimal(claim.mintSupplyAtomic, "observedMintSupplyAtomic"));
+  if (mintedSupply !== BigInt(mintedAmountAtomic)) throw new Error("LocalNativeToSolanaUnexpectedMintSupply");
+  const authorizedUnmintedCredits = 0n;
+  const otherUnsettledBridgeLiabilities = 0n;
+  const coverageRequired = mintedSupply + authorizedUnmintedCredits + otherUnsettledBridgeLiabilities;
+  const surplus = canonicalReserve - coverageRequired;
+  if (surplus < 0n) {
+    throw new Error("LocalNativeToSolanaReconciliationInsufficientBacking");
+  }
+  return Object.freeze({
+    protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/LOCAL_NATIVE_TO_SOLANA_RECONCILIATION/V1`,
+    state: "RECONCILED",
+    productionReady: false,
+    mainnetActivation: "DISABLED",
+    canonicalReserve: canonicalReserve.toString(),
+    mintedSupply: mintedSupply.toString(),
+    authorizedUnmintedCredits: authorizedUnmintedCredits.toString(),
+    otherUnsettledBridgeLiabilities: otherUnsettledBridgeLiabilities.toString(),
+    coverageRequired: coverageRequired.toString(),
+    surplus: surplus.toString(),
+    projectBridgeFeeAtomic: "0",
+    nativeMinerFeeAtomic: config.reserveMinerFeeAtomic,
+    reserveAllocationIdHex,
+    solanaSignature: claim.solanaSignature,
+    noPerTransferKingPepeTeamApprovalState: true,
   });
 }
 
@@ -661,7 +1543,7 @@ export function validateFinalizedLocalReserveSweep({
   });
 }
 
-export function signLocalReserveSweepWithFrost({
+export async function signLocalReserveSweepWithFrost({
   plan,
   flowConfig,
   frostCustody,
@@ -670,7 +1552,11 @@ export function signLocalReserveSweepWithFrost({
   reserveSweepDraft,
   taprootSighashEvidences,
   operationIdHex,
+  nativeEvidenceValidator,
+  spentOutputs,
+  tapscriptSpends,
 }) {
+  if (typeof nativeEvidenceValidator !== "function") throw new Error("LocalNativeEvidenceVerifierRequired");
   const config = requireObject(flowConfig, "flowConfig");
   const custody = requireObject(frostCustody, "frostCustody");
   const source = requireObject(nativeSource, "nativeSource");
@@ -699,6 +1585,7 @@ export function signLocalReserveSweepWithFrost({
   );
   const authorizedOperations = prepared.map((entry) => entry.authorizedOperation);
   const signerPolicy = createNativeSigningPolicy({
+    environment: "localnet",
     nativeNetwork: localSigningConfig.nativeNetworkName,
     nativeGenesisHash: localSigningConfig.nativeGenesisHash,
     solanaDeployment: localSigningConfig.solanaDeployment,
@@ -711,8 +1598,15 @@ export function signLocalReserveSweepWithFrost({
     reserveScriptPubKeyHex: validateP2trScriptPubKeyHex(custody.taprootScriptPubKeyHex, "frostCustody.taprootScriptPubKeyHex"),
     authorizedOperations,
   });
-  const coordinator = createLocalFrostTaprootSigningCoordinator({ plan, frostCustody: custody, signerPolicy });
-  const frostResults = prepared.map((entry) => coordinator.signAutomatically(entry.signingIntent));
+  const nativeRawEvidence = [];
+  const coordinator = createLocalFrostTaprootSigningCoordinator({ plan, frostCustody: custody, signerPolicy,
+    nativeEvidenceValidator: async (intent, signerId) => {
+      const evidence = await nativeEvidenceValidator(intent, signerId);
+      nativeRawEvidence.push(Object.freeze({ signerId, signingInputIndex: intent.signingInputIndex, ...evidence }));
+      return evidence;
+    } });
+  const frostResults = [];
+  for (const entry of prepared) frostResults.push(await coordinator.signAutomaticallyWithNativeEvidence(entry.signingIntent));
   const resultByInput = new Map();
   for (const [index, result] of frostResults.entries()) {
     if (result.state !== "SIGNED") {
@@ -735,9 +1629,11 @@ export function signLocalReserveSweepWithFrost({
     }
     return result.signatureHex;
   });
-  const witnessAttachment = attachKeyPathTaprootWitnesses({
+  const witnessAttachment = attachTaprootWitnesses({
     unsignedNativeTransactionHex: reserveSweepDraft.unsignedNativeTransactionHex,
     signatures,
+    spentOutputs,
+    tapscriptSpends,
   });
   if (witnessAttachment.txidHex !== reserveSweepDraft.unsignedNativeTransactionId) {
     throw new Error("LocalReserveSweepSignedTxidMismatch");
@@ -755,6 +1651,7 @@ export function signLocalReserveSweepWithFrost({
     signedNativeTransactionHex: witnessAttachment.rawSignedTransactionHex,
     signedNativeTransactionFingerprintHex: sha256Hex(Buffer.from(witnessAttachment.rawSignedTransactionHex, "hex")),
     witnessInputCount: witnessAttachment.witnessInputCount,
+    nativeRawEvidence: Object.freeze(nativeRawEvidence),
     signingIntents: Object.freeze(
       prepared.map((entry) =>
         Object.freeze({
@@ -785,7 +1682,7 @@ export function signLocalReserveSweepWithFrost({
   });
 }
 
-function createLocalFrostTaprootSigningCoordinator({ plan, frostCustody, signerPolicy }) {
+function createLocalFrostTaprootSigningCoordinator({ plan, frostCustody, signerPolicy, nativeEvidenceValidator }) {
   const repoRoot = path.resolve(plan.repoRoot);
   const stateRoots = requireObject(frostCustody.signerStateRoots, "frostCustody.signerStateRoots");
   const publicPackage = requireObject(frostCustody.publicPackage, "frostCustody.publicPackage");
@@ -793,6 +1690,7 @@ function createLocalFrostTaprootSigningCoordinator({ plan, frostCustody, signerP
     signerId: REQUIRED_FROST_SIGNERS[0],
     index: 0,
     policy: signerPolicy,
+    nativeEvidenceValidator: (intent) => nativeEvidenceValidator(intent, REQUIRED_FROST_SIGNERS[0]),
     stateStore: new FileBackedFrostStateStore({
       signerId: REQUIRED_FROST_SIGNERS[0],
       root: requireNonEmptyText(stateRoots.frostA, "frostCustody.signerStateRoots.frostA"),
@@ -803,6 +1701,7 @@ function createLocalFrostTaprootSigningCoordinator({ plan, frostCustody, signerP
     signerId: REQUIRED_FROST_SIGNERS[1],
     index: 1,
     policy: signerPolicy,
+    nativeEvidenceValidator: (intent) => nativeEvidenceValidator(intent, REQUIRED_FROST_SIGNERS[1]),
     stateStore: new FileBackedFrostStateStore({
       signerId: REQUIRED_FROST_SIGNERS[1],
       root: requireNonEmptyText(stateRoots.frostB, "frostCustody.signerStateRoots.frostB"),
@@ -935,33 +1834,6 @@ export function validateDepositUtxo({ utxo, output, expectedConfirmations, nativ
   });
 }
 
-export function localDepositProofFingerprintHex({
-  nativeSource,
-  depositTxidHex,
-  depositOutput,
-  depositUtxo,
-}) {
-  const source = requireObject(nativeSource, "nativeSource");
-  const output = requireObject(depositOutput, "depositOutput");
-  const utxo = requireObject(depositUtxo, "depositUtxo");
-  return hashJson({
-    protocol: `${LOCAL_NATIVE_TO_SOLANA_E2E_PROTOCOL}/DEPOSIT_PROOF_FINGERPRINT`,
-    trust: source.trust,
-    nativeNetwork: source.nativeNetwork,
-    nativeGenesisHash: source.nativeGenesisHash,
-    bestBlockHash: source.bestBlockHash,
-    bestHeight: source.bestHeight,
-    depositTxidHex: normalizeHash32(depositTxidHex, "depositTxidHex"),
-    depositVout: checkedInteger(output.vout, "depositOutput.vout", 0, 10_000_000),
-    amountAtomic: canonicalUintDecimal(output.amountAtomic, "depositOutput.amountAtomic"),
-    scriptPubKeyHex: normalizeHexText(output.scriptPubKeyHex, "depositOutput.scriptPubKeyHex"),
-    utxoConfirmations: checkedInteger(utxo.confirmations, "depositUtxo.confirmations", 0, 10_000_000),
-    utxoBestBlockHash: utxo.bestBlockHash ?? null,
-    finalitySatisfied: utxo.finalitySatisfied === true,
-    noPriorConsumption: utxo.unspent === true,
-  });
-}
-
 export async function draftLocalReserveSweep({
   cli,
   depositTxidHex,
@@ -999,11 +1871,16 @@ export async function draftLocalReserveSweep({
       parameters: [
         JSON.stringify(transactionInputs),
         JSON.stringify({ [reserveAddress]: reserveAmountNative }),
+        "0", // Explicit locktime; never inherit transaction-policy defaults.
+        "false", // Pinned Native RPC defaults replaceable=true; bridge replacements are disabled.
       ],
     }),
     "unsignedNativeTransactionHex",
   );
   const parsedUnsignedTransaction = parseNativeTransactionHex(unsignedNativeTransactionHex);
+  if (parsedUnsignedTransaction.inputs.some(input => input.sequence < 0xffff_fffe)) {
+    throw new Error("LocalNativeReserveSweepReplacementDisabled");
+  }
   const parsedInputOutpoints = parsedUnsignedTransaction.inputs.map((input) => input.outpoint);
   if (
     parsedInputOutpoints.length !== inputOutpoints.length ||
@@ -1092,6 +1969,9 @@ async function prepareLocalReserveSweepFeeFundingInputs({
 
 export async function createLocalFrostTaprootCustodyContext({ plan, flowConfig }) {
   const config = requireObject(flowConfig, "flowConfig");
+  const dkgPolicy = createLocalNativeDkgPolicy({ environment: "localnet", nativeNetwork: config.nativeChainName,
+    nativeGenesisHash: REGTEST_GENESIS, solanaDeployment: config.solanaDeploymentHex, keyEpoch: config.keyEpoch,
+    bridgeProgramId: config.bridgeProgramIdHex, transceiverProgramId: config.transceiverProgramIdHex, mint: config.mintHex });
   const repoRoot = path.resolve(plan.repoRoot);
   const frostRoot = validateStateRoot({
     stateRoot: path.join(config.stateRoot, "ephemeral-frost-custody"),
@@ -1101,8 +1981,9 @@ export async function createLocalFrostTaprootCustodyContext({ plan, flowConfig }
   const signerA = new NativeFrostSigner({
     signerId: REQUIRED_FROST_SIGNERS[0],
     index: 0,
-    policy: undefined,
-    stateStore: new FileBackedFrostStateStore({
+    policy: dkgPolicy,
+    stateStore: FileBackedFrostStateStore.createLocal({
+      policy: dkgPolicy,
       signerId: REQUIRED_FROST_SIGNERS[0],
       root: path.join(frostRoot, "frost-a"),
       repoRoot,
@@ -1111,14 +1992,15 @@ export async function createLocalFrostTaprootCustodyContext({ plan, flowConfig }
   const signerB = new NativeFrostSigner({
     signerId: REQUIRED_FROST_SIGNERS[1],
     index: 1,
-    policy: undefined,
-    stateStore: new FileBackedFrostStateStore({
+    policy: dkgPolicy,
+    stateStore: FileBackedFrostStateStore.createLocal({
+      policy: dkgPolicy,
       signerId: REQUIRED_FROST_SIGNERS[1],
       root: path.join(frostRoot, "frost-b"),
       repoRoot,
     }),
   });
-  const keyEpoch = 1;
+  const keyEpoch = dkgPolicy.keyEpoch;
   const epoch = runTwoPartyDkg([signerA, signerB], { epoch: keyEpoch });
   const xOnly = normalizeHash32(epoch.aggregateTweakedXOnlyPublicKey, "aggregateTweakedXOnlyPublicKey");
   return Object.freeze({
@@ -1152,9 +2034,7 @@ export function validateP2trScriptPubKeyHex(scriptPubKeyHex, label = "scriptPubK
 }
 
 export function taprootAddressFromXOnlyPublicKey(xOnlyPublicKeyHex, hrp = DEFAULT_NATIVE_BECH32_HRP) {
-  const program = Buffer.from(normalizeHash32(xOnlyPublicKeyHex, "xOnlyPublicKeyHex"), "hex");
-  const data = [1, ...convertBits([...program], 8, 5, true)];
-  return bech32Encode(sanitizeBech32Hrp(hrp), data, BECH32M_CONST);
+  return witnessAddressFromScript(p2trScriptPubKeyHex(xOnlyPublicKeyHex), sanitizeBech32Hrp(hrp));
 }
 
 export function createLocalSolanaSetupContext(options = {}) {
@@ -1190,6 +2070,8 @@ export function createLocalSolanaSetupContext(options = {}) {
     feePayerSigner,
     mintSigner,
     recipientTokenAccountSigner,
+    attesterASigner: attesterA,
+    attesterBSigner: attesterB,
   });
 }
 
@@ -1258,6 +2140,8 @@ export function validateLocalSolanaSetupContext(context, flowConfig) {
       value.recipientTokenAccountSigner,
       "localSolanaSetupContext.recipientTokenAccountSigner",
     ),
+    attesterASigner: requireObject(value.attesterASigner, "localSolanaSetupContext.attesterASigner"),
+    attesterBSigner: requireObject(value.attesterBSigner, "localSolanaSetupContext.attesterBSigner"),
   });
   assertBase58MatchesHex(normalized.feePayerBase58, normalized.feePayerHex, "localSolanaSetupContext.feePayer");
   assertBase58MatchesHex(normalized.mintBase58, normalized.mintHex, "localSolanaSetupContext.mint");
@@ -1279,13 +2163,25 @@ export function validateLocalSolanaSetupContext(context, flowConfig) {
     normalized.recipientTokenAccountBase58,
     "recipientTokenAccountSigner",
   );
+  assertSignerIdentity(
+    normalized.attesterASigner,
+    normalized.attesterPublicKeysHex[0],
+    base58Encode(Buffer.from(normalized.attesterPublicKeysHex[0], "hex")),
+    "attesterASigner",
+  );
+  assertSignerIdentity(
+    normalized.attesterBSigner,
+    normalized.attesterPublicKeysHex[1],
+    base58Encode(Buffer.from(normalized.attesterPublicKeysHex[1], "hex")),
+    "attesterBSigner",
+  );
   if (normalized.mintHex !== config.mintHex) {
     throw new Error("LocalSolanaSetupContextMintMismatch");
   }
   return normalized;
 }
 
-export async function submitLocalnetSolanaSetup({ plan, flowConfig, localSolanaSetupContext, rpcClient }) {
+export async function submitLocalnetSolanaSetup({ plan, flowConfig, localSolanaSetupContext, nativeSource, rpcClient }) {
   const config = requireObject(flowConfig, "flowConfig");
   const setupContext = validateLocalSolanaSetupContext(localSolanaSetupContext, config);
   const submitter = new LocalnetSolanaSetupSubmitter({
@@ -1293,6 +2189,9 @@ export async function submitLocalnetSolanaSetup({ plan, flowConfig, localSolanaS
       environment: "localnet",
       cluster: "localnet",
       solanaDeploymentHex: config.solanaDeploymentHex,
+      protocolId: config.protocolId,
+      nativeNetwork: config.nativeNetwork,
+      nativeGenesisHex: normalizeHash32(nativeSource?.nativeGenesisHash, "nativeGenesisHash"),
       managerProgramIdHex: config.bridgeProgramIdHex,
       transceiverProgramIdHex: config.transceiverProgramIdHex,
       decimals: config.nativeDecimals,
@@ -1390,63 +2289,6 @@ function extractOutputAddresses(scriptPubKey) {
   return [...addresses];
 }
 
-function bech32Encode(hrp, data, checksumConstant) {
-  const values = [...data];
-  if (values.some((entry) => !Number.isInteger(entry) || entry < 0 || entry > 31)) {
-    throw new Error("Bech32 data value outside 5-bit range");
-  }
-  const checksum = bech32CreateChecksum(hrp, values, checksumConstant);
-  return `${hrp}1${[...values, ...checksum].map((entry) => BECH32_CHARSET[entry]).join("")}`;
-}
-
-function bech32CreateChecksum(hrp, data, checksumConstant) {
-  const values = [...bech32HrpExpand(hrp), ...data, 0, 0, 0, 0, 0, 0];
-  const polymod = bech32Polymod(values) ^ checksumConstant;
-  return [0, 1, 2, 3, 4, 5].map((index) => (polymod >> (5 * (5 - index))) & 31);
-}
-
-function bech32HrpExpand(hrp) {
-  return [...hrp].map((char) => char.charCodeAt(0) >> 5).concat([0], [...hrp].map((char) => char.charCodeAt(0) & 31));
-}
-
-function bech32Polymod(values) {
-  const generator = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
-  let checksum = 1;
-  for (const value of values) {
-    const top = checksum >> 25;
-    checksum = ((checksum & 0x1ffffff) << 5) ^ value;
-    for (let index = 0; index < generator.length; index += 1) {
-      if (((top >> index) & 1) !== 0) {
-        checksum ^= generator[index];
-      }
-    }
-  }
-  return checksum;
-}
-
-function convertBits(data, fromBits, toBits, pad) {
-  let accumulator = 0;
-  let bits = 0;
-  const maxValue = (1 << toBits) - 1;
-  const maxAccumulator = (1 << (fromBits + toBits - 1)) - 1;
-  const result = [];
-  for (const value of data) {
-    if (value < 0 || value >> fromBits !== 0) throw new Error("invalid value while converting Bech32 groups");
-    accumulator = ((accumulator << fromBits) | value) & maxAccumulator;
-    bits += fromBits;
-    while (bits >= toBits) {
-      bits -= toBits;
-      result.push((accumulator >> bits) & maxValue);
-    }
-  }
-  if (pad) {
-    if (bits > 0) result.push((accumulator << (toBits - bits)) & maxValue);
-  } else if (bits >= fromBits || ((accumulator << (toBits - bits)) & maxValue) !== 0) {
-    throw new Error("invalid padding while converting Bech32 groups");
-  }
-  return result;
-}
-
 function sanitizeBech32Hrp(value) {
   if (typeof value !== "string" || !/^[a-z0-9]{1,83}$/u.test(value)) {
     throw new Error("Native Bech32 HRP is invalid");
@@ -1476,12 +2318,13 @@ function sanitizeFlowForReport(flow, plan) {
 }
 
 function validateStateRoot({ stateRoot, repoRoot, runRoot }) {
-  const resolved = path.resolve(stateRoot);
-  const repo = path.resolve(repoRoot);
-  const run = path.resolve(runRoot);
-  if (isSameOrInside(repo, resolved)) {
-    throw new Error("LocalNativeToSolanaStateRootInsideRepositoryRejected");
+  let resolved;
+  try { resolved = validateRuntimeStateRoot(stateRoot, repoRoot); }
+  catch (error) {
+    if (error.message.includes("InsideRepositoryRejected")) throw new Error("LocalNativeToSolanaStateRootInsideRepositoryRejected");
+    throw error;
   }
+  const run = resolveExistingParents(runRoot);
   if (!isSameOrInside(run, resolved)) {
     throw new Error("LocalNativeToSolanaStateRootOutsideRunRootRejected");
   }
@@ -1658,6 +2501,11 @@ function normalizeOutpointTexts(values, label) {
   return Object.freeze(input.map((value, index) => normalizeOutpointText(value, `${label}[${index}]`)));
 }
 
+function normalizeOutpointTextsAllowEmpty(values, label) {
+  const input = requireArray(values, label);
+  return Object.freeze(input.map((value, index) => normalizeOutpointText(value, `${label}[${index}]`)));
+}
+
 function normalizeOutpointText(value, label) {
   if (typeof value !== "string") {
     throw new Error(`${label}:ExpectedOutpointText`);
@@ -1702,11 +2550,6 @@ function requireObject(value, label) {
 
 function sha256Hex(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
-}
-
-function isSameOrInside(parent, candidate) {
-  const relative = path.relative(parent, candidate);
-  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
 if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {

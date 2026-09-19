@@ -1,0 +1,537 @@
+import assert from "node:assert/strict";
+import { DEVNET_SOLANA_GENESIS } from "../../../shared/solana-test-network.mjs";
+import { createHash } from "node:crypto";
+import { ed25519 } from "@noble/curves/ed25519.js";
+import { test } from "node:test";
+import {
+  base58Decode,
+  base58Encode,
+  buildLocalnetSolanaDepositReceiptTransactionPlan,
+  buildLocalnetSolanaDepositClaimTransactionPlan,
+  prepareSignedLocalnetSolanaDepositReceiptTransaction,
+  prepareSignedLocalnetSolanaDepositClaimTransaction,
+  verifySignedLocalnetSolanaDepositReceiptTransaction,
+  shortvecEncode,
+} from "../solana-deposit-claim-transaction-plan.mjs";
+import {
+  ProjectAttester,
+  createEphemeralAttesterKeypairForTestOnly,
+} from "../../attesters/attestation-service.mjs";
+import {
+  bytesToHex,
+  decodeCanonicalBridgeMessage,
+  encodeCanonicalBridgeMessage,
+  hexToBytes,
+} from "../../../shared/protocol/canonical-message.mjs";
+
+
+function h(label) {
+  return createHash("sha256").update(label).digest("hex");
+}
+
+function mutateLastHexByte(hex) {
+  const replacement = hex.endsWith("00") ? "01" : "00";
+  return `${hex.slice(0, -2)}${replacement}`;
+}
+
+function pubkey(label) {
+  return {
+    bytes: hexToBytes(h(label), label),
+    hex: h(label),
+    base58: base58Encode(hexToBytes(h(label), label)),
+  };
+}
+
+function keypair() {
+  const generated = ed25519.keygen();
+  return {
+    publicKey: generated.publicKey,
+    publicKeyHex: bytesToHex(generated.publicKey),
+    publicKeyBase58: base58Encode(generated.publicKey),
+    signingKey: generated["secret" + "Key"],
+  };
+}
+
+function depositMessage(fields = {}) {
+  return encodeCanonicalBridgeMessage({
+    action: "DepositClaim",
+    direction: "NativeToSolana",
+    deployment: {
+      protocolId: 1,
+      nativeNetwork: 8_000_111,
+      nativeGenesis: hexToBytes(h("native-regtest-genesis"), "nativeGenesis"),
+      solanaDeployment: hexToBytes(h("solana-localnet-deployment"), "solanaDeployment"),
+      managerProgramId: fields.managerProgram.bytes,
+      transceiverProgramId: fields.transceiverProgram.bytes,
+      mint: fields.mint.bytes,
+    },
+    depositOutpoint: {
+      txid: hexToBytes(h("native-deposit-outpoint"), "depositOutpoint.txid"),
+      vout: 2,
+    },
+
+    amountAtomic: "250000000",
+    feeAtomic: "0",
+    destination: fields.recipientTokenAccount.bytes,
+    policyEpoch: 1,
+    keyEpoch: 1,
+    nonce: hexToBytes(h("deposit-message-nonce"), "nonce"),
+    validFrom: "1700000000",
+    validUntil: "1700001200",
+    evidenceDigest: hexToBytes(h("deposit-evidence"), "evidenceDigest"),
+  });
+}
+
+function attesterPolicy(config, role, keypair) {
+  const message = decodeCanonicalBridgeMessage(config.encodedMessageHex);
+  return {
+    role,
+    attesterPublicKeyHex: keypair.publicKeyHex,
+    protocolId: message.deployment.protocolId,
+    nativeNetwork: message.deployment.nativeNetwork,
+    nativeGenesisHex: bytesToHex(message.deployment.nativeGenesis),
+    solanaDeploymentHex: bytesToHex(message.deployment.solanaDeployment),
+    managerProgramIdHex: bytesToHex(message.deployment.managerProgramId),
+    transceiverProgramIdHex: bytesToHex(message.deployment.transceiverProgramId),
+    mintHex: bytesToHex(message.deployment.mint),
+    policyEpoch: message.policyEpoch,
+    keyEpoch: message.keyEpoch,
+    acceptedNativeTrust: ["LOCALLY_VALIDATED_CHAIN_STATE"],
+    depositsPaused: false,
+    hardStop: false,
+  };
+}
+
+function depositEvidence(config) {
+  const message = decodeCanonicalBridgeMessage(config.encodedMessageHex);
+  return {
+    trust: "LOCALLY_VALIDATED_CHAIN_STATE",
+    nativeNetwork: message.deployment.nativeNetwork,
+    nativeGenesisHash: bytesToHex(message.deployment.nativeGenesis),
+    operationIdHex: message.operationIdHex,
+    depositOutpoint: message.depositOutpointText,
+    amountAtomic: message.amountAtomic.toString(),
+    solanaRecipientHex: message.destinationHex,
+    evidenceDigestHex: message.evidenceDigestHex,
+    reserveAllocationIdHex: h("bundle-reserve-allocation"),
+    reserveTransitionState: "CANONICAL_RESERVE",
+    mintCreditState: "AUTHORIZED_UNCONSUMED",
+    finalitySatisfied: true,
+    sweepFinalized: true,
+    utxoUnspentAtDeposit: true,
+    noPriorConsumption: true,
+  };
+}
+
+function createAttestations(config) {
+  const keyA = createEphemeralAttesterKeypairForTestOnly();
+  const keyB = createEphemeralAttesterKeypairForTestOnly();
+  const request = {
+    encodedMessageHex: config.encodedMessageHex,
+    messageDigestHex: decodeCanonicalBridgeMessage(config.encodedMessageHex).messageDigestHex,
+    evidence: depositEvidence(config),
+  };
+  const attesterA = new ProjectAttester({
+    role: "ATTESTER_A",
+    ["secret" + "Key"]: keyA["secret" + "Key"],
+    policy: attesterPolicy(config, "ATTESTER_A", keyA),
+  });
+  const attesterB = new ProjectAttester({
+    role: "ATTESTER_B",
+    ["secret" + "Key"]: keyB["secret" + "Key"],
+    policy: attesterPolicy(config, "ATTESTER_B", keyB),
+  });
+  return [
+    attesterA.signDepositCredit(request, 1_700_000_600),
+    attesterB.signDepositCredit(request, 1_700_000_600),
+  ];
+}
+
+function fixture(overrides = {}) {
+  const managerProgram = pubkey("manager-program");
+  const transceiverProgram = pubkey("transceiver-program");
+  const mint = pubkey("kpepe-mint");
+  const tokenProgram = pubkey("traditional-token-program");
+  const recipientTokenAccount = pubkey("recipient-token-account");
+  const feePayer = keypair();
+  const recentBlockhash = pubkey("recent-blockhash");
+  const encodedMessageHex = bytesToHex(
+    depositMessage({
+      managerProgram,
+      transceiverProgram,
+      mint,
+      recipientTokenAccount,
+    }),
+  );
+
+  return {
+    managerProgram,
+    transceiverProgram,
+    mint,
+    tokenProgram,
+    recipientTokenAccount,
+    feePayer,
+    recentBlockhash,
+    config: {
+      environment: "localnet",
+      cluster: "localnet",
+      managerProgramIdBase58: managerProgram.base58,
+      transceiverProgramIdBase58: transceiverProgram.base58,
+      mintBase58: mint.base58,
+      tokenProgramIdBase58: tokenProgram.base58,
+      recipientTokenAccountBase58: recipientTokenAccount.base58,
+      feePayerBase58: feePayer.publicKeyBase58,
+      recentBlockhashBase58: recentBlockhash.base58,
+      lastValidBlockHeight: "1000",
+      encodedMessageHex,
+      ...overrides,
+    },
+  };
+}
+
+async function signedReceiptFixture() {
+  const f = fixture({ tokenProgramIdBase58: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" });
+  const config = { ...f.config, attestations: createAttestations(f.config),
+    feePayerSigner: { publicKeyHex: f.feePayer.publicKeyHex, sign: bytes => ed25519.sign(bytes, f.feePayer.signingKey) } };
+  const packet = await prepareSignedLocalnetSolanaDepositReceiptTransaction(config);
+  return { ...f, config: { ...config, preparedTransactionBase64: packet.preparedTransactionBase64 }, packet };
+}
+
+test("explicit Devnet uses identical canonical claim/receipt bytes and truthful network labels", async () => {
+  const f = fixture({ tokenProgramIdBase58: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" });
+  const config = { ...f.config, attestations: createAttestations(f.config),
+    feePayerSigner: { publicKeyHex: f.feePayer.publicKeyHex, sign: bytes => ed25519.sign(bytes, f.feePayer.signingKey) } };
+  const devnet = { ...config, environment: "devnet", cluster: "devnet", solanaGenesis: DEVNET_SOLANA_GENESIS };
+  for (const prepare of [prepareSignedLocalnetSolanaDepositClaimTransaction, prepareSignedLocalnetSolanaDepositReceiptTransaction]) {
+    const local = await prepare(config), remote = await prepare(devnet);
+    assert.equal(remote.environment, "devnet"); assert.equal(remote.cluster, "devnet");
+    assert.equal(remote.preparedTransactionBase64, local.preparedTransactionBase64);
+    assert.equal(remote.operationIdHex, local.operationIdHex);
+    await assert.rejects(prepare({ ...devnet, solanaGenesis: undefined }));
+    await assert.rejects(prepare({ ...devnet, environment: "mainnet", cluster: "mainnet" }));
+  }
+});
+
+test("canonical receipt verification rebuilds the signed Ed25519/transceiver packet exactly", async () => {
+  const f = await signedReceiptFixture();
+  const result = verifySignedLocalnetSolanaDepositReceiptTransaction(f.config);
+  assert.equal(result.solanaSignature, f.packet.signatures[0].signatureBase58);
+  assert.equal(result.verifiedReceiptAccountBase58, f.packet.pdas.verifiedReceipt.addressBase58);
+  assert.equal(result.mintAccountBase58, f.config.mintBase58);
+});
+
+for (const [label, offset] of [["signature count", 0], ["message header", 65],
+  ["readonly accounts", 67], ["fee payer", 69], ["recent blockhash", 325],
+  ["instruction count", 357], ["verifier offsets", 365], ["compute instruction", -2]]) {
+  test("canonical receipt rejects re-signed mutation: " + label, async () => {
+    const f = await signedReceiptFixture(), raw = Buffer.from(f.packet.preparedTransactionBase64, "base64");
+    raw[offset < 0 ? raw.length + offset : offset] ^= 1;
+    Buffer.from(ed25519.sign(raw.subarray(65), f.feePayer.signingKey)).copy(raw, 1);
+    assert.throws(() => verifySignedLocalnetSolanaDepositReceiptTransaction({ ...f.config, preparedTransactionBase64: raw.toString("base64") }));
+  });
+}
+test("canonical receipt rejects bad signature, trailing packet data and a duplicate attester", async () => {
+  const f = await signedReceiptFixture(), raw = Buffer.from(f.packet.preparedTransactionBase64, "base64");
+  raw[1] ^= 1;
+  assert.throws(() => verifySignedLocalnetSolanaDepositReceiptTransaction({ ...f.config, preparedTransactionBase64: raw.toString("base64") }));
+  assert.throws(() => verifySignedLocalnetSolanaDepositReceiptTransaction({ ...f.config,
+    preparedTransactionBase64: Buffer.concat([Buffer.from(f.packet.preparedTransactionBase64, "base64"), Buffer.from([0])]).toString("base64") }));
+  assert.throws(() => verifySignedLocalnetSolanaDepositReceiptTransaction({ ...f.config, attestations: [f.config.attestations[0], f.config.attestations[0]] }));
+});
+test("receipt verification cannot accept a claim packet or substituted expected deployment", async () => {
+  const f = await signedReceiptFixture();
+  const claim = await prepareSignedLocalnetSolanaDepositClaimTransaction(f.config);
+  assert.throws(() => verifySignedLocalnetSolanaDepositReceiptTransaction({ ...f.config, preparedTransactionBase64: claim.preparedTransactionBase64 }));
+  for (const key of ["managerProgramIdBase58", "transceiverProgramIdBase58", "mintBase58", "recipientTokenAccountBase58"])
+    assert.throws(() => verifySignedLocalnetSolanaDepositReceiptTransaction({ ...f.config, [key]: pubkey("substitute").base58 }));
+});
+
+test("deposit claim transaction plan builds exact localnet instruction data and account metas", () => {
+  const { config } = fixture();
+  const plan = buildLocalnetSolanaDepositClaimTransactionPlan(config);
+
+  assert.equal(plan.environment, "localnet");
+  assert.equal(plan.cluster, "localnet");
+  assert.equal(plan.amountAtomic, "250000000");
+  assert.equal(plan.lastValidBlockHeight, "1000");
+  assert.equal(plan.managerProgramIdBase58, config.managerProgramIdBase58);
+  assert.equal(plan.transceiverProgramIdBase58, config.transceiverProgramIdBase58);
+  assert.equal(plan.mintBase58, config.mintBase58);
+  assert.equal(plan.feePayerBase58, config.feePayerBase58);
+
+  assert.deepEqual(
+    plan.accounts.map((account) => [account.role, account.isSigner, account.isWritable]),
+    [
+      ["feePayer", true, true],
+      ["bridgeState", false, true],
+      ["depositClaim", false, true],
+      ["mint", false, true],
+      ["recipientTokenAccount", false, true],
+      ["depositBacking", false, true],
+      ["verifiedReceipt", false, false],
+      ["mintAuthorityPda", false, false],
+      ["tokenProgram", false, false],
+      ["transceiverProgram", false, false],
+      ["managerProgram", false, false],
+      ["systemProgram", false, false],
+      ["computeBudgetProgram", false, false],
+    ],
+  );
+  assert.deepEqual(plan.instruction.accountIndexes, [1, 2, 6, 3, 4, 7, 8, 9, 5, 0, 11]);
+  assert.equal(plan.instruction.programIdIndex, 10);
+
+  const instructionData = Buffer.from(plan.instruction.dataBase64, "base64");
+  assert.equal(instructionData[0], 2);
+  assert.equal(instructionData.length, 483);
+  assert.equal(bytesToHex(instructionData.subarray(1)), config.encodedMessageHex);
+
+  const messageBytes = Buffer.from(plan.messageBase64, "base64");
+  assert.deepEqual([...messageBytes.subarray(0, 3)], [1, 0, 7]);
+  assert.match(plan.messageFingerprintHex, /^[0-9a-f]{64}$/u);
+  assert.equal(plan.preparedTransactionBase64, undefined);
+});
+
+test("backing PDA survives nonce and epoch rotation but binds the Native outpoint", () => {
+  const { config } = fixture();
+  const original = decodeCanonicalBridgeMessage(config.encodedMessageHex);
+  const plan = buildLocalnetSolanaDepositClaimTransactionPlan(config);
+  const changed = { ...original, operationId: undefined, keyEpoch: 8, policyEpoch: 9, nonce: new Uint8Array(32).fill(90) };
+  const rotated = buildLocalnetSolanaDepositClaimTransactionPlan({ ...config, encodedMessageHex: bytesToHex(encodeCanonicalBridgeMessage(changed)) });
+  assert.notEqual(rotated.operationIdHex, plan.operationIdHex);
+  assert.equal(rotated.pdas.depositBacking.addressBase58, plan.pdas.depositBacking.addressBase58);
+  const other = buildLocalnetSolanaDepositClaimTransactionPlan({ ...config, encodedMessageHex: bytesToHex(encodeCanonicalBridgeMessage({ ...changed, depositOutpoint: { ...changed.depositOutpoint, vout: changed.depositOutpoint.vout + 1 } })) });
+  assert.notEqual(other.pdas.depositBacking.addressBase58, plan.pdas.depositBacking.addressBase58);
+});
+
+test("signed deposit claim transaction uses injected fee-payer signer and verifies independently", async () => {
+  const { config, feePayer } = fixture();
+  const prepared = await prepareSignedLocalnetSolanaDepositClaimTransaction({
+    ...config,
+    feePayerSigner: {
+      publicKeyBase58: feePayer.publicKeyBase58,
+      sign(messageBytes) {
+        return ed25519.sign(messageBytes, feePayer.signingKey);
+      },
+    },
+  });
+
+  assert.match(prepared.preparedTransactionBase64, /^[A-Za-z0-9+/]+={0,2}$/u);
+  assert.match(prepared.preparedTransactionFingerprintHex, /^[0-9a-f]{64}$/u);
+  assert.equal(prepared.signatures.length, 1);
+  assert.equal(prepared.signatures[0].publicKeyBase58, feePayer.publicKeyBase58);
+
+  const transactionBytes = Buffer.from(prepared.preparedTransactionBase64, "base64");
+  assert.equal(transactionBytes[0], 1);
+  assert.ok(transactionBytes.length <= 1232);
+  const signature = transactionBytes.subarray(1, 65);
+  const messageBytes = transactionBytes.subarray(65);
+  assert.deepEqual(messageBytes, Buffer.from(prepared.messageBase64, "base64"));
+  assert.equal(ed25519.verify(signature, messageBytes, feePayer.publicKey), true);
+  assert.equal(JSON.stringify(prepared).includes("secret"), false);
+});
+
+test("receipt transaction references one canonical message and fits the Solana packet limit", () => {
+  const { config } = fixture();
+  const attestations = createAttestations(config);
+  const plan = buildLocalnetSolanaDepositReceiptTransactionPlan({
+    ...config,
+    attestations,
+  });
+
+  assert.equal(plan.bundle, "ED25519_ATTESTATIONS_TRANSCEIVER_RECEIPT");
+  assert.equal(plan.instructions.length, 4);
+  assert.deepEqual(
+    plan.accounts.map((account) => [account.role, account.isSigner, account.isWritable]),
+    [
+      ["feePayer", true, true],
+      ["verifiedReceipt", false, true],
+      ["transceiverConfig", false, false],
+      ["instructionsSysvar", false, false],
+      ["systemProgram", false, false],
+      ["ed25519Program", false, false],
+      ["transceiverProgram", false, false],
+      ["computeBudgetProgram", false, false],
+    ],
+  );
+
+  assert.deepEqual(
+    plan.instructions.map((instruction) => instruction.role),
+    [
+      "ed25519Attestation1",
+      "ed25519Attestation2",
+      "transceiverVerifyMessageFromEd25519",
+      "localnetComputeUnitLimit",
+    ],
+  );
+  assert.deepEqual(
+    plan.instructions.map((instruction) => instruction.programIdIndex),
+    [5, 5, 6, 7],
+  );
+  assert.deepEqual(plan.instructions[2].accountIndexes, [2, 1, 3, 0, 4]);
+
+  for (let index = 0; index < 2; index += 1) {
+    const verifierData = Buffer.from(plan.instructions[index].dataBase64, "base64");
+    assert.equal(verifierData[0], 1);
+    assert.equal(verifierData[1], 0);
+    assert.equal(verifierData.readUInt16LE(2), 16);
+    assert.equal(verifierData.readUInt16LE(4), index);
+    assert.equal(verifierData.readUInt16LE(6), 80);
+    assert.equal(verifierData.readUInt16LE(8), index);
+    assert.equal(verifierData.readUInt16LE(10), 1);
+    assert.equal(verifierData.readUInt16LE(12), 482);
+    assert.equal(verifierData.readUInt16LE(14), 2);
+    assert.equal(bytesToHex(verifierData.subarray(16, 80)), attestations[index].signatureHex);
+    assert.equal(bytesToHex(verifierData.subarray(80, 112)), attestations[index].attesterPublicKeyHex);
+    assert.equal(verifierData.length, 112);
+    const shared = Buffer.from(plan.instructions[2].dataBase64, "base64").subarray(1, 483);
+    assert.equal(ed25519.verify(verifierData.subarray(16, 80), shared, verifierData.subarray(80, 112)), true);
+  }
+
+  const transceiverData = Buffer.from(plan.instructions[2].dataBase64, "base64");
+  assert.equal(transceiverData[0], 2);
+  assert.equal(bytesToHex(transceiverData.subarray(1, 483)), config.encodedMessageHex);
+  assert.equal(transceiverData.readUInt16LE(483), 0);
+  assert.equal(transceiverData.readUInt16LE(485), 1);
+
+  assert.equal(plan.instruction.role, "transceiverVerifyMessageFromEd25519");
+
+  const messageBytes = Buffer.from(plan.messageBase64, "base64");
+  assert.deepEqual([...messageBytes.subarray(0, 3)], [1, 0, 6]);
+  const budgetData = Buffer.from(plan.instructions[3].dataBase64, "base64");
+  assert.equal(budgetData[0], 2);
+  assert.equal(budgetData.readUInt32LE(1), 600_000);
+  assert.match(plan.messageFingerprintHex, /^[0-9a-f]{64}$/u);
+  assert.equal(plan.preparedTransactionBase64, undefined);
+});
+
+test("signed localnet receipt transaction verifies fee-payer signature independently", async () => {
+  const { config, feePayer } = fixture();
+  const prepared = await prepareSignedLocalnetSolanaDepositReceiptTransaction({
+    ...config,
+    attestations: createAttestations(config),
+    feePayerSigner: {
+      publicKeyBase58: feePayer.publicKeyBase58,
+      sign(messageBytes) {
+        return ed25519.sign(messageBytes, feePayer.signingKey);
+      },
+    },
+  });
+
+  assert.equal(prepared.bundle, "ED25519_ATTESTATIONS_TRANSCEIVER_RECEIPT");
+  assert.match(prepared.preparedTransactionBase64, /^[A-Za-z0-9+/]+={0,2}$/u);
+  assert.match(prepared.preparedTransactionFingerprintHex, /^[0-9a-f]{64}$/u);
+  assert.equal(prepared.signatures.length, 1);
+  const transactionBytes = Buffer.from(prepared.preparedTransactionBase64, "base64");
+  assert.equal(transactionBytes[0], 1);
+  assert.ok(transactionBytes.length <= 1232);
+  const signature = transactionBytes.subarray(1, 65);
+  const messageBytes = transactionBytes.subarray(65);
+  assert.deepEqual(messageBytes, Buffer.from(prepared.messageBase64, "base64"));
+  assert.equal(ed25519.verify(signature, messageBytes, feePayer.publicKey), true);
+  assert.equal(JSON.stringify(prepared).includes("secret"), false);
+});
+
+test("receipt plan rejects missing, duplicate, or mutated attestations", () => {
+  const { config } = fixture();
+  const attestations = createAttestations(config);
+  assert.throws(
+    () =>
+      buildLocalnetSolanaDepositReceiptTransactionPlan({
+        ...config,
+        attestations: [attestations[0]],
+      }),
+    /ExactlyTwoAttestationsRequired/u,
+  );
+  assert.throws(
+    () =>
+      buildLocalnetSolanaDepositReceiptTransactionPlan({
+        ...config,
+        attestations: [attestations[0], attestations[0]],
+      }),
+    /DuplicateAttester/u,
+  );
+  assert.throws(
+    () =>
+      buildLocalnetSolanaDepositReceiptTransactionPlan({
+        ...config,
+        attestations: [
+          attestations[0],
+          {
+            ...attestations[1],
+            signatureHex: mutateLastHexByte(attestations[1].signatureHex),
+          },
+        ],
+      }),
+    /InvalidAttestation/u,
+  );
+});
+
+test("deposit claim transaction plan rejects wrong domain, recipient, or environment", () => {
+  const { config, mint, recipientTokenAccount } = fixture();
+  const differentMint = pubkey("different-mint");
+  assert.throws(
+    () => buildLocalnetSolanaDepositClaimTransactionPlan({ ...config, mintBase58: differentMint.base58 }),
+    /MintMismatch/,
+  );
+  const differentRecipient = pubkey("different-recipient");
+  assert.throws(
+    () =>
+      buildLocalnetSolanaDepositClaimTransactionPlan({
+        ...config,
+        recipientTokenAccountBase58: differentRecipient.base58,
+      }),
+    /RecipientMismatch/,
+  );
+  assert.throws(
+    () => buildLocalnetSolanaDepositClaimTransactionPlan({ ...config, environment: "mainnet", cluster: "mainnet-beta" }),
+    /LocalnetOnly/,
+  );
+
+  const invalidTag = Buffer.from(config.encodedMessageHex, "hex");
+  invalidTag[9] = 1;
+  assert.throws(() => buildLocalnetSolanaDepositClaimTransactionPlan({
+    ...config, encodedMessageHex: invalidTag.toString("hex"),
+  }));
+
+});
+
+test("signed deposit claim transaction rejects signer mismatch or invalid signature", async () => {
+  const { config, feePayer } = fixture();
+  const other = keypair();
+  await assert.rejects(
+    () =>
+      prepareSignedLocalnetSolanaDepositClaimTransaction({
+        ...config,
+        feePayerSigner: {
+          publicKeyBase58: other.publicKeyBase58,
+          sign(messageBytes) {
+            return ed25519.sign(messageBytes, other.signingKey);
+          },
+        },
+      }),
+    /SignerMismatch/,
+  );
+
+  await assert.rejects(
+    () =>
+      prepareSignedLocalnetSolanaDepositClaimTransaction({
+        ...config,
+        feePayerSigner: {
+          publicKeyBase58: feePayer.publicKeyBase58,
+          sign() {
+            return Buffer.alloc(64);
+          },
+        },
+      }),
+    /SignatureVerificationFailed/,
+  );
+});
+
+test("base58 and shortvec helpers reject malformed input while preserving exact bytes", () => {
+  const bytes = hexToBytes(h("roundtrip-bytes"), "roundtrip");
+  assert.deepEqual(base58Decode(base58Encode(bytes)), bytes);
+  assert.throws(() => base58Decode("0".repeat(44)), /InvalidBase58/);
+  assert.deepEqual([...shortvecEncode(127)], [127]);
+  assert.deepEqual([...shortvecEncode(128)], [128, 1]);
+  assert.throws(() => shortvecEncode(-1), /ShortvecLengthInvalid/);
+});

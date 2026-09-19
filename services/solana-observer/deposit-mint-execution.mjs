@@ -24,7 +24,7 @@ export function verifyDepositMintExecution(result, observation, config) {
     stage = "CANONICAL_PACKET";
     // The complete signed packet is rebuilt and compared below; these offsets
     // extract fields ONLY for that canonical format, never for generic messages.
-    check(packet.length >= 1031 && packet.length <= 1232 && packet.toString("base64") === encoded &&
+    check(packet.length >= MESSAGE_LENGTH + 517 && packet.length <= 1232 && packet.toString("base64") === encoded &&
       packet[0] === 1 && packet.subarray(65, 69).equals(Buffer.from([1, 0, 7, 13])));
     // Manager claim is first; the trailing eight bytes encode ComputeBudget.
     const bytes = packet.subarray(-(MESSAGE_LENGTH + 8), -8), message = decodeCanonicalBridgeMessage(bytes);

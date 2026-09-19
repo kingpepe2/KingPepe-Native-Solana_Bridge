@@ -12,7 +12,7 @@ const fields = (v, names) => check(v && !Array.isArray(v) && Object.keys(v).sort
 export function validateProtectedAttestationRequest(input, policy) {
   const p = validateSolanaDeliveryPolicy(policy), v = structuredClone(input);
   fields(v, ["encodedMessageHex", "rawEvidence"]); fields(v.rawEvidence, ["plan", "acceptedCheckpoint"]);
-  check(typeof v.encodedMessageHex === "string" && /^[0-9a-f]{1028}$/u.test(v.encodedMessageHex) && Buffer.byteLength(JSON.stringify(v)) <= 200000);
+  check(typeof v.encodedMessageHex === "string" && /^[0-9a-f]{964}$/u.test(v.encodedMessageHex) && Buffer.byteLength(JSON.stringify(v)) <= 200000);
   const plan = validateDepositOperationPlan(v.rawEvidence.plan, p.operationPolicy);
   const m = decodeCanonicalBridgeMessage(Buffer.from(v.encodedMessageHex, "hex")), d = m.deployment, op = p.operationPolicy;
   check(m.action === "DepositClaim" && m.direction === "NativeToSolana" && m.feeAtomic === 0n &&
