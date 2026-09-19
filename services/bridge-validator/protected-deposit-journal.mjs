@@ -4,7 +4,7 @@
 import { createHash } from "node:crypto";
 import { assertWindowsProtectedStore } from "../../shared/windows/protected-store.mjs";
 import { requireIntegrityGuard } from "../supervisor/protected-integrity.mjs";
-import { requireVerifiedRegtestReserve, verifiedReserveChain } from "../../native/node/native-raw-evidence.mjs";
+import { requireVerifiedNativeReserve, verifiedReserveChain } from "../../native/node/native-raw-evidence.mjs";
 import { canonicalJson } from "../../native/frost/policy/native-signing-policy.mjs";
 import { parseNativeTransactionHex } from "../../native/node/native-taproot-transaction.mjs";
 import { requireProtectedClaimObservation } from "../solana-observer/solana-deposit-claim-observer.mjs";
@@ -122,8 +122,9 @@ export class ProtectedDepositOperationJournal {
     });
   }
   async retainFinalizedCredit(operationId, { receipt, encodedMessageHex, reserveAllocationIdHex }) {
-    requireVerifiedRegtestReserve(receipt);
-    const chain = verifiedReserveChain(receipt), fact = structuredClone({ acceptedCheckpoint: receipt.acceptedCheckpoint,
+    check(JOURNALS.has(this), "ProtectedDepositJournalRequired");
+    requireVerifiedNativeReserve(receipt, this.#policy.nativeGenesis);
+    const chain = verifiedReserveChain(receipt, this.#policy.nativeGenesis), fact = structuredClone({ acceptedCheckpoint: receipt.acceptedCheckpoint,
       reserveBasis: receipt.reserveBasis, encodedMessageHex, reserveAllocationIdHex });
     return this.#exclusive(() => {
       const { state, revision } = this.#read(), record = this.#record(state, operationId);

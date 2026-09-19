@@ -7,9 +7,15 @@
   "mainnetActivation": "DISABLED",
   "productionSigningAuthorized": false,
   "productionBroadcastAuthorized": false,
-  "sourceStatus": "ONE_WAY_CONVERSION_VALIDATION_IN_PROGRESS",
-  "historyRewrite": "PRIVATE_CANDIDATE_UNDER_REVIEW_NOT_PUBLISHED",
-  "exactShaCi": "PENDING_NEW_REWRITTEN_HEAD",
+  "sourceStatus": "ONE_WAY_REWRITE_VALIDATED_MAINNET_BINDING_IN_PROGRESS",
+  "historyRewrite": "PUBLISHED_REACHABLE_PUBLIC_REFS_REVIEWED",
+  "exactShaCi": {
+    "sourceSha": "50d8dcb73e254cbba85fdf06c4a1f09626400d4d",
+    "runId": "35464725988",
+    "requiredJobsPassed": 4,
+    "skippedSteps": 0,
+    "laterChangesRequireMatchingCi": true
+  },
   "borsh": {
     "version": 3,
     "magic": "KPEPBRG3",
@@ -36,10 +42,11 @@
     "nativeMinerFeePolicy": "DYNAMIC_NODE_ESTIMATE_WITH_CAP",
     "feeReadiness": "BLOCKED_NORMAL_NODE_ESTIMATE_INSUFFICIENT_DATA"
   },
-  "recoveryProcedure": "PENDING_CURRENT_ONE_WAY_EXACT_SOURCE_DRILL",
+  "recoveryProcedure": "TESTED",
+  "recoveryScope": "SOURCE_50D8DCB_LOCALNET_REGTEST_ENCRYPTED_RESTORE_AND_RESTART_NOT_PRODUCTION_PORTABILITY",
   "historicalRecoveryEvidence": "RETAINED_PRIVATELY_SOURCE_BOUND_NOT_CURRENT_SHA_CERTIFICATION",
   "publicTestUpdate": "PENDING_REVIEWED_FORWARD_DEPLOYMENT",
-  "freshForwardDevnet": "COMPLETED_MATCH_PRE_REWRITE_SOURCE",
+  "freshForwardDevnet": "COMPLETED_MATCH_REBUILT_IDENTICAL_AFTER_REWRITE",
   "mainnetDeployment": "NOT_DEPLOYED",
   "fundingRequest": "AFTER_NON_FUNDING_READINESS",
   "activationApproval": "REQUIRED_AFTER_FUNDING_AND_UNCHANGED_ARTIFACT_PREFLIGHT",

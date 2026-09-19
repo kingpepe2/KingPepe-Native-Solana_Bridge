@@ -43,10 +43,17 @@ operation evidence were preserved in a verified private local safety mirror.
 This preserves review and rollback provenance without retaining the retired
 product implementation in the rewritten public source.
 
-The clean conversion source passed all four required CI jobs and every step
-before TEST deployment. Rewritten-source build validation and exact-SHA CI are
-still pending. Historical CI is not a certificate for a rewritten commit.
-The private evidence retains source bindings and failed setup diagnostics.
+The deployment preceded the authorized history rewrite. Its rewritten source
+identity is `ba7f0cb8ede2d989425cfa37a906a426a23a937e`. Both deployed program
+binaries were rebuilt byte-for-byte from the later reviewed source
+`50d8dcb73e254cbba85fdf06c4a1f09626400d4d`, which passed all four required jobs
+and every step in [CI 35464725988](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/35464725988).
+That CI includes fresh local forward flow, encrypted restore, deployment
+integrity, reconciliation and Native reorganization checks. The retained Devnet
+journal reopened under that source and recognized the completed operation.
+The manifest records this rebuild lineage; it does not claim a new deployment
+transaction. Historical CI is not used to certify the rewritten commit.
+Private evidence preserves the old/new commit map and failed setup diagnostics.
 
 The common-host FROST risk, account-bound protected state, configured RPC trust,
 two project attesters and centralized upgrade authority remain explicit.

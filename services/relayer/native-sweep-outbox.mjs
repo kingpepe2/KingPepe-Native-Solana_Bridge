@@ -3,9 +3,10 @@
 import { createHash } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { NativeRpcClient, normalizeEndpoint } from "../../native/node/native-rpc-client.mjs";
-import { LocalNativeEvidenceVerifier, requireVerifiedRegtestChain } from "../../native/node/native-raw-evidence.mjs";
+import { LocalNativeEvidenceVerifier, requireVerifiedNativeChain } from "../../native/node/native-raw-evidence.mjs";
 import { parseNativeTransactionHex } from "../../native/node/native-taproot-transaction.mjs";
 import { assertWindowsProtectedStore } from "../../shared/windows/protected-store.mjs";
+import { assertMainnetProtectedDeployment } from "../../shared/network-identity.mjs";
 import { requireIntegrityGuard } from "../supervisor/protected-integrity.mjs";
 import { validateDepositOperationPolicy, depositOperationPolicyDigest, decodeDepositOperationState,
   DEPOSIT_OPERATION_PROTOCOL, MAX_DEPOSIT_OPERATIONS } from "../bridge-validator/deposit-operation-state.mjs";
@@ -13,6 +14,7 @@ import { canonicalJson } from "../../native/frost/policy/native-signing-policy.m
 
 export const NATIVE_OUTBOX_PROTOCOL = "KINGPEPE_PROTECTED_NATIVE_SWEEP_OUTBOX_V1";
 const INSTANCES = new WeakSet(), MAX_SENDS = 32;
+const MAINNET_OUTBOX = Symbol("Protected Mainnet Native sweep outbox");
 const check = (v, code = "NativeSweepOutboxRejected") => { if (!v) throw new Error(code); };
 const hash = bytes => createHash("sha256").update(bytes).digest("hex");
 const fields = (v, names) => check(v && !Array.isArray(v) && Object.keys(v).sort().join() === [...names].sort().join());
@@ -53,12 +55,25 @@ export function validateNativeSweepDelivery(input, policy) {
 
 export class ProtectedNativeSweepOutbox {
   #store; #guard; #policy; #rpc; #verifier; #lease; #revision; #pending; #cursor = 0; #busy = false; #running = false; #closed = false; #stopped = false;
-  static async open({ store, integrity, policy, rpc, nativeVerifier }) {
+  #broadcastAuthorized = false;
+  static async openMainnet(options) {
+    const policy = validateDepositOperationPolicy(options.policy);
+    assertWindowsProtectedStore(options.store, "RELAYER", "native-sweep-outbox");
+    assertMainnetProtectedDeployment(options.store.context, policy);
+    check(options.productionBroadcastAuthorized === false || options.productionBroadcastAuthorized === true,
+      "NativeMainnetBroadcastAdmissionRequired");
+    return ProtectedNativeSweepOutbox.open({ ...options, policy }, MAINNET_OUTBOX);
+  }
+  static async open({ store, integrity, policy, rpc, nativeVerifier, productionBroadcastAuthorized }, capability) {
     assertWindowsProtectedStore(store, "RELAYER", "native-sweep-outbox"); requireIntegrityGuard(integrity, "RELAYER");
     check(rpc instanceof NativeRpcClient && nativeVerifier instanceof LocalNativeEvidenceVerifier);
     normalizeEndpoint(rpc.endpointForReport(), { localOnly: true });
     const self = new ProtectedNativeSweepOutbox(); self.#policy = validateDepositOperationPolicy(policy);
     const { environment, nativeGenesis, solanaDeployment, keyEpoch } = self.#policy;
+    const mainnet = environment === "mainnet" && capability === MAINNET_OUTBOX;
+    check(environment === "localnet" || environment === "devnet" || mainnet, "NativeSweepExplicitNetworkRequired");
+    check(nativeVerifier.nativeGenesis === nativeGenesis, "NativeSweepVerifierNetworkMismatch");
+    self.#broadcastAuthorized = !mainnet || productionBroadcastAuthorized === true;
     integrity.assertDeployment({ environment, nativeGenesis, solanaDeployment, keyEpoch });
     check(Object.entries({ environment, nativeGenesis, solanaDeployment, keyEpoch }).every(([k, v]) => store.context[k] === v));
     self.#store = store; self.#guard = integrity; self.#rpc = rpc; self.#verifier = nativeVerifier;
@@ -133,8 +148,9 @@ export class ProtectedNativeSweepOutbox {
     check(raw === record.signedTransactionHex, "NativeOutboxBroadcastConflict"); return true;
   }
   async #sameBroadcastChain(tipHash) {
-    const observed = await this.#rpc.getSourceSnapshot({ expectedNetwork: "regtest", expectedGenesisHash: this.#policy.nativeGenesis });
-    check(observed.network === "regtest" && observed.genesisHash === this.#policy.nativeGenesis, "NativeOutboxBroadcastConflict");
+    const expectedNetwork = this.#policy.environment === "mainnet" ? "main" : "regtest";
+    const observed = await this.#rpc.getSourceSnapshot({ expectedNetwork, expectedGenesisHash: this.#policy.nativeGenesis });
+    check(observed.network === expectedNetwork && observed.genesisHash === this.#policy.nativeGenesis, "NativeOutboxBroadcastConflict");
     check(observed.state === "READY" && observed.headers === observed.bestHeight && observed.bestHash === tipHash, "NativeSweepBroadcastSourceStale");
   }
   async runOne() {
@@ -153,11 +169,12 @@ export class ProtectedNativeSweepOutbox {
         return null;
       });
       if (!record) return Object.freeze({ state: "WAITING_FOR_DEPENDENCY" });
-      const chain = await this.#verifier.observeChain(); requireVerifiedRegtestChain(chain);
+      const chain = await this.#verifier.observeChain(); requireVerifiedNativeChain(chain, this.#policy.nativeGenesis);
       check(chain.genesis === this.#policy.nativeGenesis, "NativeOutboxBroadcastConflict");
       await this.#sameBroadcastChain(chain.tipHash);
       let known = await this.#known(record);
       if (!known) {
+        check(this.#broadcastAuthorized, "NativeMainnetBroadcastNotAuthorized");
         if (record.sendAttempts >= MAX_SENDS) return Object.freeze({ state: "QUEUED_BY_LIMIT" });
         const p = record.plan, fee = p.inputs.reduce((n, i) => n + BigInt(i.amountAtomic), 0n) - BigInt(p.depositIntent.amountAtomic);
         // Same independent full raw-evidence verifier used by the signers.

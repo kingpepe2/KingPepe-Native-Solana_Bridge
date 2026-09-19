@@ -1,9 +1,10 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
-// LOCALNET-only protected service composition. No private share/key, production
-// enablement, approval queue, replacement Native inputs or economic repair.
+// Explicitly network-bound protected composition. No private share/key,
+// automatic production enablement, replacement inputs or economic repair.
 import { createHash } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { assertWindowsProtectedStore } from "../../shared/windows/protected-store.mjs";
+import { assertMainnetProtectedDeployment } from "../../shared/network-identity.mjs";
 import { canonicalJson } from "../../native/frost/policy/native-signing-policy.mjs";
 import { LocalNativeEvidenceVerifier } from "../../native/node/native-raw-evidence.mjs";
 import { attachTaprootWitnesses } from "../../native/node/native-taproot-transaction.mjs";
@@ -25,29 +26,43 @@ import { decodeCanonicalBridgeMessage } from "../../shared/protocol/canonical-me
 import { validateDepositControllerPolicy, depositControllerPolicyDigest, decodeDepositControllerState,
   newDepositControllerRecord, controllerAttestationRequest } from "./deposit-controller-state.mjs";
 const INSTANCES = new WeakSet(), HASH = /^[0-9a-f]{64}$/u;
+const MAINNET_CONTROLLER = Symbol("Protected Mainnet deposit controller");
 const check = (v, code = "DepositControllerUnavailable") => { if (!v) throw new Error(code); };
 const digest = b => createHash("sha256").update(b).digest("hex"), same = (a, b) => canonicalJson(a) === canonicalJson(b);
 const result = (operationId, state, reason) => Object.freeze({ operationId, state, reason });
 export class ProtectedDepositController {
   #store; #guard; #policy; #journal; #native; #jobs; #nativeOutbox; #attesters; #payer; #solanaOutbox;
   #chain; #rpc; #observer; #lease; #revision; #pending; #closed = false; #stopped = false; #busy = false; #notify;
-  static async open({ store, integrity, policy, journal, nativeVerifier, jobs, nativeOutbox, attesters, feePayer, solanaOutbox, endpoint, onTransition = async () => {} }) {
+  static async openMainnet(options) {
+    const policy = validateDepositControllerPolicy(options.policy);
+    assertWindowsProtectedStore(options.store, "BRIDGE_VALIDATOR", "deposit-controller");
+    assertMainnetProtectedDeployment(options.store.context, policy.deliveryPolicy.operationPolicy);
+    return ProtectedDepositController.open({ ...options, policy }, MAINNET_CONTROLLER);
+  }
+  static async open({ store, integrity, policy, journal, nativeVerifier, jobs, nativeOutbox, attesters, feePayer, solanaOutbox, endpoint, onTransition = async () => {} }, capability) {
     const p = validateDepositControllerPolicy(policy), op = p.deliveryPolicy.operationPolicy;
+    const mainnet = op.environment === "mainnet" && capability === MAINNET_CONTROLLER;
+    check(op.environment === "localnet" || mainnet, "DepositControllerExplicitNetworkRequired");
     assertWindowsProtectedStore(store, "BRIDGE_VALIDATOR", "deposit-controller"); requireIntegrityGuard(integrity, "BRIDGE_VALIDATOR");
     requireDepositOperationJournal(journal, op, integrity); requireSweepJobClient(jobs, op); requireNativeSweepClient(nativeOutbox, op);
     requireSolanaDepositClient(solanaOutbox, p.deliveryPolicy); requireDepositFeePayerClient(feePayer, p.deliveryPolicy);
     check(Array.isArray(attesters) && attesters.length === 2);
     attesters.forEach((v, i) => requireDepositAttesterClient(v, p.deliveryPolicy, ["ATTESTER_A", "ATTESTER_B"][i]));
-    check(nativeVerifier instanceof LocalNativeEvidenceVerifier && typeof onTransition === "function");
+    check(nativeVerifier instanceof LocalNativeEvidenceVerifier && nativeVerifier.nativeGenesis === op.nativeGenesis && typeof onTransition === "function");
     const domain = { environment: op.environment, nativeGenesis: op.nativeGenesis, solanaDeployment: op.solanaDeployment, keyEpoch: op.keyEpoch };
     integrity.assertDeployment(domain); check(Object.entries(domain).every(([k, v]) => store.context[k] === v));
     const self = new ProtectedDepositController();
     self.#store = store; self.#guard = integrity; self.#policy = p; self.#journal = journal; self.#native = nativeVerifier;
     self.#jobs = jobs; self.#nativeOutbox = nativeOutbox; self.#attesters = [...attesters]; self.#payer = feePayer; self.#solanaOutbox = solanaOutbox; self.#notify = onTransition;
-    // These concrete transports all address the same strict LOCAL endpoint.
-    self.#chain = new LocalDeploymentRpc({ endpoint }); self.#rpc = new SolanaLocalRpcClient({ endpoint });
-    self.#observer = new SolanaDepositClaimObserver({ endpoint, config: { environment: "localnet", cluster: "localnet",
-      managerProgramIdHex: op.managerProgramId, transceiverProgramIdHex: op.transceiverProgramId, mintHex: op.mint, nativeDecimals: 8 } });
+    // Read-only transports share one endpoint and exact deployment identity.
+    // Signing/delivery remain separate protected roles under current admission.
+    const rpcOptions = { endpoint, expectedGenesis: op.solanaGenesis };
+    self.#chain = mainnet ? LocalDeploymentRpc.createMainnet(rpcOptions) : new LocalDeploymentRpc({ endpoint });
+    self.#rpc = mainnet ? SolanaLocalRpcClient.createMainnet(rpcOptions) : new SolanaLocalRpcClient({ endpoint });
+    const observerOptions = { endpoint, config: { environment: op.environment, cluster: op.environment, solanaGenesis: op.solanaGenesis,
+      protocolId: op.protocolId, nativeNetwork: op.nativeNetwork, nativeGenesis: op.nativeGenesis, solanaDeployment: op.solanaDeployment,
+      managerProgramIdHex: op.managerProgramId, transceiverProgramIdHex: op.transceiverProgramId, mintHex: op.mint, nativeDecimals: 8 } };
+    self.#observer = mainnet ? SolanaDepositClaimObserver.createMainnet(observerOptions) : new SolanaDepositClaimObserver(observerOptions);
     try { self.#lease = await store.acquireLease(); self.#read(); INSTANCES.add(self); return self; }
     catch (error) { try { await self.#report(error); } finally { await self.close(); } throw new Error("DepositControllerUnavailable"); }
   }

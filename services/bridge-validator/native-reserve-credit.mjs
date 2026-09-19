@@ -3,7 +3,7 @@
 // serialized proof flag substitutes for the verifier's private capability.
 import { createHash } from "node:crypto";
 import { bridgeInputDigest } from "../../shared/protocol/bridge-inputs.mjs";
-import { LocalNativeEvidenceVerifier, requireVerifiedRegtestReserve, verifiedReserveChain } from "../../native/node/native-raw-evidence.mjs";
+import { LocalNativeEvidenceVerifier, requireVerifiedNativeReserve, verifiedReserveChain } from "../../native/node/native-raw-evidence.mjs";
 import { parseNativeTransactionHex } from "../../native/node/native-taproot-transaction.mjs";
 import { canonicalJson, canonicalUintDecimal } from "../../native/frost/policy/native-signing-policy.mjs";
 import { encodeCanonicalBridgeMessage, decodeCanonicalBridgeMessage } from "../../shared/protocol/canonical-message.mjs";
@@ -27,8 +27,9 @@ export function nativeReserveCreditEvidenceInput(plan, policy, acceptedCheckpoin
     ...(acceptedCheckpoint === undefined ? {} : { acceptedCheckpoint: structuredClone(acceptedCheckpoint) }) };
 }
 export function createVerifiedNativeReserveCredit({ plan, policy, receipt, validityWindow }) {
-  requireVerifiedRegtestReserve(receipt);
-  const chain = verifiedReserveChain(receipt), p = validateDepositOperationPolicy(policy), operation = validateDepositOperationPlan(plan, p);
+  const p = validateDepositOperationPolicy(policy);
+  requireVerifiedNativeReserve(receipt, p.nativeGenesis);
+  const chain = verifiedReserveChain(receipt, p.nativeGenesis), operation = validateDepositOperationPlan(plan, p);
   check(chain.genesis === p.nativeGenesis);
   const d = operation.depositIntent, validity = window(validityWindow), identity = depositOperationPolicyDigest(p);
   const reserveAllocationIdHex = bridgeInputDigest("ReserveAllocation", { protocol: "KINGPEPE_PROTECTED_RESERVE_ALLOCATION_V1", policyDigest: identity,
@@ -48,7 +49,8 @@ export function createVerifiedNativeReserveCredit({ plan, policy, receipt, valid
 }
 export async function recoverNativeReserveCredit({ journal, integrity, policy, nativeVerifier, operationId, validityWindow }) {
   const p = validateDepositOperationPolicy(policy); requireIntegrityGuard(integrity, "BRIDGE_VALIDATOR");
-  requireDepositOperationJournal(journal, p, integrity); check(nativeVerifier instanceof LocalNativeEvidenceVerifier);
+  requireDepositOperationJournal(journal, p, integrity);
+  check(nativeVerifier instanceof LocalNativeEvidenceVerifier && nativeVerifier.nativeGenesis === p.nativeGenesis);
   const record = await journal.inspect(operationId);
   check(record.broadcastAttempted && record.signedTransactionHex !== null, "NativeReserveCreditBroadcastNotPrepared");
   const receipt = await nativeVerifier.verifyReserve(nativeReserveCreditEvidenceInput(record.plan, p, record.finalizedCredit?.acceptedCheckpoint));
@@ -69,7 +71,8 @@ export async function recoverNativeReserveCredit({ journal, integrity, policy, n
     operationId, credit: current.finalizedCredit });
 }
 export function createRawNativeCreditAttestationVerifier({ policy, nativeVerifier }) {
-  const p = validateDepositOperationPolicy(policy); check(nativeVerifier instanceof LocalNativeEvidenceVerifier);
+  const p = validateDepositOperationPolicy(policy);
+  check(nativeVerifier instanceof LocalNativeEvidenceVerifier && nativeVerifier.nativeGenesis === p.nativeGenesis);
   return async ({ encodedMessageHex, rawEvidence }) => {
     check(typeof encodedMessageHex === "string" && /^[0-9a-f]{964}$/u.test(encodedMessageHex));
     check(rawEvidence && Object.keys(rawEvidence).sort().join() === "acceptedCheckpoint,plan");

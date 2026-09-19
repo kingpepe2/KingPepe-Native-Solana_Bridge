@@ -3,9 +3,11 @@
   "scope": "DEVNET_TEST_ONLY",
   "architecture": "ONE_WAY",
   "supportedDirection": "KINGPEPE_NATIVE_TO_SOLANA",
-  "sourceSha": "0f6ee19c9b304cd5c930a27e6c1509ae19deef1c",
+  "sourceSha": "50d8dcb73e254cbba85fdf06c4a1f09626400d4d",
+  "sourceBinding": "IDENTICAL_PROGRAM_BYTES_REBUILT_AFTER_AUTHORIZED_HISTORY_REWRITE",
+  "rewrittenDeploymentSourceSha": "ba7f0cb8ede2d989425cfa37a906a426a23a937e",
   "sourceCi": {
-    "runId": "35462677931",
+    "runId": "35464725988",
     "requiredJobsPassed": 4,
     "skippedSteps": 0
   },

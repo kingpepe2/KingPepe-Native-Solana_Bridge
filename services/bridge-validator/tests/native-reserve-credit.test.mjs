@@ -8,6 +8,8 @@ import path from "node:path";
 import os from "node:os";
 import { createHash } from "node:crypto";
 import { depositOperationFixture } from "../../../tests/integration/deposit-operation-fixture.mjs";
+import { solanaDeliveryFixture } from "../../../tests/integration/solana-delivery-fixture.mjs";
+import { LocalNativeEvidenceVerifier } from "../../../native/node/native-raw-evidence.mjs";
 import { nativeReserveCreditEvidenceInput, createVerifiedNativeReserveCredit, recoverNativeReserveCredit,
   createRawNativeCreditAttestationVerifier } from "../native-reserve-credit.mjs";
 const repoRoot = path.resolve(import.meta.dirname, "../../.."), h = v => createHash("sha256").update(v).digest("hex");
@@ -40,6 +42,16 @@ for (const [name, change] of [
 test("credit factory never accepts serialized reserve facts or proof flags as genuine validation", () => {
   assert.throws(() => createVerifiedNativeReserveCredit({ plan: fixture.plan, policy: fixture.policy,
     receipt: { ...fixture.finalizedCredit, proofVerified: true }, validityWindow: { validFrom: "1", validUntil: "2" } }), /RAW_NATIVE_VERIFIED_RESERVE_REQUIRED/u);
+});
+test("Mainnet credit requires its concrete genesis-bound verifier and cannot accept serialized proof", async () => {
+  const policy = (await solanaDeliveryFixture({ mainnet: true })).policy.operationPolicy;
+  const mainnetVerifier = LocalNativeEvidenceVerifier.createMainnet({ rpc: {}, executable: "/unused-unit-fixture" });
+  const testVerifier = new LocalNativeEvidenceVerifier({ rpc: {}, executable: "/unused-unit-fixture" });
+  assert.equal(typeof createRawNativeCreditAttestationVerifier({ policy, nativeVerifier: mainnetVerifier }), "function");
+  assert.throws(() => createRawNativeCreditAttestationVerifier({ policy, nativeVerifier: testVerifier }));
+  assert.throws(() => createRawNativeCreditAttestationVerifier({ policy: fixture.policy, nativeVerifier: mainnetVerifier }));
+  assert.throws(() => createVerifiedNativeReserveCredit({ policy, plan: {},
+    receipt: { proofVerified: true, reserveBasis: { genesis: policy.nativeGenesis } } }), /RAW_NATIVE_VERIFIED_RESERVE_REQUIRED/);
 });
 test("credit recovery rejects caller journal and guard adapters before any side effect", async () => {
   let called = false;

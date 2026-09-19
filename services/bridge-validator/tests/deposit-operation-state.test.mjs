@@ -53,9 +53,9 @@ test("protected deposit journal capability cannot be forged from its prototype",
   assert.throws(() => requireDepositOperationJournal(forged, fixture.policy, {}), /ProtectedDepositJournalRequired/u);
   assert.throws(() => requireDepositOperationJournal(new Proxy(forged, {}), fixture.policy, {}), /ProtectedDepositJournalRequired/u);
 });
-test("protected finalized-credit entry point does not accept serializable proof flags", async () => {
+test("protected finalized-credit entry point rejects a forged journal before reading its bound network", async () => {
   const forged = Object.create(ProtectedDepositOperationJournal.prototype);
-  await assert.rejects(forged.retainFinalizedCredit(fixture.plan.operationId, { receipt: { ...fixture.finalizedCredit, proofVerified: true } }), /RAW_NATIVE_VERIFIED_RESERVE_REQUIRED/u);
+  await assert.rejects(forged.retainFinalizedCredit(fixture.plan.operationId, { receipt: { ...fixture.finalizedCredit, proofVerified: true } }), /ProtectedDepositJournalRequired/u);
 });
 test("protected finalized-mint entry point does not accept caller settlement flags", async () => {
   const forged = Object.create(ProtectedDepositOperationJournal.prototype);
