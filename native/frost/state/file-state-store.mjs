@@ -30,6 +30,7 @@ export class FileBackedFrostStateStore {
     // Genuine immutable localnet/REGTEST capability, checked before any I/O.
     // Production provisioning is not implemented by this explicit test setup API.
     assertNativeFrostRuntimePolicy(options.policy);
+    if (options.policy.environment !== "localnet") throw new Error("FrostPlaintextLocalOnly");
     const store = new FileBackedFrostStateStore(options);
     validateRuntimeFile(store.#file, store.#repoRoot);
     try {

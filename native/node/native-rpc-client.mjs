@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { validateRuntimeFile } from "../../shared/runtime-path-boundary.mjs";
 import { scriptFromWitnessAddress } from "./witness-address.mjs";
+import { assertWindowsProtectedStore } from "../../shared/windows/protected-store.mjs";
+import { NATIVE_MAINNET_GENESIS } from "../../shared/network-identity.mjs";
 
 export const NATIVE_RPC_ADAPTER_PROTOCOL =
   "KINGPEPE_NATIVE_SOLANA_BRIDGE/NATIVE_RPC_ADAPTER/V1";
@@ -24,6 +26,7 @@ const METHOD_ALLOWLIST = new Set([
   "getblockheader",
   "getnetworkinfo",
   "getmempoolinfo",
+  "getindexinfo",
   "estimatesmartfee",
   "getrawtransaction",
   "gettxout",
@@ -52,6 +55,26 @@ export class NativeRpcClient {
     this.#timeoutMs = checkedPositiveInteger(options.timeoutMs ?? DEFAULT_TIMEOUT_MS, "timeoutMs");
     this.#maximumResponseBytes = checkedPositiveInteger(options.maximumResponseBytes ?? 8_000_000, "maximumResponseBytes");
     if (this.#maximumResponseBytes > 16_000_000) throw new Error("NativeRpcResponseLimitTooLarge");
+  }
+
+  // Mainnet credentials can only enter through an actual protected role store.
+  // No plaintext file/header fallback and no injected production fetch handler.
+  static fromProtectedMainnetCredentials(store) {
+    assertWindowsProtectedStore(store, "NATIVE_OBSERVER", "native-rpc-auth");
+    if (store.context.environment !== "mainnet" || store.context.nativeGenesis !== NATIVE_MAINNET_GENESIS)
+      throw new Error("NativeRpcMainnetProtectedContextRequired");
+    const { payload } = store.read();
+    try {
+      const credentials = JSON.parse(payload.toString("utf8"));
+      if (!credentials || Object.keys(credentials).sort().join() !== "endpoint,password,username" ||
+          typeof credentials.username !== "string" || !/^[^:\r\n\0]{1,256}$/u.test(credentials.username) ||
+          typeof credentials.password !== "string" || !/^[^\r\n\0]{1,1024}$/u.test(credentials.password)) throw new Error();
+      const endpoint = normalizeEndpoint(credentials.endpoint, { localOnly: true });
+      const client = new NativeRpcClient({ endpoint });
+      client.#authHeader = "Basic " + Buffer.from(credentials.username + ":" + credentials.password).toString("base64");
+      return client;
+    } catch { throw new Error("NativeRpcProtectedCredentialsRejected"); }
+    finally { payload.fill(0); }
   }
 
   endpointForReport() {

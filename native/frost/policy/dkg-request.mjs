@@ -2,6 +2,7 @@
 // Original project DKG metadata. This does not alter the pinned FROST primitive.
 import { bridgeInputDigest } from "../../../shared/protocol/bridge-inputs.mjs";
 import { REGTEST_GENESIS } from "../../node/native-raw-evidence.mjs";
+import { NATIVE_MAINNET_GENESIS } from "../../../shared/network-identity.mjs";
 import { REQUIRED_FROST_SIGNERS, REQUIRED_FROST_THRESHOLD, assertHashHex,
   assertNativeFrostRuntimePolicy, canonicalJson, dataArray, dataRecord } from "./native-signing-policy.mjs";
 
@@ -27,10 +28,11 @@ function epoch(value) {
 
 export function normalizeNativeFrostKeyContext(value) {
   const context = fields(value, CONTEXT_FIELDS, "FrostDkgContext");
-  if (context.protocol !== CONTEXT_PROTOCOL || context.environment !== "localnet" || context.nativeNetwork !== "regtest" ||
-      context.nativeGenesisHash !== REGTEST_GENESIS) throw new Error("FrostDkgLocalContextRequired");
-  return Object.freeze({ protocol: CONTEXT_PROTOCOL, environment: "localnet", nativeNetwork: "regtest",
-    nativeGenesisHash: REGTEST_GENESIS, solanaDeployment: assertHashHex(context.solanaDeployment, "DKG deployment"),
+  const local = context.environment === "localnet" && context.nativeNetwork === "regtest" && context.nativeGenesisHash === REGTEST_GENESIS;
+  const mainnet = context.environment === "mainnet" && context.nativeNetwork === "mainnet" && context.nativeGenesisHash === NATIVE_MAINNET_GENESIS;
+  if (context.protocol !== CONTEXT_PROTOCOL || (!local && !mainnet)) throw new Error("FrostDkgLocalContextRequired");
+  return Object.freeze({ protocol: CONTEXT_PROTOCOL, environment: context.environment, nativeNetwork: context.nativeNetwork,
+    nativeGenesisHash: context.nativeGenesisHash, solanaDeployment: assertHashHex(context.solanaDeployment, "DKG deployment"),
     bridgeProgramId: assertHashHex(context.bridgeProgramId, "DKG bridge program"),
     transceiverProgramId: assertHashHex(context.transceiverProgramId, "DKG transceiver program"),
     mint: assertHashHex(context.mint, "DKG mint"), keyEpoch: epoch(context.keyEpoch) });

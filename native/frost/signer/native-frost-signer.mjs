@@ -54,6 +54,8 @@ export class NativeFrostSigner {
     this.#keyContext = nativeFrostKeyContext(this.#policy);
     this.#dkgRequest = createTwoPartyDkgRequest({ epoch: this.#keyContext.keyEpoch, context: this.#keyContext });
     this.#stateStore = options.stateStore;
+    if (this.#keyContext.environment === "mainnet" && !(this.#stateStore instanceof WindowsProtectedFrostStateStore))
+      throw new Error("MainnetFrostProtectedStateRequired");
     if (this.#stateStore instanceof WindowsProtectedFrostStateStore) this.#stateStore.assertPolicy(this.#policy);
     if (options.nativeEvidenceValidator !== undefined && typeof options.nativeEvidenceValidator !== "function") {
       throw new Error("FROST native evidence validator must be a function");

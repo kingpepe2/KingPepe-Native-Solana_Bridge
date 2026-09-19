@@ -18,8 +18,17 @@ export class WindowsProtectedFrostStateStore {
   static createLocal(options, policy) {
     assertNativeFrostRuntimePolicy(policy);
     if (options.context.environment !== "localnet") throw new Error("LocalProtectedFrostContextRequired");
+    return this.#create(options, policy);
+  }
+  static createMainnetPreparation(options, policy) {
+    assertNativeFrostRuntimePolicy(policy);
+    if (options.context.environment !== "mainnet" || policy.environment !== "mainnet" || policy.purpose !== "MAINNET_DKG_PREPARATION")
+      throw new Error("MainnetProtectedFrostPreparationRequired");
+    return this.#create(options, policy);
+  }
+  static #create(options, policy) {
     const bound = nativeFrostKeyContext(policy);
-    if (options.context.nativeGenesis !== bound.nativeGenesisHash || options.context.solanaDeployment !== bound.solanaDeployment ||
+    if (options.context.environment !== bound.environment || options.context.nativeGenesis !== bound.nativeGenesisHash || options.context.solanaDeployment !== bound.solanaDeployment ||
         options.context.keyEpoch !== bound.keyEpoch) throw new Error("ProtectedFrostPolicyMismatch");
     const payload = Buffer.from(JSON.stringify(initialSignerState(options.context.role)));
     try { return new WindowsProtectedFrostStateStore(WindowsProtectedStore.create(options, payload), options.context.role); }

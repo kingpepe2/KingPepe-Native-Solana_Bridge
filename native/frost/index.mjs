@@ -6,6 +6,7 @@ export {
   canonicalJson,
   createNativeSigningPolicy,
   createLocalNativeDkgPolicy,
+  createMainnetNativeDkgPolicy,
   evaluateNativeSigningPolicy,
   nativeSigningIntentDigest,
   sha256Canonical,
