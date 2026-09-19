@@ -2,7 +2,8 @@ use num_bigint::BigUint;
 
 use crate::bytes::{parse_hex_fixed, to_hex};
 use crate::difficulty::{
-    expected_next_work_required, validate_compact_target, DifficultyNode, PowParameters,
+    difficulty_adjustment_interval, expected_next_work_required, validate_compact_target,
+    DifficultyNode, PowParameters,
 };
 use crate::header::{
     block_proof, parse_header, serialize_header, uint256_max, verify_proof_of_work, ParsedHeader,
@@ -215,7 +216,7 @@ impl HeaderChain {
         }
         assert_contextual_header_version(parsed.version, next_height, self.params)?;
         let expected = expected_next_work_required(
-            &self.difficulty_nodes(),
+            &self.difficulty_nodes()?,
             parsed.time,
             &self.params.pow_parameters(),
         )?;
@@ -243,15 +244,21 @@ impl HeaderChain {
         Ok(meta)
     }
 
-    fn difficulty_nodes(&self) -> Vec<DifficultyNode> {
-        self.headers
-            .iter()
-            .map(|header| DifficultyNode {
-                height: header.height,
-                time: header.time,
-                bits: header.bits,
-            })
-            .collect()
+    fn difficulty_nodes(&self) -> Result<Vec<DifficultyNode>, NativeProofError> {
+        // Difficulty uses at most the current adjustment interval, including
+        // the last boundary. Avoid copying the complete chain for every new
+        // header: that made full Mainnet verification quadratic in height.
+        let interval = difficulty_adjustment_interval(&self.params.pow_parameters())?;
+        Ok(
+            self.headers[self.headers.len().saturating_sub(interval as usize)..]
+                .iter()
+                .map(|header| DifficultyNode {
+                    height: header.height,
+                    time: header.time,
+                    bits: header.bits,
+                })
+                .collect(),
+        )
     }
 }
 

@@ -127,6 +127,45 @@ export class NativeRpcClient {
     return (await this.call("getblockchaininfo")).result;
   }
 
+  // Bounded, read-only bootstrap for independent full-header verification.
+  // No caller-selected method, forwarding, signing or broadcast is accepted.
+  async getHeadersByHeight(startHeight, count) {
+    if (!Number.isSafeInteger(startHeight) || startHeight < 1 || !Number.isSafeInteger(count) ||
+        count < 1 || count > 128 || startHeight + count - 1 > 1_000_000) throw new Error("NativeRpcHeaderRangeRejected");
+    const hashes = await this.#headerBatch("getblockhash", Array.from({ length: count }, (_, n) => [startHeight + n]));
+    const normalized = hashes.map(hash => normalizeHash32(hash, "blockHash"));
+    const headers = await this.#headerBatch("getblockheader", normalized.map(hash => [hash, false]));
+    return Object.freeze(headers.map((header, n) => {
+      if (typeof header !== "string" || !/^[0-9a-f]{160}$/u.test(header)) throw new Error("NativeRpcHeaderRejected");
+      return Object.freeze({ height: startHeight + n, hash: normalized[n], header });
+    }));
+  }
+
+  async #headerBatch(method, params) {
+    const requests = params.map(value => ({ jsonrpc: JSON_RPC_VERSION, id: this.#nextId++, method, params: value }));
+    const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), this.#timeoutMs);
+    try {
+      const response = await this.#fetchFn(this.#endpoint, { method: "POST", redirect: "error",
+        headers: { "content-type": "application/json", ...(this.#authHeader === undefined ? {} : { authorization: this.#authHeader }) },
+        body: JSON.stringify(requests), signal: controller.signal });
+      if (!response.ok) { await response.body?.cancel(); throw rpcError("NativeRpcHttpFailure", method, response.status); }
+      let envelopes;
+      try { envelopes = JSON.parse(await readBoundedRpcResponse(response, this.#maximumResponseBytes)); }
+      catch { throw rpcError("NativeRpcInvalidEnvelope", method); }
+      if (!Array.isArray(envelopes) || envelopes.length !== requests.length) throw rpcError("NativeRpcInvalidEnvelope", method);
+      const expected = new Set(requests.map(r => r.id)), values = new Map();
+      for (const envelope of envelopes) {
+        if (!envelope || !expected.has(envelope.id) || values.has(envelope.id) || envelope.error !== null ||
+            !Object.hasOwn(envelope, "result")) throw rpcError("NativeRpcInvalidEnvelope", method);
+        values.set(envelope.id, envelope.result);
+      }
+      return requests.map(r => values.get(r.id));
+    } catch (error) {
+      if (error?.code?.startsWith("NativeRpc")) throw error;
+      throw rpcError("NativeRpcBatchUnavailable", method);
+    } finally { clearTimeout(timeout); }
+  }
+
   async getSourceSnapshot(options = {}) {
     const info = requireObject(await this.getBlockchainInfo(), "getblockchaininfo.result");
     const genesisHash = normalizeHash32((await this.call("getblockhash", [0])).result, "genesisHash");

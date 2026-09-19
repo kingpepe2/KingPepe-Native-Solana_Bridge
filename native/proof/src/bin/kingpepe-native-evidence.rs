@@ -2,23 +2,39 @@
 use std::io::{self, Read, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use kingpepe_native_proof::evidence::{verify_regtest_evidence, MAX_EVIDENCE_BYTES};
+use kingpepe_native_proof::evidence::{
+    verify_mainnet_evidence, verify_regtest_evidence, MAX_EVIDENCE_BYTES,
+    MAX_MAINNET_EVIDENCE_BYTES,
+};
 
 fn run() -> Result<(), ()> {
-    if std::env::args().skip(1).collect::<Vec<_>>() != ["--regtest-verify"] {
-        return Err(());
-    }
+    let args = std::env::args().skip(1).collect::<Vec<_>>();
+    let mainnet = match args.as_slice() {
+        [arg] if arg == "--regtest-verify" => false,
+        [arg] if arg == "--mainnet-verify" => true,
+        _ => return Err(()),
+    };
+    let maximum = if mainnet {
+        MAX_MAINNET_EVIDENCE_BYTES
+    } else {
+        MAX_EVIDENCE_BYTES
+    };
     let mut packet = Vec::new();
     io::stdin()
         .lock()
-        .take(MAX_EVIDENCE_BYTES as u64 + 1)
+        .take(maximum as u64 + 1)
         .read_to_end(&mut packet)
         .map_err(|_| ())?;
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|_| ())?
         .as_secs();
-    let result = verify_regtest_evidence(&packet, now).map_err(|_| ())?;
+    let result = if mainnet {
+        verify_mainnet_evidence(&packet, now)
+    } else {
+        verify_regtest_evidence(&packet, now)
+    }
+    .map_err(|_| ())?;
     // Fixed Borsh public digests/counts only. Never echo input, paths or errors.
     io::stdout()
         .lock()

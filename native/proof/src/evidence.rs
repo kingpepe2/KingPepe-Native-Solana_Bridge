@@ -1,5 +1,5 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
-//! Bounded raw REGTEST header/Merkle evidence. This does not establish UTXO
+//! Bounded raw Native header/Merkle evidence. This does not establish UTXO
 //! state or validate every transaction script in every block. A separately
 //! configured fully validating Native node supplies canonical-chain/UTXO state.
 
@@ -18,6 +18,9 @@ use crate::NativeProofError;
 pub const EVIDENCE_MAGIC: &[u8; 8] = b"KPNEVD02";
 pub const MAX_EVIDENCE_BYTES: usize = 8_000_000;
 pub const MAX_EVIDENCE_HEADERS: usize = 4096;
+// Mainnet entrypoint only. TEST entrypoints retain their smaller limits.
+pub const MAX_MAINNET_EVIDENCE_BYTES: usize = 96_000_000;
+pub const MAX_MAINNET_EVIDENCE_HEADERS: usize = 1_000_000;
 pub const MAX_EVIDENCE_TRANSACTIONS: usize = 16;
 pub const MAX_BLOCK_TRANSACTION_IDS: usize = 65_536;
 // Pinned Native source src/chain.h and ContextualCheckBlockHeader.
@@ -106,14 +109,45 @@ pub fn verify_regtest_evidence(
     packet: &[u8],
     verifier_now_unix: u64,
 ) -> Result<ValidatedRegtestEvidence, NativeProofError> {
-    if packet.len() > MAX_EVIDENCE_BYTES {
+    verify_evidence(
+        packet,
+        verifier_now_unix,
+        NativeChainParams::regtest(),
+        MAX_EVIDENCE_BYTES,
+        MAX_EVIDENCE_HEADERS,
+    )
+}
+
+/// Explicit Mainnet entrypoint with pinned consensus parameters. A TEST packet
+/// cannot be promoted by changing a label; genesis, every header, accumulated
+/// work and Merkle/finality evidence are independently checked from genesis.
+pub fn verify_mainnet_evidence(
+    packet: &[u8],
+    verifier_now_unix: u64,
+) -> Result<ValidatedRegtestEvidence, NativeProofError> {
+    verify_evidence(
+        packet,
+        verifier_now_unix,
+        NativeChainParams::mainnet(),
+        MAX_MAINNET_EVIDENCE_BYTES,
+        MAX_MAINNET_EVIDENCE_HEADERS,
+    )
+}
+
+fn verify_evidence(
+    packet: &[u8],
+    verifier_now_unix: u64,
+    params: NativeChainParams,
+    maximum_bytes: usize,
+    maximum_headers: usize,
+) -> Result<ValidatedRegtestEvidence, NativeProofError> {
+    if packet.len() > maximum_bytes {
         return Err(NativeProofError::ResourceLimit("evidence bytes".to_owned()));
     }
     let mut reader = EvidenceReader::new(packet);
     if reader.take(8)? != EVIDENCE_MAGIC {
         return Err(NativeProofError::InvalidEvidence);
     }
-    let params = NativeChainParams::regtest();
     if reader.hash()? != params.genesis_hash() {
         return Err(NativeProofError::WrongNetworkOrGenesis);
     }
@@ -124,7 +158,7 @@ pub fn verify_regtest_evidence(
     if minimum_confirmations == 0 || minimum_confirmations > MAX_EVIDENCE_HEADERS as u32 {
         return Err(NativeProofError::FinalityNotSatisfied);
     }
-    let header_count = reader.count(MAX_EVIDENCE_HEADERS)?;
+    let header_count = reader.count(maximum_headers)?;
     if header_count == 0 || header_count as u32 != expected_tip_height {
         return Err(NativeProofError::EvidenceTipMismatch);
     }
@@ -240,6 +274,103 @@ impl<'a> EvidenceReader<'a> {
 mod tests {
     use super::*;
     use crate::header::{serialize_header, verify_proof_of_work};
+
+    fn mainnet_fixture(height: usize) -> NativeEvidenceEnvelope {
+        let vector: serde_json::Value =
+            serde_json::from_str(include_str!("../vectors/mainnet-header-merkle.json")).unwrap();
+        let input = &vector["input"];
+        let bytes = |v: &serde_json::Value| {
+            crate::bytes::parse_hex(v.as_str().unwrap(), None, "fixture").unwrap()
+        };
+        let headers: Vec<[u8; 80]> = input["headers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .take(height)
+            .map(|v| bytes(v).try_into().unwrap())
+            .collect();
+        let mut chain = HeaderChain::from_genesis(NativeChainParams::mainnet()).unwrap();
+        for header in &headers {
+            chain.connect_header(header).unwrap();
+        }
+        let mut work = [0; 32];
+        let work_bytes = chain.tip().chainwork.to_bytes_be();
+        work[32 - work_bytes.len()..].copy_from_slice(&work_bytes);
+        let proof = &input["proofs"][0];
+        NativeEvidenceEnvelope {
+            genesis: NativeChainParams::mainnet().genesis_hash(),
+            tip: chain.tip().hash,
+            tip_height: chain.tip().height,
+            chainwork: work,
+            minimum_confirmations: 12,
+            headers,
+            proofs: vec![NativeEvidenceTransaction {
+                transaction: bytes(&proof["rawTransactionHex"]),
+                block_height: 1,
+                transaction_index: 0,
+                transaction_ids: proof["transactionIds"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| bytes(v).try_into().unwrap())
+                    .collect(),
+            }],
+        }
+    }
+
+    #[test]
+    fn mainnet_actual_headers_retarget_chainwork_merkle_and_canonical_bytes() {
+        let fixture = mainnet_fixture(241);
+        let vector: serde_json::Value =
+            serde_json::from_str(include_str!("../vectors/mainnet-header-merkle.json")).unwrap();
+        let packet = borsh::to_vec(&fixture).unwrap();
+        let result = verify_mainnet_evidence(&packet, u64::MAX).unwrap();
+        assert_eq!(result.tip_height, 241);
+        assert_eq!(
+            crate::bytes::to_hex(&result.tip_hash),
+            vector["input"]["tipHash"].as_str().unwrap()
+        );
+        assert_eq!(
+            crate::bytes::to_hex(&fixture.chainwork),
+            vector["input"]["chainworkHex"].as_str().unwrap()
+        );
+        assert_eq!(
+            crate::bytes::to_hex(&result.digest),
+            vector["digest"].as_str().unwrap()
+        );
+        assert_eq!(result.transactions.len(), 1);
+        assert_eq!(
+            verify_regtest_evidence(&packet, u64::MAX).unwrap_err(),
+            NativeProofError::WrongNetworkOrGenesis
+        );
+    }
+
+    #[test]
+    fn mainnet_twelve_confirmation_boundary_and_substitution_fail_closed() {
+        assert_eq!(
+            verify_mainnet_evidence(&borsh::to_vec(&mainnet_fixture(11)).unwrap(), u64::MAX)
+                .unwrap_err(),
+            NativeProofError::FinalityNotSatisfied
+        );
+        assert!(
+            verify_mainnet_evidence(&borsh::to_vec(&mainnet_fixture(12)).unwrap(), u64::MAX)
+                .is_ok()
+        );
+        assert_eq!(
+            verify_mainnet_evidence(&fixture(), u64::MAX).unwrap_err(),
+            NativeProofError::WrongNetworkOrGenesis
+        );
+        let packet = borsh::to_vec(&mainnet_fixture(12)).unwrap();
+        for offset in [8, 40, 80, 116 + 4, packet.len() - 1] {
+            let mut changed = packet.clone();
+            changed[offset] ^= 1;
+            assert!(verify_mainnet_evidence(&changed, u64::MAX).is_err());
+        }
+        assert!(verify_mainnet_evidence(&packet[..packet.len() - 1], u64::MAX).is_err());
+        let mut extra = packet;
+        extra.push(0);
+        assert!(verify_mainnet_evidence(&extra, u64::MAX).is_err());
+    }
 
     #[test]
     fn borsh_envelope_and_response_match_shared_vectors() {
