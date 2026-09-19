@@ -55,10 +55,14 @@ export class NativeDepositObserver {
       check(this.#feePolicy.maximumFeeAtomic === this.#policy.maximumFeeAtomic);
     } else check(nativeFeePolicy === undefined);
   }
+  async assertNetwork() {
+    const p = this.#policy;
+    const source = await this.#rpc.getSourceSnapshot({ expectedNetwork: nativeIdentity(p.environment).rpcChain, expectedGenesisHash: p.nativeGenesis });
+    check(source.state === "READY"); return source;
+  }
   async #fundedOutput(input) {
     const p = this.#policy, r = validateNativeDepositRequest(input, p), script = depositPolicy(r, p);
-    const source = await this.#rpc.getSourceSnapshot({ expectedNetwork: nativeIdentity(p.environment).rpcChain, expectedGenesisHash: p.nativeGenesis });
-    check(source.state === "READY");
+    const source = await this.assertNetwork();
     const tx = parseNativeTransactionHex(await this.#rpc.getRawTransaction(r.depositTxidHex, false));
     check(tx.txidHex === r.depositTxidHex);
     const matches = tx.outputs.map((o, vout) => ({ ...o, vout })).filter(o =>
@@ -71,7 +75,10 @@ export class NativeDepositObserver {
   }
   // Intake establishes a real matching unspent output, including mempool
   // deposits. It grants no finality, sweep, attestation or mint authorization.
-  async verifyNotification(input) { return (await this.#fundedOutput(input)).request; }
+  async verifyNotification(input) {
+    const { request, vout } = await this.#fundedOutput(input);
+    return this.#policy.environment === "mainnet" ? { ...request, depositVout: vout } : request;
+  }
   async observe(input) {
     const p = this.#policy, { request: r, script, tx, vout } = await this.#fundedOutput(input);
     const inputs = [{ txid: tx.txidHex, vout, amountAtomic: r.depositIntent.amountAtomic,

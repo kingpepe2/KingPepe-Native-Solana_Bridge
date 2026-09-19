@@ -5,10 +5,13 @@ import { createHash } from "node:crypto";
 import { decodeCanonicalBridgeMessage } from "../../shared/protocol/canonical-message.mjs";
 import { canonicalJson } from "../../native/frost/policy/native-signing-policy.mjs";
 import { validateDepositOperationPlan, validateDepositCreditFact, MAX_DEPOSIT_OPERATIONS } from "./deposit-operation-state.mjs";
+import { validateNativeDepositRequest } from "./native-deposit-observer.mjs";
+import { parseNativeTransactionHex } from "../../native/node/native-taproot-transaction.mjs";
 import { validateProtectedAttestationResponse } from "../attesters/protected-client.mjs";
 import { validateSolanaDeliveryPolicy, solanaDeliveryPolicyDigest, validateSolanaDepositSigningIntent,
   validateSolanaDepositDelivery, deliveryUint, MAX_SOLANA_REBUILDS } from "../relayer/solana-deposit-delivery.mjs";
 export const DEPOSIT_CONTROLLER_PROTOCOL = "KINGPEPE_PROTECTED_DEPOSIT_CONTROLLER_V1";
+const MAINNET_CONTROLLER_PROTOCOL = "KINGPEPE_MAINNET_DEPOSIT_CONTROLLER_V2";
 const check = v => { if (!v) throw new Error("DepositControllerStateRejected"); };
 const fields = (v, names) => check(v && !Array.isArray(v) && Object.keys(v).sort().join() === [...names].sort().join());
 const hash = v => { check(typeof v === "string" && /^[0-9a-f]{64}$/u.test(v)); return v; };
@@ -20,10 +23,13 @@ export function validateDepositControllerPolicy(input) {
   return { deliveryPolicy: policy, creditValiditySeconds: input.creditValiditySeconds };
 }
 export function depositControllerPolicyDigest(input) {
-  const p = validateDepositControllerPolicy(input); return digest([DEPOSIT_CONTROLLER_PROTOCOL, solanaDeliveryPolicyDigest(p.deliveryPolicy), p.creditValiditySeconds]);
+  const p = validateDepositControllerPolicy(input); return digest([controllerProtocol(p), solanaDeliveryPolicyDigest(p.deliveryPolicy), p.creditValiditySeconds]);
 }
+const controllerProtocol = p => p.deliveryPolicy.operationPolicy.environment === "mainnet" ? MAINNET_CONTROLLER_PROTOCOL : DEPOSIT_CONTROLLER_PROTOCOL;
 export function initialDepositControllerState(policy) {
-  return Buffer.from(JSON.stringify({ protocol: DEPOSIT_CONTROLLER_PROTOCOL, policyDigest: depositControllerPolicyDigest(policy), lastTimeMs: 0, records: [] }));
+  const p = validateDepositControllerPolicy(policy);
+  return Buffer.from(JSON.stringify({ protocol: controllerProtocol(p), policyDigest: depositControllerPolicyDigest(p), lastTimeMs: 0, records: [],
+    ...(p.deliveryPolicy.operationPolicy.environment === "mainnet" ? { requests: [] } : {}) }));
 }
 export function newDepositControllerRecord(plan, policy) {
   const p = validateDepositControllerPolicy(policy);
@@ -39,14 +45,16 @@ export function decodeDepositControllerState(bytes, policy, now = Date.now()) {
   const p = validateDepositControllerPolicy(policy), dp = p.deliveryPolicy;
   check(bytes instanceof Uint8Array && bytes.length <= 900000);
   const text = Buffer.from(bytes).toString("utf8"), v = JSON.parse(text); check(JSON.stringify(v) === text);
-  fields(v, ["protocol", "policyDigest", "lastTimeMs", "records"]);
-  check(v.protocol === DEPOSIT_CONTROLLER_PROTOCOL && v.policyDigest === depositControllerPolicyDigest(p));
+  const mainnet = dp.operationPolicy.environment === "mainnet";
+  fields(v, ["protocol", "policyDigest", "lastTimeMs", "records", ...(mainnet ? ["requests"] : [])]);
+  check(v.protocol === controllerProtocol(p) && v.policyDigest === depositControllerPolicyDigest(p));
   check(Number.isSafeInteger(now) && now > 0 && Number.isSafeInteger(v.lastTimeMs) && v.lastTimeMs >= 0 && v.lastTimeMs <= now);
   check(Array.isArray(v.records) && v.records.length <= MAX_DEPOSIT_OPERATIONS);
-  const ids = new Set(), deposits = new Set(), inputs = new Set();
+  const ids = new Set(), deposits = new Set(), inputs = new Set(), reserves = new Set();
   for (const r of v.records) {
     fields(r, ["plan", "nativeValidationDigest", "creditWindow", "credit", "attestations", "packets", "completed"]);
     const plan = validateDepositOperationPlan(r.plan, dp.operationPolicy), id = plan.operationId, point = plan.inputs[0].txid + ":" + plan.inputs[0].vout;
+    reserves.add(parseNativeTransactionHex(plan.unsignedTransactionHex).txidHex + ":0");
     check(!ids.has(id) && !deposits.has(point)); ids.add(id); deposits.add(point);
     for (const input of plan.inputs) { const key = input.txid + ":" + input.vout; check(!inputs.has(key)); inputs.add(key); }
     if (r.nativeValidationDigest !== null) check(hash(r.nativeValidationDigest) === plan.acceptedCheckpoint.evidenceDigestHex);
@@ -92,5 +100,21 @@ export function decodeDepositControllerState(bytes, policy, now = Date.now()) {
       check(deliveryUint(r.completed.journalRevision) > 0n); deliveryUint(r.completed.solanaSlot); hash(r.completed.evidenceDigest);
     }
   }
+  if (mainnet) {
+    check(Array.isArray(v.requests) && v.records.length + v.requests.length <= MAX_DEPOSIT_OPERATIONS);
+    for (const request of v.requests) {
+      const r = validateNativeDepositRequest(request, dp.operationPolicy);
+      check(canonicalJson(r) === canonicalJson(request) && !ids.has(r.operationId)); ids.add(r.operationId);
+      // A pending deposit's output is unique, and operator fee funding cannot
+      // be spent by two pending/registered operations. Intake resolves null vout.
+      check(r.depositVout !== null);
+      const point = r.depositTxidHex + ":" + r.depositVout;
+      check(!deposits.has(point) && !inputs.has(point)); deposits.add(point); inputs.add(point);
+      for (const input of r.feeFundingInputs) {
+        const key = input.txid + ":" + input.vout; check(!inputs.has(key)); inputs.add(key);
+      }
+    }
+  }
+  check([...inputs].every(input => !reserves.has(input)));
   return v;
 }

@@ -56,13 +56,13 @@ export async function listenBridgeUserApi({ api, accessToken, port = 0 }) {
       if (active >= 4) return reply(429, { error: "RETRY_LATER" });
       active++;
       try {
-        if (req.method === "GET" && req.url === "/bridge/status") return reply(200, api.getBridgeStatus());
+        if (req.method === "GET" && req.url === "/bridge/status") return reply(200, await api.getBridgeStatus());
         const balance = /^\/balances\/(solana|native)\/([a-zA-Z0-9]{32,90})$/u.exec(req.url);
         if (req.method === "GET" && balance) return reply(200, await api.getPublicBalance(balance[1], balance[2]));
         const match = /^\/(operations|deposits)\/([0-9a-f]{64})$/u.exec(req.url);
         if (req.method === "GET" && match) {
           const method = { operations: "getOperationStatus", deposits: "getDepositStatus" }[match[1]];
-          const value = api[method](match[2]); return reply(value ? 200 : 404, value ?? { error: "OPERATION_NOT_FOUND" });
+          const value = await api[method](match[2]); return reply(value ? 200 : 404, value ?? { error: "OPERATION_NOT_FOUND" });
         }
         const routes = { "/deposits/request": "createNativeDepositRequest", "/deposits/submit": "submitNativeDeposit" };
         if (req.method !== "POST" || !Object.hasOwn(routes, req.url)) return reply(404, { error: "ROUTE_NOT_FOUND" });

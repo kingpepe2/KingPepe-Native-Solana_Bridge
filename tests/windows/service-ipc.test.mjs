@@ -55,6 +55,9 @@ import { NativeRpcClient } from "../../native/node/native-rpc-client.mjs";
 import { ProtectedDepositAttesterClient } from "../../services/attesters/protected-client.mjs";
 import { NATIVE_MAINNET_GENESIS, NATIVE_MAINNET_DOMAIN, SOLANA_MAINNET_GENESIS, mainnetDeploymentIdentity } from "../../shared/network-identity.mjs";
 import { prepareMainnetFrostParticipants } from "../../native/frost/coordinator/mainnet-preparation.mjs";
+import { mainnetDepositRequestFixture } from "../integration/mainnet-deposit-request-fixture.mjs";
+import { BridgeUserApi } from "../../services/bridge-validator/user-api.mjs";
+import { BridgeUserBalances } from "../../services/bridge-validator/user-balances.mjs";
 
 if (process.platform !== "win32") throw new Error("WINDOWS_IPC_TESTS_REQUIRE_WINDOWS");
 const repoRoot = path.resolve(import.meta.dirname, "../.."), serviceSid = windowsCurrentServiceSid();
@@ -405,7 +408,7 @@ test("Mainnet protected fee payer and Solana outbox remain paused and cannot reu
 
 test("Mainnet protected forward composition opens only with its exact deployment and remains paused", async t => {
   // Actual CurrentUser DPAPI/leases/mTLS; no chain or economic RPC is permitted.
-  const f = await solanaDeliveryFixture({ mainnet: true }), d = f.policy.operationPolicy, root = temporary(t);
+  const intake = await mainnetDepositRequestFixture(), f = { policy: intake.policy.deliveryPolicy }, d = f.policy.operationPolicy, root = temporary(t);
   const bound = (name, role, purpose) => {
     const opts = options(root, name, role, purpose);
     Object.assign(opts.context, { environment: "mainnet", nativeGenesis: d.nativeGenesis, solanaDeployment: d.solanaDeployment, keyEpoch: d.keyEpoch });
@@ -421,8 +424,7 @@ test("Mainnet protected forward composition opens only with its exact deployment
   let calls = 0;
   const noNetwork = async () => { calls++; throw new Error("MAINNET_TEST_NETWORK_FORBIDDEN"); };
   t.mock.method(globalThis, "fetch", noNetwork);
-  const nativeRpc = new NativeRpcClient({ endpoint: "http://127.0.0.1:23457" });
-  const nativeVerifier = LocalNativeEvidenceVerifier.createMainnet({ rpc: nativeRpc, executable: path.join(root, "unused-verifier") });
+  const nativeRpc = intake.rpc, nativeVerifier = intake.verifier;
   const wrongVerifier = new LocalNativeEvidenceVerifier({ rpc: nativeRpc, executable: path.join(root, "unused-verifier") });
   const clients = [["COORDINATOR", ProtectedSweepJobClient, d], ["RELAYER", ProtectedNativeSweepClient, d],
     ["RELAYER", ProtectedSolanaDepositClient, f.policy], ["FEE_PAYER", ProtectedDepositFeePayerClient, f.policy],
@@ -438,14 +440,51 @@ test("Mainnet protected forward composition opens only with its exact deployment
     /RAW_NATIVE_VERIFIED_RESERVE_REQUIRED/);
   const policy = { deliveryPolicy: f.policy, creditValiditySeconds: 3600 }, opts = bound("forward-controller", "BRIDGE_VALIDATOR", "deposit-controller");
   const bytes = initialDepositControllerState(policy), store = WindowsProtectedStore.create(opts, bytes); bytes.fill(0);
-  const input = { store, integrity: guard, policy, journal: book, nativeVerifier, jobs: clients[0], nativeOutbox: clients[1],
+  const input = { store, integrity: guard, policy, journal: book, nativeVerifier, nativeRpc, nativeFeePolicy: intake.feePolicy, jobs: clients[0], nativeOutbox: clients[1],
     solanaOutbox: clients[2], feePayer: clients[3], attesters: clients.slice(4), endpoint: "https://rpc.example.invalid/mainnet-forward" };
   await assert.rejects(ProtectedDepositController.open(input), /ExplicitNetworkRequired/);
   await assert.rejects(ProtectedDepositController.openMainnet({ ...input, nativeVerifier: wrongVerifier }));
   let controller = await ProtectedDepositController.openMainnet(input); cleanups.get(root).push(() => controller.close());
   await assert.rejects(controller.submit({ operationId: h("unproven"), proofVerified: true }));
   assert.deepEqual((await book.snapshot()).operations, []);
+  const balances = BridgeUserBalances.createMainnet({ nativeRpc,
+    solanaRpc: LocalDeploymentRpc.createMainnet({ endpoint: input.endpoint, expectedGenesis: d.solanaGenesis }), manifest: f.policy.manifest });
+  const apiFor = value => BridgeUserApi.createMainnet({ controller: value, balances, depositFeeInputs: async () => intake.request.feeFundingInputs });
+  const api = apiFor(controller);
+  const publicStatus = await api.getBridgeStatus(); assert.equal(publicStatus.nativeNetwork, "MAINNET");
+  assert.equal(publicStatus.state, "PAUSED"); assert.equal(publicStatus.productionReady, false); assert.equal(publicStatus.mainnetActivation, "DISABLED");
+  await assert.rejects(api.createNativeDepositRequest(intake.input), /PublicActivationRequired/);
+  await assert.rejects(api.submitNativeDeposit({ request: intake.input, depositTxidHex: intake.request.depositTxidHex, depositVout: 0 }), /PublicActivationRequired/);
+  await assert.rejects(controller.watch(intake.request), /PublicActivationRequired/);
+  assert.equal(intake.calls.length, 0);
+  // Isolate durable intake from activation. The real guard above rejects it;
+  // synthetic reads below are NOT Mainnet finality/economic evidence.
+  t.mock.method(controller, "assertPublicAdmission", async () => {});
+  await controller.watch({ ...intake.request, depositVout: null }); await controller.watch(intake.request);
+  await assert.rejects(controller.watch({ ...intake.request, depositTxidHex: h("changed source") }));
+  await assert.rejects(controller.advance(intake.request.operationId), /FINALITY_INSUFFICIENT/);
+  assert.equal((await controller.publicSnapshot()).operations.length, 1);
+  assert.deepEqual((await book.snapshot()).operations, []);
   await controller.close(); controller = await ProtectedDepositController.openMainnet({ ...input, store: new WindowsProtectedStore(opts) });
+  assert.deepEqual(await controller.pendingRequest(intake.request.operationId), intake.request);
+  assert.equal((await apiFor(controller).getOperationStatus(intake.request.operationId)).state, "OBSERVED");
+  t.mock.method(controller, "assertPublicAdmission", async () => {}); intake.conditions.finalized = true;
+  await controller.advance(intake.request.operationId);
+  assert.equal(await controller.pendingRequest(intake.request.operationId), null);
+  assert.equal((await controller.publicSnapshot()).operations.length, 1);
+  t.mock.method(controller, "assertSolanaDestination", async () => {});
+  let funded = 0;
+  const resumedApi = BridgeUserApi.createMainnet({ controller, balances, depositFeeInputs: async () => { funded++; return intake.request.feeFundingInputs; } });
+  const duplicate = { request: intake.input, depositTxidHex: intake.request.depositTxidHex, depositVout: 0 };
+  assert.equal((await resumedApi.submitNativeDeposit(duplicate)).operationId, intake.request.operationId);
+  assert.equal(funded, 0);
+  await assert.rejects(resumedApi.submitNativeDeposit({ ...duplicate, request: { ...intake.input, userRecoveryPublicKeyHex: d.frostPublicKeyHex } }));
+  const outcomes = await Promise.allSettled([resumedApi.submitNativeDeposit(duplicate), resumedApi.submitNativeDeposit(duplicate)]);
+  assert.deepEqual(outcomes.map(o => o.status).sort(), ["fulfilled", "rejected"]);
+  assert.equal(funded, 0); assert.equal((await controller.publicSnapshot()).operations.length, 1);
+  // Registering the unsigned plan still cannot authorize a sweep while paused.
+  assert.equal((await controller.advance(intake.request.operationId)).state, "WAITING_FOR_DEPENDENCY");
+  assert.deepEqual((await book.snapshot()).operations, []);
   const relayOptions = bound("forward-native-outbox", "RELAYER", "native-sweep-outbox"), relayBytes = initialNativeSweepOutbox(d);
   const relayStore = WindowsProtectedStore.create(relayOptions, relayBytes); relayBytes.fill(0);
   const relayInput = { store: relayStore, integrity: relayGuard, policy: d, rpc: nativeRpc, nativeVerifier, productionBroadcastAuthorized: false };

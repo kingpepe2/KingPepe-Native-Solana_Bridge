@@ -7,7 +7,9 @@ import { assertWindowsProtectedStore } from "../../shared/windows/protected-stor
 import { assertMainnetProtectedDeployment } from "../../shared/network-identity.mjs";
 import { canonicalJson } from "../../native/frost/policy/native-signing-policy.mjs";
 import { LocalNativeEvidenceVerifier } from "../../native/node/native-raw-evidence.mjs";
-import { attachTaprootWitnesses } from "../../native/node/native-taproot-transaction.mjs";
+import { attachTaprootWitnesses, parseNativeTransactionHex } from "../../native/node/native-taproot-transaction.mjs";
+import { NativeDepositObserver, validateNativeDepositRequest } from "./native-deposit-observer.mjs";
+import { base58Encode } from "./solana-deposit-claim-transaction-plan.mjs";
 import { requireSweepJobClient } from "../../native/frost/coordinator/sweep-job-ipc.mjs";
 import { requireNativeSweepClient } from "../relayer/native-sweep-ipc.mjs";
 import { requireSolanaDepositClient } from "../relayer/solana-deposit-ipc.mjs";
@@ -33,13 +35,14 @@ const result = (operationId, state, reason) => Object.freeze({ operationId, stat
 export class ProtectedDepositController {
   #store; #guard; #policy; #journal; #native; #jobs; #nativeOutbox; #attesters; #payer; #solanaOutbox;
   #chain; #rpc; #observer; #lease; #revision; #pending; #closed = false; #stopped = false; #busy = false; #notify;
+  #depositObserver;
   static async openMainnet(options) {
     const policy = validateDepositControllerPolicy(options.policy);
     assertWindowsProtectedStore(options.store, "BRIDGE_VALIDATOR", "deposit-controller");
     assertMainnetProtectedDeployment(options.store.context, policy.deliveryPolicy.operationPolicy);
     return ProtectedDepositController.open({ ...options, policy }, MAINNET_CONTROLLER);
   }
-  static async open({ store, integrity, policy, journal, nativeVerifier, jobs, nativeOutbox, attesters, feePayer, solanaOutbox, endpoint, onTransition = async () => {} }, capability) {
+  static async open({ store, integrity, policy, journal, nativeVerifier, nativeRpc, nativeFeePolicy, jobs, nativeOutbox, attesters, feePayer, solanaOutbox, endpoint, onTransition = async () => {} }, capability) {
     const p = validateDepositControllerPolicy(policy), op = p.deliveryPolicy.operationPolicy;
     const mainnet = op.environment === "mainnet" && capability === MAINNET_CONTROLLER;
     check(op.environment === "localnet" || mainnet, "DepositControllerExplicitNetworkRequired");
@@ -54,6 +57,10 @@ export class ProtectedDepositController {
     const self = new ProtectedDepositController();
     self.#store = store; self.#guard = integrity; self.#policy = p; self.#journal = journal; self.#native = nativeVerifier;
     self.#jobs = jobs; self.#nativeOutbox = nativeOutbox; self.#attesters = [...attesters]; self.#payer = feePayer; self.#solanaOutbox = solanaOutbox; self.#notify = onTransition;
+    if (nativeRpc !== undefined || nativeFeePolicy !== undefined) {
+      check(mainnet, "DepositControllerMainnetIntakeRequired");
+      self.#depositObserver = NativeDepositObserver.createMainnet({ nativeRpc, nativeVerifier, policy: op, nativeFeePolicy });
+    }
     // Read-only transports share one endpoint and exact deployment identity.
     // Signing/delivery remain separate protected roles under current admission.
     const rpcOptions = { endpoint, expectedGenesis: op.solanaGenesis };
@@ -104,12 +111,93 @@ export class ProtectedDepositController {
   #record(state, id) { check(typeof id === "string" && HASH.test(id)); const r = state.records.find(x => x.plan.operationId === id); check(r, "DepositControllerOperationMissing"); return r; }
   #mutate(id, change) { const { state, revision } = this.#read(), r = this.#record(state, id); change(r); this.#write(state, revision); return structuredClone(r); }
   async #transition(id, stage) { await this.#notify(Object.freeze({ operationId: id, stage })); }
+  publicPolicy() { this.assertBinding(this.#policy, this.#guard); check(this.#depositObserver, "DepositControllerIntakeUnavailable");
+    return structuredClone(this.#policy.deliveryPolicy.operationPolicy); }
+  async assertPublicAdmission() {
+    this.publicPolicy(); const dp = this.#policy.deliveryPolicy;
+    // Controlled activation remains a private, explicitly approved operation.
+    // The ordinary public gateway cannot admit it or promote the program mode.
+    check(dp.manifest.config.mainnetProgramState === 5 && dp.manifest.config.mainnetActivationEnabled === true,
+      "DepositControllerPublicActivationRequired");
+    await this.#guard.assertRunning(depositControllerPolicyDigest(this.#policy), "AUTHORIZE_CLAIM");
+    await this.#depositObserver.assertNetwork();
+    verifyDeploymentSnapshot(dp.manifest, await this.#chain.snapshot(dp.manifest, dp.operationPolicy.minimumSolanaSlot));
+    await this.#guard.assertRunning(depositControllerPolicyDigest(this.#policy), "AUTHORIZE_CLAIM");
+  }
+  async assertSolanaDestination(tokenAccount) {
+    await this.assertPublicAdmission(); const dp = this.#policy.deliveryPolicy;
+    const s = await this.#chain.snapshotWithAdditionalAccounts(dp.manifest, [tokenAccount]);
+    check(Array.isArray(s.accounts) && s.accounts.length > 1, "UserTokenAccountUnavailable");
+    verifyDeploymentSnapshot(dp.manifest, { ...s, accounts: s.accounts.slice(0, -1) });
+    const account = s.accounts.at(-1);
+    check(account && account.owner === dp.manifest.mint.tokenProgram && account.executable === false &&
+      Array.isArray(account.data) && account.data.length === 2 && account.data[1] === "base64" &&
+      typeof account.data[0] === "string" && account.data[0].length === 220, "UserTokenAccountRejected");
+    const bytes = Buffer.from(account.data[0], "base64");
+    check(bytes.length === 165 && bytes.toString("base64") === account.data[0] &&
+      bytes.subarray(0, 32).toString("hex") === dp.operationPolicy.mint && bytes[108] === 1, "UserTokenAccountRejected");
+    await this.assertPublicAdmission();
+  }
+  async pendingRequest(id) {
+    check(HASH.test(id)); return this.#exclusive(() => structuredClone(this.#read().state.requests?.find(r => r.operationId === id) ?? null));
+  }
+  async watch(input) {
+    const request = validateNativeDepositRequest(input, this.publicPolicy());
+    return this.#exclusive(async () => {
+      await this.assertPublicAdmission();
+      const verified = await this.#depositObserver.verifyNotification(request), { state, revision } = this.#read();
+      const old = state.requests.find(r => r.operationId === request.operationId);
+      const registered = state.records.find(r => r.plan.operationId === request.operationId);
+      if (old) check(same(old, verified), "DepositControllerRequestChanged");
+      else if (registered) this.#matchRequest(verified, registered.plan);
+      else {
+        // Never fund miner fees from reserve already committed to representation.
+        const reserve = new Set(state.records.map(r => parseNativeTransactionHex(r.plan.unsignedTransactionHex).txidHex + ":0"));
+        check(verified.feeFundingInputs.every(i => !reserve.has(i.txid + ":" + i.vout)), "DepositControllerReserveFeeRejected");
+        state.requests.push(verified); await this.assertPublicAdmission(); this.#write(state, revision);
+      }
+      return result(request.operationId, "OBSERVED", "DURABLE_REQUEST_ONLY_NOT_CHAIN_AUTHORIZATION");
+    });
+  }
+  #matchRequest(request, plan) {
+    check(request.depositTxidHex === plan.inputs[0].txid && request.depositVout === plan.inputs[0].vout &&
+      request.userRecoveryPublicKeyHex === plan.depositPolicy.userRecoveryPublicKeyHex && same(request.depositIntent, plan.depositIntent) &&
+      same(request.feeFundingInputs, plan.inputs.slice(1)), "DepositControllerRequestChanged");
+  }
+  async publicSnapshot() {
+    return this.#exclusive(async () => {
+      const { state } = this.#read(), journal = await this.#journal.snapshot();
+      const integrity = await this.#guard.status(depositControllerPolicyDigest(this.#policy));
+      const active = integrity.state === "RUNNING" && this.#policy.deliveryPolicy.manifest.config.mainnetActivationEnabled === true;
+      if (active) await this.assertPublicAdmission();
+      const operations = [...(state.requests ?? []).map(r => ({ operationId: r.operationId, direction: "NativeToSolana", state: "OBSERVED",
+        amountAtomic: r.depositIntent.amountAtomic, destination: base58Encode(Buffer.from(r.depositIntent.recipientHex, "hex")),
+        transactionIds: { nativeDeposit: r.depositTxidHex, nativeSweep: null, solanaClaim: null }, trust: "JOURNAL_OBSERVATION" })),
+      ...state.records.map(r => {
+        const book = journal.operations.find(o => o.plan.operationId === r.plan.operationId);
+        if (book) check(same(book.plan, r.plan), "DepositControllerJournalConflict");
+        const packet = r.packets.findLast(p => p.intent.kind === "CLAIM" && p.delivery !== null);
+        const claim = packet ? validateSolanaDepositDelivery(packet.delivery, this.#policy.deliveryPolicy).signature : null;
+        return { operationId: r.plan.operationId, direction: "NativeToSolana",
+          state: r.completed ? "COMPLETED" : book?.mintReceipt ? "MINTED" : r.attestations.length === 2 ? "ATTESTED" :
+            book?.finalizedCredit ? "SWEPT" : r.nativeValidationDigest ? "VALIDATED" : "OBSERVED",
+          amountAtomic: r.plan.depositIntent.amountAtomic, destination: base58Encode(Buffer.from(r.plan.depositIntent.recipientHex, "hex")),
+          transactionIds: { nativeDeposit: r.plan.inputs[0].txid, nativeSweep: book?.broadcastAccepted ? parseNativeTransactionHex(r.plan.unsignedTransactionHex).txidHex : null,
+            solanaClaim: book?.mintReceipt?.signature ?? claim }, trust: "JOURNAL_OBSERVATION" };
+      })];
+      return { state: active ? "ACTIVE" : "PAUSED",
+        trust: "LOCAL_JOURNAL_NOT_FRESH_CHAIN_RECONCILIATION", accounting: journal.accounting, operations };
+    });
+  }
   async submit(input) {
     const plan = validateDepositOperationPlan(input, this.#policy.deliveryPolicy.operationPolicy);
     return this.#exclusive(async () => {
       const { state, revision } = this.#read(), old = state.records.find(x => x.plan.operationId === plan.operationId);
       if (old) check(same(old.plan, plan), "DepositControllerPlanChanged");
-      else { check(state.records.length < MAX_DEPOSIT_OPERATIONS, "DepositControllerCapacity"); state.records.push(newDepositControllerRecord(plan, this.#policy)); this.#write(state, revision);
+      else { check(state.records.length < MAX_DEPOSIT_OPERATIONS, "DepositControllerCapacity");
+        const pending = state.requests?.find(r => r.operationId === plan.operationId);
+        if (pending) { this.#matchRequest(pending, plan); state.requests = state.requests.filter(r => r !== pending); }
+        state.records.push(newDepositControllerRecord(plan, this.#policy)); this.#write(state, revision);
         await this.#transition(plan.operationId, "DEPOSIT_OBSERVED"); }
       return result(plan.operationId, "OBSERVED", "DURABLE_INTENT_ONLY_NOT_CHAIN_AUTHORIZATION");
     });
@@ -117,6 +205,15 @@ export class ProtectedDepositController {
   async inspect(id) { return this.#exclusive(async () => ({ record: structuredClone(this.#record(this.#read().state, id)), integrity: await this.#guard.status(id) })); }
   async advance(id) { return this.#exclusive(() => this.#advance(id)); }
   async #advance(id) {
+    const pending = this.#read().state.requests?.find(r => r.operationId === id);
+    if (pending) {
+      await this.assertPublicAdmission();
+      const plan = await this.#depositObserver.observe(pending), { state, revision } = this.#read();
+      this.#matchRequest(pending, plan);
+      state.requests = state.requests.filter(r => r.operationId !== id);
+      state.records.push(newDepositControllerRecord(plan, this.#policy)); this.#write(state, revision);
+      return result(id, "OBSERVED", "FINALIZED_PLAN_RETAINED");
+    }
     let r = this.#record(this.#read().state, id), book;
     const dp = this.#policy.deliveryPolicy, op = dp.operationPolicy;
     const snapshot = await this.#journal.snapshot(); book = snapshot.operations.find(x => x.plan.operationId === id);
@@ -260,7 +357,8 @@ export class ProtectedDepositController {
   async run({ signal, intervalMs = 1000, onStatus = () => {} }) {
     check(signal && typeof signal.aborted === "boolean" && Number.isInteger(intervalMs) && intervalMs >= 250 && intervalMs <= 30000 && typeof onStatus === "function");
     while (!signal.aborted && !this.#closed && !this.#stopped) {
-      const ids = await this.#exclusive(() => this.#read().state.records.map(r => r.plan.operationId));
+      const ids = await this.#exclusive(() => { const state = this.#read().state;
+        return [...(state.requests ?? []).map(r => r.operationId), ...state.records.map(r => r.plan.operationId)]; });
       for (const id of ids) {
         if (signal.aborted || this.#closed || this.#stopped) break;
         try { await onStatus(await this.advance(id)); }

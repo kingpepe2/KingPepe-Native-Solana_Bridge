@@ -124,6 +124,13 @@ Trust boundary:
 - `LOCALLY_VALIDATED_CHAIN_STATE` means the local proof engine accepted headers, work, and inclusion evidence according to configured parameters.
 - `PROJECT_ATTESTATION` remains a later attestation layer and does not make unchecked chain data true.
 
+The protected Mainnet credit adapter emits `LOCALLY_VALIDATED_CHAIN_STATE`
+only after the concrete raw verifier's process-local reserve capability and
+the exact canonical credit match. Serialized proof flags and caller-provided
+trust labels cannot supply that capability. Canonical branch selection and
+UTXO availability still depend on the configured validating Native node;
+local header/work/inclusion verification is not an independent UTXO proof.
+
 The Phase 06 primitives do not broadcast transactions, manage wallets, load
 secrets or activate Mainnet. The Phase 08 harness above exercises real isolated
 REGTEST and Solana local-validator operations; this is not live deployment.

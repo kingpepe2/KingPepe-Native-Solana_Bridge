@@ -82,7 +82,12 @@ export function createRawNativeCreditAttestationVerifier({ policy, nativeVerifie
       validityWindow: { validFrom: message.validFrom.toString(), validUntil: message.validUntil.toString() } });
     check(credit.encodedMessageHex === encodedMessageHex, "NativeCreditAttestationEvidenceChanged");
     return Object.freeze({ operationIdHex: message.operationIdHex, messageDigestHex: message.messageDigestHex,
-      evidence: Object.freeze({ trust: "RPC_OBSERVATION", nativeNetwork: p.nativeNetwork, nativeGenesisHash: p.nativeGenesis,
+      // Mainnet reaches here only after the concrete verifier's private reserve
+      // capability, full headers/work/inclusion and exact sweep checks. UTXO
+      // availability and canonical branch selection still trust the configured
+      // validating Native node; this is not an independent UTXO proof.
+      evidence: Object.freeze({ trust: p.environment === "mainnet" ? "LOCALLY_VALIDATED_CHAIN_STATE" : "RPC_OBSERVATION",
+        nativeNetwork: p.nativeNetwork, nativeGenesisHash: p.nativeGenesis,
         operationIdHex: message.operationIdHex, depositOutpoint: message.depositOutpointText, amountAtomic: plan.depositIntent.amountAtomic,
         solanaRecipientHex: plan.depositIntent.recipientHex, evidenceDigestHex: message.evidenceDigestHex,
         reserveAllocationIdHex: credit.reserveAllocationIdHex, reserveTransitionState: "CANONICAL_RESERVE", mintCreditState: "AUTHORIZED_UNCONSUMED",

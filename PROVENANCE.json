@@ -19,7 +19,7 @@
   "cleanup": {
     "scope": "TEAM_AUTHORIZED_ONE_WAY_CONVERSION",
     "status": "VALIDATION_IN_PROGRESS",
-    "filesAfter": 290,
+    "filesAfter": 292,
     "removed": "Retired economic direction and obsolete implementation/fixtures. Forward signing, proof, recovery, accounting, legal notices and original file-origin classifications remain.",
     "importedSource": "No third-party source imported during conversion."
   },
@@ -1199,6 +1199,13 @@
       "reviewDisposition": "KEEP_TEST"
     },
     {
+      "path": "services/bridge-validator/tests/mainnet-deposit-intake.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original Mainnet pending-intake persistence, domain, duplicate-input and pre-finality regressions. No real Mainnet operation evidence.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
       "path": "services/bridge-validator/tests/native-reserve-credit.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original credit recovery input/capability boundary tests; no fixture proof flags accepted.",
@@ -1907,6 +1914,13 @@
       "path": "tests/integration/deposit-operation-fixture.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original reusable real FROST/transaction fixture; chain data synthetic, private test material external and never returned.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "tests/integration/mainnet-deposit-request-fixture.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated Mainnet-shaped pending-deposit fixture. Synthetic RPC/checkpoint data only; no keys, real Mainnet proof or economic transactions.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },

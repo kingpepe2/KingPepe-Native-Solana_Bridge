@@ -66,9 +66,9 @@ async function httpFixture(t) {
   // This explicit method stub tests ONLY transport/routing. Local-chain tests
   // use real BridgeUserApi/service instances and verify actual on-chain actions.
   const api = Object.create(BridgeUserApi.prototype), calls = [];
-  Object.assign(api, { getBridgeStatus: () => ({ state: "PAUSED", trust: "UNIT_TEST_ONLY" }),
+  Object.assign(api, { getBridgeStatus: async () => ({ state: "PAUSED", trust: "UNIT_TEST_ONLY" }),
     getPublicBalance: (network, address) => ({ network, address, amountAtomic: "9007199254740993" }),
-    getOperationStatus: id => ({ operationId: id, state: "OBSERVED" }), getDepositStatus: () => null,
+    getOperationStatus: async id => ({ operationId: id, state: "OBSERVED" }), getDepositStatus: async () => null,
     createNativeDepositRequest: v => { calls.push(v); return { state: "AWAITING_USER_TRANSACTION" }; },
     submitNativeDeposit: async () => { throw new Error("PRIVATE_EXCEPTION_MUST_NOT_LEAK"); } });
   const token = randomBytes(32), server = await listenBridgeUserApi({ api, accessToken: token });
