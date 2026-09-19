@@ -1,8 +1,10 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
-// Separate protected LOCALNET transaction identity, not an attester or minter.
+// Separate protected transaction identity, not an attester or minter. Mainnet
+// requires explicit full-deployment admission and the same live pause authority.
 import { createHash } from "node:crypto";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { assertWindowsProtectedStore } from "../../shared/windows/protected-store.mjs";
+import { assertMainnetProtectedDeployment } from "../../shared/network-identity.mjs";
 import { requireIntegrityGuard } from "../supervisor/protected-integrity.mjs";
 import { LocalDeploymentRpc, verifyDeploymentSnapshot } from "../solana-observer/deployment-integrity.mjs";
 import { SolanaLocalRpcClient } from "./solana-deposit-claim-submitter.mjs";
@@ -13,16 +15,26 @@ import { prepareSignedLocalnetSolanaDepositReceiptTransaction, prepareSignedLoca
 const INSTANCES = new WeakSet();
 const check = (v, code = "ProtectedDepositFeePayerUnavailable") => { if (!v) throw new Error(code); };
 const digest = b => createHash("sha256").update(b).digest("hex");
+const MAINNET_PAYER = Symbol("Protected Mainnet deposit fee payer");
 export class ProtectedDepositFeePayer {
   #store; #guard; #policy; #chain; #rpc; #lease; #revision; #busy = false; #closed = false; #stopped = false;
-  static async open({ store, integrity, policy, endpoint }) {
+  static async openMainnet(options) {
+    const policy = validateSolanaDeliveryPolicy(options.policy);
+    assertWindowsProtectedStore(options.store, "FEE_PAYER", "fee-payer-seed");
+    assertMainnetProtectedDeployment(options.store.context, policy.operationPolicy);
+    return ProtectedDepositFeePayer.open({ ...options, policy }, MAINNET_PAYER);
+  }
+  static async open({ store, integrity, policy, endpoint }, capability) {
     assertWindowsProtectedStore(store, "FEE_PAYER", "fee-payer-seed"); requireIntegrityGuard(integrity, "FEE_PAYER");
     const self = new ProtectedDepositFeePayer(); self.#policy = validateSolanaDeliveryPolicy(policy);
     const { environment, nativeGenesis, solanaDeployment, keyEpoch } = self.#policy.operationPolicy;
-    check(environment === "localnet" && Object.entries({ environment, nativeGenesis, solanaDeployment, keyEpoch }).every(([k, v]) => store.context[k] === v));
+    const mainnet = environment === "mainnet" && capability === MAINNET_PAYER;
+    check((environment === "localnet" || mainnet) && Object.entries({ environment, nativeGenesis, solanaDeployment, keyEpoch }).every(([k, v]) => store.context[k] === v));
     integrity.assertDeployment({ environment, nativeGenesis, solanaDeployment, keyEpoch });
     self.#store = store; self.#guard = integrity;
-    self.#chain = new LocalDeploymentRpc({ endpoint }); self.#rpc = new SolanaLocalRpcClient({ endpoint });
+    const rpcOptions = { endpoint, expectedGenesis: self.#policy.operationPolicy.solanaGenesis };
+    self.#chain = mainnet ? LocalDeploymentRpc.createMainnet(rpcOptions) : new LocalDeploymentRpc({ endpoint });
+    self.#rpc = mainnet ? SolanaLocalRpcClient.createMainnet(rpcOptions) : new SolanaLocalRpcClient({ endpoint });
     try { self.#lease = await store.acquireLease(); const seed = self.#seed(); seed.fill(0); INSTANCES.add(self); return self; }
     catch (error) { try { await self.#report(error); } finally { await self.close(); } throw new Error("ProtectedDepositFeePayerUnavailable"); }
   }
@@ -59,7 +71,9 @@ export class ProtectedDepositFeePayer {
       await this.#guard.assertRunning(intent.operationId, "SIGN_SOLANA_CLAIM"); validNow();
       const p = this.#policy.operationPolicy, payer = this.#policy.feePayerPublicKey;
       const prepare = intent.kind === "RECEIPT" ? prepareSignedLocalnetSolanaDepositReceiptTransaction : prepareSignedLocalnetSolanaDepositClaimTransaction;
-      const transaction = await prepare({ environment: "localnet", cluster: "localnet", managerProgramIdHex: p.managerProgramId,
+      const transaction = await prepare({ environment: p.environment, cluster: p.environment, solanaGenesis: p.solanaGenesis,
+        ...(p.environment === "mainnet" ? { protocolId: p.protocolId, nativeNetwork: p.nativeNetwork, nativeGenesis: p.nativeGenesis, solanaDeployment: p.solanaDeployment } : {}),
+        managerProgramIdHex: p.managerProgramId,
         transceiverProgramIdHex: p.transceiverProgramId, mintHex: p.mint, recipientTokenAccountHex: message.destinationHex,
         tokenProgramIdBase58: this.#policy.manifest.mint.tokenProgram,
         feePayerBase58: payer, feePayerHex: Buffer.from(base58Decode(payer)).toString("hex"),

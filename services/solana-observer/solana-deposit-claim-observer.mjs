@@ -1,5 +1,6 @@
 import { bytesToHex, isHash32Hex, normalizeHex } from "../../shared/protocol/canonical-message.mjs";
 import { devnetRpcEndpoint, assertDevnetGenesis, isTestSolanaCluster } from "../../shared/solana-test-network.mjs";
+import { mainnetRpcEndpoint, assertMainnetSolanaGenesis, assertMainnetDeploymentFields, SOLANA_MAINNET_GENESIS } from "../../shared/network-identity.mjs";
 import { decodeBridgeAbi } from "../../shared/protocol/solana-bridge-abi.mjs";
 import { base58Decode, base58Encode, findProgramAddress, DEPOSIT_CLAIM_PDA_SEED_PREFIX, MINT_AUTHORITY_PDA_SEED_PREFIX } from "../bridge-validator/solana-deposit-claim-transaction-plan.mjs";
 import { verifyDepositMintExecution } from "./deposit-mint-execution.mjs";
@@ -27,16 +28,30 @@ export function requireProtectedClaimObservation(value) {
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 const BASE58_PATTERN = /^[1-9A-HJ-NP-Za-km-z]{32,128}$/u;
 const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+const MAINNET_OBSERVER = Symbol("Explicit Mainnet finalized claim observer");
 
 export class SolanaDepositClaimObserver {
   #config;
   #rpcClient;
+  #mainnet;
 
-  constructor(options = {}) {
+  static createMainnet(options) { return new SolanaDepositClaimObserver(options, MAINNET_OBSERVER); }
+  constructor(options = {}, capability) {
     if (!options || typeof options !== "object") {
       throw new Error("MissingSolanaDepositClaimObserverOptions");
     }
     this.#config = normalizeSolanaDepositClaimObserverConfig(options.config);
+    this.#mainnet = capability === MAINNET_OBSERVER;
+    if (this.#mainnet) {
+      const c = options.config;
+      if (c.environment !== "mainnet" || c.cluster !== "mainnet" || c.solanaGenesis !== SOLANA_MAINNET_GENESIS || options.rpcClient !== undefined || c.nativeDecimals !== 8)
+        throw new Error("SolanaMainnetClaimConfigurationRejected");
+      assertMainnetDeploymentFields({ protocolId: c.protocolId, nativeNetwork: c.nativeNetwork, nativeGenesis: c.nativeGenesis,
+        solanaDeployment: c.solanaDeployment, managerProgramId: c.managerProgramIdHex, transceiverProgramId: c.transceiverProgramIdHex, mint: c.mintHex });
+      this.#rpcClient = SolanaDepositClaimRpcClient.createMainnet({ endpoint: options.endpoint, expectedGenesis: c.solanaGenesis });
+      return;
+    }
+    if (this.#config.environment === "mainnet") throw new Error("SolanaMainnetClaimExplicitFactoryRequired");
     this.#rpcClient =
       options.rpcClient ??
       new SolanaDepositClaimRpcClient({
@@ -71,7 +86,7 @@ export class SolanaDepositClaimObserver {
   }
 
   async observeFinalizedDepositClaim(input = {}) {
-    if (!isTestSolanaCluster(this.#config)) {
+    if (!this.#mainnet && !isTestSolanaCluster(this.#config)) {
       throw new Error("SolanaDepositClaimObserverLocalnetOnly");
     }
 
@@ -148,11 +163,18 @@ export class SolanaDepositClaimRpcClient {
   #timeoutMs;
   #maxResponseBytes;
   #devnet;
+  #mainnet;
 
-  constructor(options = {}) {
-    if (![undefined, "localnet", "devnet"].includes(options.environment)) throw new Error("SolanaDepositClaimRpcEnvironmentRejected");
+  static createMainnet(options) {
+    if (options?.environment !== undefined && options.environment !== "mainnet") throw new Error("SolanaDepositClaimRpcEnvironmentRejected");
+    return new SolanaDepositClaimRpcClient({ ...options, environment: "mainnet" }, MAINNET_OBSERVER);
+  }
+  constructor(options = {}, capability) {
+    this.#mainnet = options.environment === "mainnet" && capability === MAINNET_OBSERVER;
+    if (!this.#mainnet && ![undefined, "localnet", "devnet"].includes(options.environment)) throw new Error("SolanaDepositClaimRpcEnvironmentRejected");
     this.#devnet = options.environment === "devnet";
-    this.#endpoint = this.#devnet ? devnetRpcEndpoint(options.endpoint, options.expectedGenesis) : normalizeSolanaDepositClaimRpcEndpoint(options.endpoint);
+    this.#endpoint = this.#mainnet ? mainnetRpcEndpoint(options.endpoint, options.expectedGenesis) :
+      this.#devnet ? devnetRpcEndpoint(options.endpoint, options.expectedGenesis) : normalizeSolanaDepositClaimRpcEndpoint(options.endpoint);
     this.#timeoutMs = boundedLimit(options.timeoutMs ?? 10_000, 10, 30_000);
     this.#maxResponseBytes = boundedLimit(options.maxResponseBytes ?? 2_097_152, 128, 4_194_304);
     RPC_INSTANCES.add(this);
@@ -195,6 +217,7 @@ export class SolanaDepositClaimRpcClient {
       throw new Error(`SolanaDepositClaimRpcMethodNotAllowed:${method}`);
     }
     if (this.#devnet && method !== "getGenesisHash") assertDevnetGenesis(await this.getGenesisHash());
+    if (this.#mainnet && method !== "getGenesisHash") assertMainnetSolanaGenesis(await this.getGenesisHash());
     const id = ++this.#requestId;
     if (!Number.isSafeInteger(id)) throw new Error("SolanaDepositClaimRpcRequestIdExhausted");
     const abort = new AbortController();
@@ -229,9 +252,14 @@ export class SolanaDepositClaimRpcClient {
           || !Object.hasOwn(payload, "result") || Object.hasOwn(payload, "error")) {
         throw new Error("SolanaDepositClaimRpcInvalidEnvelope");
       }
+      if (this.#mainnet) {
+        if (method === "getGenesisHash") assertMainnetSolanaGenesis(payload.result);
+        else assertMainnetSolanaGenesis(await this.getGenesisHash());
+      }
       return payload.result;
     } catch (error) {
       // Never surface an RPC error body, redirect target, endpoint or exception cause.
+      if (error?.integrityCode === "SOLANA_GENESIS_CHANGED") throw error;
       if (/^SolanaDepositClaimRpc[A-Za-z]+$/u.test(error?.message)) throw new Error(error.message);
       throw new Error(abort.signal.aborted ? "SolanaDepositClaimRpcTimeout" : "SolanaDepositClaimRpcUnavailable");
     } finally {

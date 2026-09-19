@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { isTestSolanaCluster } from "../../shared/solana-test-network.mjs";
+import { assertMainnetDeploymentFields, SOLANA_MAINNET_GENESIS } from "../../shared/network-identity.mjs";
 import { encodeBridgeAbi } from "../../shared/protocol/solana-bridge-abi.mjs";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import {
@@ -457,13 +458,22 @@ function normalizePlanConfig(config) {
   if (!config || typeof config !== "object") {
     throw new Error("MissingSolanaDepositClaimTransactionPlanConfig");
   }
-  if (!isTestSolanaCluster(config)) {
+  const mainnet = config.environment === "mainnet" && config.cluster === "mainnet" && config.solanaGenesis === SOLANA_MAINNET_GENESIS;
+  if (!mainnet && !isTestSolanaCluster(config)) {
     throw new Error("SolanaDepositClaimTransactionPlanLocalnetOnly");
   }
   const managerProgram = normalizePubkeyPair(config, "managerProgramIdBase58", "managerProgramIdHex");
   const transceiverProgram = normalizePubkeyPair(config, "transceiverProgramIdBase58", "transceiverProgramIdHex");
   const mint = normalizePubkeyPair(config, "mintBase58", "mintHex");
+  let productionDomain;
+  if (mainnet) {
+    productionDomain = Object.freeze({ protocolId: config.protocolId, nativeNetwork: config.nativeNetwork,
+      nativeGenesis: config.nativeGenesis, solanaDeployment: config.solanaDeployment,
+      managerProgramId: managerProgram.hex, transceiverProgramId: transceiverProgram.hex, mint: mint.hex });
+    assertMainnetDeploymentFields(productionDomain);
+  }
   const tokenProgram = normalizePubkeyPair(config, "tokenProgramIdBase58", "tokenProgramIdHex");
+  if (mainnet && tokenProgram.base58 !== "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA") throw new Error("MainnetDepositTokenProgramRejected");
   const feePayer = normalizePubkeyPair(config, "feePayerBase58", "feePayerHex");
   const recipientTokenAccount = normalizePubkeyPair(
     config,
@@ -474,6 +484,7 @@ function normalizePlanConfig(config) {
   return Object.freeze({
     environment: config.environment ?? LOCALNET,
     cluster: config.cluster ?? LOCALNET,
+    ...(productionDomain ? { productionDomain } : {}),
     managerProgram,
     transceiverProgram,
     mint,
@@ -489,6 +500,15 @@ function normalizePlanConfig(config) {
 function validateDepositClaimMessageDomain(config, message) {
   if (message.action !== "DepositClaim" || message.direction !== "NativeToSolana") {
     throw new Error("SolanaDepositClaimWrongMessageKind");
+  }
+  if (config.productionDomain) {
+    const d = message.deployment;
+    const actual = { protocolId: d.protocolId, nativeNetwork: d.nativeNetwork, nativeGenesis: bytesToHex(d.nativeGenesis),
+      solanaDeployment: bytesToHex(d.solanaDeployment), managerProgramId: bytesToHex(d.managerProgramId),
+      transceiverProgramId: bytesToHex(d.transceiverProgramId), mint: bytesToHex(d.mint) };
+    assertMainnetDeploymentFields(actual);
+    if (Object.entries(config.productionDomain).some(([key, value]) => actual[key] !== value) || message.feeAtomic !== 0n || message.amountAtomic <= 0n)
+      throw new Error("MainnetDepositClaimDomainMismatch");
   }
   const managerProgramIdHex = bytesToHex(message.deployment.managerProgramId);
   const transceiverProgramIdHex = bytesToHex(message.deployment.transceiverProgramId);

@@ -66,6 +66,7 @@ export function validateSolanaDepositDelivery(input, policy) {
   const v = { ...checked.intent, preparedTransactionBase64 };
   check(Buffer.byteLength(JSON.stringify(v)) <= 12000);
   const config = { environment: op.environment, cluster: op.environment, solanaGenesis: op.solanaGenesis,
+    ...(op.environment === "mainnet" ? { protocolId: op.protocolId, nativeNetwork: op.nativeNetwork, nativeGenesis: op.nativeGenesis, solanaDeployment: op.solanaDeployment } : {}),
     managerProgramIdHex: op.managerProgramId, transceiverProgramIdHex: op.transceiverProgramId,
     mintHex: op.mint, recipientTokenAccountHex: m.destinationHex, encodedMessageHex: v.encodedMessageHex, attestations: v.attestations,
     recentBlockhashBase58: v.recentBlockhash, lastValidBlockHeight: v.lastValidBlockHeight, preparedTransactionBase64: v.preparedTransactionBase64 };

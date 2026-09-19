@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { devnetRpcEndpoint, assertDevnetGenesis, isTestSolanaCluster } from "../../shared/solana-test-network.mjs";
+import { mainnetRpcEndpoint, assertMainnetSolanaGenesis } from "../../shared/network-identity.mjs";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { validateRuntimeFile, validateRuntimeStateRoot as validateStateRootOutsideRepo } from "../../shared/runtime-path-boundary.mjs";
@@ -31,6 +32,7 @@ const JSON_RPC_VERSION = "2.0";
 const MAX_SOLANA_RPC_REQUEST_BYTES = 65_536;
 const MAX_SOLANA_RPC_RESPONSE_BYTES = 2_097_152;
 const SOLANA_RPC_TIMEOUT_MS = 10_000;
+const MAINNET_RPC = Symbol("Explicit Mainnet claim transport");
 const INSTRUCTION_FAILURE_REASONS = new Set(["InvalidAccountData", "InvalidArgument", "InvalidInstructionData", "InsufficientFunds", "ProgramFailedToComplete", "ComputationalBudgetExceeded", "AccountNotRentExempt", "AccountAlreadyInitialized", "IncorrectProgramId"]);
 const EXECUTION_FAULTS = new Set(["SBF_STACK_ACCESS_VIOLATION", "SBF_ACCESS_VIOLATION", "SBF_HEAP_EXHAUSTED", "SBF_COMPUTE_BUDGET_EXCEEDED"]);
 const TRANSACTION_FAILURES = new Set(["BlockhashNotFound", "AccountNotFound", "InvalidAccountForFee", "InsufficientFundsForFee",
@@ -290,12 +292,23 @@ export class SolanaLocalRpcClient {
   #fetchImpl;
   #nextId = 0;
   #devnet;
+  #mainnet;
+  #broadcastAuthorized;
 
-  constructor(options) {
+  static createMainnet(options) {
+    if (options?.environment !== undefined && options.environment !== "mainnet") throw new Error("SolanaRpcEnvironmentRejected");
+    return new SolanaLocalRpcClient({ ...options, environment: "mainnet" }, MAINNET_RPC);
+  }
+  constructor(options, capability) {
     const value = requireObject(options, "options");
-    if (![undefined, "localnet", "devnet"].includes(value.environment)) throw new Error("SolanaRpcEnvironmentRejected");
+    this.#mainnet = value.environment === "mainnet" && capability === MAINNET_RPC;
+    if (!this.#mainnet && ![undefined, "localnet", "devnet"].includes(value.environment)) throw new Error("SolanaRpcEnvironmentRejected");
+    if (this.#mainnet && (value.fetchImpl !== undefined || ![undefined, false, true].includes(value.productionBroadcastAuthorized)))
+      throw new Error("SolanaMainnetTransportConfigurationRejected");
+    this.#broadcastAuthorized = this.#mainnet && value.productionBroadcastAuthorized === true;
     this.#devnet = value.environment === "devnet";
-    this.#endpoint = this.#devnet ? devnetRpcEndpoint(value.endpoint, value.expectedGenesis) : normalizeSolanaRpcEndpoint(value.endpoint);
+    this.#endpoint = this.#mainnet ? mainnetRpcEndpoint(value.endpoint, value.expectedGenesis) :
+      this.#devnet ? devnetRpcEndpoint(value.endpoint, value.expectedGenesis) : normalizeSolanaRpcEndpoint(value.endpoint);
     this.#fetchImpl = value.fetchImpl ?? globalThis.fetch;
     if (typeof this.#fetchImpl !== "function") {
       throw new Error("SolanaRpcFetchUnavailable");
@@ -310,8 +323,19 @@ export class SolanaLocalRpcClient {
       throw new Error("SolanaRpcParamsMustBeArray");
     }
     if (this.#devnet && method === "requestAirdrop") throw new Error("DevnetAutomaticAirdropDisabled");
+    if (this.#mainnet && method === "requestAirdrop") throw new Error("MainnetAirdropForbidden");
+    if (this.#mainnet && method === "sendTransaction") {
+      if (!this.#broadcastAuthorized) throw new Error("MainnetBroadcastNotAuthorized");
+      const send = params[1];
+      if (params.length !== 2 || !send || Object.keys(send).sort().join() !== "encoding,maxRetries,preflightCommitment,skipPreflight" ||
+          send.encoding !== "base64" || send.skipPreflight !== false || send.preflightCommitment !== "finalized" ||
+          !Number.isInteger(send.maxRetries) || send.maxRetries < 0 || send.maxRetries > 20)
+        throw new Error("MainnetSubmissionPolicyRejected");
+      normalizePreparedTransactionBase64(params[0]);
+    }
     // Even direct call(sendTransaction) must pass the same live genesis gate.
     if (this.#devnet && method !== "getGenesisHash") assertDevnetGenesis(await this.call("getGenesisHash"));
+    if (this.#mainnet && method !== "getGenesisHash") assertMainnetSolanaGenesis(await this.call("getGenesisHash"));
     const id = ++this.#nextId;
     if (!Number.isSafeInteger(id)) throw rpcError("SolanaRpcRequestIdentityExhausted", method);
     const body = JSON.stringify({ jsonrpc: JSON_RPC_VERSION, id, method, params });
@@ -378,6 +402,10 @@ export class SolanaLocalRpcClient {
     }
     if (!Object.hasOwn(envelope, "result")) throw rpcError("SolanaRpcInvalidEnvelope", method);
     if (this.#devnet && method === "getGenesisHash") assertDevnetGenesis(envelope.result);
+    if (this.#mainnet) {
+      if (method === "getGenesisHash") assertMainnetSolanaGenesis(envelope.result);
+      else assertMainnetSolanaGenesis(await this.call("getGenesisHash"));
+    }
     return envelope.result;
   }
 
@@ -388,6 +416,7 @@ export class SolanaLocalRpcClient {
         encoding: "base64",
         maxRetries: checkedSmallInteger(options.maxRetries ?? 0, "maxRetries"),
         skipPreflight: options.skipPreflight === true,
+        ...(this.#mainnet ? { preflightCommitment: "finalized" } : {}),
       },
     ]);
   }

@@ -229,19 +229,10 @@ test("deposit claim observer fails closed for unavailable transaction or non-loc
     /TransactionUnavailable/,
   );
 
-  const mainnetObserver = new SolanaDepositClaimObserver({
+  assert.throws(() => new SolanaDepositClaimObserver({
     config: config({ environment: "mainnet", cluster: "mainnet-beta" }),
     rpcClient: new FakeDepositClaimRpcClient(),
-  });
-  await assert.rejects(
-    () =>
-      mainnetObserver.observeFinalizedDepositClaim({
-        operationIdHex: h("operation-id"),
-        messageDigestHex: h("message-digest"),
-        solanaSignature: signature(),
-      }),
-    /LocalnetOnly/,
-  );
+  }), /ExplicitFactoryRequired/);
 });
 
 test("observer rejects account-program substitution, stale snapshots, and changed Mint authority", async () => {

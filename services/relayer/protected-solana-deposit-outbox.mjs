@@ -4,6 +4,7 @@
 import { createHash } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { assertWindowsProtectedStore } from "../../shared/windows/protected-store.mjs";
+import { assertMainnetProtectedDeployment } from "../../shared/network-identity.mjs";
 import { requireIntegrityGuard } from "../supervisor/protected-integrity.mjs";
 import { LocalDeploymentRpc } from "../solana-observer/deployment-integrity.mjs";
 import { SolanaLocalRpcClient, sanitizedRpcDiagnostic } from "../bridge-validator/solana-deposit-claim-submitter.mjs";
@@ -13,20 +14,31 @@ import { validateSolanaDeliveryPolicy, solanaDeliveryPolicyDigest, validateSolan
   deliveryUint, MAX_SOLANA_DELIVERIES, MAX_SOLANA_SENDS } from "./solana-deposit-delivery.mjs";
 
 const INSTANCES = new WeakSet();
+const MAINNET_OUTBOX = Symbol("Protected Mainnet Solana deposit outbox");
 const check = (v, code = "SolanaDepositOutboxUnavailable") => { if (!v) throw new Error(code); };
 const hash = b => createHash("sha256").update(b).digest("hex");
 const maximum = (...v) => v.map(deliveryUint).reduce((a, b) => a > b ? a : b, 0n).toString();
 export class ProtectedSolanaDepositOutbox {
   #store; #guard; #policy; #rpc; #chain; #lease; #revision; #pending; #cursor = 0; #busy = false; #running = false; #closed = false; #stopped = false;
-  static async open({ store, integrity, policy, endpoint }) {
+  static async openMainnet(options) {
+    const policy = validateSolanaDeliveryPolicy(options.policy);
+    assertWindowsProtectedStore(options.store, "RELAYER", "solana-deposit-outbox");
+    assertMainnetProtectedDeployment(options.store.context, policy.operationPolicy);
+    return ProtectedSolanaDepositOutbox.open({ ...options, policy }, MAINNET_OUTBOX);
+  }
+  static async open({ store, integrity, policy, endpoint, productionBroadcastAuthorized }, capability) {
     assertWindowsProtectedStore(store, "RELAYER", "solana-deposit-outbox"); requireIntegrityGuard(integrity, "RELAYER");
     const self = new ProtectedSolanaDepositOutbox(); self.#policy = validateSolanaDeliveryPolicy(policy);
     const { environment, nativeGenesis, solanaDeployment, keyEpoch } = self.#policy.operationPolicy;
     integrity.assertDeployment({ environment, nativeGenesis, solanaDeployment, keyEpoch });
     check(Object.entries({ environment, nativeGenesis, solanaDeployment, keyEpoch }).every(([k, v]) => store.context[k] === v));
-    // Construct both concrete transports from ONE strict local endpoint.
+    const mainnet = environment === "mainnet" && capability === MAINNET_OUTBOX;
+    check(environment === "localnet" || mainnet);
+    // Construct both concrete transports from ONE network-bound endpoint.
     // No externally supplied transport callback can return proofVerified=true.
-    self.#chain = new LocalDeploymentRpc({ endpoint }); self.#rpc = new SolanaLocalRpcClient({ endpoint });
+    const rpcOptions = { endpoint, expectedGenesis: self.#policy.operationPolicy.solanaGenesis };
+    self.#chain = mainnet ? LocalDeploymentRpc.createMainnet(rpcOptions) : new LocalDeploymentRpc({ endpoint });
+    self.#rpc = mainnet ? SolanaLocalRpcClient.createMainnet({ ...rpcOptions, productionBroadcastAuthorized }) : new SolanaLocalRpcClient({ endpoint });
     self.#store = store; self.#guard = integrity;
     try { self.#lease = await store.acquireLease(); self.#read(); INSTANCES.add(self); return self; }
     catch (error) { try { await self.#report(error); } finally { await self.close(); } throw new Error("SolanaDepositOutboxUnavailable"); }
