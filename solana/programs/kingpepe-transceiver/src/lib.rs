@@ -194,6 +194,22 @@ impl TransceiverConfig {
         if self.key_epoch == 0 {
             return Err(TransceiverError::InvalidConfig);
         }
+        // A partial Mainnet label must not admit a mixed TEST deployment.
+        if (self.native_network == bridge_messages::NATIVE_MAINNET_DOMAIN
+            || self.native_genesis == bridge_messages::NATIVE_MAINNET_GENESIS)
+            && !(bridge_messages::DeploymentIdentity {
+                protocol_id: self.protocol_id,
+                native_network: self.native_network,
+                native_genesis: self.native_genesis,
+                solana_deployment: self.solana_deployment,
+                manager_program_id: self.manager_program_id,
+                transceiver_program_id: self.transceiver_program_id,
+                mint: self.mint,
+            })
+            .is_mainnet_bound()
+        {
+            return Err(TransceiverError::InvalidConfig);
+        }
         if self.authorized_attesters[0] == self.authorized_attesters[1]
             || self.authorized_attesters.contains(&[0u8; 32])
         {
@@ -1205,12 +1221,43 @@ mod tests {
         config
     }
 
+    #[test]
+    fn mainnet_transceiver_requires_complete_domain_and_two_attesters() {
+        let mut config = config();
+        config.native_network = bridge_messages::NATIVE_MAINNET_DOMAIN;
+        config.native_genesis = bridge_messages::NATIVE_MAINNET_GENESIS;
+        config.solana_deployment = bridge_messages::mainnet_deployment_identity(
+            &config.manager_program_id,
+            &config.transceiver_program_id,
+            &config.mint,
+        )
+        .unwrap();
+        let mut receiver = TransceiverProgram::initialize(config.clone()).unwrap();
+        let message = message(&config);
+        let proof = observations(&config, message.message_digest().unwrap());
+        assert!(receiver.verify_message(&message, &proof[..1]).is_err());
+        assert!(receiver.verify_message(&message, &proof[1..]).is_err());
+        receiver.verify_message(&message, &proof).unwrap();
+        for field in 0..6 {
+            let mut wrong = config.clone();
+            match field {
+                0 => wrong.native_network = 8_000_111,
+                1 => wrong.native_genesis[0] ^= 1,
+                2 => wrong.protocol_id = 2,
+                3 => wrong.solana_deployment[0] ^= 1,
+                4 => wrong.manager_program_id[0] ^= 1,
+                _ => wrong.mint[0] ^= 1,
+            }
+            assert_eq!(wrong.validate(), Err(TransceiverError::InvalidConfig));
+        }
+    }
+
     fn message(config: &TransceiverConfig) -> CanonicalBridgeMessage {
         CanonicalBridgeMessage::new_deposit_claim(DepositClaimFields {
             deployment: DeploymentIdentity {
-                protocol_id: 1,
-                native_network: 2,
-                native_genesis: h(7),
+                protocol_id: config.protocol_id,
+                native_network: config.native_network,
+                native_genesis: config.native_genesis,
                 solana_deployment: config.solana_deployment,
                 manager_program_id: config.manager_program_id,
                 transceiver_program_id: config.transceiver_program_id,
