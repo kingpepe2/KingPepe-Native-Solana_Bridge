@@ -2,47 +2,62 @@
 // Accepted-basis monitoring is not a minting authority or economic repair tool.
 import { createHash } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
-import { LocalNativeEvidenceVerifier, REGTEST_GENESIS, requireVerifiedRegtestChain, requireVerifiedRegtestReserve, verifiedReserveChain } from "./native-raw-evidence.mjs";
+import { LocalNativeEvidenceVerifier, REGTEST_GENESIS, requireVerifiedNativeChain, requireVerifiedNativeReserve, verifiedReserveChain } from "./native-raw-evidence.mjs";
 import { assertWindowsProtectedStore } from "../../shared/windows/protected-store.mjs";
 import { requireIntegrityGuard } from "../../services/supervisor/protected-integrity.mjs";
+import { NATIVE_MAINNET_GENESIS, assertMainnetProtectedDeployment } from "../../shared/network-identity.mjs";
 
 export const NATIVE_INTEGRITY_PROTOCOL = "KINGPEPE_NATIVE_INTEGRITY_V1";
 const HASH = /^[0-9a-f]{64}$/u, MAX_BASES = 128;
+const MAINNET_MONITOR = Symbol("Explicit Mainnet Native integrity monitor");
 const requireValue = (v, code = "NativeProgressRejected") => { if (!v) throw new Error(code); };
 const digest = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const hash = value => { requireValue(typeof value === "string" && HASH.test(value)); return value; };
 const uint = value => { requireValue(typeof value === "string" && /^(0|[1-9][0-9]{0,19})$/u.test(value) && BigInt(value) <= 0xffff_ffff_ffff_ffffn); return BigInt(value); };
-const height = value => { requireValue(Number.isInteger(value) && value >= 1 && value <= 4096); return value; };
+const height = (value, maximum = 4096) => { requireValue(Number.isInteger(value) && value >= 1 && value <= maximum); return value; };
+const maximumHeight = p => p.environment === "mainnet" ? 1_000_000 : 4096;
 const fields = (v, names) => requireValue(v && !Array.isArray(v) && Object.keys(v).sort().join() === [...names].sort().join());
 function policy(input) {
-  const p = structuredClone(input); fields(p, ["environment", "nativeGenesis", "solanaDeployment", "keyEpoch", "minimumConfirmations", "maximumStallMs"]);
-  requireValue(p.environment === "localnet" && p.nativeGenesis === REGTEST_GENESIS); hash(p.solanaDeployment);
+  const p = structuredClone(input); fields(p, ["environment", "nativeGenesis", "solanaDeployment", "keyEpoch", "minimumConfirmations", "maximumStallMs",
+    ...(p.environment === "mainnet" ? ["deployment"] : [])]);
+  requireValue(p.environment === "localnet" && p.nativeGenesis === REGTEST_GENESIS || p.environment === "mainnet" && p.nativeGenesis === NATIVE_MAINNET_GENESIS);
+  if (p.environment === "mainnet") {
+    assertMainnetProtectedDeployment(p, p.deployment);
+    requireValue(p.minimumConfirmations === 12, "NativeMainnetFinalityPolicyRequired");
+    Object.freeze(p.deployment);
+  }
+  hash(p.solanaDeployment);
   requireValue(Number.isInteger(p.keyEpoch) && p.keyEpoch > 0 && p.keyEpoch <= 0xffff_ffff);
   height(p.minimumConfirmations);
   requireValue(Number.isInteger(p.maximumStallMs) && p.maximumStallMs >= 1000 && p.maximumStallMs <= 300000);
-  return Object.freeze(Object.fromEntries(["environment", "nativeGenesis", "solanaDeployment", "keyEpoch", "minimumConfirmations", "maximumStallMs"].map(k => [k, p[k]])));
+  return Object.freeze(Object.fromEntries(["environment", "nativeGenesis", "solanaDeployment", "keyEpoch", "minimumConfirmations", "maximumStallMs",
+    ...(p.environment === "mainnet" ? ["deployment"] : [])].map(k => [k, p[k]])));
 }
-function block(b) { fields(b, ["txid", "vout", "height", "blockHash"]); hash(b.txid); hash(b.blockHash); height(b.height);
+function block(b, p) { fields(b, ["txid", "vout", "height", "blockHash"]); hash(b.txid); hash(b.blockHash); height(b.height, maximumHeight(p));
   requireValue(Number.isInteger(b.vout) && b.vout >= 0 && b.vout <= 0xffff_ffff); }
-function basis(b) {
+function basis(b, p) {
   fields(b, ["operationId", "genesis", "chainworkHex", "deposit", "sweep", "amountAtomic", "reserveScriptHex"]);
-  hash(b.operationId); requireValue(b.genesis === REGTEST_GENESIS); hash(b.chainworkHex); block(b.deposit); block(b.sweep);
+  hash(b.operationId); requireValue(b.genesis === p.nativeGenesis); hash(b.chainworkHex); block(b.deposit, p); block(b.sweep, p);
   requireValue(b.sweep.height >= b.deposit.height && uint(b.amountAtomic) > 0n && /^5120[0-9a-f]{64}$/u.test(b.reserveScriptHex));
 }
-function chain(c) {
-  requireValue(c && c.genesis === REGTEST_GENESIS); height(c.tipHeight); hash(c.tipHash); hash(c.chainworkHex);
+function chain(c, p) {
+  requireValue(c && c.genesis === p.nativeGenesis); height(c.tipHeight, maximumHeight(p)); hash(c.tipHash); hash(c.chainworkHex);
   requireValue(BigInt("0x" + c.chainworkHex) > 0n && Array.isArray(c.headerHashes) && c.headerHashes.length === c.tipHeight + 1);
-  c.headerHashes.forEach(hash); requireValue(c.headerHashes[0] === REGTEST_GENESIS && c.headerHashes[c.tipHeight] === c.tipHash);
+  c.headerHashes.forEach(hash); requireValue(c.headerHashes[0] === p.nativeGenesis && c.headerHashes[c.tipHeight] === c.tipHash);
   requireValue(Number.isSafeInteger(c.observedAt) && c.observedAt > 0);
 }
 function progress(value, expectedPolicy) {
-  const v = structuredClone(value);
+  const v = structuredClone(value), p = policy(expectedPolicy);
   fields(v, ["protocol", "policyDigest", "genesis", "tipHeight", "tipHash", "chainworkHex", "lastObservationMs", "lastAdvanceMs", "bases", "incident"]);
-  requireValue(v.protocol === NATIVE_INTEGRITY_PROTOCOL && v.policyDigest === digest(policy(expectedPolicy)) && v.genesis === REGTEST_GENESIS);
-  height(v.tipHeight); hash(v.tipHash); hash(v.chainworkHex);
+  requireValue(v.protocol === NATIVE_INTEGRITY_PROTOCOL && v.policyDigest === digest(p) && v.genesis === p.nativeGenesis);
+  height(v.tipHeight, maximumHeight(p)); hash(v.tipHash); hash(v.chainworkHex);
   requireValue(Number.isSafeInteger(v.lastObservationMs) && v.lastObservationMs > 0 && Number.isSafeInteger(v.lastAdvanceMs) && v.lastAdvanceMs > 0 && v.lastAdvanceMs <= v.lastObservationMs);
   requireValue(Array.isArray(v.bases) && v.bases.length <= MAX_BASES);
-  v.bases.forEach(basis);
+  v.bases.forEach(b => basis(b, p));
+  if (p.environment === "mainnet") for (const b of v.bases) {
+    requireValue(v.tipHeight - b.deposit.height + 1 >= p.minimumConfirmations &&
+      v.tipHeight - b.sweep.height + 1 >= p.minimumConfirmations, "NativeReserveBasisFinalityInsufficient");
+  }
   for (const index of [b => b.operationId, b => b.deposit.txid + ":" + b.deposit.vout, b => b.sweep.txid + ":" + b.sweep.vout]) requireValue(new Set(v.bases.map(index)).size === v.bases.length);
   if (v.incident !== null) {
     fields(v.incident, ["code", "previousTip", "observedTip", "affected", "affectedReserveAtomic", "evidenceDigest"]);
@@ -57,8 +72,8 @@ function progress(value, expectedPolicy) {
 }
 
 export function initialNativeProgress(expectedPolicy, verifiedChain) {
-  requireVerifiedRegtestChain(verifiedChain); chain(verifiedChain); const p = policy(expectedPolicy);
-  return { protocol: NATIVE_INTEGRITY_PROTOCOL, policyDigest: digest(p), genesis: REGTEST_GENESIS,
+  const p = policy(expectedPolicy); requireVerifiedNativeChain(verifiedChain, p.nativeGenesis); chain(verifiedChain, p);
+  return { protocol: NATIVE_INTEGRITY_PROTOCOL, policyDigest: digest(p), genesis: p.nativeGenesis,
     tipHeight: verifiedChain.tipHeight, tipHash: verifiedChain.tipHash, chainworkHex: verifiedChain.chainworkHex,
     lastObservationMs: verifiedChain.observedAt, lastAdvanceMs: verifiedChain.observedAt, bases: [], incident: null };
 }
@@ -67,7 +82,7 @@ export function initialNativeProgress(expectedPolicy, verifiedChain) {
 // no capability: the protected service additionally requires branded results
 // from the independent Rust header verifier before persisting any observation.
 export function compareNativeProgress(stored, observed, expectedPolicy, now = Date.now()) {
-  const p = policy(expectedPolicy), old = progress(stored, p); chain(observed);
+  const p = policy(expectedPolicy), old = progress(stored, p); chain(observed, p);
   requireValue(Number.isSafeInteger(now) && now >= old.lastObservationMs && now >= observed.observedAt, "NativeProgressClockRollback");
   if (old.incident !== null) return { state: "HARD_STOP_INTEGRITY", progress: old, incident: old.incident };
   if (observed.observedAt < old.lastObservationMs || now - observed.observedAt > p.maximumStallMs) return { state: "WAITING_FOR_DEPENDENCY", reason: "STALE_NATIVE_OBSERVATION", progress: old };
@@ -87,14 +102,14 @@ export function compareNativeProgress(stored, observed, expectedPolicy, now = Da
 }
 
 export function retainVerifiedReserveBasis(stored, receipt, operationId, expectedPolicy) {
-  requireVerifiedRegtestReserve(receipt); hash(operationId); const old = progress(stored, expectedPolicy);
+  const p = policy(expectedPolicy); requireVerifiedNativeReserve(receipt, p.nativeGenesis); hash(operationId); const old = progress(stored, p);
   requireValue(old.incident === null, "NativeProgressStopped");
-  const current = compareNativeProgress(old, verifiedReserveChain(receipt), expectedPolicy);
+  const current = compareNativeProgress(old, verifiedReserveChain(receipt, p.nativeGenesis), p);
   if (current.incident) return current.progress;
   requireValue(current.state === "OBSERVED_MATCH", "NativeReserveBasisStale");
-  const b = { operationId, ...receipt.reserveBasis }; basis(b);
-  requireValue(receipt.tipHeight - b.sweep.height + 1 >= policy(expectedPolicy).minimumConfirmations &&
-    receipt.tipHeight - b.deposit.height + 1 >= policy(expectedPolicy).minimumConfirmations, "NativeReserveBasisFinalityInsufficient");
+  const b = { operationId, ...receipt.reserveBasis }; basis(b, p);
+  requireValue(receipt.tipHeight - b.sweep.height + 1 >= p.minimumConfirmations &&
+    receipt.tipHeight - b.deposit.height + 1 >= p.minimumConfirmations, "NativeReserveBasisFinalityInsufficient");
   const existing = old.bases.find(v => v.operationId === operationId);
   if (existing) { requireValue(JSON.stringify(existing) === JSON.stringify({ ...b, chainworkHex: existing.chainworkHex }), "NativeReserveBasisConflict"); return current.progress; }
   requireValue(old.bases.length < MAX_BASES, "NativeProgressCapacity");
@@ -105,9 +120,15 @@ export function retainVerifiedReserveBasis(stored, receipt, operationId, expecte
 
 export class ProtectedNativeIntegrityMonitor {
   #policy; #verifier; #guard; #store; #lease; #closed = false; #busy = false; #stopped = false;
-  static async open({ expectedPolicy, verifier, integrity, store }) {
+  static async openMainnet(options) {
+    requireValue(options?.expectedPolicy?.environment === "mainnet", "NativeMainnetMonitorBindingRequired");
+    return ProtectedNativeIntegrityMonitor.open(options, MAINNET_MONITOR);
+  }
+  static async open({ expectedPolicy, verifier, integrity, store }, capability) {
     const self = new ProtectedNativeIntegrityMonitor(); self.#policy = policy(expectedPolicy);
+    requireValue(self.#policy.environment === "localnet" || capability === MAINNET_MONITOR, "NativeExplicitMainnetMonitorRequired");
     requireValue(verifier instanceof LocalNativeEvidenceVerifier, "NativeIndependentVerifierRequired");
+    requireValue(verifier.nativeGenesis === self.#policy.nativeGenesis, "NativeVerifierNetworkMismatch");
     requireIntegrityGuard(integrity, "NATIVE_OBSERVER"); assertWindowsProtectedStore(store, "NATIVE_OBSERVER", "chain-progress");
     const { environment, nativeGenesis, solanaDeployment, keyEpoch } = self.#policy;
     integrity.assertDeployment({ environment, nativeGenesis, solanaDeployment, keyEpoch });
@@ -163,7 +184,7 @@ export class ProtectedNativeIntegrityMonitor {
         return Object.freeze({ state: "HARD_STOP_INTEGRITY", affectedReserveAtomic: old.value.incident.affectedReserveAtomic });
       }
       ticket = await this.#guard.beginSourceCheck(digest(this.#policy));
-      const observed = await this.#verifier.observeChain(); requireVerifiedRegtestChain(observed);
+      const observed = await this.#verifier.observeChain(); requireVerifiedNativeChain(observed, this.#policy.nativeGenesis);
       const next = compareNativeProgress(old.value, observed, this.#policy);
       if (next.incident) {
         this.#stopped = true;

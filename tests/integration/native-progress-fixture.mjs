@@ -3,6 +3,8 @@
 import { createHash } from "node:crypto";
 import { REGTEST_GENESIS } from "../../native/node/native-raw-evidence.mjs";
 import { NATIVE_INTEGRITY_PROTOCOL } from "../../native/node/native-integrity.mjs";
+import { mainnetDeploymentFixture } from "./deployment-fixture.mjs";
+import { base58Decode } from "../../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs";
 export const nativeFixtureHash = text => createHash("sha256").update(text).digest("hex");
 export function nativeProgressFixture() {
   const h = nativeFixtureHash;
@@ -15,4 +17,20 @@ export function nativeProgressFixture() {
   const stored = { protocol: NATIVE_INTEGRITY_PROTOCOL, policyDigest: h(JSON.stringify(expectedPolicy)), genesis: REGTEST_GENESIS,
     tipHeight: 5, tipHash: hashes[5], chainworkHex: chain.chainworkHex, lastObservationMs: now, lastAdvanceMs: now, bases: [b], incident: null };
   return { expectedPolicy, chain, stored, now };
+}
+
+export function mainnetNativeProgressFixture() {
+  const f = nativeProgressFixture(), { manifest: m } = mainnetDeploymentFixture(), h = nativeFixtureHash;
+  const hex = key => Buffer.from(base58Decode(key)).toString("hex");
+  const deployment = { environment: "mainnet", protocolId: m.config.protocolId, nativeNetwork: m.config.nativeNetwork,
+    nativeGenesis: m.nativeGenesisHex, solanaGenesis: m.solanaGenesis, solanaDeployment: m.solanaDeploymentHex,
+    managerProgramId: hex(m.manager.id), transceiverProgramId: hex(m.transceiver.id), mint: hex(m.mint.id), keyEpoch: m.config.keyEpoch };
+  f.expectedPolicy = { ...f.expectedPolicy, environment: "mainnet", nativeGenesis: m.nativeGenesisHex,
+    solanaDeployment: m.solanaDeploymentHex, minimumConfirmations: 12, deployment };
+  const hashes = [m.nativeGenesisHex, ...Array.from({ length: 5000 }, (_, i) => h("mainnet-monitor-fixture-" + i))];
+  Object.assign(f.chain, { genesis: m.nativeGenesisHex, tipHeight: 5000, tipHash: hashes[5000], headerHashes: hashes });
+  Object.assign(f.stored, { genesis: m.nativeGenesisHex, policyDigest: h(JSON.stringify(f.expectedPolicy)), tipHeight: 5000, tipHash: hashes[5000] });
+  const b = f.stored.bases[0]; b.genesis = m.nativeGenesisHex;
+  Object.assign(b.deposit, { height: 4988, blockHash: hashes[4988] }); Object.assign(b.sweep, { height: 4989, blockHash: hashes[4989] });
+  return f;
 }

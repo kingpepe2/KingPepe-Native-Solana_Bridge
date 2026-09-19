@@ -2,9 +2,9 @@
 // Pure comparison fixtures, not a claim of Native chain or DPAPI execution.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { requireVerifiedRegtestChain, requireVerifiedRegtestReserve } from "../native-raw-evidence.mjs";
+import { LocalNativeEvidenceVerifier, requireVerifiedRegtestChain, requireVerifiedRegtestReserve } from "../native-raw-evidence.mjs";
 import { compareNativeProgress, initialNativeProgress, retainVerifiedReserveBasis, ProtectedNativeIntegrityMonitor } from "../native-integrity.mjs";
-import { nativeProgressFixture as fixture, nativeFixtureHash as h } from "../../../tests/integration/native-progress-fixture.mjs";
+import { nativeProgressFixture as fixture, mainnetNativeProgressFixture, nativeFixtureHash as h } from "../../../tests/integration/native-progress-fixture.mjs";
 test("unchanged Native accepted basis preserves exact liabilities and stable snapshot", () => {
   const f = fixture(); const r = compareNativeProgress(f.stored, f.chain, f.expectedPolicy, f.now);
   assert.equal(r.state, "OBSERVED_MATCH"); assert.deepEqual(r.progress.bases, f.stored.bases);
@@ -50,4 +50,41 @@ test("a fixture or RPC flag is never a verified chain/reserve or protected servi
   const f = fixture(); assert.throws(() => requireVerifiedRegtestChain(f.chain)); assert.throws(() => requireVerifiedRegtestReserve({ reserveBasis: f.stored.bases[0] }));
   assert.throws(() => initialNativeProgress(f.expectedPolicy, f.chain)); assert.throws(() => retainVerifiedReserveBasis(f.stored, {}, h("fake"), f.expectedPolicy));
   await assert.rejects(ProtectedNativeIntegrityMonitor.open({ expectedPolicy: f.expectedPolicy, verifier: { observeChain: () => f.chain } }), /NativeIndependentVerifierRequired/u);
+});
+
+test("Mainnet progress accepts actual-height ranges and rejects mixed deployment or finality policy", () => {
+  const f = mainnetNativeProgressFixture();
+  assert.equal(compareNativeProgress(f.stored, f.chain, f.expectedPolicy, f.now).state, "OBSERVED_MATCH");
+  for (const mutation of [{ minimumConfirmations: 11 }, { minimumConfirmations: 13 }, { nativeGenesis: h("other-chain") },
+    { solanaDeployment: h("other-deployment") }, { keyEpoch: 2 }, { deployment: { ...f.expectedPolicy.deployment, mint: h("other-mint") } }])
+    assert.throws(() => compareNativeProgress(f.stored, f.chain, { ...f.expectedPolicy, ...mutation }, f.now));
+  assert.throws(() => compareNativeProgress(f.stored, { ...f.chain, genesis: h("other-chain") }, f.expectedPolicy, f.now));
+  assert.throws(() => compareNativeProgress(f.stored, { ...f.chain, tipHeight: 1_000_001 }, f.expectedPolicy, f.now));
+  for (const name of ["deposit", "sweep"]) {
+    const immature = structuredClone(f.stored); immature.bases[0][name].height = 4990;
+    // Preserve ordering so the failure specifically checks the finality boundary.
+    if (name === "deposit") immature.bases[0].sweep.height = 4990;
+    assert.throws(() => compareNativeProgress(immature, f.chain, f.expectedPolicy, f.now), /NativeReserveBasisFinalityInsufficient/);
+  }
+});
+
+test("Mainnet pre-finality reorg waits for policy and an accepted-basis reorg retains exact stopped accounting", () => {
+  const f = mainnetNativeProgressFixture();
+  f.chain.headerHashes[4999] = h("shallow-fork"); f.chain.chainworkHex = "00".repeat(31) + "20";
+  assert.equal(compareNativeProgress(f.stored, f.chain, f.expectedPolicy, f.now).state, "OBSERVED_MATCH");
+  f.chain.headerHashes[4988] = h("accepted-deposit-orphaned");
+  const stopped = compareNativeProgress(f.stored, f.chain, f.expectedPolicy, f.now);
+  assert.equal(stopped.state, "HARD_STOP_INTEGRITY"); assert.equal(stopped.incident.affectedReserveAtomic, "9007199254740993");
+  const original = mainnetNativeProgressFixture(); original.chain.observedAt = f.now;
+  assert.equal(compareNativeProgress(stopped.progress, original.chain, f.expectedPolicy, f.now).state, "HARD_STOP_INTEGRITY");
+});
+
+test("Mainnet observations require branded consensus verification and explicit matching runtime", async () => {
+  const f = mainnetNativeProgressFixture();
+  assert.throws(() => initialNativeProgress(f.expectedPolicy, f.chain), /RAW_NATIVE_VERIFIED_CHAIN_REQUIRED/);
+  assert.throws(() => retainVerifiedReserveBasis(f.stored, { reserveBasis: f.stored.bases[0] }, h("fake-mainnet-receipt"), f.expectedPolicy), /RAW_NATIVE_VERIFIED_RESERVE_REQUIRED/);
+  await assert.rejects(ProtectedNativeIntegrityMonitor.open({ expectedPolicy: f.expectedPolicy }), /NativeExplicitMainnetMonitorRequired/);
+  await assert.rejects(ProtectedNativeIntegrityMonitor.openMainnet({ expectedPolicy: f.expectedPolicy,
+    verifier: new LocalNativeEvidenceVerifier({ rpc: {}, executable: "unused-fixture" }) }), /NativeVerifierNetworkMismatch/);
+  await assert.rejects(ProtectedNativeIntegrityMonitor.openMainnet({ expectedPolicy: fixture().expectedPolicy }), /NativeMainnetMonitorBindingRequired/);
 });
