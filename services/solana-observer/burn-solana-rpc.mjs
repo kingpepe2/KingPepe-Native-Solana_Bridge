@@ -10,7 +10,14 @@ export class BurnSolanaRpc {
   constructor({environment,endpoint,expectedGenesis}) {
     check(['localnet','devnet'].includes(environment),'BurnSolanaTestOnly');
     check(base58Decode(expectedGenesis).length===32,'BurnSolanaGenesisRejected');
-    if(environment==='devnet'){check(expectedGenesis===DEVNET_SOLANA_GENESIS,'BurnSolanaGenesisRejected');this.#endpoint=devnetRpcEndpoint(endpoint,expectedGenesis);}
+    if(environment==='devnet'){
+      check(expectedGenesis===DEVNET_SOLANA_GENESIS,'BurnSolanaGenesisRejected');
+      // The private service file may name this fixed TEST-only process
+      // binding. A protected launcher supplies its value in memory, keeping
+      // the credential-bearing URL out of configuration files and argv.
+      const value=endpoint==='ENV:SOLANA_DEVNET_RPC_URL'?process.env.SOLANA_DEVNET_RPC_URL:endpoint;
+      this.#endpoint=devnetRpcEndpoint(value,expectedGenesis);
+    }
     else {
       let u;try{u=new URL(endpoint);}catch{throw new Error('BurnSolanaEndpointRejected');}
       check(u.protocol==='http:'&&u.hostname==='127.0.0.1'&&Number(u.port)>=1024&&u.pathname==='/'&&!u.search&&!u.hash&&!u.username&&!u.password,'BurnSolanaEndpointRejected');

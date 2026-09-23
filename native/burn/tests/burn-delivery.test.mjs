@@ -12,6 +12,7 @@ import {validateBurnSolanaPolicy,verifyBurnDeploymentSnapshot} from '../../../se
 import {BurnSolanaRpc} from '../../../services/solana-observer/burn-solana-rpc.mjs';
 import {validateRegtestBurnNetwork} from '../burn-evidence.mjs';
 import {REGTEST_GENESIS} from '../../node/native-raw-evidence.mjs';
+import {DEVNET_SOLANA_GENESIS} from '../../../shared/solana-test-network.mjs';
 async function packet(f,authorization,kind,block=1) {
   const recentBlockhash=base58Encode(Buffer.alloc(32,block)),lastValidBlockHeight=String(300+block);
   const config={...burnSolanaPlanOptions({context:f.context,binding:f.binding,feePayerHex:f.policy.feePayerHex,...authorization,recentBlockhash,lastValidBlockHeight}),
@@ -20,6 +21,22 @@ async function packet(f,authorization,kind,block=1) {
   return {kind,recentBlockhash,lastValidBlockHeight,messageDigestHex:decodeCanonicalBridgeMessage(Buffer.from(authorization.encodedMessageHex,'hex')).messageDigestHex,
     preparedTransactionBase64:raw.preparedTransactionBase64,signature:raw.signatures[0].signatureBase58};
 }
+test('private Devnet process binding requires a valid endpoint and cannot enable another cluster',()=>{
+  const previous=process.env.SOLANA_DEVNET_RPC_URL;
+  const options={environment:'devnet',endpoint:'ENV:SOLANA_DEVNET_RPC_URL',expectedGenesis:DEVNET_SOLANA_GENESIS};
+  try{
+    delete process.env.SOLANA_DEVNET_RPC_URL;
+    assert.throws(()=>new BurnSolanaRpc(options),/^Error: DevnetRpcEndpointRejected$/);
+    process.env.SOLANA_DEVNET_RPC_URL='https://devnet.invalid.example/';
+    assert.doesNotThrow(()=>new BurnSolanaRpc(options));
+    assert.throws(()=>new BurnSolanaRpc({...options,environment:'mainnet'}),/TestOnly/);
+    assert.throws(()=>new BurnSolanaRpc({...options,environment:'localnet'}),/EndpointRejected/);
+    assert.throws(()=>new BurnSolanaRpc({...options,expectedGenesis:base58Encode(Buffer.alloc(32,77))}),/GenesisRejected/);
+    process.env.SOLANA_DEVNET_RPC_URL='invalid-private-value';
+    assert.throws(()=>new BurnSolanaRpc(options),/^Error: DevnetRpcEndpointRejected$/);
+  }finally{if(previous===undefined)delete process.env.SOLANA_DEVNET_RPC_URL;else process.env.SOLANA_DEVNET_RPC_URL=previous;}
+});
+
 test('Native catch-up waits without conflating synchronization with a wrong network',()=>{
   const ready={chain:'regtest',initialblockdownload:false,blocks:12,headers:12};
   assert.equal(validateRegtestBurnNetwork(ready,REGTEST_GENESIS),ready);
