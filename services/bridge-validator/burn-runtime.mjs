@@ -131,7 +131,27 @@ export class BurnRuntime {
         finalized+=BigInt(proof.evidence.amountAtomic);
         if(!await this.#recoverMint(this.#op(op.operationId))){this.#health={state:'PENDING',reconciliation:null,reason:'SOLANA_EXECUTION_RECOVERY_PENDING'};return this.status();}
       }
-      const deployed=await this.#solana.deployment();
+      let deployed=await this.#solana.deployment();
+      if(burnJournalAccounting(this.#journal.read()).mintedAtomic!==deployed.managerMintedAtomic){
+        // Finalization can advance between the claim read above and this
+        // issuance snapshot. The snapshot advances the adapter's minimum slot;
+        // recover journaled claims again at or after that slot before comparing.
+        const priorIssued=BigInt(deployed.managerMintedAtomic);
+        for(const op of this.#journal.read().operations){
+          if(op.burnEvidence&&!await this.#recoverMint(op)){
+            this.#health={state:'PENDING',reconciliation:null,reason:'SOLANA_EXECUTION_RECOVERY_PENDING'};return this.status();
+          }
+        }
+        deployed=await this.#solana.deployment();
+        const issued=BigInt(deployed.managerMintedAtomic),minted=BigInt(burnJournalAccounting(this.#journal.read()).mintedAtomic);
+        // A further increase while recovering may require another cycle. This
+        // is unavailable accounting, never healthy or permission to burn/mint.
+        // Stable unexplained issuance, decreases and excess burn backing still
+        // reach the critical reconciliation check below.
+        if(issued>priorIssued&&issued>minted&&issued<=finalized){
+          this.#health={state:'PENDING',reconciliation:null,reason:'SOLANA_FINALIZED_SNAPSHOT_ADVANCED'};return this.status();
+        }
+      }
       reconcileBurnAccounting(this.#journal.read(),{finalizedNativeBurnAtomic:finalized.toString(),bridgeIssuedAtomic:deployed.managerMintedAtomic,mintSupplyAtomic:deployed.mintSupplyAtomic});
       for(const op of this.#journal.read().operations)if(op.state==='MINTED'){
         this.#update(state=>completeBurnOperation(state,op.operationId));this.#emit('COMPLETED',op.operationId);

@@ -58,6 +58,7 @@ const quote=s=>"'"+s.replaceAll("'","'\\''")+"'";
 const nodeRoot=path.join(root,'native');mkdirSync(nodeRoot);
 const logs=[],children=[],proxies=[];let rpc,nativePort,nativeEndpoint,solanaEndpoint,runtimeNativeEndpoint,runtimeSolanaEndpoint,journal,burnSigner,attesters=[],solanaSigner,runtime,policy,stores;
 let loseNativeBroadcast=true,loseSolanaClaim=false,nativeResponsesLost=0,solanaResponsesLost=0,serviceController,serviceTask;
+let delayedFinalizedSnapshot=false;const priorClaimSnapshots=new Map();
 const nativeBroadcastIds=new Set();
 const freePort=async()=>{const s=createServer();s.listen(0,'127.0.0.1');await once(s,'listening');const p=s.address().port;await new Promise(r=>s.close(r));return p;};
 async function freeRpcPair(){
@@ -78,6 +79,17 @@ async function lossyTestRpc(target,kind){
       const response=await fetch(target,{method:'POST',headers:{'content-type':'application/json',...(req.headers.authorization?{authorization:req.headers.authorization}:{})},
         body,signal:AbortSignal.timeout(30000)});
       const bytes=Buffer.from(await response.arrayBuffer()),value=JSON.parse(bytes.toString('utf8'));
+      if(kind==='solana'&&request.method==='getMultipleAccounts'&&request.params[0].length===12&&!value.error){
+        const key=JSON.stringify(request.params[0]),prior=priorClaimSnapshots.get(key),result=value.result;
+        if(result.value[8]===null)priorClaimSnapshots.set(key,structuredClone(result));
+        else if(!delayedFinalizedSnapshot&&solanaResponsesLost===1&&prior&&prior.context.slot>=(request.params[1]?.minContextSlot??0)){
+          // A genuine earlier finalized response remains valid at minContextSlot.
+          // Deliver it once while the next deployment read sees the landed mint.
+          // This reproduces Devnet's finality advance between two RPC reads.
+          delayedFinalizedSnapshot=true;report.delayedFinalizedSnapshot={priorSlot:prior.context.slot,currentSlot:result.context.slot};save();
+          res.writeHead(response.status,{'content-type':'application/json'});res.end(JSON.stringify({...value,result:prior}));return;
+        }
+      }
       if(kind==='native'&&request.method==='sendrawtransaction'&&!value.error){
         nativeBroadcastIds.add(value.result);
         if(loseNativeBroadcast){loseNativeBroadcast=false;nativeResponsesLost++;report.lostNativeResponseAt=new Date().toISOString();res.destroy();return;}
@@ -228,6 +240,7 @@ try{
   report.solanaSignature=completed.solanaSignature;report.amounts.minted=journal.read().operations[0].mintReceipt.amountAtomic;
   assert.equal(report.amounts.minted,report.amounts.burn);pass('RESTART_AFTER_BURN_RECOVERS_ONE_MINT');
   assert.equal(solanaResponsesLost,1);assert.equal(nativeBroadcastIds.size,1);pass('LOST_SOLANA_CLAIM_RESPONSE_RECOVERS_EXACTLY_ONCE');
+  assert(delayedFinalizedSnapshot,'FinalizedSnapshotRaceNotExercised');pass('FINALIZED_CLAIM_AND_ISSUANCE_READ_RACE_RECOVERS_WITHOUT_FALSE_PAUSE');
   await closeRuntime();await openRuntime();await runtime.cycle();await runtime.cycle();
   assert.equal(runtime.operation(created.operationId).state,'COMPLETED');assert.equal(journal.read().operations.length,1);
   assert.equal((await new BurnSolanaAdapter({policy,endpoint:solanaEndpoint}).deployment()).mintSupplyAtomic,'100000');pass('COMPLETED_RESTART_NO_SECOND_BURN_OR_MINT');
