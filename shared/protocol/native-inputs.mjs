@@ -3,14 +3,8 @@
 import { serialize } from "borsh";
 const h = { array: { type: "u8", len: 32 } };
 export const NATIVE_INPUT_SCHEMAS = Object.freeze({
-  DepositIntent: { struct: { magic: { array: { type: "u8", len: 8 } },
-    nativeGenesisHex: h, solanaDeploymentHex: h, managerProgramIdHex: h,
-    transceiverProgramIdHex: h, mintHex: h, recipientHex: h, nonceHex: h,
-    amountAtomic: "u64", protocolId: "u32", nativeNetwork: "u32", policyEpoch: "u32", keyEpoch: "u32" } },
   DepositEvidence: { struct: { transaction: { array: { type: "u8" } }, blockHash: h,
     outputIndex: "u32", amountAtomic: "u64" } },
-  ReserveAllocation: { struct: { depositTxid: h, depositVout: "u32", sweepTxid: h,
-    reserveVout: "u32", amountAtomic: "u64" } },
 });
 export function encodeNativeInput(name, input) {
   const schema = NATIVE_INPUT_SCHEMAS[name];
@@ -31,6 +25,5 @@ export function encodeNativeInput(name, input) {
       value[field] = item;
     }
   }
-  if (name === "DepositIntent" && Buffer.from(value.magic).toString("hex") !== "4b5044494e543031") throw Error("NativeInputDomain");
   return Buffer.from(serialize(schema, value));
 }

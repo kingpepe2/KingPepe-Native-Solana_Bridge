@@ -1,10 +1,9 @@
-import { bridgeInputDigest } from "../../shared/protocol/bridge-inputs.mjs";
 import { createHash } from "node:crypto";
 import { tapLeafHashHex, verifyTaprootControlBlock } from "./native-tapscript.mjs";
 import {
   bytesToHex,
   hexToBytes,
-} from "../../shared/protocol/canonical-message.mjs";
+} from "../../shared/protocol/codec-helpers.mjs";
 
 export const LOCAL_NATIVE_TAPROOT_TRANSACTION_PROTOCOL =
   "KINGPEPE_NATIVE_SOLANA_BRIDGE/NATIVE_TAPROOT_TRANSACTION/V1";
@@ -14,8 +13,21 @@ export const LOCAL_NATIVE_TAPROOT_SIGHASH_VALIDATED =
   "LOCALLY_VALIDATED_NATIVE_SIGHASH";
 export const SIGHASH_DEFAULT = 0x00;
 
-// Deterministic transaction serialization for forward deposits, sweeps and recovery. No signing key or RPC.
+// Native transaction serialization and independent consensus parsing. No key or RPC.
 export function createUnsignedNativeTransaction({ inputs, outputs }) {
+  return createUnsignedTransaction(inputs, outputs, false);
+}
+
+// The single canonical burn output is an explicit constructor, never a relaxed
+// spendable-output check on the retained transaction constructor.
+export function createUnsignedNativeBurnTransaction({ inputs, outputs }) {
+  if (!Array.isArray(outputs) || outputs.length !== 2 ||
+      !/^6a374b494e47504550455f4252494447455f4255524e5f5631[0-9a-f]{64}$/u.test(outputs[0]?.scriptPubKeyHex ?? '') ||
+      !/^5120[0-9a-f]{64}$/u.test(outputs[1]?.scriptPubKeyHex ?? '')) throw new Error('NativeBurnOutputRejected');
+  return createUnsignedTransaction(inputs, outputs, true);
+}
+
+function createUnsignedTransaction(inputs, outputs, burn) {
   if (!Array.isArray(inputs) || inputs.length < 1 || inputs.length > 8 ||
       !Array.isArray(outputs) || outputs.length < 1 || outputs.length > 2) throw new Error("NativeTransactionShapeRejected");
   const ids = new Set();
@@ -25,9 +37,9 @@ export function createUnsignedNativeTransaction({ inputs, outputs }) {
     ids.add(`${input.txid}:${input.vout}`);
     return { serializedOutpoint: Buffer.concat([Buffer.from(input.txid, "hex").reverse(), uint32LE(input.vout)]), scriptSig: Buffer.alloc(0), sequence: 0xffffffff };
   });
-  for (const output of outputs) {
+  for (const [index, output] of outputs.entries()) {
     canonicalUintDecimal(output.amountAtomic, "transaction output");
-    if (BigInt(output.amountAtomic) === 0n || !/^(?:0014[0-9a-f]{40}|0020[0-9a-f]{64}|5120[0-9a-f]{64})$/u.test(output.scriptPubKeyHex)) throw new Error("NativeTransactionOutputRejected");
+    if (BigInt(output.amountAtomic) === 0n || (!(burn && index === 0) && !/^(?:0014[0-9a-f]{40}|0020[0-9a-f]{64}|5120[0-9a-f]{64})$/u.test(output.scriptPubKeyHex))) throw new Error("NativeTransactionOutputRejected");
   }
   const raw = serializeNativeTransactionParts({ version: 2, inputs: nativeInputs, outputs, lockTime: 0 });
   return parseNativeTransactionHex(raw.toString("hex")).rawHex;
@@ -37,115 +49,6 @@ const MAX_NATIVE_TRANSACTION_BYTES = 4_000_000;
 const MAX_NATIVE_TRANSACTION_INPUTS = 100_000;
 const MAX_NATIVE_TRANSACTION_OUTPUTS = 500_000;
 const MAX_NATIVE_TRANSACTION_WITNESS_ITEMS = 100_000;
-
-export function createLocalTaprootSighashEvidence(input) {
-  const value = requireObject(input, "input");
-  const transaction = parseNativeTransactionHex(value.unsignedNativeTransactionHex);
-  const spentOutputs = normalizeSpentOutputs(value.spentOutputs, transaction.inputs.length);
-  const signingInputIndex = checkedNonNegativeSafeInteger(value.signingInputIndex, "signingInputIndex");
-  if (signingInputIndex >= transaction.inputs.length) {
-    throw new Error("NativeTaprootSigningInputIndexOutOfRange");
-  }
-  const signingSpentOutput = spentOutputs[signingInputIndex];
-  if (!isP2trScriptPubKeyHex(signingSpentOutput.scriptPubKeyHex)) {
-    throw new Error("NativeTaprootSigningInputMustSpendP2tr");
-  }
-  const expectedRecipientScriptPubKeyHex =
-    value.expectedRecipientScriptPubKeyHex === undefined
-      ? undefined
-      : normalizeNonEmptyHex(value.expectedRecipientScriptPubKeyHex, "expectedRecipientScriptPubKeyHex");
-  const expectedChangeScriptPubKeyHex =
-    value.expectedChangeScriptPubKeyHex === undefined
-      ? expectedRecipientScriptPubKeyHex
-      : normalizeNonEmptyHex(value.expectedChangeScriptPubKeyHex, "expectedChangeScriptPubKeyHex");
-  const reserveAmountAtomic = canonicalUintDecimal(value.reserveAmountAtomic, "reserveAmountAtomic");
-  const nativeMinerFeeAtomic = canonicalUintDecimal(value.nativeMinerFeeAtomic, "nativeMinerFeeAtomic");
-  const reserveOutput = findUniqueReserveOutput({
-    transaction,
-    reserveAmountAtomic,
-    expectedRecipientScriptPubKeyHex,
-  });
-  const changeAtomic = calculateChangeAtomic({
-    transaction,
-    reserveOutputIndex: reserveOutput.index,
-    expectedChangeScriptPubKeyHex,
-  });
-  const computedFeeAtomic = transactionFeeAtomic(transaction, spentOutputs);
-  if (computedFeeAtomic !== nativeMinerFeeAtomic) {
-    throw new Error("NativeTaprootSighashFeeMismatch");
-  }
-
-  const tapscriptSpend = value.tapscriptSpend;
-  if (tapscriptSpend !== undefined) {
-    verifyTaprootControlBlock({ ...tapscriptSpend, scriptPubKeyHex: signingSpentOutput.scriptPubKeyHex });
-  }
-  const sighash = (tapscriptSpend === undefined ? taprootKeyPathSighashDefault : taprootScriptPathSighashDefault)({
-    transaction,
-    spentOutputs,
-    inputIndex: signingInputIndex,
-    ...(tapscriptSpend === undefined ? {} : { scriptHex: tapscriptSpend.scriptHex }),
-  });
-  const outputCommitments = transaction.outputs.map((output, index) =>
-    bridgeInputDigest("IndexedOutput", { index, amountAtomic: output.amountAtomic, scriptPubKeyHex: output.scriptPubKeyHex }),
-  );
-
-  return Object.freeze({
-    protocol: LOCAL_NATIVE_TAPROOT_SIGHASH_EVIDENCE_PROTOCOL,
-    state: LOCAL_NATIVE_TAPROOT_SIGHASH_VALIDATED,
-    unsignedNativeTransactionFingerprintHex: sha256Hex(transaction.raw),
-    nativeSweepTxidHex: transaction.txidHex,
-    unsignedNativeTransactionId: transaction.txidHex,
-    transactionCommitment: bridgeInputDigest("TransactionCommitment", {
-      protocol: `${LOCAL_NATIVE_TAPROOT_TRANSACTION_PROTOCOL}/TRANSACTION_COMMITMENT`,
-      txidHex: transaction.txidHex,
-      inputOutpoints: transaction.inputs.map((entry) => entry.outpoint),
-      outputCommitments,
-      shaPrevouts: sighash.precomputed.shaPrevouts,
-      shaAmounts: sighash.precomputed.shaAmounts,
-      shaScriptPubKeys: sighash.precomputed.shaScriptPubKeys,
-      shaSequences: sighash.precomputed.shaSequences,
-      shaOutputs: sighash.precomputed.shaOutputs,
-    }),
-    taprootSighashHex: sighash.sigHashHex,
-    taprootSigMsgWithEpochHex: sighash.sigMsgWithEpochHex,
-    proofFingerprintHex: normalizeHash32(value.proofFingerprintHex, "proofFingerprintHex"),
-    signingInputIndex,
-    ...(tapscriptSpend === undefined ? {} : { tapscriptSpend: Object.freeze({
-      scriptHex: tapscriptSpend.scriptHex, controlBlockHex: tapscriptSpend.controlBlockHex,
-      ...(tapscriptSpend.publicPreimageHex === undefined ? {} : { publicPreimageHex: tapscriptSpend.publicPreimageHex }),
-    }) }),
-    recipientScriptPubKeyHex: reserveOutput.output.scriptPubKeyHex,
-    changeScriptPubKeyHex: expectedChangeScriptPubKeyHex ?? reserveOutput.output.scriptPubKeyHex,
-    changeAtomic,
-    nativeMinerFeeAtomic,
-    reserveAmountAtomic,
-    inputOutpoints: Object.freeze(transaction.inputs.map((entry) => entry.outpoint)),
-    spentOutputCommitments: Object.freeze(
-      spentOutputs.map((output, index) =>
-        bridgeInputDigest("IndexedOutput", { index, amountAtomic: output.amountAtomic, scriptPubKeyHex: output.scriptPubKey }),
-      ),
-    ),
-    outputCommitments: Object.freeze(outputCommitments),
-    reserveCommitment: outputCommitments[reserveOutput.index],
-  });
-}
-
-export function createLocalTaprootSighashEvidences(input) {
-  const value = requireObject(input, "input");
-  const transaction = parseNativeTransactionHex(value.unsignedNativeTransactionHex);
-  if (value.tapscriptSpends !== undefined && (!Array.isArray(value.tapscriptSpends) || value.tapscriptSpends.length !== transaction.inputs.length)) {
-    throw new Error("NativeTaprootScriptSpendsLengthMismatch");
-  }
-  return Object.freeze(
-    transaction.inputs.map((_, index) =>
-      createLocalTaprootSighashEvidence({
-        ...value,
-        signingInputIndex: index,
-        tapscriptSpend: value.tapscriptSpends?.[index],
-      }),
-    ),
-  );
-}
 
 export function taprootKeyPathSighashDefault(input) {
   return taprootDefaultSighash(input, 0);
@@ -436,50 +339,6 @@ function serializeTransactionOutput(outputInput) {
 function serializeScript(bytes) {
   const value = Buffer.from(bytes);
   return Buffer.concat([encodeVarint(value.length), value]);
-}
-
-function findUniqueReserveOutput({
-  transaction,
-  reserveAmountAtomic,
-  expectedRecipientScriptPubKeyHex,
-}) {
-  const matches = transaction.outputs.filter(
-    (output) =>
-      output.amountAtomic === reserveAmountAtomic &&
-      (expectedRecipientScriptPubKeyHex === undefined ||
-        output.scriptPubKeyHex === expectedRecipientScriptPubKeyHex),
-  );
-  if (matches.length !== 1) {
-    throw new Error("NativeTaprootReserveOutputNotUnique");
-  }
-  return Object.freeze({
-    index: matches[0].index,
-    output: matches[0],
-  });
-}
-
-function calculateChangeAtomic({
-  transaction,
-  reserveOutputIndex,
-  expectedChangeScriptPubKeyHex,
-}) {
-  if (expectedChangeScriptPubKeyHex === undefined) return "0";
-  let change = 0n;
-  for (const output of transaction.outputs) {
-    if (output.index !== reserveOutputIndex && output.scriptPubKeyHex === expectedChangeScriptPubKeyHex) {
-      change += BigInt(output.amountAtomic);
-    }
-  }
-  return change.toString();
-}
-
-function transactionFeeAtomic(transaction, spentOutputs) {
-  const totalIn = spentOutputs.reduce((sum, output) => sum + BigInt(output.amountAtomic), 0n);
-  const totalOut = transaction.outputs.reduce((sum, output) => sum + BigInt(output.amountAtomic), 0n);
-  if (totalIn < totalOut) {
-    throw new Error("NativeTaprootTransactionOutputsExceedInputs");
-  }
-  return (totalIn - totalOut).toString();
 }
 
 function normalizeSpentOutputs(value, expectedLength) {

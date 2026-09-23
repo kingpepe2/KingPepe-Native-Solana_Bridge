@@ -1,90 +1,39 @@
-# KingPepe Native → Solana Bridge
+# KingPepe Native -> Solana Bridge
 
-**One-way bridge.** Supported: KingPepe Native → Solana KPEPE.
-Solana KPEPE → KingPepe Native redemption is not provided.
+The current source implements **ONE_WAY_AUTOMATIC_BURN_AND_MINT** for TEST validation. Mainnet is not deployed or activated. The public TEST site is [KingPepe Bridge](https://kingpepe.net/bridge); publication of this conversion's source does not itself switch its runtime. See [current validation and deployment status](docs/development-status.md).
 
-Mainnet is not deployed or activated. The public one-way TEST interface is
-[KingPepe Bridge](https://kingpepe.net/bridge), using REGTEST → DEVNET.
-No Mainnet Mint or program
-address is published until independently verified after deployment.
+## Transfer
 
-## Deposit flow
+Connect a Solana Wallet Standard wallet on the configured TEST chain (`solana:devnet`). The Bridge binds the wallet destination before issuing a unique, single-use Native deposit address. Send from your own Native wallet. The deposit is authorization; there is no separate approval button and the website cannot spend your wallet.
 
-1. Select a Solana recipient using Wallet Standard or a public address. The
-   destination must have an initialized token account for the exact configured Mint.
-2. Enter an exact KPEPE amount and the public Native recovery key. Confirm the
-   recipient and save the public deposit request and operation ID.
-3. Send Native KPEPE from your own Native wallet to the generated deposit address.
-4. The observer verifies Native identity, transaction, output and finality.
-   Separate FROST A+B participants sign the reserve sweep using exact 2-of-2.
-5. Verified reserve credit becomes a canonical Borsh message. Two project
-   attesters sign the same bytes; the Solana Transceiver verifies them.
-6. The Bridge claims the receipt once and mints to the bound recipient. Finalized
-   Solana evidence and reconciliation are required for `COMPLETED`.
+After 12 Native deposit confirmations and the pre-burn checks, the next processing cycle signs and broadcasts an exact-value OP_RETURN burn. Separate Bridge operational inputs pay its miner fee. After 12 burn confirmations, two project attesters sign canonical Borsh V4 burn evidence. Solana verifies the attestation, consumes the deposit and burn exactly once, and mints to the original wallet. Finalized execution and matching reconciliation complete the operation.
 
-The visible states are `OBSERVED`, `VALIDATED`, `SWEPT`, `ATTESTED`, `CLAIMED`,
-`MINTED`, `COMPLETED`. Refresh/status lookup never creates a new operation.
-The Solana wallet is a recipient connection; the bridge requests no wallet
-signature. Native public-address balance lookup is informational. Users retain
-their own Native wallets. Never enter a seed phrase, private key or wallet file.
+**A successful Native burn is irreversible.** The Bridge fee is **0**. The deposit is not reduced by the Bridge: confirmed deposit = finalized Native burn = Solana mint. Late deposits to retired addresses and multiple separate deposits enter an exception state; they are not automatically burned or minted. Transfers are not batched. Wallet disconnect or account changes cannot redirect an existing operation.
 
-## Accounting and protection
+Solana -> Native redemption, withdrawal and Native payout are not provided. Wallet connection never requests a private key, seed phrase or wallet file. Native public-address balance lookup is informational.
 
-KingPepe Native's monetary ceiling is **21,000,000 KPEPE**. Solana KPEPE is
-representation against eligible Native backing, not independent supply or a
-21M mint allocation. Both the monetary ceiling and the stronger backing
-invariant apply. See [source confirmation, enforcement and counter semantics](docs/security/monetary-supply.md).
+## Supply and accounting
 
-Native and SPL units use eight decimals and exact integers. Eligible canonical
-reserve equals authorized pending credits plus cumulative bridge-issued units.
-Actual reserve must match the recorded reserve. SPL supply must not exceed
-cumulative authorized issuance. Ordinary user token burns may reduce supply;
-they grant no reserve-release entitlement. Forward sweep fees are paid from
-separate operator fee inputs and are explicitly excluded from backing credit.
-The Bridge service fee is zero.
+KingPepe Native's source monetary maximum is **21,000,000 KPEPE**. Both Native and Solana use 8 decimals: **2,100,000,000,000,000 base units**. This is a monetary ceiling, not a Bridge mint allocation.
 
-Network/genesis, Mint, program, PDA, account ownership, amount, recipient,
-finality and replay checks remain mandatory. Journal state is durable before
-external action. Ambiguous responses require chain-state checks. A critical
-reconciliation contradiction pauses processing; there is no automatic economic
-repair. Resume requires explicit operational review.
+Cumulative Bridge-created Solana units must not exceed either 21M or verified finalized Native burns. Finalized burns awaiting mint are explicit pending obligations. Every completed operation has equal burn and mint amounts. Holder-initiated SPL burns reduce live token supply without reopening the cumulative issuance cap or creating a redemption entitlement. See [the accounting equation and source evidence](docs/security/monetary-supply.md).
 
-Production policy is `UNBOUNDED_BY_TEAM_DECISION`: there are no numeric mint
-transfer/window caps. This does not waive reserve, accounting, finality, replay
-or reconciliation checks. Approved Native deposit/sweep finality is 12 blocks;
-recoverable deposits use a 1,440-block CSV delay. Dynamic sweep fee estimation
-and measured safety caps must be ready before activation.
+The public counter uses completed, canonically accounted burn/mint operations. It does not count requests, observed deposits or pending burns. TEST and future production journals/Mints remain isolated. Missing, stale or contradictory accounting is displayed as unavailable, not as healthy progress.
 
-## Trust and deployment status
+`productionLimitPolicy=UNBOUNDED_BY_TEAM_DECISION` means no arbitrary per-transfer or time-window monetary cap. Finality, the 21M ceiling, conservation, replay checks and reconciliation remain mandatory. Storage and fee-funding exhaustion hold new work safely; they never reduce the user's burn amount.
 
-FROST is retained for forward reserve sweeps. Participants have separate
-software processes, protected shares and nonce state on a single host.
-Common-host compromise or outage may affect both participants; this is an
-accepted risk. The coordinator has no share. The upstream Noble FROST primitive
-is UNAUDITED. Project attestations and configured RPC sources are trust boundaries.
+## Trust and recovery
 
-Upgrade policy: `SINGLE_KEY_WITH_REVIEW_CONTROL`, no fixed timelock or review
-waiting window. The dedicated authority may replace program logic. Reviewed
-source/build/tests and specific Team approval are operational controls.
-`externalSecurityAuditCompleted = false`.
+Native burn custody uses **SINGLE_KEY_ACCEPTED_RISK**. The root signs independently derived operation addresses and a separate operational fee address. It is server-side and DPAPI-protected; it is separate from Solana payer, upgrade authority and attester keys. No FROST is used. Compromise before burn may permit theft of temporarily held deposits and operational fees; key loss may prevent processing. Cloudflare does not store or protect that key. Dedicated service identity separation and encrypted offline recovery must be proven before production.
 
-See [current status](docs/development-status.md),
-[accounting](docs/security/local-deposit-accounting.md),
-[canonical bytes](docs/architecture/protocol-messages.md),
-[recovery](docs/security/deposit-operation-recovery.md),
-[program upgrades](docs/security/program-upgrades.md), and
-[production plan](docs/deployment/production-plan.md).
+The journal and exact signed transactions persist before broadcast. After an ambiguous response, recovery checks the existing Native transaction or Solana claim before retrying the same action. A finalized burn remains a mint obligation after restart. Critical contradictions persistently pause economic processing; there is no automatic economic repair.
 
-## Development and licensing
+Native header/Merkle checks and configured RPC observations have their stated trust boundaries. Solana relies on two authorized project attesters for Native burn evidence, rather than running Native consensus itself. The upgrade model is `SINGLE_KEY_WITH_REVIEW_CONTROL`, with no fixed timelock or waiting window. The upgrade authority can replace program logic. Specific Team approval is required for production upgrades. No independent external audit is claimed.
 
-Pinned tools and isolated test commands are in
-[local validation](docs/deployment/local-e2e-build.md). Test state, keys,
-databases, backups and build outputs stay outside the checkout.
-Historical validation applies only to its named source. Rewritten history
-requires new exact-SHA CI; it does not inherit an earlier result.
+## Development
 
-Original code: Copyright © 2026 KingPepe Team. All Rights Reserved.
-See [LICENSE](LICENSE), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
-and [PROVENANCE.json](PROVENANCE.json). Historical third-party and prior license
-grants are preserved. Report security concerns privately to the KingPepe Team;
-do not publish credentials or sensitive reproduction material in an issue.
+[Validation commands](docs/deployment/local-e2e-build.md), [protocol](docs/architecture/protocol-messages.md), [recovery](docs/security/deposit-operation-recovery.md), [key protection](docs/security/windows-protected-storage.md), [future production plan](docs/deployment/production-plan.md).
+
+All runtime state, keys, credentials, backups and build outputs stay outside Git. Historical CI certifies only its named source. New commits require matching CI.
+
+Original code: Copyright (c) 2026 KingPepe Team. All Rights Reserved. Preserve [LICENSE](LICENSE), [third-party notices](THIRD_PARTY_NOTICES.md), and [provenance](PROVENANCE.json). Historical license grants are not revoked. Report security concerns privately to the KingPepe Team; do not post secrets in public issues.

@@ -3,7 +3,6 @@ import { createHash } from "node:crypto";
 import { test } from "node:test";
 import {
   attachKeyPathTaprootWitnesses,
-  createLocalTaprootSighashEvidence,
   parseNativeTransactionHex,
   taprootKeyPathSighashDefault,
   taprootPrecomputedHashes,
@@ -53,61 +52,6 @@ test("BIP341 wallet vector computes the default Taproot key-path sighash", () =>
     "0000020000000065cd1de3b33bb4ef3a52ad1fffb555c0d82828eb22737036eaeb02a235d82b909c4c3f58a6964a4f5f8f0b642ded0a8a553be7622a719da71d1f5befcefcdee8e0fde623ad0f61ad2bca5ba6a7693f50fce988e17c3780bf2b1e720cfbb38fbdd52e2118959c7221ab5ce9e26c3cd67b22c24f8baa54bac281d8e6b05e400e6c3a957ea2e6dab7c1f0dcd297c8d61647fd17d821541ea69c3cc37dcbad7f90d4eb4bc50004000000",
   );
   assert.equal(sighash.sigHashHex, "4f900a0bae3f1446fd48490c2958b5a023228f01661cda3496a11da502a7f7ef");
-});
-
-test("local reserve sweep evidence binds P2TR inputs, exact fee, and reserve output", () => {
-  const reserveScript = p2tr("phase08-local-reserve-script");
-  const unsignedNativeTransactionHex = buildUnsignedTransactionHex({
-    inputs: [
-      { txid: h("phase08-deposit-outpoint"), vout: 1 },
-      { txid: h("phase08-fee-outpoint"), vout: 0 },
-    ],
-    outputs: [{ amountAtomic: "100000000", scriptPubKeyHex: reserveScript }],
-  });
-
-  const evidence = createLocalTaprootSighashEvidence({
-    unsignedNativeTransactionHex,
-    spentOutputs: [
-      { amountAtomic: "100000000", scriptPubKeyHex: reserveScript },
-      { amountAtomic: "1000", scriptPubKeyHex: reserveScript },
-    ],
-    signingInputIndex: 0,
-    proofFingerprintHex: h("validated-native-proof"),
-    reserveAmountAtomic: "100000000",
-    nativeMinerFeeAtomic: "1000",
-    expectedRecipientScriptPubKeyHex: reserveScript,
-  });
-
-  const parsed = parseNativeTransactionHex(unsignedNativeTransactionHex);
-  assert.equal(evidence.state, "LOCALLY_VALIDATED_NATIVE_SIGHASH");
-  assert.equal(evidence.nativeSweepTxidHex, parsed.txidHex);
-  assert.equal(evidence.unsignedNativeTransactionFingerprintHex, hBytes(unsignedNativeTransactionHex));
-  assert.equal(evidence.signingInputIndex, 0);
-  assert.equal(evidence.recipientScriptPubKeyHex, reserveScript);
-  assert.equal(evidence.changeScriptPubKeyHex, reserveScript);
-  assert.equal(evidence.changeAtomic, "0");
-  assert.equal(evidence.nativeMinerFeeAtomic, "1000");
-  assert.deepEqual(evidence.inputOutpoints, [
-    `${h("phase08-deposit-outpoint")}:1`,
-    `${h("phase08-fee-outpoint")}:0`,
-  ]);
-
-  assert.throws(
-    () =>
-      createLocalTaprootSighashEvidence({
-        unsignedNativeTransactionHex,
-        spentOutputs: [
-          { amountAtomic: "100000000", scriptPubKeyHex: reserveScript },
-          { amountAtomic: "1000", scriptPubKeyHex: reserveScript },
-        ],
-        signingInputIndex: 0,
-        proofFingerprintHex: h("validated-native-proof"),
-        reserveAmountAtomic: "100000000",
-        nativeMinerFeeAtomic: "999",
-        expectedRecipientScriptPubKeyHex: reserveScript,
-      }),
-    /FeeMismatch/u,
-  );
 });
 
 test("key-path witness attachment preserves txid and rejects malformed signatures", () => {

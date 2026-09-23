@@ -149,196 +149,37 @@ jobs:
             --target wasm32-unknown-unknown nightly-2023-10-29
           cargo +nightly-2023-10-29 build --locked --manifest-path native/proof/Cargo.toml \
             --bin kingpepe-native-evidence --target-dir "${KINGPEPE_CI_TOOL_ROOT}/build/native-evidence"
-      - name: Real automatic Native to Solana local flow
+      - name: Real Native burn policy, finality, reorg and restart proof
         shell: bash
         run: |
           set -euo pipefail
           export PATH="${KINGPEPE_CI_TOOL_ROOT}/solana-release/bin:${KINGPEPE_CI_TOOL_ROOT}/native-build/bin:${PATH}"
-          export KINGPEPE_LOCAL_E2E_ROOT="${KINGPEPE_CI_TOOL_ROOT}/run"
-          export KINGPEPE_LOCAL_BUILD_ROOT="${KINGPEPE_CI_TOOL_ROOT}/build"
-          # Full diagnostic material stays external and is not uploaded.
-          flow_exit=0
-          node solana/tests/local-deposit-security.mjs > "${KINGPEPE_CI_TOOL_ROOT}/result.json" || flow_exit=$?
+          export KINGPEPE_NATIVE_BURN_RUN_ROOT="${KINGPEPE_CI_TOOL_ROOT}/native-burn-proof"
+          export KINGPEPE_TEST_NATIVE_VERIFIER="${KINGPEPE_CI_TOOL_ROOT}/build/native-evidence/debug/kingpepe-native-evidence"
+          npm run local:proof:burn
+      - name: Real burn evidence, Solana mint, replay and conservation
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="${KINGPEPE_CI_TOOL_ROOT}/solana-release/bin:${KINGPEPE_CI_TOOL_ROOT}/native-build/bin:${PATH}"
+          export KINGPEPE_BURN_TEST_ROOT="${KINGPEPE_CI_TOOL_ROOT}/burn-chain-regression"
+          export KINGPEPE_BURN_SBF_ROOT="${KINGPEPE_CI_TOOL_ROOT}/production-output"
+          export KINGPEPE_TEST_NATIVE_VERIFIER="${KINGPEPE_CI_TOOL_ROOT}/build/native-evidence/debug/kingpepe-native-evidence"
+          npm run local:e2e:native-to-solana
           node --input-type=module -e '
             import {readFileSync} from "node:fs";
-            const r = JSON.parse(readFileSync(process.env.KINGPEPE_CI_TOOL_ROOT + "/result.json", "utf8"));
-            const f = r.nativeToSolanaE2e;
-            console.log(JSON.stringify({sourceSha: process.env.GITHUB_SHA, state: r.state, reason: r.reason,
-              failedStep: r.infrastructure?.failedStep,
-              failureSource: r.infrastructure?.failureSource,
-              localSecurity: r.localSecurity,
-              localRecovery: r.localRecovery,
-              localRecoveryPsbt: r.localRecoveryPsbt,
-              localRecoveryRaces: r.localRecoveryRaces,
-              localClaimRetry: r.localClaimRetry,
-              localAccounting: r.localAccounting,
-              nativeEvidence: f?.nativeRawEvidence,
-              nativeToSolana: r.fullNativeToSolanaE2e, reserve: f?.reconciliation?.canonicalReserve,
-              observedMintSupply: f?.reconciliation?.mintedSupply, productionReady: false, mainnetActivation: "DISABLED"}));
-            if (r.state !== "COMPLETED" || r.fullNativeToSolanaE2e !== "PASS") process.exit(1);
-            if (r.localSecurity?.pass !== 22 || r.localSecurity?.fail !== 0) process.exit(1);
-            if (r.localRecovery?.pass !== 7 || r.localRecovery?.fail !== 0) process.exit(1);
-            if (r.localRecoveryPsbt?.pass !== 4 || r.localRecoveryPsbt?.fail !== 0) process.exit(1);
-            if (r.localRecoveryRaces?.pass !== 10 || r.localRecoveryRaces?.fail !== 0) process.exit(1);
-            if (r.localClaimRetry?.pass !== 7 || r.localClaimRetry?.fail !== 0) process.exit(1);
-            for (const check of ["STOPPED_CLAIM_WORKER_REOPEN_DOES_NOT_OBSERVE_OR_SEND",
-              "LATE_COMPLETION_CANNOT_CLEAR_STOPPED_CLAIM_JOURNAL"]) {
-              if (!r.localClaimRetry.passed.includes(check)) process.exit(1);
-            }
-            if (r.localAccounting?.pass !== 5 || r.localAccounting?.fail !== 0) process.exit(1);
-            if (f?.depositAccounting?.snapshot?.authorizedUnmintedCredits !== "0") process.exit(1);
-            if (f?.depositIntent?.recoverable !== true || f.depositIntent.recoveryAvailableAfterSweep !== false) process.exit(1);
-            if (f.depositIntent.scriptPubKeyHex === f.frostCustody.taprootScriptPubKeyHex) process.exit(1);
+            const r=JSON.parse(readFileSync(process.env.KINGPEPE_BURN_TEST_ROOT+"/evidence.json","utf8"));
+            if(r.sourceSha!==process.env.GITHUB_SHA||r.exactSource!==true||r.state!=="COMPLETED"||r.accounting.state!=="MATCH")process.exit(1);
+            for(const check of ["DEPOSIT_OBSERVATION_CANNOT_AUTHORIZE_BURN_OR_MINT","MAXBURNAMOUNT_ONE_UNIT_OVERAGE_REJECTED",
+              "BROADCAST_IS_NOT_MINT_AUTHORIZATION","ELEVEN_CONFIRMATIONS_AND_ORPHANED_BURN_REJECTED",
+              "FINALIZED_EXACT_BURN_UNSPENDABLE_NO_SECOND_BURN","FINALIZED_BURN_RELOAD_RETAINS_PENDING_MINT_OBLIGATION",
+              "ATTESTATION_RECEIPT_ALONE_DOES_NOT_MINT","FINALIZED_EXACT_MINT_TO_ORIGINAL_WALLET",
+              "CLAIM_REPLAY_REJECTED_NO_SECOND_MINT","CRITICAL_ACCOUNTING_MISMATCH_PAUSES",
+              "EXACT_DEPOSIT_BURN_MINT_SEPARATE_FEES_RECONCILIATION"])if(!r.checks.includes(check))process.exit(1);
+            console.log(JSON.stringify({sourceSha:r.sourceSha,artifacts:r.artifacts,state:r.state,accounting:r.accounting,checks:r.checks,
+              productionReady:false,mainnetActivation:"DISABLED"}));
           '
-          test "${flow_exit}" -eq 0
           test -z "$(find . -path './.git' -prune -o -name '*-keypair.json' -print)"
-      - name: Real delayed signing and immutable acceptance checkpoint (regtest only)
-        shell: bash
-        run: |
-          set -euo pipefail
-          export PATH="${KINGPEPE_CI_TOOL_ROOT}/solana-release/bin:${KINGPEPE_CI_TOOL_ROOT}/native-build/bin:${PATH}"
-          export KINGPEPE_LOCAL_E2E_ROOT="${KINGPEPE_CI_TOOL_ROOT}/acceptance-checkpoint-run"
-          export KINGPEPE_LOCAL_BUILD_ROOT="${KINGPEPE_CI_TOOL_ROOT}/build"
-          node solana/tests/local-acceptance-checkpoint.mjs > "${KINGPEPE_CI_TOOL_ROOT}/acceptance-checkpoint-result.json"
-          node --input-type=module -e '
-            import {readFileSync} from "node:fs";
-            const r = JSON.parse(readFileSync(process.env.KINGPEPE_CI_TOOL_ROOT + "/acceptance-checkpoint-result.json", "utf8"));
-            console.log(JSON.stringify({sourceSha: process.env.GITHUB_SHA, ...r}));
-            if (r.acceptanceCheckpoint?.pass !== 13 || r.acceptanceCheckpoint?.fail !== 0 || r.fullNativeToSolanaE2e !== "COMPLETED") process.exit(1);
-            for (const check of ["REAL_NATIVE_ACCEPTED_FROST_AND_SOLANA_MINT_AFTER_TIP_ADVANCE",
-              "FORGED_PREFIX_WORK_AND_DIGEST_REJECTED_BY_INDEPENDENT_RUST", "HISTORICALLY_INCLUDED_BUT_NOW_SPENT_INPUT_REJECTED",
-              "REORGANIZED_ACCEPTED_SWEEP_REJECTED_WITHOUT_NEW_CREDIT"]) {
-              if (!r.acceptanceCheckpoint.passed.includes(check)) process.exit(1);
-            }
-          '
-
-      - name: Real finalized claim and consistent-snapshot reconciliation (regtest only)
-        shell: bash
-        run: |
-          set -euo pipefail
-          export PATH="${KINGPEPE_CI_TOOL_ROOT}/solana-release/bin:${KINGPEPE_CI_TOOL_ROOT}/native-build/bin:${PATH}"
-          export KINGPEPE_LOCAL_E2E_ROOT="${KINGPEPE_CI_TOOL_ROOT}/reconciliation-run"
-          export KINGPEPE_LOCAL_BUILD_ROOT="${KINGPEPE_CI_TOOL_ROOT}/build"
-          export KINGPEPE_TEST_SOURCE_SHA="${GITHUB_SHA}"
-          node solana/tests/local-reconciliation.mjs > "${KINGPEPE_CI_TOOL_ROOT}/reconciliation-result.json"
-          node --input-type=module -e '
-            import {readFileSync} from "node:fs";
-            const r = JSON.parse(readFileSync(process.env.KINGPEPE_CI_TOOL_ROOT + "/reconciliation-result.json", "utf8"));
-            console.log(JSON.stringify({sourceSha: process.env.GITHUB_SHA, ...r}));
-            if (r.pass !== 10 || r.fail !== 0 || r.claimChecks !== 14 || r.state !== "COMPLETED") process.exit(1);
-            for (const check of ["MEMPOOL_RESERVE_SPEND_SUSPENDS_NOT_CONFIRMED_CHAIN_DEFICIT",
-              "CONFIRMED_UNREGISTERED_RESERVE_MOVE_IS_EXACT_INTEGRITY_INCIDENT",
-              "HIGHER_WORK_POST_MINT_REORG_IDENTIFIES_EXACT_AFFECTED_BACKING",
-              "REORG_DETECTION_DOES_NOT_REMINT_BURN_OR_CONFISCATE"]) {
-              if (!r.passed.includes(check)) process.exit(1);
-            }
-          '
-
-      - name: Real forward supply accounting after ordinary SPL owner burn (regtest only)
-        shell: bash
-        run: |
-          set -euo pipefail
-          export PATH="${KINGPEPE_CI_TOOL_ROOT}/solana-release/bin:${KINGPEPE_CI_TOOL_ROOT}/native-build/bin:${PATH}"
-          export KINGPEPE_LOCAL_E2E_ROOT="${KINGPEPE_CI_TOOL_ROOT}/forward-accounting-run"
-          export KINGPEPE_LOCAL_BUILD_ROOT="${KINGPEPE_CI_TOOL_ROOT}/build"
-          export KINGPEPE_TEST_SOURCE_SHA="$GITHUB_SHA"
-          node solana/tests/local-forward-accounting.mjs > "${KINGPEPE_CI_TOOL_ROOT}/forward-accounting-result.json"
-          node --input-type=module -e '
-            import {readFileSync} from "node:fs";
-            const r = JSON.parse(readFileSync(process.env.KINGPEPE_CI_TOOL_ROOT + "/forward-accounting-result.json", "utf8"));
-            console.log(JSON.stringify(r));
-            if (r.sourceSha !== process.env.GITHUB_SHA || r.worktreeDirty !== false ||
-                r.infrastructure !== "LOCAL_E2E_BOOTSTRAP_READY" || r.forwardAccounting?.pass !== 6 || r.forwardAccounting?.fail !== 0) process.exit(1);
-            for (const check of ["DIRECT_OWNER_BURN_REDUCES_SUPPLY_ONLY", "SECOND_NATIVE_SWEEP_VERIFIED_WITH_CREDIT_RETAINED",
-              "DIRECT_BURN_DIFFERENCE_SURVIVES_VERIFIED_MINT", "TWO_FINALIZED_RESERVES_RECONCILE_EXACT_ISSUANCE",
-              "REOPENED_POST_DIRECT_BURN_MINT_DOES_NOT_MINT_AGAIN", "POST_DIRECT_BURN_NEW_TRANSACTION_CLAIM_REPLAY_REJECTED"])
-              if (!r.forwardAccounting.passed.includes(check)) process.exit(1);
-          '
-
-      - name: Real forward service, response loss and encrypted restore (regtest only)
-        shell: bash
-        run: |
-          set -euo pipefail
-          export PATH="${KINGPEPE_CI_TOOL_ROOT}/solana-release/bin:${KINGPEPE_CI_TOOL_ROOT}/native-build/bin:${PATH}"
-          export KINGPEPE_LOCAL_E2E_ROOT="${KINGPEPE_CI_TOOL_ROOT}/service-run"
-          export KINGPEPE_LOCAL_BUILD_ROOT="${KINGPEPE_CI_TOOL_ROOT}/build"
-          node solana/tests/local-service-recovery.mjs > "${KINGPEPE_CI_TOOL_ROOT}/service-result.json"
-          node --input-type=module -e '
-            import {readFileSync} from "node:fs";
-            const r = JSON.parse(readFileSync(process.env.KINGPEPE_CI_TOOL_ROOT + "/service-result.json", "utf8"));
-            console.log(JSON.stringify(r));
-            if (r.sourceSha !== process.env.GITHUB_SHA || r.worktreeDirty !== false || r.state !== "COMPLETED" ||
-                r.nativeToSolana !== "COMPLETED" ||
-                r.noPerTransferKingPepeTeamApproval !== true || r.checks?.pass !== 16 || r.checks?.fail !== 0) process.exit(1);
-            if (r.recoveryProcedure !== "TESTED" || r.recovery?.length !== 2) process.exit(1);
-            for (const restore of r.recovery) {
-              for (const field of ["encryptedCapture", "fileHashesMatched", "sourceStateUnchanged",
-                "originalJournalIdentityRetained", "consumedSignerStateRetained", "wrongPassphraseRejected",
-                "corruptArchiveRejectedBeforeExtraction", "missingExpectedOperationKeptPaused",
-                "ambiguousPostSnapshotActivityKeptPaused", "resumedPaused"]) {
-                if (restore[field] !== true) process.exit(1);
-              }
-              if (restore.liveChainCatchUp !== "PASS" || restore.newSigningOrBroadcast !== false) process.exit(1);
-            }
-            for (const check of ["SDK_HTTP_DEPOSIT_INTAKE_IDEMPOTENT_EXISTING_JOURNAL",
-              "PENDING_DEPOSIT_RESTART_PRESERVES_PAUSE_NO_SIGNING",
-              "PROCESS_EXIT_AFTER_NONCE_COMMITMENT_RETAINED",
-              "RESTART_ABORTS_OLD_NONCE_A_B_AND_PERSISTS_NEW_AGGREGATE",
-              "AUTOMATIC_NATIVE_OBSERVER_VALIDATES_AND_FROST_SWEEPS",
-              "NATIVE_SWEEP_RESPONSE_LOST_SIGNED_OPERATION_RETAINED",
-              "PENDING_DEPOSIT_PROCESS_RESTART_NO_DOUBLE_SWEEP_OR_RESIGN",
-              "CREDIT_APPEND_CRASH_AND_RPC_OUTAGE_WAIT_NOT_FALSE_DEFICIT",
-              "RPC_RECOVERY_RETAINS_EXACT_CREDIT_AND_CANONICAL_RESERVE",
-              "REAL_UNSUBMITTED_SOLANA_PACKET_EXPIRED_NO_MINT",
-              "EXPIRED_PACKET_REBUILT_SAME_CREDIT_AFTER_LIVE_ABSENCE_CHECK",
-              "PAUSED_RESTART_RETAINS_ALREADY_FINALIZED_MINT_WITHOUT_REMINT",
-              "LOST_SOLANA_RECEIPT_AND_CLAIM_RESPONSES_RECOVERED",
-              "AUTOMATIC_NATIVE_TO_SOLANA_COMPLETED_AND_RECONCILED",
-              "DUPLICATE_DEPOSIT_AND_RESTART_NO_DOUBLE_MINT",
-              "PERSISTENT_PAUSE_AND_EXPLICIT_REVIEWED_RESUME"]) {
-              if (!r.checks.passed.includes(check)) process.exit(1);
-            }
-          '
-
-      - name: Real deployment-integrity and upgrade regression (localnet only)
-        shell: bash
-        run: |
-          set -euo pipefail
-          export PATH="${KINGPEPE_CI_TOOL_ROOT}/solana-release/bin:${KINGPEPE_CI_TOOL_ROOT}/native-build/bin:${PATH}"
-          export KINGPEPE_LOCAL_E2E_ROOT="${KINGPEPE_CI_TOOL_ROOT}/deployment-monitor-run"
-          export KINGPEPE_LOCAL_BUILD_ROOT="${KINGPEPE_CI_TOOL_ROOT}/monitor-build"
-          export KINGPEPE_TEST_SOURCE_SHA="${GITHUB_SHA}"
-          node solana/tests/local-deployment-integrity.mjs > "${KINGPEPE_CI_TOOL_ROOT}/deployment-monitor-result.json"
-          node --input-type=module -e '
-            import {readFileSync} from "node:fs";
-            const r = JSON.parse(readFileSync(process.env.KINGPEPE_CI_TOOL_ROOT + "/deployment-monitor-result.json", "utf8"));
-            console.log(JSON.stringify({sourceSha: process.env.GITHUB_SHA, state: r.state,
-              deploymentIntegrity: r.deploymentIntegrity, fullNativeToSolanaE2e: r.fullNativeToSolanaE2e}));
-            if (r.deploymentIntegrity?.pass !== 18 || r.deploymentIntegrity?.fail !== 0 || r.fullNativeToSolanaE2e !== "COMPLETED") process.exit(1);
-            for (const check of ["ACTUAL_FINALIZED_UPGRADE_AUTHORITY_CHANGE_DETECTED",
-              "ACTUAL_FINALIZED_WRONG_PROGRAM_BYTECODE_DETECTED", "FINALIZED_UNAPPROVED_MINT_WITH_FREEZE_AUTHORITY_REJECTED"]) {
-              if (!r.deploymentIntegrity.passed.includes(check)) process.exit(1);
-            }
-          '
-
-      - name: Real post-mint Native reorganization and incident replay (regtest only)
-        shell: bash
-        run: |
-          set -euo pipefail
-          export PATH="${KINGPEPE_CI_TOOL_ROOT}/solana-release/bin:${KINGPEPE_CI_TOOL_ROOT}/native-build/bin:${PATH}"
-          export KINGPEPE_LOCAL_E2E_ROOT="${KINGPEPE_CI_TOOL_ROOT}/native-reorg-run"
-          export KINGPEPE_LOCAL_BUILD_ROOT="${KINGPEPE_CI_TOOL_ROOT}/build"
-          node solana/tests/local-native-reorg.mjs > "${KINGPEPE_CI_TOOL_ROOT}/native-reorg-result.json"
-          node --input-type=module -e '
-            import {readFileSync} from "node:fs";
-            const r = JSON.parse(readFileSync(process.env.KINGPEPE_CI_TOOL_ROOT + "/native-reorg-result.json", "utf8"));
-            console.log(JSON.stringify({sourceSha: process.env.GITHUB_SHA, ...r}));
-            if (r.nativeReorg?.pass !== 8 || r.nativeReorg?.fail !== 0 || r.fullNativeToSolanaE2e !== "COMPLETED") process.exit(1);
-            for (const check of ["REAL_POST_MINT_HIGHER_WORK_FORK_IDENTIFIES_EXACT_BACKING_INCIDENT",
-              "NO_REMINT_CONFISCATION_OR_AUTOMATIC_SUPPLY_REPAIR", "REAL_CHAIN_RECOVERY_CANNOT_AUTOMATICALLY_CLEAR_INCIDENT"]) {
-              if (!r.nativeReorg.passed.includes(check)) process.exit(1);
-            }
-          '
 
   foundation-guardrails:
     name: Foundation Guardrails
@@ -381,7 +222,7 @@ jobs:
           curl --fail --location --silent --show-error --max-time 120 "${url}" --output "${audit_root}/audit.tgz"
           printf '%s  %s\n' "${expected}" "${audit_root}/audit.tgz" | sha256sum --check
           tar -xzf "${audit_root}/audit.tgz" -C "${audit_root}" --strip-components=1 --no-same-owner
-          for lockfile in solana/Cargo.lock native/{proof,reserve,recovery}/Cargo.lock; do
+          for lockfile in solana/Cargo.lock native/proof/Cargo.lock; do
             "${audit_root}/cargo-audit" audit --file "${lockfile}" --deny unsound --deny yanked
           done
       - name: Check dependency license metadata and local proprietary boundary
@@ -392,20 +233,12 @@ jobs:
           cargo fmt --check --all
       - name: Validate native proof formatting
         run: cargo fmt --check --manifest-path native/proof/Cargo.toml
-      - name: Validate native reserve formatting
-        run: cargo fmt --check --manifest-path native/reserve/Cargo.toml
-      - name: Validate native recovery formatting
-        run: cargo fmt --check --manifest-path native/recovery/Cargo.toml
       - name: Run Solana clippy
         run: |
           cd solana
-          cargo clippy --locked --workspace --all-targets -- -D warnings
+          cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
       - name: Run native proof clippy
         run: cargo clippy --locked --manifest-path native/proof/Cargo.toml --all-targets -- -D warnings
-      - name: Run native reserve clippy
-        run: cargo clippy --locked --manifest-path native/reserve/Cargo.toml --all-targets -- -D warnings
-      - name: Run native recovery clippy
-        run: cargo clippy --locked --manifest-path native/recovery/Cargo.toml --all-targets -- -D warnings
       - name: Validate Solana workspace
         run: |
           cd solana
@@ -416,36 +249,12 @@ jobs:
           cargo test --locked --workspace
       - name: Verify TypeScript protocol vectors
         run: node solana/ts/scripts/verify-vectors.mjs
-      - name: Run Native FROST Node tests
-        run: npm run test:frost
-      - name: Run Native node adapter tests
-        run: npm run test:native-node
-      - name: Run project attester tests
-        run: npm run test:attesters
-      - name: Run Solana observer tests
-        run: npm run test:solana-observer
-      - name: Run bridge validator tests
-        run: npm run test:bridge-validator
-      - name: Run consistent-snapshot reconciliation tests
-        run: npm run test:reconciliation
-      - name: Run durable signed-transaction delivery tests
-        run: npm run test:relayer
-      - name: Run local E2E readiness gate tests
-        run: npm run test:local-e2e-readiness
-      - name: Run user-interface amount and request checks
-        run: npm run test:app
+      - name: Verify burn protocol, attestation, transport, accounting and API regressions
+        run: npm test
       - name: Validate native proof crate
         run: cargo check --locked --manifest-path native/proof/Cargo.toml --all-targets
       - name: Run native proof tests
         run: cargo test --locked --manifest-path native/proof/Cargo.toml
-      - name: Validate native reserve crate
-        run: cargo check --locked --manifest-path native/reserve/Cargo.toml --all-targets
-      - name: Run native reserve tests
-        run: cargo test --locked --manifest-path native/reserve/Cargo.toml
-      - name: Validate native recovery crate
-        run: cargo check --locked --manifest-path native/recovery/Cargo.toml --all-targets
-      - name: Run native recovery tests
-        run: cargo test --locked --manifest-path native/recovery/Cargo.toml
 
   foundation-windows-check:
     name: Foundation Windows Check
@@ -510,37 +319,9 @@ jobs:
           cargo test --locked --workspace
       - name: Verify TypeScript protocol vectors
         run: node solana/ts/scripts/verify-vectors.mjs
-      - name: Run Native FROST Node tests
-        run: npm run test:frost
-      - name: Run Native node adapter tests
-        run: npm run test:native-node
-      - name: Run project attester tests
-        run: npm run test:attesters
-      - name: Run Solana observer tests
-        run: npm run test:solana-observer
-      - name: Run bridge validator tests
-        run: npm run test:bridge-validator
-      - name: Run consistent-snapshot reconciliation tests
-        run: npm run test:reconciliation
-      - name: Run durable signed-transaction delivery tests
-        run: npm run test:relayer
-      - name: Run local E2E readiness gate tests
-        run: npm run test:local-e2e-readiness
-      - name: Run user-interface amount and request checks
-        run: npm run test:app
-      - name: Run isolated real-browser user-interface checks
-        # Use the runner's installed Chrome, not a user profile or downloaded
-        # browser. Missing browser/test failure is a failure, never a skip.
-        run: npm run test:user-interface
+      - name: Verify burn protocol, attestation, transport, accounting and API regressions
+        run: npm test
       - name: Validate native proof crate
         run: cargo check --locked --manifest-path native/proof/Cargo.toml --all-targets
       - name: Run native proof tests
         run: cargo test --locked --manifest-path native/proof/Cargo.toml
-      - name: Validate native reserve crate
-        run: cargo check --locked --manifest-path native/reserve/Cargo.toml --all-targets
-      - name: Run native reserve tests
-        run: cargo test --locked --manifest-path native/reserve/Cargo.toml
-      - name: Validate native recovery crate
-        run: cargo check --locked --manifest-path native/recovery/Cargo.toml --all-targets
-      - name: Run native recovery tests
-        run: cargo test --locked --manifest-path native/recovery/Cargo.toml

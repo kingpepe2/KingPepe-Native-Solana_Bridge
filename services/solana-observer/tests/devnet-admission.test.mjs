@@ -2,8 +2,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { DEVNET_SOLANA_GENESIS, isTestSolanaCluster, devnetRpcEndpoint } from "../../../shared/solana-test-network.mjs";
-import { SolanaLocalRpcClient } from "../../bridge-validator/solana-deposit-claim-submitter.mjs";
-import { SolanaDepositClaimRpcClient } from "../solana-deposit-claim-observer.mjs";
+import { BurnSolanaRpc } from "../burn-solana-rpc.mjs";
 import { LocalDeploymentRpc, devnetTestManifest, validateDeploymentManifest, verifyDeploymentSnapshot } from "../deployment-integrity.mjs";
 import { deploymentFixture } from "../../../tests/integration/deployment-fixture.mjs";
 
@@ -12,7 +11,7 @@ const endpoint = "https://rpc.example.invalid/configured-locally";
 const options = { endpoint, environment: "devnet", expectedGenesis: DEVNET_SOLANA_GENESIS };
 
 test("Devnet transport is explicit, HTTPS and genesis-bound; local defaults and Mainnet remain closed", () => {
-  for (const Client of [SolanaLocalRpcClient, SolanaDepositClaimRpcClient, LocalDeploymentRpc]) {
+  for (const Client of [BurnSolanaRpc, LocalDeploymentRpc]) {
     assert.throws(() => new Client({ endpoint }));
     assert.doesNotThrow(() => new Client(options));
     for (const change of [{ environment: "mainnet" }, { expectedGenesis: undefined }, { expectedGenesis: "wrong-network" },
@@ -28,30 +27,40 @@ test("Devnet transport is explicit, HTTPS and genesis-bound; local defaults and 
     e => e.message === "DevnetRpcEndpointRejected" && !String(e.stack).includes("invalid-private-endpoint"));
 });
 
-test("every Devnet send checks actual genesis, including direct calls, retries and changed endpoints", async () => {
-  let genesis = DEVNET_SOLANA_GENESIS; const calls = [];
-  const rpc = new SolanaLocalRpcClient({ ...options, fetchImpl: async (url, init) => {
-    assert.equal(url, endpoint); assert.equal(init.redirect, "error");
+test("every Devnet send checks actual genesis before and after, including retries and endpoint changes", async t => {
+  let genesis = DEVNET_SOLANA_GENESIS, changeAfterSend = false; const calls = [];
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    assert.equal(url, endpoint); assert.equal(init.redirect, 'error');
     const input = JSON.parse(init.body); calls.push(input.method);
-    return Response.json({ jsonrpc: "2.0", id: input.id, result: input.method === "getGenesisHash" ? genesis : "submitted" });
-  } });
-  await rpc.call("sendTransaction", ["test-packet"]);
-  await rpc.call("sendTransaction", ["same-test-packet"]);
-  assert.deepEqual(calls, ["getGenesisHash", "sendTransaction", "getGenesisHash", "sendTransaction"]);
-  genesis = "wrong-network";
-  await assert.rejects(rpc.call("sendTransaction", ["never-submitted"]), e => e.integrityCode === "SOLANA_GENESIS_CHANGED");
-  assert.equal(calls.at(-1), "getGenesisHash"); assert.equal(calls.filter(x => x === "sendTransaction").length, 2);
-  const before = calls.length;
-  await assert.rejects(rpc.requestAirdrop("1".repeat(32), "1"), /DevnetAutomaticAirdropDisabled/u);
-  assert.equal(calls.length, before);
+    const result = input.method === 'getGenesisHash' ? genesis : 'submitted';
+    if(input.method === 'sendTransaction') {
+      assert.deepEqual(input.params[1], {encoding:'base64',skipPreflight:false,preflightCommitment:'finalized',maxRetries:0});
+      if(changeAfterSend)genesis = 'wrong-network';
+    }
+    return Response.json({jsonrpc:'2.0',id:input.id,result});
+  });
+  const rpc = new BurnSolanaRpc(options);
+  await rpc.send('AQ=='); await rpc.send('AQ==');
+  assert.deepEqual(calls.splice(0), ['getGenesisHash','sendTransaction','getGenesisHash','getGenesisHash','sendTransaction','getGenesisHash']);
+  for(const bad of [{encoding:'base64',skipPreflight:true,preflightCommitment:'finalized',maxRetries:0},
+    {encoding:'base64',skipPreflight:false,preflightCommitment:'confirmed',maxRetries:0}])
+    await assert.rejects(rpc.call('sendTransaction',['AQ==',bad]), /SubmissionPolicyRejected/);
+  await assert.rejects(rpc.call('requestAirdrop',[]), /MethodRejected/);
+  assert.deepEqual(calls,[]);
+  genesis = 'wrong-network'; await assert.rejects(rpc.send('AQ=='), /BURN_SOLANA_NETWORK_MISMATCH/);
+  assert.deepEqual(calls.splice(0), ['getGenesisHash']);
+  genesis = DEVNET_SOLANA_GENESIS; changeAfterSend = true;
+  await assert.rejects(rpc.send('AQ=='), /BURN_SOLANA_NETWORK_MISMATCH/);
+  assert.deepEqual(calls, ['getGenesisHash','sendTransaction','getGenesisHash']);
 });
 
-test("Devnet provider exceptions and error bodies never escape through RPC diagnostics", async () => {
-  const rpc = new SolanaLocalRpcClient({ ...options, fetchImpl: async () => { throw new Error("private-provider-detail"); } });
-  await assert.rejects(rpc.getBlockHeight(), e => e.kind === "SolanaRpcTransportUnavailable" && !String(e.stack).includes("private-provider-detail"));
-  const rejected = new SolanaLocalRpcClient({ ...options, fetchImpl: async (_url, init) => Response.json({ jsonrpc: "2.0",
-    id: JSON.parse(init.body).id, error: { code: -32000, message: "private-provider-detail" } }) });
-  await assert.rejects(rejected.getBlockHeight(), e => e.kind === "SolanaRpcRejected" && e.code === -32000 && !String(e.stack).includes("private-provider-detail"));
+test("Devnet provider exceptions and error bodies never escape through RPC diagnostics", async t => {
+  const rpc = new BurnSolanaRpc(options);
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('private-provider-detail'); });
+  await assert.rejects(rpc.finalizedHeight(), e => e.message === 'BURN_SOLANA_RPC_UNAVAILABLE' && !String(e.stack).includes('private-provider-detail'));
+  t.mock.method(globalThis, 'fetch', async (_url, init) => Response.json({jsonrpc:'2.0',id:JSON.parse(init.body).id,
+    error:{code:-32000,message:'private-provider-detail'}}));
+  await assert.rejects(rpc.finalizedHeight(), e => e.rpcCode === -32000 && !String(e.stack).includes('private-provider-detail'));
 });
 
 test("Devnet snapshot binds the existing Borsh DevnetTesting state and rejects local/wrong-network substitution", () => {
@@ -72,7 +81,7 @@ test("runtime manifest comes from the reviewed public deployment record, not RPC
   const { manifest: m } = deploymentFixture();
   // Synthetic enrollment parser fixture, never evidence of a real deployment.
   const record = { schema: "KINGPEPE_ONE_WAY_DEVNET_DEPLOYMENT/V1", scope: "DEVNET_TEST_ONLY",
-    borshSchemaVersion: 3, canonicalMagic: "KPEPBRG3", initialSupplyAtomic: "0", freezeAuthority: null,
+    borshSchemaVersion: 4, canonicalMagic: "KPBRMSG4", initialSupplyAtomic: "0", freezeAuthority: null,
     productionReady: false, mainnetActivation: "DISABLED", sourceSha: m.sourceSha,
     nativeGenesis: m.nativeGenesisHex, solanaGenesis: DEVNET_SOLANA_GENESIS, solanaDeploymentHex: m.solanaDeploymentHex,
     managerProgram: m.manager.id, transceiverProgram: m.transceiver.id, mint: m.mint.id, tokenProgram: m.mint.tokenProgram,
@@ -84,6 +93,6 @@ test("runtime manifest comes from the reviewed public deployment record, not RPC
   const manifest = devnetTestManifest(record);
   assert.equal(manifest.environment, "devnet"); assert.equal(manifest.manager.id, record.managerProgram);
   assert.equal(manifest.sourceSha, record.sourceSha); assert.equal(manifest.config.protocolId, 1);
-  for (const change of [{ productionReady: true }, { mainnetActivation: "ENABLED" }, { borshSchemaVersion: 1 }, { borshSchemaVersion: 2 }, { canonicalMagic: "KPEPBRG2" },
+  for (const change of [{ productionReady: true }, { mainnetActivation: "ENABLED" }, { borshSchemaVersion: 1 }, { borshSchemaVersion: 2 }, { borshSchemaVersion: 3 }, { canonicalMagic: "KPEPBRG2" },
     { freezeAuthority: record.upgradeAuthority }, { solanaGenesis: "1".repeat(32) }]) assert.throws(() => devnetTestManifest({ ...record, ...change }));
 });

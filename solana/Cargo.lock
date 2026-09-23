@@ -107,6 +107,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "solana-sha256-hasher",
 ]
 
 [[package]]

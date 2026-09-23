@@ -1,5 +1,6 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 // User-access transport only. No wallet key, arbitrary RPC or retry-broadcast API.
+import {createBurnOperationRequest} from './bridge.mjs';
 export function createBridgeClient({ endpoint, accessToken, fetchImpl = globalThis.fetch }) {
   const u = new URL(endpoint);
   if (u.protocol !== "http:" || u.hostname !== "127.0.0.1" || !u.port || u.username || u.password || u.search || u.hash || u.pathname !== "/" ||
@@ -23,8 +24,8 @@ export function createBridgeClient({ endpoint, accessToken, fetchImpl = globalTh
   const address = value => { if (typeof value !== "string" || !/^[a-zA-Z0-9]{32,90}$/u.test(value)) throw new Error("PublicAddressRejected"); return value; };
   return Object.freeze({
     getSolanaBalance: value => request("/balances/solana/" + address(value)), getNativeBalance: value => request("/balances/native/" + address(value)),
-    createNativeDepositRequest: value => request("/deposits/request", value), submitNativeDeposit: value => request("/deposits/submit", value),
-    getBridgeStatus: () => request("/bridge/status"), getDepositStatus: value => request("/deposits/" + id(value)),
+    createOperation: value => request("/operations", createBurnOperationRequest(value)),
+    getBridgeStatus: () => request("/bridge/status"),
     getOperationStatus: value => request("/operations/" + id(value)),
   });
 }

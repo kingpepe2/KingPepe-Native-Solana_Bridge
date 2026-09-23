@@ -1189,10 +1189,16 @@ pub enum TransceiverError {
 
 #[cfg(test)]
 mod tests {
+    mod burn_fixture {
+        include!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/support/burn-fixture.rs"
+        ));
+    }
+    use burn_fixture::{burn_message, TestBurnFields};
+
     use super::*;
-    use bridge_messages::{
-        DeploymentIdentity, DepositClaimFields, MessageEpochs, NativeOutpoint, ValidityWindow,
-    };
+    use bridge_messages::{DeploymentIdentity, MessageEpochs, NativeOutpoint, ValidityWindow};
     use solana_instructions_sysvar::store_current_index_checked;
     use solana_program::sysvar::instructions::{construct_instructions_data, BorrowedInstruction};
 
@@ -1253,7 +1259,7 @@ mod tests {
     }
 
     fn message(config: &TransceiverConfig) -> CanonicalBridgeMessage {
-        CanonicalBridgeMessage::new_deposit_claim(DepositClaimFields {
+        burn_message(TestBurnFields {
             deployment: DeploymentIdentity {
                 protocol_id: config.protocol_id,
                 native_network: config.native_network,
@@ -1906,7 +1912,7 @@ mod tests {
                 1 => msg.deployment.native_network += 1,
                 _ => msg.deployment.native_genesis = h(99),
             }
-            msg.operation_id = msg.derive_operation_id().unwrap();
+            burn_fixture::rebind_burn_fixture(&mut msg);
             let digest = msg.message_digest().unwrap();
             let mut program = TransceiverProgram::initialize(config.clone()).unwrap();
             assert_eq!(

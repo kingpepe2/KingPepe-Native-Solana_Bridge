@@ -1,34 +1,9 @@
-# Forward user interface and API
+# Public TEST access
 
-Public Explorer flow: browser → narrow Explorer gateway → authenticated loopback
-Bridge service. The browser never receives the internal token or private RPC URL.
-The loopback service keeps authentication, request limits and origin checks.
+[KingPepe Bridge](https://kingpepe.net/bridge) remains TEST: KingPepe REGTEST -> Solana DEVNET. The prepared burn interface connects a Wallet Standard wallet first, binds that destination, then automatically issues a unique Native address. Send from your own Native wallet. There is no additional approval-to-Bridge button and no reverse operation.
 
-User operations are bridge status, Native deposit request, deposit notification,
-operation lookup, and public-address balance reads. The gateway rejects unknown
-routes, extra fields, wrong origins, arbitrary RPC selection and network mismatch.
-Admin, attester, signer, raw-journal and filesystem interfaces are not public.
+The display follows real deposit/confirmation/burn/burn-finality/attestation/mint/completion state. Technical TXIDs, signature, operation ID, Mint and exact state remain collapsed. Resume stores public identifiers only. Disconnect or another wallet account cannot redirect an issued operation. Native address balance is read-only; no private recovery material is requested.
 
-The SDK creates a bound Native deposit request from exact `amountAtomic`,
-recipient token account, public Native recovery key and public nonce. The service
-checks the initialized token account against the configured Mint and deployment.
-This check is repeated by the economic pipeline; frontend display is not authority.
+The counter displays completed canonical TEST burn/mint accounting and never suggests Devnet is Mainnet supply. The TEST warning remains until actual approved production deployment. Prepared source does not certify public cutover; see current development status.
 
-The CLI supports `bridge deposit`, `bridge deposit submit`, `bridge status` and
-`bridge operation <id>`. Authentication stays in local process configuration.
-Public amounts are decimal strings containing base units; UI conversion accepts
-at most eight decimal places, never floating-point economic arithmetic.
-
-Wallet Standard supplies a Solana public recipient address and account-change
-events. Compatible wallets do not need any signing feature. Balance reads use
-the exact configured Mint and finalized commitment. Native address balance reads
-are informational; the user sends the deposit using their own Native wallet.
-
-The Explorer currently remains TEST-bound to REGTEST and `solana:devnet` until
-the reviewed one-way deployment is ready. The local developer app is explicitly
-REGTEST/localnet. Prepared Mainnet bindings must not switch the public site before
-actual deployed identities are verified. Neither interface asks for wallet keys.
-
-Save the public request and operation ID. Refresh/reopen performs status reads;
-it must not create a replacement economic request. The forward states are
-OBSERVED, VALIDATED, SWEPT, ATTESTED, CLAIMED, MINTED and COMPLETED.
+Browser -> Explorer gateway -> authenticated loopback Bridge service. Public capabilities are status, wallet-bound operation creation, operation status and public balances. No admin, raw signing, arbitrary RPC or reverse route is exposed. Mutations require approved same origin, exact schemas, rate/body limits and sanitized errors.

@@ -9,7 +9,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { serialize } from "borsh";
 import { collectRegtestEvidence, encodeRegtestEvidence, encodeRegtestEvidenceAtCheckpoint, MAX_RAW_EVIDENCE_BYTES,
-  REGTEST_GENESIS, verifyRegtestEvidencePacket, observedSpentRegtestReserve,
+  REGTEST_GENESIS, verifyRegtestEvidencePacket,
   decodeNativeVerificationResult, NATIVE_VERIFICATION_SCHEMA } from "../native-raw-evidence.mjs";
 import { parseNativeTransactionHex } from "../native-taproot-transaction.mjs";
 
@@ -44,12 +44,7 @@ test("Native Borsh envelope and verification response match fixed Rust vectors",
   }
 });
 
-test("caller-created errors and copied fields cannot claim a verified spent reserve", () => {
-  for (const value of [undefined, null, "RAW_NATIVE_RESERVE_SPENT", new Error("RAW_NATIVE_RESERVE_SPENT"),
-    { reserveBasis: {}, chain: {}, utxoTrust: "CONFIGURED_LOCAL_VALIDATING_NODE_RPC_OBSERVATION" }]) {
-    assert.equal(observedSpentRegtestReserve(value), undefined);
-  }
-});
+
 
 function rpcModel(overrides = {}) {
   return { getBlockchainInfo: async () => ({ chain: "regtest", initialblockdownload: false, blocks: 1, headers: 1,

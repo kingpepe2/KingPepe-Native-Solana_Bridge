@@ -8,21 +8,15 @@ import { once } from "node:events";
 import os from "node:os";
 import path from "node:path";
 import { WindowsProtectedStore, windowsCurrentServiceSid } from "../../shared/windows/protected-store.mjs";
-import { WindowsProtectedFrostStateStore } from "../../native/frost/state/windows-protected-state-store.mjs";
-import { initialSignerState } from "../../native/frost/state/file-state-store.mjs";
-import { NativeFrostSigner, NativeFrostCoordinator, createNativeSigningPolicy, runTwoPartyDkg,
-  FROST_SIGNING_INTENT_PROTOCOL, FROST_SIGNING_MODE, REQUIRED_FROST_SIGNERS } from "../../native/frost/index.mjs";
 import { REGTEST_GENESIS } from "../../native/node/native-raw-evidence.mjs";
-import { schnorr } from "@noble/curves/secp256k1.js";
-import { ProjectAttester, verifyProjectAttestation } from "../../services/attesters/attestation-service.mjs";
 import { ed25519 } from "@noble/curves/ed25519.js";
-import { decodeCanonicalBridgeMessage } from "../../shared/protocol/canonical-message.mjs";
-import { AuthenticatedLocalDepositLedger } from "../../services/bridge-validator/local-deposit-ledger.mjs";
 import { DEVNET_SOLANA_GENESIS } from "../../shared/solana-test-network.mjs";
 import { NATIVE_MAINNET_GENESIS, NATIVE_MAINNET_DOMAIN, SOLANA_MAINNET_GENESIS, mainnetDeploymentIdentity } from "../../shared/network-identity.mjs";
 import { base58 } from "@scure/base";
-import { prepareMainnetFrostParticipants } from "../../native/frost/coordinator/mainnet-preparation.mjs";
 import { NativeRpcClient } from "../../native/node/native-rpc-client.mjs";
+import { ProtectedBurnJournal } from '../../services/bridge-validator/protected-burn-journal.mjs';
+import { initialBurnJournal } from '../../services/bridge-validator/burn-journal-state.mjs';
+import { burnFixture } from '../../native/burn/tests/burn-fixture.mjs';
 import { prepareMainnetProgramIdentities, preparedMainnetProgramIdentities, prepareMainnetRoleSeed } from "../../services/bridge-validator/mainnet-identity-preparation.mjs";
 
 if (process.platform !== "win32") throw new Error("WINDOWS_PROTECTED_STORAGE_TESTS_REQUIRE_WINDOWS");
@@ -30,26 +24,7 @@ const repoRoot = path.resolve(import.meta.dirname, "../..");
 const serviceSid = windowsCurrentServiceSid(); // Never logged or committed.
 const h = value => createHash("sha256").update(value).digest("hex");
 
-test("Mainnet preparation uses separate protected A+B processes and resumes the same public key without signing", async t => {
-  const policy = { environment: "mainnet", nativeNetwork: "mainnet", nativeGenesisHash: NATIVE_MAINNET_GENESIS,
-    solanaGenesis: SOLANA_MAINNET_GENESIS, solanaDeployment: h("isolated-mainnet-dkg"), bridgeProgramId: h("mainnet-program-a"),
-    transceiverProgramId: h("mainnet-program-b"), mint: h("mainnet-mint"), keyEpoch: 1,
-    productionReady: false, productionSigningAuthorized: false, productionBroadcastAuthorized: false, mainnetActivation: "DISABLED" };
-  const participantStates = REQUIRED_FROST_SIGNERS.map(role => fixture(t, role, "frost-state", {
-    environment: "mainnet", nativeGenesis: NATIVE_MAINNET_GENESIS, solanaDeployment: policy.solanaDeployment }).options);
-  const first = await prepareMainnetFrostParticipants({ policy, participantStates });
-  assert(first.separateProcesses && first.threshold === 2 && first.participants === 2);
-  assert.equal(first.productionSigningAuthorized, false); assert.equal(first.productionBroadcastAuthorized, false);
-  const reopened = await prepareMainnetFrostParticipants({ policy, participantStates });
-  assert.equal(reopened.aggregateTweakedXOnlyPublicKey, first.aggregateTweakedXOnlyPublicKey);
-  assert.equal(reopened.publicPackageHash, first.publicPackageHash);
-  for (const options of participantStates) {
-    const store = new WindowsProtectedStore(options), read = store.read();
-    try { const state = JSON.parse(read.payload.toString("utf8"));
-      assert(Object.keys(state.signing).length === 0 && Object.keys(state.nonceTombstones).length === 0, "PreparationCreatedEconomicNonceState");
-    } finally { read.payload.fill(0); store.close(); }
-  }
-});
+
 
 test("Mainnet Native RPC authentication requires the protected role and rejects malformed secret payloads without echoing them", t => {
   assert.throws(() => NativeRpcClient.fromProtectedMainnetCredentials({}), /ProtectedStoreRoleMismatch/);
@@ -77,43 +52,8 @@ test("Mainnet program, Mint and attester preparation keeps new identities protec
   assert.throws(() => prepareMainnetRoleSeed({ ...attester.options, context: { ...attester.options.context, environment: "devnet" } }), /MainnetRolePreparationRejected/);
 });
 
-test("Mainnet journal requires its protected key, begins paused and reopens the exact empty accounting state", t => {
-  const publicKeys = Object.fromEntries(["manager", "transceiver", "mint"].map(name => [name, base58.encode(Buffer.from(h(name), "hex"))]));
-  const deploymentHash = mainnetDeploymentIdentity(publicKeys), deployment = Buffer.alloc(168);
-  deployment.writeUInt32LE(1, 0); deployment.writeUInt32LE(NATIVE_MAINNET_DOMAIN, 4);
-  Buffer.from(NATIVE_MAINNET_GENESIS, "hex").copy(deployment, 8); Buffer.from(deploymentHash, "hex").copy(deployment, 40);
-  for (const [n, key] of Object.values(publicKeys).entries()) Buffer.from(base58.decode(key)).copy(deployment, 72 + n * 32);
-  const { parent, options } = fixture(t, "BRIDGE_VALIDATOR", "bridge-journal-key", { environment: "mainnet", nativeGenesis: NATIVE_MAINNET_GENESIS, solanaDeployment: deploymentHash });
-  const key = randomBytes(32), store = WindowsProtectedStore.create(options, key); key.fill(0);
-  const journalOptions = { root: path.join(parent, "journal"), repoRoot, environment: "mainnet", solanaGenesis: SOLANA_MAINNET_GENESIS,
-    journalIdHex: options.context.instanceId, deploymentHex: deployment.toString("hex") };
-  for (const factory of [AuthenticatedLocalDepositLedger.createLocal, AuthenticatedLocalDepositLedger.openLocal])
-    assert.throws(() => factory(journalOptions), /LocalLedgerEnvironmentRejected/);
-  assert.throws(() => AuthenticatedLocalDepositLedger.fromProtectedLocalKey(journalOptions, store, true), /LocalLedgerProtectedKeyBindingRejected/);
-  for (const mutation of [{ environment: "devnet" }, { solanaGenesis: DEVNET_SOLANA_GENESIS }, { journalIdHex: h("wrong-journal") }, { authenticationKey: randomBytes(32) }])
-    assert.throws(() => AuthenticatedLocalDepositLedger.fromProtectedMainnetKey({ ...journalOptions, ...mutation }, store, true), /MainnetLedgerProtectedKeyBindingRejected/);
-  const badDomain = Buffer.from(deployment); badDomain.writeUInt32LE(8_000_111, 4);
-  assert.throws(() => AuthenticatedLocalDepositLedger.fromProtectedMainnetKey({ ...journalOptions, deploymentHex: badDomain.toString("hex") }, store, true), /MainnetLedgerDeploymentRequired/);
-  const policy = { scope: "MAINNET", productionLimitPolicy: "UNBOUNDED_BY_TEAM_DECISION", windowDuration: "NOT_APPLICABLE",
-    maxMintPerTransfer: "UNBOUNDED",  maxMintPerWindow: "UNBOUNDED" };
-  let journal = AuthenticatedLocalDepositLedger.fromProtectedMainnetKey(journalOptions, store, true);
-  let checkpoint, accounting;
-  try {
-    assert.equal(journal.status().state, "PAUSED");
-    assert.throws(() => journal.assertEconomicLimitsReady(), /EconomicLimitsRequired/);
-    journal.configureEconomicLimits(policy); journal.assertEconomicLimitsReady();
-    assert.throws(() => journal.authorizeEconomicOperation("MINT", h("operation")), /EconomicLimitBridgePaused/);
-    checkpoint = journal.checkpoint(); accounting = journal.bridgeSnapshot();
-    assert(Object.values(accounting).every(value => value === "0"));
-  } finally { journal.close(); }
-  journal = AuthenticatedLocalDepositLedger.fromProtectedMainnetKey(journalOptions, store);
-  try {
-    assert.deepEqual(journal.checkpoint(), checkpoint); assert.deepEqual(journal.bridgeSnapshot(), accounting);
-    assert.equal(journal.status().state, "PAUSED"); assert.deepEqual(journal.economicLimitsStatus().policy, policy);
-    assert.equal(journal.knownWithdrawalIds, undefined); assert.deepEqual(journal.serviceDeposits(), []);
-  } finally { journal.close(); store.close(); }
-});
-function fixture(t, role = "KINGPEPE_FROST_A", purpose = "frost-state", overrides = {}) {
+
+function fixture(t, role = "BURN_SIGNER", purpose = "native-burn-key", overrides = {}) {
   const parent = mkdtempSync(path.join(os.tmpdir(), "kingpepe-protected-test-"));
   t.after(() => {
     assert(path.dirname(parent) === path.resolve(os.tmpdir()) && path.basename(parent).startsWith("kingpepe-protected-test-"), "UnsafeTemporaryCleanupTarget");
@@ -161,31 +101,32 @@ test("Devnet deployment test material uses real DPAPI without a plaintext fallba
   assert.equal(readFileSync(stateFile(options)).includes(payload), false);
   const reopened = new WindowsProtectedStore(options), restored = reopened.read().payload;
   sameProtectedBytes(restored, payload); restored.fill(0); payload.fill(0); store.close(); reopened.close();
-  for (const overrides of [{ environment: "localnet" }, { environment: "mainnet" }, { role: "COORDINATOR" }]) {
+  for (const overrides of [{ environment: "localnet" }, { environment: "mainnet" }, { role: "ATTESTER_A" }]) {
     assert.throws(() => new WindowsProtectedStore({ ...options, context: { ...options.context, ...overrides } }), /ProtectedDevnetDeploymentContextRequired/u);
   }
   assert.throws(() => new WindowsProtectedStore({ ...options, context: { ...options.context,
     solanaDeployment: h("different-devnet-deployment") } }).read(), /WindowsProtectedStoreRejected/u);
 });
-for (const environment of ["localnet", "devnet"]) test(`${environment} economic journal uses an existing DPAPI key without plaintext fallback`, t => {
-  const vector = JSON.parse(readFileSync(path.join(repoRoot, "solana/modules/bridge-messages/vectors/canonical-borsh-v3.json"))).vectors[0];
-  const deployment = Buffer.from(vector.encodedHex.slice(24, 360), "hex");
-  Buffer.from(REGTEST_GENESIS, "hex").copy(deployment, 8);
-  const deploymentHex = deployment.toString("hex"), id = h("protected-journal-test");
-  const { parent, options } = fixture(t, "BRIDGE_VALIDATOR", "bridge-journal-key", { environment, instanceId: id,
-    nativeGenesis: deploymentHex.slice(16, 80), solanaDeployment: deploymentHex.slice(80, 144) });
-  const settings = { environment, solanaGenesis: DEVNET_SOLANA_GENESIS, repoRoot, root: path.join(parent, "accounting"), deploymentHex, journalIdHex: id };
-  const key = randomBytes(32), store = WindowsProtectedStore.create(options, key); key.fill(0);
-  const ledger = AuthenticatedLocalDepositLedger.fromProtectedLocalKey(settings, store, true);
-  ledger.hardStop("TEST_REVIEW_REQUIRED"); ledger.close();
-  const reopened = AuthenticatedLocalDepositLedger.fromProtectedLocalKey(settings, store);
-  assert.equal(reopened.status().state, "HARD_STOP"); reopened.close();
-  assert.throws(() => AuthenticatedLocalDepositLedger.fromProtectedLocalKey({ ...settings, journalIdHex: h("wrong-journal") }, store));
-  assert.throws(() => AuthenticatedLocalDepositLedger.fromProtectedLocalKey({ ...settings, authenticationKey: randomBytes(32) }, store));
-  assert.throws(() => AuthenticatedLocalDepositLedger.fromProtectedLocalKey({ ...settings, environment: environment === "devnet" ? "localnet" : "devnet" }, store));
-  if (environment === "devnet") assert.throws(() => AuthenticatedLocalDepositLedger.fromProtectedLocalKey({ ...settings, solanaGenesis: "wrong-network" }, store));
-  store.close(); assert.throws(() => AuthenticatedLocalDepositLedger.fromProtectedLocalKey(settings, store));
+for (const environment of ["localnet", "devnet"]) test(`${environment} burn journal reopens encrypted paused state and rejects context substitution`, async t => {
+  const f=burnFixture();
+  try {
+    f.context.environment=environment;
+    if(environment==='devnet')f.context.deployment.solanaGenesis=Buffer.from(base58.decode(DEVNET_SOLANA_GENESIS)).toString('hex');
+    Object.assign(f.binding,f.context.deployment);
+    const {options}=fixture(t,'BRIDGE_VALIDATOR','burn-operations',{environment,solanaDeployment:f.binding.solanaDeployment});
+    const state=initialBurnJournal(f.binding,{context:f.context,feePayerHex:f.policy.feePayerHex});
+    const payload=Buffer.from(JSON.stringify(state)),store=WindowsProtectedStore.create(options,payload);payload.fill(0);
+    let journal=await ProtectedBurnJournal.open(store);
+    try { journal.pause('TEST_RECOVERY_REVIEW'); } finally { await journal.close(); }
+    assert.equal(readFileSync(stateFile(options)).includes(Buffer.from(f.binding.solanaDeployment)),false);
+    journal=await ProtectedBurnJournal.open(new WindowsProtectedStore(options));
+    try { assert.equal(journal.read().pauseReason,'TEST_RECOVERY_REVIEW');assert.equal(journal.read().paused,true); }
+    finally { await journal.close(); }
+    for(const changes of [{environment:environment==='devnet'?'localnet':'devnet'},{solanaDeployment:h('wrong-deployment')},{instanceId:h('wrong-instance')}])
+      await assert.rejects(ProtectedBurnJournal.open(new WindowsProtectedStore({...options,context:{...options.context,...changes}})));
+  }finally{f.destroy();}
 });
+
 test("created protected files have explicit private DACLs on a fixed local volume", t => {
   const { options } = fixture(t); WindowsProtectedStore.create(options, randomBytes(32));
   const ps = path.join(process.env.SystemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
@@ -212,7 +153,7 @@ test("wrong pinned service SID is refused before decryption", t => {
 });
 test("encrypted context rejects wrong role epoch deployment network and instance", t => {
   const { options } = fixture(t); WindowsProtectedStore.create(options, randomBytes(32));
-  for (const change of [{ role: "KINGPEPE_FROST_B" }, { keyEpoch: 2 }, { nativeGenesis: h("wrong-genesis") },
+  for (const change of [{ role: "ATTESTER_B" }, { keyEpoch: 2 }, { nativeGenesis: h("wrong-genesis") },
     { solanaDeployment: h("wrong-deployment") }, { environment: "mainnet" }, { instanceId: h("wrong-instance") }]) {
     assert.throws(() => new WindowsProtectedStore({ ...options, context: { ...options.context, ...change } }).read());
   }
@@ -307,79 +248,4 @@ test("an actual second process holding the protected lock blocks reads and write
   child.stdin.end("RELEASE\n"); assert.equal((await exited)[0], 0);
   // Lock release after process exit is measured; no lifetime fencing is claimed.
   assert.equal(store.read().revision, "1");
-});
-test("FROST save cannot use a stale object even after reading a new revision", t => {
-  const { options } = fixture(t);
-  const blob = WindowsProtectedStore.create(options, Buffer.from(JSON.stringify(initialSignerState(options.context.role))));
-  const store = new WindowsProtectedFrostStateStore(blob, options.context.role);
-  const a = store.load(), b = store.load(); store.save(a); store.load();
-  assert.throws(() => store.save(b)); assert.throws(() => store.save(structuredClone(a)), /ProtectedFrostLoadRequired/u);
-});
-
-function nativeIntent() {
-  return { protocol: FROST_SIGNING_INTENT_PROTOCOL, mode: FROST_SIGNING_MODE, purpose: "RESERVE_SWEEP", nativeNetwork: "regtest",
-    nativeGenesisHash: REGTEST_GENESIS, solanaDeployment: h("protected-local-deployment"), bridgeProgramId: h("manager"), transceiverProgramId: h("transceiver"),
-    mint: h("mint"), keyEpoch: 1, proofFingerprint: h("evidence"), unsignedNativeTransactionId: h("transaction"), pauseDeposits: false, hardStop: false,
-    signingRequestId: h("request"), operationId: h("operation"),  taprootSighashHex: h("public-test-sighash"), transactionCommitment: h("transaction-commitment"),
-    signingInputIndex: 0, recipientScriptPubKeyHex: "5120" + h("reserve"), amountAtomic: "1000", feeAtomic: "10", changeScriptPubKeyHex: "5120" + h("reserve"),
-    changeAtomic: "2000", inputOutpoints: [h("input") + ":0"], outputCommitments: [h("output")], reserveCommitment: h("reserve-commitment") };
-}
-test("real A+B FROST signs and reopens using only encrypted persistent state", t => {
-  const intent = nativeIntent();
-  const policy = createNativeSigningPolicy({ environment: "localnet", nativeNetwork: "regtest", nativeGenesisHash: REGTEST_GENESIS,
-    solanaDeployment: intent.solanaDeployment, bridgeProgramId: intent.bridgeProgramId, transceiverProgramId: intent.transceiverProgramId, mint: intent.mint,
-    keyEpoch: 1, maxAmountAtomic: "100000", maxFeeAtomic: "100", reserveScriptPubKeyHex: intent.changeScriptPubKeyHex, authorizedOperations: [intent] });
-  const options = REQUIRED_FROST_SIGNERS.map(role => fixture(t, role).options);
-  let signers = options.map((o, index) => new NativeFrostSigner({ signerId: o.context.role, index, policy, stateStore: WindowsProtectedFrostStateStore.createLocal(o, policy) }));
-  const dkg = runTwoPartyDkg(signers, { epoch: 1 });
-  const coordinator = new NativeFrostCoordinator({ signers, publicPackage: dkg.publicPackage, aggregateTweakedXOnlyPublicKey: dkg.aggregateTweakedXOnlyPublicKey });
-  const signed = coordinator.signAutomatically(intent);
-  assert(schnorr.verify(Buffer.from(signed.signatureHex, "hex"), Buffer.from(intent.taprootSighashHex, "hex"), Buffer.from(dkg.aggregateTweakedXOnlyPublicKey, "hex")));
-  signers.forEach(s => s.close());
-  signers = options.map((o, index) => new NativeFrostSigner({ signerId: o.context.role, index, policy,
-    stateStore: new WindowsProtectedFrostStateStore(new WindowsProtectedStore(o), o.context.role) }));
-  const retry = new NativeFrostCoordinator({ signers, publicPackage: dkg.publicPackage, aggregateTweakedXOnlyPublicKey: dkg.aggregateTweakedXOnlyPublicKey }).signAutomatically(intent);
-  assert.equal(retry.signatureHex, signed.signatureHex);
-  signers.forEach(s => s.close());
-  for (const o of options) assert.deepEqual(readdirSync(o.root), ["lease.protected", "lock.protected", "state.protected"]);
-});
-test("attester loads a distinct DPAPI-protected seed with deployment binding", t => {
-  const vector = JSON.parse(readFileSync(path.join(repoRoot, "solana/modules/bridge-messages/vectors/canonical-borsh-v3.json"))).vectors.find(v => v.name === "deposit-claim-v3");
-  const decoded = decodeCanonicalBridgeMessage(vector.encodedHex), seed = randomBytes(32);
-  const { options } = fixture(t, "ATTESTER_A", "attester-seed", { nativeGenesis: vector.deployment.nativeGenesis,
-    solanaDeployment: vector.deployment.solanaDeployment, keyEpoch: vector.keyEpoch });
-  const policy = { role: "ATTESTER_A", attesterPublicKeyHex: Buffer.from(ed25519.getPublicKey(seed)).toString("hex"), protocolId: vector.deployment.protocolId,
-    nativeNetwork: vector.deployment.nativeNetwork, nativeGenesisHex: vector.deployment.nativeGenesis, solanaDeploymentHex: vector.deployment.solanaDeployment,
-    managerProgramIdHex: vector.deployment.managerProgramId, transceiverProgramIdHex: vector.deployment.transceiverProgramId, mintHex: vector.deployment.mint,
-    keyEpoch: vector.keyEpoch, policyEpoch: vector.policyEpoch, acceptedNativeTrust: ["LOCALLY_VALIDATED_CHAIN_STATE"], depositsPaused: false, hardStop: false };
-  const store = WindowsProtectedStore.create(options, seed); seed.fill(0);
-  assert.throws(() => ProjectAttester.fromWindowsProtectedStore({ store, role: "ATTESTER_A", policy: { ...policy, keyEpoch: policy.keyEpoch + 1 } }));
-  let reads = 0;
-  const changingPolicy = { ...policy, get nativeGenesisHex() { return reads++ === 0 ? policy.nativeGenesisHex : h("substituted-genesis"); } };
-  const attester = ProjectAttester.fromWindowsProtectedStore({ store, role: "ATTESTER_A", policy: changingPolicy });
-  assert.equal(reads, 1); assert.equal(attester.policy.nativeGenesisHex, policy.nativeGenesisHex);
-  const request = { encodedMessageHex: vector.encodedHex, evidence: { trust: "LOCALLY_VALIDATED_CHAIN_STATE", nativeNetwork: vector.deployment.nativeNetwork,
-    nativeGenesisHash: vector.deployment.nativeGenesis, operationIdHex: decoded.operationIdHex, depositOutpoint: decoded.depositOutpointText,
-    amountAtomic: decoded.amountAtomic.toString(), solanaRecipientHex: decoded.destinationHex, evidenceDigestHex: decoded.evidenceDigestHex,
-    reserveAllocationIdHex: h("allocation"), reserveTransitionState: "CANONICAL_RESERVE", mintCreditState: "AUTHORIZED_UNCONSUMED", finalitySatisfied: true,
-    sweepFinalized: true, utxoUnspentAtDeposit: true, noPriorConsumption: true } };
-  const attestation = attester.signDepositCredit(request, decoded.validFrom);
-  assert.equal(verifyProjectAttestation(attestation, vector.encodedHex), true); attester.close();
-});
-
-test("Devnet attester requires explicit test-network admission before reading protected credentials", t => {
-  const seed = randomBytes(32), publicKeyHex = Buffer.from(ed25519.getPublicKey(seed)).toString("hex");
-  const { options } = fixture(t, "ATTESTER_A", "attester-seed", { environment: "devnet" });
-  const policy = { role: "ATTESTER_A", attesterPublicKeyHex: publicKeyHex, protocolId: 1,
-    nativeNetwork: 8_000_111, nativeGenesisHex: REGTEST_GENESIS, solanaDeploymentHex: options.context.solanaDeployment,
-    managerProgramIdHex: h("manager"), transceiverProgramIdHex: h("transceiver"), mintHex: h("mint"),
-    keyEpoch: 1, policyEpoch: 1, acceptedNativeTrust: ["LOCALLY_VALIDATED_CHAIN_STATE"], depositsPaused: false, hardStop: false };
-  const store = WindowsProtectedStore.create(options, seed); seed.fill(0);
-  const request = { store, role: "ATTESTER_A", policy, environment: "devnet", solanaGenesis: DEVNET_SOLANA_GENESIS };
-  for (const overrides of [{ environment: "localnet" }, { environment: "mainnet" }, { solanaGenesis: "wrong-network" },
-    { policy: { ...policy, nativeGenesisHex: h("wrong-native-network") } }]) {
-    assert.throws(() => ProjectAttester.fromWindowsProtectedStore({ ...request, ...overrides }), /ProtectedAttesterLocalOnly/u);
-  }
-  const attester = ProjectAttester.fromWindowsProtectedStore(request);
-  assert.equal(attester.publicKeyHex, publicKeyHex); attester.close();
 });

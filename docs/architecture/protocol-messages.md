@@ -1,34 +1,11 @@
-# Canonical forward protocol
+# Finalized Native burn protocol
 
-The only economic message is `DepositClaim` with direction `NativeToSolana`.
-Canonical Borsh V3 uses magic `KPEPBRG3`, version 3 and exactly 482 bytes.
-Amounts and fees are unsigned 64-bit atomic integers. Integers use little endian.
-The destination is a u16 length and 128-byte zero-padded array; a deposit claim
-requires exactly 32 destination bytes. The reserved header byte must be zero.
+The sole active economic message is Borsh V4, magic `KPBRMSG4`, exactly 563 bytes. `shared/protocol/burn-message.mjs` and `solana/modules/bridge-messages/src/burn.rs` encode the same 530-byte finalized-burn evidence plus version/domain, key/policy epochs and validity interval. The fixed vector is `burn-borsh-v4.json`; old V3 deposit/reserve messages are rejected.
 
-Field order: magic, version, action, direction, reserved byte, deployment,
-operation ID, Native deposit outpoint, amount, fee, destination length/storage,
-policy epoch, key epoch, nonce, validity start/end, evidence digest.
-No alternative encoding or trailing bytes is accepted.
+The operation binding contains protocol and Native network/genesis, actual Solana genesis/deployment, Bridge/Transceiver/Mint identities, destination wallet, burn public identity and nonce. Its digest is the operation ID, created before the deposit address. Evidence adds original deposit outpoint/height/block, burn outpoint/height/block, exact amount and versioned commitment. Burn height must follow the 12-confirmation deposit boundary. Verifiers independently require 12 burn confirmations from Native chain evidence.
 
-The operation ID is SHA-256 of the typed Borsh operation inputs, with domain
-`KPEPID03`. The full message SHA-256 is its digest. Attesters sign the complete
-canonical message, not JSON or a digest wrapper. Rust, the shared JavaScript
-codec and the TypeScript SDK use the same pinned vectors.
+The 57-byte OP_RETURN script carries `KINGPEPE_BRIDGE_BURN_V1` and a compact SHA-256 commitment to the operation, original deposit and exact amount. It contains no secret. Native RPC maxburnamount is a per-output ceiling, so Bridge validation independently permits exactly one canonical nonzero unspendable output and an approved operational change output.
 
-`canonical-borsh-v3.json` pins three forward messages, including one atomic
-unit and u64 maximum. `abi-borsh-v3.json` pins 14 ABI cases.
-`inputs-borsh-v2.json` pins 27 retained application preimages. Their `KPINPUT2`
-typed envelope is unchanged for retained shapes; the forward-only signing
-intent uses kind 31. Removed kinds have no decoder.
+Both Ed25519 project attesters sign the complete canonical bytes. Transceiver verifies two distinct authorized signatures and exact context. Bridge validates the receipt, bound wallet's exact-Mint ATA, account owners, programs, PDAs, amount, epochs, pause and cumulative cap. Operation, Native deposit and Native burn replay accounts prevent reuse, even after authorization renewal. Solana trusts these project attestations for Native consensus evidence; it does not independently run a Native light client.
 
-Native consensus transactions, scripts, header proof bytes, BIP340/341/342
-hashes, Solana transactions and standard System/SPL/Ed25519 instructions retain
-their upstream encoding. Native input/evidence vectors remain intact. Required
-Solana SDK/System bincode dependencies are not an economic message codec, and
-their advisory status is not suppressed.
-
-V3 is incompatible with previous bridge messages and account layouts.
-Validation uses a fresh, isolated journal and deployment. Existing credentials,
-funded scripts, nonces, signatures and private evidence must not be relabeled.
-Old source/CI identity does not validate rewritten source.
+Malformed, trailing, truncated, non-canonical and cross-context encodings are rejected. The TEST evidence package records actual signed bytes as well as shared Rust/TypeScript vectors.

@@ -14,7 +14,7 @@ import {
   ATTESTATION_MODE,
   ATTESTATION_PROTOCOL,
   verifyProjectAttestation,
-} from "../attesters/attestation-service.mjs";
+} from "../attesters/burn-attestation-codec.mjs";
 
 export const SOLANA_DEPOSIT_CLAIM_TRANSACTION_PLAN_PROTOCOL =
   "KINGPEPE_NATIVE_SOLANA_BRIDGE/SOLANA_DEPOSIT_CLAIM_TRANSACTION_PLAN/V1";
@@ -23,7 +23,8 @@ export const BRIDGE_INSTRUCTION_ACCEPT_DEPOSIT_CLAIM = 2;
 export const TRANSCEIVER_INSTRUCTION_VERIFY_MESSAGE_FROM_ED25519 = 2;
 export const BRIDGE_STATE_PDA_SEED_PREFIX = "kingpepe-bridge-state";
 export const DEPOSIT_CLAIM_PDA_SEED_PREFIX = "kingpepe-deposit-claim";
-export const DEPOSIT_BACKING_PDA_SEED_PREFIX = "kingpepe-deposit-backing";
+export const DEPOSIT_REPLAY_PDA_SEED_PREFIX = "kingpepe-deposit-replay";
+export const BURN_REPLAY_PDA_SEED_PREFIX = "kingpepe-burn-replay";
 export const MINT_AUTHORITY_PDA_SEED_PREFIX = "kingpepe-mint-authority";
 export const TRANSCEIVER_CONFIG_PDA_SEED_PREFIX = "kingpepe-transceiver-config";
 export const TRANSCEIVER_RECEIPT_PDA_SEED_PREFIX = "kingpepe-transceiver-receipt";
@@ -61,7 +62,7 @@ function verifySignedCanonicalDepositTransaction(config, kind) {
   // Rebuild the whole message below: these fixed offsets are not a permissive
   // general transaction parser or permission to accept arbitrary instructions.
   if (packet.toString("base64") !== encoded || packet.length > SOLANA_MAX_TRANSACTION_BYTES ||
-      packet.length < 101 || !packet.subarray(65, 69).equals(Buffer.from(isReceipt ? [1, 0, 6, 8] : [1, 0, 7, 13])) || packet[0] !== 1) {
+      packet.length < 101 || !packet.subarray(65, 69).equals(Buffer.from(isReceipt ? [1, 0, 6, 8] : [1, 0, 7, 14])) || packet[0] !== 1) {
     throw new Error("SolanaClaimPacketInvalid");
   }
   const feePayer = packet.subarray(69, 101);
@@ -103,11 +104,14 @@ export function buildLocalnetSolanaDepositClaimTransactionPlan(config) {
   );
   const outputIndex = Buffer.alloc(4);
   outputIndex.writeUInt32LE(decodedMessage.depositOutpoint.vout);
-  const depositBacking = findProgramAddress(
-    [utf8(DEPOSIT_BACKING_PDA_SEED_PREFIX), normalized.mint.bytes,
+  const depositReplay = findProgramAddress(
+    [utf8(DEPOSIT_REPLAY_PDA_SEED_PREFIX), normalized.mint.bytes,
       decodedMessage.deployment.nativeGenesis, decodedMessage.depositOutpoint.txid, outputIndex],
     normalized.managerProgram.bytes,
   );
+  const burnIndex = Buffer.alloc(4); burnIndex.writeUInt32LE(decodedMessage.burnEvidence.burn.vout);
+  const burnReplay = findProgramAddress([utf8(BURN_REPLAY_PDA_SEED_PREFIX),normalized.mint.bytes,
+    decodedMessage.deployment.nativeGenesis,hexToBytes(decodedMessage.burnEvidence.burn.txid),burnIndex],normalized.managerProgram.bytes);
   const verifiedReceipt = findProgramAddress(
     [utf8(TRANSCEIVER_RECEIPT_PDA_SEED_PREFIX), hexToBytes(decodedMessage.messageDigestHex, "messageDigestHex")],
     normalized.transceiverProgram.bytes,
@@ -119,7 +123,8 @@ export function buildLocalnetSolanaDepositClaimTransactionPlan(config) {
     accountMeta("depositClaim", depositClaim, false, true),
     accountMeta("mint", normalized.mint, false, true),
     accountMeta("recipientTokenAccount", normalized.recipientTokenAccount, false, true),
-    accountMeta("depositBacking", depositBacking, false, true),
+    accountMeta("depositReplay", depositReplay, false, true),
+    accountMeta("burnReplay", burnReplay, false, true),
     accountMeta("verifiedReceipt", verifiedReceipt, false, false),
     accountMeta("mintAuthorityPda", mintAuthority, false, false),
     accountMeta("tokenProgram", normalized.tokenProgram, false, false),
@@ -134,8 +139,8 @@ export function buildLocalnetSolanaDepositClaimTransactionPlan(config) {
     tag: BRIDGE_INSTRUCTION_ACCEPT_DEPOSIT_CLAIM, message: normalized.encodedMessageBytes,
   });
   const compiledInstruction = Object.freeze({
-    programIdIndex: 10,
-    accountIndexes: Object.freeze([1, 2, 6, 3, 4, 7, 8, 9, 5, 0, 11]),
+    programIdIndex: 11,
+    accountIndexes: Object.freeze([1, 2, 7, 3, 4, 8, 9, 10, 5, 6, 0, 12]),
     dataBase64: Buffer.from(instructionData).toString("base64"),
     dataHex: bytesToHex(instructionData),
   });
@@ -163,7 +168,8 @@ export function buildLocalnetSolanaDepositClaimTransactionPlan(config) {
     pdas: Object.freeze({
       bridgeState: publicPda(bridgeState),
       depositClaim: publicPda(depositClaim),
-      depositBacking: publicPda(depositBacking),
+      depositReplay: publicPda(depositReplay),
+      burnReplay: publicPda(burnReplay),
       mintAuthority: publicPda(mintAuthority),
       verifiedReceipt: publicPda(verifiedReceipt),
     }),
@@ -475,15 +481,18 @@ function normalizePlanConfig(config) {
   const tokenProgram = normalizePubkeyPair(config, "tokenProgramIdBase58", "tokenProgramIdHex");
   if (mainnet && tokenProgram.base58 !== "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA") throw new Error("MainnetDepositTokenProgramRejected");
   const feePayer = normalizePubkeyPair(config, "feePayerBase58", "feePayerHex");
-  const recipientTokenAccount = normalizePubkeyPair(
-    config,
-    "recipientTokenAccountBase58",
-    "recipientTokenAccountHex",
-  );
+  const encodedMessageBytes=hexToBytes(normalizeHexBytes(config.encodedMessageHex,'encodedMessageHex'));
+  const decoded=decodeCanonicalBridgeMessage(encodedMessageBytes);
+  const recipientTokenAccount=associatedTokenDestination(decoded.destination,mint.bytes,tokenProgram.bytes);
+  if(config.recipientTokenAccountBase58!==undefined||config.recipientTokenAccountHex!==undefined) {
+    const requested=normalizePubkeyPair(config,'recipientTokenAccountBase58','recipientTokenAccountHex');
+    if(requested.hex!==recipientTokenAccount.hex)throw new Error('SolanaDepositClaimRecipientMismatch');
+  }
   const recentBlockhash = normalizePubkeyPair(config, "recentBlockhashBase58", "recentBlockhashHex");
   return Object.freeze({
     environment: config.environment ?? LOCALNET,
     cluster: config.cluster ?? LOCALNET,
+    solanaGenesis: config.solanaGenesis,
     ...(productionDomain ? { productionDomain } : {}),
     managerProgram,
     transceiverProgram,
@@ -492,7 +501,7 @@ function normalizePlanConfig(config) {
     feePayer,
     recipientTokenAccount,
     recentBlockhash,
-    encodedMessageBytes: hexToBytes(normalizeHexBytes(config.encodedMessageHex, "encodedMessageHex"), "encodedMessageHex"),
+    encodedMessageBytes,
     lastValidBlockHeight: normalizeDecimal(config.lastValidBlockHeight, "lastValidBlockHeight"),
   });
 }
@@ -522,9 +531,16 @@ function validateDepositClaimMessageDomain(config, message) {
   if (mintHex !== config.mint.hex) {
     throw new Error("SolanaDepositClaimMintMismatch");
   }
-  if (message.destinationHex !== config.recipientTokenAccount.hex) {
+  if (associatedTokenDestination(message.destination,config.mint.bytes,config.tokenProgram.bytes).hex !== config.recipientTokenAccount.hex) {
     throw new Error("SolanaDepositClaimRecipientMismatch");
   }
+  if(config.solanaGenesis && bytesToHex(base58Decode(config.solanaGenesis))!==message.burnEvidence.binding.solanaGenesis)
+    throw new Error('SolanaBurnGenesisMismatch');
+}
+
+export function associatedTokenDestination(owner,mint,tokenProgram=base58Decode('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA')) {
+  return findProgramAddress([asPubkeyBytes(owner,'owner'),asPubkeyBytes(tokenProgram,'tokenProgram'),asPubkeyBytes(mint,'mint')],
+    base58Decode('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'));
 }
 
 function encodeLegacyMessage({ accountKeys, recentBlockhash, compiledInstruction }) {
@@ -532,7 +548,7 @@ function encodeLegacyMessage({ accountKeys, recentBlockhash, compiledInstruction
     accountKeys,
     recentBlockhash,
     readonlyUnsignedAccounts: 7,
-    compiledInstructions: [compiledInstruction, computeBudgetInstruction(12)],
+    compiledInstructions: [compiledInstruction, computeBudgetInstruction(13)],
   });
 }
 
@@ -686,7 +702,7 @@ function encodeEd25519VerifierInstruction({
   const signatureOffset = ED25519_INSTRUCTION_HEADER_LENGTH;
   const publicKeyOffset = signatureOffset + ED25519_SIGNATURE_LENGTH;
   // Both verifiers sign the exact canonical bytes starting after the tag of
-  // transceiver instruction 2. Do not duplicate the 482-byte message per key.
+  // transceiver instruction 2. Each verifier references the same V4 bytes.
   const messageOffset = 1;
   return concatBytes([
     Uint8Array.of(1, 0),

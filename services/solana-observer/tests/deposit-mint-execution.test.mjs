@@ -4,23 +4,20 @@ import assert from "node:assert/strict";
 import { before, test } from "node:test";
 import { createHash, randomBytes } from "node:crypto";
 import { ed25519 } from "@noble/curves/ed25519.js";
-import { encodeCanonicalBridgeMessage, decodeCanonicalBridgeMessage } from "../../../shared/protocol/canonical-message.mjs";
+import { decodeCanonicalBridgeMessage } from "../../../shared/protocol/canonical-message.mjs";
+import { burnFixture } from "../../../native/burn/tests/burn-fixture.mjs";
 import { base58Encode, prepareSignedLocalnetSolanaDepositClaimTransaction } from "../../bridge-validator/solana-deposit-claim-transaction-plan.mjs";
 import { verifyDepositMintExecution } from "../deposit-mint-execution.mjs";
 const h = v => createHash("sha256").update(v).digest("hex");
 let fixture;
 before(async () => {
-  const config = { environment: "localnet", cluster: "localnet", managerProgramIdHex: h("manager"), transceiverProgramIdHex: h("transceiver"),
-    mintHex: h("mint"), nativeDecimals: 8 };
-  const messageBytes = encodeCanonicalBridgeMessage({ action: "DepositClaim", direction: "NativeToSolana",
-    deployment: { protocolId: 1, nativeNetwork: 8000111, nativeGenesis: h("genesis"), solanaDeployment: h("deployment"),
-      managerProgramId: config.managerProgramIdHex, transceiverProgramId: config.transceiverProgramIdHex, mint: config.mintHex },
-    depositOutpoint: { txid: h("deposit"), vout: 0 },  amountAtomic: "100000000", feeAtomic: "0",
-    destination: Buffer.from(h("recipient"), "hex"), policyEpoch: 1, keyEpoch: 1, nonce: h("nonce"), validFrom: "1", validUntil: "4102444800", evidenceDigest: h("evidence") });
+  const f = burnFixture(), config = { environment: "localnet", cluster: "localnet", managerProgramIdHex: f.binding.bridgeProgram,
+    transceiverProgramIdHex: f.binding.transceiverProgram, mintHex: f.binding.mint, nativeDecimals: 8 };
+  const messageBytes = Buffer.from(f.authorize().encodedMessageHex, "hex"); f.destroy();
   const message = decodeCanonicalBridgeMessage(messageBytes), seed = randomBytes(32), publicKeyHex = Buffer.from(ed25519.getPublicKey(seed)).toString("hex");
   let packet;
   try { packet = await prepareSignedLocalnetSolanaDepositClaimTransaction({ ...config, encodedMessageHex: Buffer.from(messageBytes).toString("hex"),
-    tokenProgramIdBase58: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", recipientTokenAccountHex: message.destinationHex,
+    tokenProgramIdBase58: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
     feePayerHex: publicKeyHex, recentBlockhashHex: h("blockhash"), lastValidBlockHeight: "50",
     feePayerSigner: { publicKeyHex, sign: bytes => ed25519.sign(bytes, seed) } }); } finally { seed.fill(0); }
   const observation = { slot: "10", transaction: { signature: packet.signatures[0].signatureBase58 },
@@ -30,12 +27,12 @@ before(async () => {
   const balance = amount => ({ accountIndex: 4, mint: base58Encode(Buffer.from(config.mintHex, "hex")),
     programId: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", uiTokenAmount: { amount, decimals: 8 } });
   const result = { version: "legacy", slot: 10, transaction: [packet.preparedTransactionBase64, "base64"], meta: { err: null,
-    innerInstructions: [{ index: 0, instructions: [{ programIdIndex: 8, accounts: [3, 4, 7], data: base58Encode(data), stackHeight: 2 }] }],
-    preTokenBalances: [balance("12")], postTokenBalances: [balance("100000012")] } };
+    innerInstructions: [{ index: 0, instructions: [{ programIdIndex: 9, accounts: [3, 4, 8], data: base58Encode(data), stackHeight: 2 }] }],
+    preTokenBalances: [balance("12")], postTokenBalances: [balance("100012")] } };
   fixture = { config, observation, result };
 });
 test("exact signed claim packet agrees with reported MintToChecked and integer balance delta", () => {
-  assert.equal(verifyDepositMintExecution(fixture.result, fixture.observation, fixture.config).amountAtomic, "100000000");
+  assert.equal(verifyDepositMintExecution(fixture.result, fixture.observation, fixture.config).amountAtomic, "100000");
 });
 for (const [name, change] of [
   ["unrelated transaction signature", v => { v.observation.transaction.signature = base58Encode(Buffer.alloc(64, 3)); }],
@@ -58,7 +55,7 @@ for (const [name, change] of [
   ["missing CPI trace", v => { v.result.meta.innerInstructions = null; }],
   ["wrong outer instruction", v => { v.result.meta.innerInstructions[0].index = 1; }],
   ["duplicate mint CPI", v => { v.result.meta.innerInstructions[0].instructions.push(structuredClone(v.result.meta.innerInstructions[0].instructions[0])); }],
-  ["wrong Token Program CPI", v => { v.result.meta.innerInstructions[0].instructions[0].programIdIndex = 9; }],
+  ["wrong Token Program CPI", v => { v.result.meta.innerInstructions[0].instructions[0].programIdIndex = 10; }],
   ["wrong mint CPI accounts", v => { v.result.meta.innerInstructions[0].instructions[0].accounts = [3, 5, 7]; }],
   ["wrong mint CPI amount", v => { v.result.meta.innerInstructions[0].instructions[0].data = base58Encode(Buffer.alloc(10, 4)); }],
   ["wrong CPI stack height", v => { v.result.meta.innerInstructions[0].instructions[0].stackHeight = 3; }],

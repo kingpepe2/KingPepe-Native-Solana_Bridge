@@ -21,27 +21,6 @@
       "type": "string",
       "const": "localnet"
     },
-    "frost": {
-      "type": "object",
-      "properties": {
-        "participantAStateRoot": {
-          "type": "string"
-        },
-        "participantBStateRoot": {
-          "type": "string"
-        },
-        "policyEpoch": {
-          "type": "integer",
-          "minimum": 1
-        }
-      },
-      "required": [
-        "participantAStateRoot",
-        "participantBStateRoot",
-        "policyEpoch"
-      ],
-      "additionalProperties": false
-    },
     "attestation": {
       "type": "object",
       "properties": {
@@ -81,6 +60,41 @@
         "tokenProgram"
       ],
       "additionalProperties": false
+    },
+    "architecture": {
+      "const": "ONE_WAY_AUTOMATIC_BURN_AND_MINT"
+    },
+    "burn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "custodyModel",
+        "keyReference",
+        "nativeDepositConfirmations",
+        "nativeBurnConfirmations",
+        "feeFunding",
+        "bridgeFeeAtomic"
+      ],
+      "properties": {
+        "custodyModel": {
+          "const": "SINGLE_KEY_ACCEPTED_RISK"
+        },
+        "keyReference": {
+          "const": "PROTECTED_SERVER_SIDE_ONLY"
+        },
+        "nativeDepositConfirmations": {
+          "const": 12
+        },
+        "nativeBurnConfirmations": {
+          "const": 12
+        },
+        "feeFunding": {
+          "const": "SEPARATE_OPERATIONAL_INPUTS"
+        },
+        "bridgeFeeAtomic": {
+          "const": "0"
+        }
+      }
     }
   },
   "description": "Non-secret localnet example only; not a complete service deployment configuration."

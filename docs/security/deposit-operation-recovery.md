@@ -1,41 +1,9 @@
-# Forward operation recovery
+# Burn operation recovery
 
-The normal journal is the recovery source of truth. Public operation IDs,
-deposit outpoints, immutable plans, consumed nonce tombstones, signed sweep
-packets, attestation receipts and exact Solana packets are persisted before
-external effects. The coordinator contains no FROST private share.
+Persist operation/destination/address before display, input reservations and exact plan before signing, signed Native bytes before broadcast, and signed Solana bytes before submission. A lost response is not authorization to construct another economic transaction. Query the recorded Native TXID/mempool and Solana signature/claim/replay accounts first. Retry identical bytes only when the existing state permits it.
 
-A restart checks actual Native and finalized Solana state before progressing.
-An ambiguous Native response is resolved by the retained transaction ID; it
-does not authorize a new sweep. An ambiguous Solana response is resolved by
-signature and receipt/claim state. A replacement expired packet requires live
-absence and expiry checks and preserves the exact operation and message.
+Restart before finality resumes observation. Restart after burn broadcast reobserves that transaction and waits for 12 confirmations. Restart after finalized burn reloads the exact evidence and original destination, then resumes attestation/claim; it never asks the user to deposit again. Completed operations remain retired and cannot reopen economically. Their addresses remain observed for late-deposit exceptions.
 
-Pause prevents new signing/submission. Read-only catch-up may record an already
-landed mint. Integrity stops are absorbing. Unknown post-snapshot activity or
-missing expected operations keeps a restored service paused; it is never repaired
-by minting. Same-host snapshot rollback freshness is not certified.
+A replaced/orphaned pre-final burn cannot authorize mint. A contradiction affecting accepted/finalized evidence pauses new economic work. Read-only observation may continue; restoring chain availability does not clear a critical pause automatically. Review the cause before the private TEST resume command. No public admin/resume API exists.
 
-Use manual or existing OS-scheduled encrypted snapshots. Stop the writer, retain
-the journal and its authenticated checkpoint, private deployment configuration,
-protected role stores, nonce state, exact packets and public artifact identities.
-Include required keys only inside the established protected encrypted backup.
-Do not put backups, DPAPI blobs, passphrases or private paths into Git or reports.
-
-Restore into an isolated private location with services PAUSED. Verify inventory,
-hashes, permissions, authenticated journal identity, deployment binding and known
-quiescent interval. Reject wrong passphrase/corruption before extraction. Check
-actual chains and replay the same retained operation identities. Require MATCH
-before explicit resume; never use an older snapshot over a running writer.
-
-The forward local recovery suite covers a broadcast sweep awaiting finality and
-a finalized mint awaiting journal accounting. It checks no additional signing,
-broadcast or mint, and retains the 16 forward service regressions. Fresh evidence
-must name the tested source. Historical drills do not certify a rewritten SHA,
-production DPAPI portability, distinct service principals or arbitrary host loss.
-
-The user CSV path is separate: an unswept Native deposit can be recovered using
-the user's own wallet after its script-relative delay. A successfully spent
-deposit cannot also be recovered. Production delay is Team-approved at 1,440
-Native blocks; deposit and sweep finality are 12 confirmations. Native consensus
-source governs script semantics and block timing.
+Protected TEST recovery has separate evidence from production portability. Real same-account DPAPI reopen and process-kill-after-finalized-burn tests do not prove a replacement host can decrypt keys. Before production, use an encrypted offline backup covering signing authority, fee role, attesters, journal and exact configuration. Restore TEST material under the intended replacement service identity, compare public identities and journal history, requery chains, and prove no new burn or mint before marking recovery tested. No automatic economic repair or full-host snapshot rollback guarantee is provided.

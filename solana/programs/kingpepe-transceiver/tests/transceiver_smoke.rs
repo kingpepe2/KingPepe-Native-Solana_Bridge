@@ -1,7 +1,11 @@
-use bridge_messages::{
-    CanonicalBridgeMessage, DeploymentIdentity, DepositClaimFields, MessageEpochs, NativeOutpoint,
-    ValidityWindow,
-};
+mod burn_fixture {
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../tests/support/burn-fixture.rs"
+    ));
+}
+use bridge_messages::{DeploymentIdentity, MessageEpochs, NativeOutpoint, ValidityWindow};
+use burn_fixture::{burn_message, TestBurnFields};
 use kingpepe_transceiver::{AttestationObservation, TransceiverConfig, TransceiverProgram};
 
 fn h(byte: u8) -> [u8; 32] {
@@ -22,7 +26,7 @@ fn transceiver_can_record_verification() {
         active: true,
         key_epoch: 7,
     };
-    let message = CanonicalBridgeMessage::new_deposit_claim(DepositClaimFields {
+    let message = burn_message(TestBurnFields {
         deployment: DeploymentIdentity {
             protocol_id: 1,
             native_network: 2,

@@ -16,7 +16,7 @@ Solana's [program deployment documentation](https://solana.com/docs/programs/dep
 describes the upgrade authority and Program/ProgramData relationship.
 
 This policy applies only to future production program upgrades. It does not
-introduce any waiting period or Team approval into normal deposits, reserve-sweep signing or minting. Existing verification/finality requirements
+introduce any waiting period or Team approval into normal deposits, automatic Native burn signing or minting. Existing verification/finality requirements
 remain unchanged. This policy does not itself provision a key or authorize a
 deployment. The existing Devnet authority is a test identity,
 not an implicit production key selection.
@@ -26,7 +26,7 @@ not an implicit production key selection.
 Keep the private key in protected local/private storage, outside Git, build
 artifacts, reports, command output and logs. Never publish its contents
 or operational storage path. Only its public authority address may be recorded.
-Do not reuse it for the fee payer, relayer, FROST participants or attesters. A
+Do not reuse it for the fee payer, relayer, Native burn signer or attesters. A
 separate fee payer is required; there is no fee-payer reuse exception. Generate
 or migrate private material only under explicit local provisioning authorization,
 never as a side effect of a template or documentation update. Recovery and
@@ -35,7 +35,7 @@ custody material remain private.
 The Phase-19 local preparation record is in `BRIDGE-READINESS.json`. Its public
 authority address may be published; its protected key, local configuration and
 storage paths must not be. Successful local key/permission checks do not certify
-the remaining production RPC, reserve, runtime, backup or deployment configuration.
+the remaining production RPC, burn signer, runtime, backup or deployment configuration.
 CurrentUser DPAPI custody is account-bound, not proof of replacement-host recovery.
 
 ## Required procedure for each upgrade

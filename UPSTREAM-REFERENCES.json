@@ -65,7 +65,11 @@
     },
     {
       "project": "Native witness addresses and scure-base",
-      "urls": ["https://bips.dev/173/", "https://bips.dev/350/", "https://github.com/paulmillr/scure-base"],
+      "urls": [
+        "https://bips.dev/173/",
+        "https://bips.dev/350/",
+        "https://github.com/paulmillr/scure-base"
+      ],
       "checkedAt": "2026-09-13",
       "use": "Pinned @scure/base 2.4.0 MIT package API for checksum and bit conversion. Original adapter restricts supported scripts and expected HRP. No upstream implementation or vectors copied. REGTEST rkpepe is verified in the pinned Native source src/kernel/chainparams.cpp, not assumed from Bitcoin. No external audit claim for current package or integration."
     },
@@ -143,10 +147,11 @@
       "project": "@noble/curves",
       "version": "2.3.0",
       "license": "MIT",
-      "use": "Native secp256k1 Taproot/BIP340-compatible FROST implementation and Ed25519 project attestations",
-      "reviewStatus": "FROST is explicitly new and unaudited upstream; local vectors/node acceptance do not confer audit coverage.",
+      "use": "Native BIP340/BIP341 single-key burn signing and Ed25519 project attestations",
+      "reviewStatus": "Pinned dependency; local vectors and chain tests are not an external security audit.",
       "reviewSource": "https://github.com/paulmillr/noble-curves/blob/2.3.0/README.md#frost-threshold-signatures",
-      "status": "direct-runtime-dependency"
+      "status": "direct-runtime-dependency",
+      "historicalUse": "Earlier reserve model used upstream unaudited FROST; no active FROST remains after burn conversion."
     },
     {
       "project": "@noble/hashes",
@@ -206,7 +211,10 @@
   "productionUpgradeControl": {
     "checkedAt": "2026-09-14",
     "use": "Reference-only Solana upgrade authority and Program/ProgramData semantics. Original Team operational review procedure, no fixed delay, no upstream implementation or sample code copied.",
-    "urls": ["https://solana.com/docs/programs/deploying", "https://solana.com/docs/core/programs"],
+    "urls": [
+      "https://solana.com/docs/programs/deploying",
+      "https://solana.com/docs/core/programs"
+    ],
     "limits": "Manual review is not an on-chain constraint on the centralized key holder. No production key provisioning, deployment or independent audit."
   },
   "serviceIpc": {

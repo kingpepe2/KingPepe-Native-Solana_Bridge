@@ -5,10 +5,7 @@ import { createHash } from "node:crypto";
 import { serialize, deserialize } from "borsh";
 import { spawn } from "node:child_process";
 import path from "node:path";
-import { schnorr } from "@noble/curves/secp256k1.js";
-import { createLocalTaprootSighashEvidences, parseNativeTransactionHex,
-  taprootKeyPathSighashDefault, taprootScriptPathSighashDefault } from "./native-taproot-transaction.mjs";
-import { verifyTaprootControlBlock } from "./native-tapscript.mjs";
+import { parseNativeTransactionHex } from "./native-taproot-transaction.mjs";
 import { NATIVE_MAINNET_GENESIS } from "../../shared/network-identity.mjs";
 
 export const REGTEST_GENESIS = "352a1a62f7880d325da6d3fe2e62272cd0ce735a7ba003eae4fb59d2a175a8b9";
@@ -21,32 +18,8 @@ const REGTEST_PROFILE = Object.freeze({ genesis: REGTEST_GENESIS, chain: "regtes
   maximumBytes: MAX_RAW_EVIDENCE_BYTES, checkpointProtocol: CHECKPOINT_PROTOCOL, command: "--regtest-verify", timeoutMs: 15_000 });
 const MAINNET_PROFILE = Object.freeze({ genesis: NATIVE_MAINNET_GENESIS, chain: "main", network: "mainnet", maximumHeaders: 1_000_000,
   maximumBytes: 96_000_000, checkpointProtocol: "KINGPEPE_MAINNET_ACCEPTANCE_CHECKPOINT_V2", command: "--mainnet-verify", timeoutMs: 120_000 });
-const MAINNET_VERIFIER = Symbol("MainnetNativeEvidenceVerifier");
 const MAINNET_HEADER_CACHE = new WeakMap();
-const VERIFIED_CHAINS = new WeakSet(), VERIFIED_RESERVES = new WeakMap(), OBSERVED_SPENT_RESERVES = new WeakMap();
 const headerId = raw => createHash("sha256").update(createHash("sha256").update(hex(raw, 80)).digest()).digest().reverse().toString("hex");
-const knownGenesis = value => [REGTEST_GENESIS, NATIVE_MAINNET_GENESIS].includes(value);
-export function requireVerifiedNativeChain(value, genesis) { if (!knownGenesis(genesis) || !VERIFIED_CHAINS.has(value) || value.genesis !== genesis) throw new Error("RAW_NATIVE_VERIFIED_CHAIN_REQUIRED"); }
-export function requireVerifiedNativeReserve(value, genesis) { if (!knownGenesis(genesis) || !VERIFIED_RESERVES.has(value) || value.reserveBasis.genesis !== genesis) throw new Error("RAW_NATIVE_VERIFIED_RESERVE_REQUIRED"); }
-export function requireVerifiedRegtestChain(value) { requireVerifiedNativeChain(value, REGTEST_GENESIS); }
-export function requireVerifiedRegtestReserve(value) { requireVerifiedNativeReserve(value, REGTEST_GENESIS); }
-export function verifiedReserveChain(value, genesis = REGTEST_GENESIS) { requireVerifiedNativeReserve(value, genesis); return VERIFIED_RESERVES.get(value); }
-// A generic RPC error or a caller-created object is not evidence of a deficit.
-// Only the verified sweep path below can produce this capability. UTXO absence
-// still relies on the configured validating node; it is not a cryptographic
-// proof of the node's honesty or a proof of the spending transaction itself.
-export function observedSpentNativeReserve(error, genesis) {
-  const value = OBSERVED_SPENT_RESERVES.get(error);
-  return knownGenesis(genesis) && value?.reserveBasis.genesis === genesis ? value : undefined;
-}
-export function observedSpentRegtestReserve(error) { return observedSpentNativeReserve(error, REGTEST_GENESIS); }
-function verifiedChain(bundle, verified, observedAt) {
-  const result = Object.freeze({ ...verified, genesis: bundle.genesisHash, chainworkHex: bundle.chainworkHex, observedAt,
-    headerHashes: Object.freeze([bundle.genesisHash, ...bundle.headers.map(headerId)]),
-    canonicalChoiceTrust: "CONFIGURED_LOCAL_VALIDATING_NODE_RPC_OBSERVATION" });
-  VERIFIED_CHAINS.add(result); return result;
-}
-
 const hashSchema = { array: { type: "u8", len: 32 } };
 export const NATIVE_EVIDENCE_SCHEMA = { struct: {
   magic: { array: { type: "u8", len: 8 } },
@@ -153,20 +126,26 @@ function transactionHints(bundle) {
 export async function collectRegtestEvidence({ rpc, transactionIds, minimumConfirmations }) {
   return collectNativeEvidence({ rpc, transactionIds, minimumConfirmations }, REGTEST_PROFILE);
 }
-export async function collectMainnetEvidence(options) { return collectNativeEvidence(options, MAINNET_PROFILE); }
+export async function collectMainnetEvidence(options) {
+  if (options?.minimumConfirmations !== 12) throw new Error("MAINNET_FINALITY_POLICY_REQUIRED");
+  return collectNativeEvidence(options, MAINNET_PROFILE);
+}
 async function collectNativeEvidence({ rpc, transactionIds, minimumConfirmations, transactionBlockHints = {} }, profile) {
   const expectedIds = boundedArray(transactionIds, MAX_TRANSACTIONS).map((id) => hex(id, 32).toString("hex"));
   if (new Set(expectedIds).size !== expectedIds.length) throw new Error("RAW_NATIVE_DUPLICATE_TRANSACTION");
   if (!transactionBlockHints || Array.isArray(transactionBlockHints) || Object.keys(transactionBlockHints).some(id => !expectedIds.includes(id)))
     throw new Error("RAW_NATIVE_BLOCK_HINT_REJECTED");
   const info = await rpc.getBlockchainInfo();
-  if (info?.chain !== profile.chain || info.initialblockdownload !== false || info.headers !== info.blocks) {
+  if (info?.chain !== profile.chain) throw new Error("RAW_NATIVE_WRONG_NETWORK");
+  if (typeof info.initialblockdownload !== 'boolean' || !Number.isSafeInteger(info.blocks) || info.blocks < 0 ||
+      !Number.isSafeInteger(info.headers) || info.headers < info.blocks) {
     throw new Error("RAW_NATIVE_SOURCE_NOT_READY");
   }
-  const tipHeight = positive(info.blocks, profile.maximumHeaders);
-  const tipHash = hex(info.bestblockhash, 32).toString("hex");
   const genesisHash = (await rpc.call("getblockhash", [0])).result;
   if (genesisHash !== profile.genesis) throw new Error("RAW_NATIVE_WRONG_GENESIS");
+  if (info.initialblockdownload || info.headers !== info.blocks) throw new Error("RAW_NATIVE_SOURCE_SYNCHRONIZING");
+  const tipHeight = positive(info.blocks, profile.maximumHeaders);
+  const tipHash = hex(info.bestblockhash, 32).toString("hex");
   const { headers, hashes } = profile === MAINNET_PROFILE ? await collectMainnetHeaders(rpc, tipHeight) : { headers: [], hashes: [genesisHash] };
   if (profile === REGTEST_PROFILE) for (let height = 1; height <= tipHeight; height += 1) {
       const blockHash = hex((await rpc.call("getblockhash", [height])).result, 32).toString("hex");
@@ -272,236 +251,6 @@ async function collectMainnetHeaders(rpc, tipHeight) {
     }
     return { headers: cache.headers.slice(), hashes: cache.hashes.slice() };
   } finally { cache.busy = false; }
-}
-
-export class LocalNativeEvidenceVerifier {
-  #rpc;
-  #executable;
-  #profile;
-  constructor({ rpc, executable }, mode) {
-    if (mode !== undefined && mode !== MAINNET_VERIFIER) throw new Error("RAW_NATIVE_VERIFIER_MODE_REJECTED");
-    this.#rpc = rpc; this.#executable = executable; this.#profile = mode === MAINNET_VERIFIER ? MAINNET_PROFILE : REGTEST_PROFILE;
-  }
-  static createMainnet(options) { return new LocalNativeEvidenceVerifier(options, MAINNET_VERIFIER); }
-  get nativeGenesis() { return this.#profile.genesis; }
-  #collect(options) { return collectNativeEvidence({ rpc: this.#rpc, ...options }, this.#profile); }
-  #verify(bundle) { return verifyNativeEvidencePacket({ executable: this.#executable, packet: encodeNativeEvidence(bundle, this.#profile) }, this.#profile); }
-  #confirmations(value) {
-    const required = positive(value, MAX_HEADERS);
-    if (this.#profile === MAINNET_PROFILE && required < 12) throw new Error("RAW_NATIVE_MAINNET_FINALITY_POLICY_REQUIRED");
-    return required;
-  }
-
-  async #verifyCurrentAndAccepted(bundle, checkpoint) {
-    const current = await this.#verify(bundle);
-    let verified = current;
-    if (checkpoint !== undefined) {
-      const packet = encodeEvidenceAtCheckpoint(bundle, checkpoint, this.#profile);
-      if (createHash("sha256").update(packet).digest("hex") !== current.digestHex) {
-        verified = await verifyNativeEvidencePacket({ executable: this.#executable, packet }, this.#profile);
-      }
-    }
-    const acceptedCheckpoint = Object.freeze({ protocol: this.#profile.checkpointProtocol, genesis: this.#profile.genesis,
-      tipHash: verified.tipHash, tipHeight: verified.tipHeight,
-      chainworkHex: checkpoint?.chainworkHex ?? bundle.chainworkHex,
-      minimumConfirmations: bundle.minimumConfirmations, evidenceDigestHex: verified.digestHex,
-      ...(this.#profile === MAINNET_PROFILE ? { transactionBlockHints: Object.freeze(transactionHints(bundle)) } : {}) });
-    return { current, verified, acceptedCheckpoint };
-  }
-
-  async #transactionHints(inputs, retained = {}) {
-    if (this.#profile !== MAINNET_PROFILE) return {};
-    const ids = [...new Set(inputs.map(input => input.txid))];
-    if (!retained || Array.isArray(retained) || Object.keys(retained).some(id => !ids.includes(id)))
-      throw new Error("RAW_NATIVE_BLOCK_HINT_REJECTED");
-    const hints = {};
-    for (const id of ids) {
-      if (retained[id] !== undefined) { hints[id] = hex(retained[id], 32).toString("hex"); continue; }
-      const located = await this.#rpc.locateMainnetTransaction({ txid: id, vout: inputs.find(input => input.txid === id).vout });
-      if (located.state !== "OBSERVED") throw new Error("RAW_NATIVE_TRANSACTION_UNAVAILABLE");
-      if (located.blockHash === null) throw new Error("RAW_NATIVE_TRANSACTION_UNCONFIRMED");
-      hints[id] = hex(located.blockHash, 32).toString("hex");
-    }
-    return hints;
-  }
-
-  // Verify the CURRENT branch even when a previously accepted transaction has
-  // disappeared from it. A current coinbase anchors a real Merkle proof; it is
-  // never a deposit or a reserve credit. The independent Rust verifier checks
-  // the complete bounded header sequence and declared chainwork.
-  async observeChain() {
-    const observedAt = Date.now(), info = await this.#rpc.getBlockchainInfo();
-    if (info?.chain !== this.#profile.chain || info.initialblockdownload !== false || info.headers !== info.blocks) throw new Error("RAW_NATIVE_SOURCE_NOT_READY");
-    const block = await this.#rpc.getBlock(hex(info.bestblockhash, 32).toString("hex"), 1);
-    const ids = boundedArray(block?.tx, MAX_BLOCK_TXIDS);
-    if (ids.length === 0) throw new Error("RAW_NATIVE_SOURCE_NOT_READY");
-    const bundle = await this.#collect({ transactionIds: [ids[0]], minimumConfirmations: 1,
-      transactionBlockHints: { [ids[0]]: hex(info.bestblockhash, 32).toString("hex") } });
-    const verified = await this.#verify(bundle);
-    if ((await this.#rpc.call("getbestblockhash", [])).result !== verified.tipHash) throw new Error("RAW_NATIVE_SOURCE_CHANGED");
-    return verifiedChain(bundle, verified, observedAt);
-  }
-
-  async verifySweepSigning({ inputs, minimumConfirmations, unsignedTransactionHex, reserveAmountAtomic, feeAtomic, reserveScriptHex, intent, tapscriptSpends, acceptedCheckpoint }) {
-    const expected = structuredClone({ inputs, minimumConfirmations, unsignedTransactionHex, reserveAmountAtomic, feeAtomic, reserveScriptHex, intent, tapscriptSpends, acceptedCheckpoint });
-    const verified = await this.verifyInputs(expected);
-    const tx = parseNativeTransactionHex(expected.unsignedTransactionHex);
-    const inputIds = expected.inputs.map((input) => `${input.txid}:${input.vout}`);
-    if (tx.inputs.length !== inputIds.length || tx.inputs.some((input, index) => input.outpoint !== inputIds[index])
-      || tx.outputs.length !== 1 || tx.outputs[0].amountAtomic !== expected.reserveAmountAtomic
-      || tx.outputs[0].scriptPubKeyHex !== expected.reserveScriptHex) throw new Error("RAW_NATIVE_SWEEP_SUBSTITUTED");
-    const evidences = createLocalTaprootSighashEvidences({
-      unsignedNativeTransactionHex: expected.unsignedTransactionHex,
-      spentOutputs: expected.inputs.map((input) => ({ amountAtomic: input.amountAtomic, scriptPubKeyHex: input.scriptPubKeyHex })),
-      proofFingerprintHex: verified.digestHex, reserveAmountAtomic: expected.reserveAmountAtomic,
-      nativeMinerFeeAtomic: expected.feeAtomic, expectedRecipientScriptPubKeyHex: expected.reserveScriptHex,
-      expectedChangeScriptPubKeyHex: expected.reserveScriptHex,
-      tapscriptSpends: expected.tapscriptSpends,
-    });
-    const evidence = evidences[expected.intent.signingInputIndex];
-    if (!evidence || expected.intent.purpose !== "RESERVE_SWEEP" || expected.intent.nativeNetwork !== this.#profile.network
-      || expected.intent.nativeGenesisHash !== this.#profile.genesis || expected.intent.unsignedNativeTransactionId !== tx.txidHex
-      || expected.intent.taprootSighashHex !== evidence.taprootSighashHex || expected.intent.proofFingerprint !== verified.digestHex
-      || expected.intent.amountAtomic !== expected.reserveAmountAtomic || expected.intent.feeAtomic !== expected.feeAtomic
-      || expected.intent.recipientScriptPubKeyHex !== expected.reserveScriptHex || expected.intent.changeAtomic !== "0"
-      || expected.intent.changeScriptPubKeyHex !== expected.reserveScriptHex
-      || expected.intent.transactionCommitment !== evidence.transactionCommitment
-      || expected.intent.reserveCommitment !== evidence.reserveCommitment
-      || JSON.stringify(expected.intent.outputCommitments) !== JSON.stringify(evidence.outputCommitments)
-      || JSON.stringify(expected.intent.inputOutpoints) !== JSON.stringify(inputIds)) throw new Error("RAW_NATIVE_SIGNING_INTENT_SUBSTITUTED");
-    return verified;
-  }
-
-  async verifyInputs({ inputs, minimumConfirmations, acceptedCheckpoint }) {
-    this.#confirmations(minimumConfirmations);
-    const requested = structuredClone(boundedArray(inputs, MAX_TRANSACTIONS));
-    const checkpoint = structuredClone(acceptedCheckpoint);
-    const transactionBlockHints = await this.#transactionHints(requested, checkpoint?.transactionBlockHints);
-    const bundle = await this.#collect({
-      transactionIds: [...new Set(requested.map((input) => input.txid))], minimumConfirmations: 1, transactionBlockHints });
-    const { current, verified, acceptedCheckpoint: acceptance } = await this.#verifyCurrentAndAccepted(bundle, checkpoint);
-    const transactions = bundle.proofs.map((proof) => parseNativeTransactionHex(proof.rawTransactionHex));
-    for (const input of requested) {
-      const tx = transactions.find((candidate) => candidate.txidHex === input.txid);
-      const proof = bundle.proofs[transactions.indexOf(tx)];
-      const output = tx?.outputs[integer(input.vout, 0xffff_ffff)];
-      if (output?.amountAtomic !== input.amountAtomic || output.scriptPubKeyHex !== input.scriptPubKeyHex) {
-        throw new Error("RAW_NATIVE_INPUT_SUBSTITUTED");
-      }
-      const required = this.#confirmations(input.minimumConfirmations ?? minimumConfirmations);
-      if (verified.tipHeight - proof.blockHeight + 1 < required) throw new Error("RAW_NATIVE_INPUT_FINALITY_INSUFFICIENT");
-      const utxo = await this.#rpc.getUtxoObservation({ txid: input.txid, vout: input.vout, decimals: 8, includeMempool: true });
-      if (!utxo.unspent || utxo.coinbase || utxo.bestBlockHash !== current.tipHash
-        || utxo.valueAtomic !== input.amountAtomic || utxo.scriptPubKeyHex !== input.scriptPubKeyHex
-        || utxo.confirmations < required) {
-        throw new Error("RAW_NATIVE_INPUT_NOT_AVAILABLE");
-      }
-    }
-    if ((await this.#rpc.call("getbestblockhash", [])).result !== current.tipHash) throw new Error("RAW_NATIVE_SOURCE_CHANGED");
-    return Object.freeze({ ...verified, acceptedCheckpoint: acceptance,
-      currentTipHash: current.tipHash, currentTipHeight: current.tipHeight,
-      utxoTrust: "CONFIGURED_LOCAL_VALIDATING_NODE_RPC_OBSERVATION" });
-  }
-
-
-  async verifyReserve({ deposit, feeInputs, sweepTxid, reserveVout, reserveScriptHex, feeAtomic, minimumConfirmations, tapscriptSpends, acceptedCheckpoint, transactionBlockHints }) {
-    this.#confirmations(minimumConfirmations);
-    const observedAt = Date.now();
-    const expected = structuredClone({ deposit, feeInputs, sweepTxid, reserveVout, reserveScriptHex, feeAtomic, minimumConfirmations, tapscriptSpends, acceptedCheckpoint, transactionBlockHints });
-    if (!Array.isArray(expected.feeInputs) || expected.feeInputs.length > MAX_TRANSACTIONS - 2) throw new Error("RAW_NATIVE_COUNT_INVALID");
-    const inputs = [expected.deposit, ...expected.feeInputs];
-    const hints = await this.#transactionHints([...inputs, { txid: expected.sweepTxid, vout: expected.reserveVout }],
-      expected.acceptedCheckpoint?.transactionBlockHints ?? expected.transactionBlockHints);
-    const bundle = await this.#collect({
-      transactionIds: [...new Set([...inputs.map((input) => input.txid), expected.sweepTxid])],
-      minimumConfirmations: this.#confirmations(expected.minimumConfirmations), transactionBlockHints: hints });
-    const { current, verified, acceptedCheckpoint: acceptance } = await this.#verifyCurrentAndAccepted(bundle, expected.acceptedCheckpoint);
-    const transactions = bundle.proofs.map((proof) => parseNativeTransactionHex(proof.rawTransactionHex));
-    const sweep = transactions.find((tx) => tx.txidHex === expected.sweepTxid);
-    const inputIds = inputs.map((input) => `${input.txid}:${integer(input.vout, 0xffff_ffff)}`);
-    if (!sweep || new Set(inputIds).size !== inputIds.length || sweep.inputs.length !== inputIds.length
-      || sweep.inputs.some((input, index) => input.outpoint !== inputIds[index])
-      || sweep.outputs.length !== 1 || expected.reserveVout !== 0) throw new Error("RAW_NATIVE_SWEEP_SUBSTITUTED");
-    let total = 0n;
-    for (const input of inputs) {
-      const tx = transactions.find((candidate) => candidate.txidHex === input.txid);
-      const output = tx?.outputs[input.vout];
-      if (output?.amountAtomic !== input.amountAtomic || output.scriptPubKeyHex !== input.scriptPubKeyHex) throw new Error("RAW_NATIVE_INPUT_SUBSTITUTED");
-      total += atomic(input.amountAtomic);
-    }
-    const output = sweep.outputs[0];
-    if (output.amountAtomic !== expected.deposit.amountAtomic || output.scriptPubKeyHex !== expected.reserveScriptHex
-      || total - atomic(output.amountAtomic) !== atomic(expected.feeAtomic)) throw new Error("RAW_NATIVE_SWEEP_VALUE_MISMATCH");
-    const witnessSignatures = verifyRegtestSweepSignatures({ sweep, inputs, tapscriptSpends: expected.tapscriptSpends,
-      reserveScriptHex: expected.reserveScriptHex });
-    const basis = txid => { const proof = bundle.proofs.find(p => parseNativeTransactionHex(p.rawTransactionHex).txidHex === txid);
-      return Object.freeze({ txid, height: proof.blockHeight, blockHash: headerId(bundle.headers[proof.blockHeight - 1]) }); };
-    const reserveBasis = Object.freeze({ genesis: this.#profile.genesis, chainworkHex: bundle.chainworkHex,
-      deposit: Object.freeze({ ...basis(expected.deposit.txid), vout: expected.deposit.vout }),
-      sweep: Object.freeze({ ...basis(sweep.txidHex), vout: expected.reserveVout }),
-      amountAtomic: output.amountAtomic, reserveScriptHex: output.scriptPubKeyHex });
-    const utxo = await this.#rpc.getUtxoObservation({ txid: sweep.txidHex, vout: 0, decimals: 8, includeMempool: true });
-    if (utxo.unspent === false) {
-      // Exclude mempool spends before classifying canonical reserve loss. The
-      // creating sweep's inclusion, exact inputs/output/fees and all signatures
-      // have already passed independent raw verification at this same tip.
-      const canonical = await this.#rpc.getUtxoObservation({ txid: sweep.txidHex, vout: 0, decimals: 8, includeMempool: false });
-      if ((await this.#rpc.call("getbestblockhash", [])).result !== current.tipHash) throw new Error("RAW_NATIVE_SOURCE_CHANGED");
-      if (canonical.unspent === false) {
-        const error = new Error("RAW_NATIVE_RESERVE_SPENT");
-        OBSERVED_SPENT_RESERVES.set(error, Object.freeze({ reserveBasis, chain: verifiedChain(bundle, current, observedAt),
-          utxoTrust: "CONFIGURED_LOCAL_VALIDATING_NODE_RPC_OBSERVATION" }));
-        throw error;
-      }
-    }
-    if (!utxo.unspent || utxo.coinbase || utxo.bestBlockHash !== current.tipHash
-      || utxo.valueAtomic !== output.amountAtomic || utxo.scriptPubKeyHex !== output.scriptPubKeyHex
-      || utxo.confirmations < expected.minimumConfirmations) throw new Error("RAW_NATIVE_RESERVE_NOT_AVAILABLE");
-    if ((await this.#rpc.call("getbestblockhash", [])).result !== current.tipHash) throw new Error("RAW_NATIVE_SOURCE_CHANGED");
-    const result = Object.freeze({ ...verified, acceptedCheckpoint: acceptance,
-      currentTipHash: current.tipHash, currentTipHeight: current.tipHeight, witnessSignatures, utxoTrust: "CONFIGURED_LOCAL_VALIDATING_NODE_RPC_OBSERVATION",
-      reserveBasis });
-    VERIFIED_RESERVES.set(result, verifiedChain(bundle, current, observedAt)); return result;
-  }
-}
-
-// Verify actual witness bytes separately: a legacy txid alone does not commit
-// its witness. This is not full Native script/block validation or a UTXO proof.
-export function verifyRegtestSweepSignatures({ sweep, inputs, tapscriptSpends, reserveScriptHex }) {
-  if (typeof reserveScriptHex !== "string" || !/^5120[0-9a-f]{64}$/u.test(reserveScriptHex)
-    || !Array.isArray(inputs) || inputs.length < 1 || inputs.length > MAX_TRANSACTIONS || inputs.length !== sweep.inputs.length
-    || (tapscriptSpends !== undefined && (!Array.isArray(tapscriptSpends) || tapscriptSpends.length !== inputs.length))) {
-    throw new Error("RAW_NATIVE_SWEEP_WITNESS_INVALID");
-  }
-  const publicKey = Buffer.from(reserveScriptHex.slice(4), "hex");
-  const spentOutputs = inputs.map(({ amountAtomic, scriptPubKeyHex }) => ({ amountAtomic, scriptPubKeyHex }));
-  let scriptPathInputs = 0;
-  for (const [index, input] of sweep.inputs.entries()) {
-    const script = tapscriptSpends?.[index];
-    if (input.witness.length !== (script === undefined ? 1 : 4) || input.witness[0]?.length !== 64) {
-      throw new Error("RAW_NATIVE_SWEEP_WITNESS_INVALID");
-    }
-    if (script === undefined) {
-      if (spentOutputs[index].scriptPubKeyHex !== reserveScriptHex) throw new Error("RAW_NATIVE_SWEEP_WITNESS_INVALID");
-    } else {
-      if (!/^82012088a820[0-9a-f]{64}8820[0-9a-f]{64}ac$/u.test(script.scriptHex)
-        || script.scriptHex.slice(-66, -2) !== reserveScriptHex.slice(4)
-        || input.witness[1].length !== 32 || Buffer.from(input.witness[1]).toString("hex") !== script.publicPreimageHex
-        || createHash("sha256").update(Buffer.from(input.witness[1])).digest("hex") !== script.scriptHex.slice(12, 76)
-        || Buffer.from(input.witness[2]).toString("hex") !== script.scriptHex
-        || Buffer.from(input.witness[3]).toString("hex") !== script.controlBlockHex) {
-        throw new Error("RAW_NATIVE_SWEEP_WITNESS_INVALID");
-      }
-      verifyTaprootControlBlock({ ...script, scriptPubKeyHex: spentOutputs[index].scriptPubKeyHex });
-      scriptPathInputs++;
-    }
-    const hash = (script === undefined ? taprootKeyPathSighashDefault : taprootScriptPathSighashDefault)({
-      transaction: sweep, spentOutputs, inputIndex: index, ...(script === undefined ? {} : { scriptHex: script.scriptHex }) });
-    if (!schnorr.verify(Uint8Array.from(input.witness[0]), Buffer.from(hash.sigHashHex, "hex"), publicKey)) {
-      throw new Error("RAW_NATIVE_SWEEP_SIGNATURE_INVALID");
-    }
-  }
-  return Object.freeze({ scriptPathInputs, keyPathInputs: inputs.length - scriptPathInputs });
 }
 
 function hex(value, length, maximum = length) {

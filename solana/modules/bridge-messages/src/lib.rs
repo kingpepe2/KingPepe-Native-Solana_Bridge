@@ -4,17 +4,17 @@
 
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use solana_sha256_hasher::{hash, hashv};
 
 pub mod abi;
-pub mod inputs;
+pub mod burn;
 
-pub const PROTOCOL_MAGIC: [u8; 8] = *b"KPEPBRG3";
-pub const MESSAGE_VERSION: u8 = 3;
+pub const PROTOCOL_MAGIC: [u8; 8] = *b"KPBRMSG4";
+pub const MESSAGE_VERSION: u8 = 4;
 pub const DEPLOYMENT_IDENTITY_LENGTH: usize = 168;
 pub const NATIVE_OUTPOINT_LENGTH: usize = 36;
 pub const MAX_DESTINATION_LENGTH: usize = 128;
-pub const MESSAGE_LENGTH: usize = 482;
+pub const MESSAGE_LENGTH: usize = burn::BURN_MESSAGE_LENGTH;
 
 pub type Hash32 = [u8; 32];
 pub type PubkeyBytes = [u8; 32];
@@ -45,14 +45,17 @@ pub fn mainnet_deployment_identity(
     {
         return None;
     }
-    let mut hash = Sha256::new();
-    hash.update(b"KINGPEPE_MAINNET_DEPLOYMENT_V1\0");
-    hash.update(NATIVE_MAINNET_GENESIS);
-    hash.update(SOLANA_MAINNET_GENESIS);
-    hash.update(manager);
-    hash.update(transceiver);
-    hash.update(mint);
-    Some(hash.finalize().into())
+    Some(
+        hashv(&[
+            b"KINGPEPE_MAINNET_DEPLOYMENT_V1\0",
+            &NATIVE_MAINNET_GENESIS,
+            &SOLANA_MAINNET_GENESIS,
+            manager,
+            transceiver,
+            mint,
+        ])
+        .to_bytes(),
+    )
 }
 
 #[cfg(test)]
@@ -149,82 +152,6 @@ impl From<BridgeAction> for u8 {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[repr(u8)]
-pub enum BridgeOperationState {
-    Observed = 0,
-    WaitingForFinality = 1,
-    WaitingForDependency = 2,
-    QueuedByLimit = 3,
-    VerifiedReady = 4,
-    Signing = 5,
-    Broadcast = 6,
-    WaitingSettlement = 7,
-    Completed = 8,
-    Rejected = 9,
-    HardStop = 10,
-}
-
-impl BridgeOperationState {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Observed => "OBSERVED",
-            Self::WaitingForFinality => "WAITING_FOR_FINALITY",
-            Self::WaitingForDependency => "WAITING_FOR_DEPENDENCY",
-            Self::QueuedByLimit => "QUEUED_BY_LIMIT",
-            Self::VerifiedReady => "VERIFIED_READY",
-            Self::Signing => "SIGNING",
-            Self::Broadcast => "BROADCAST",
-            Self::WaitingSettlement => "WAITING_SETTLEMENT",
-            Self::Completed => "COMPLETED",
-            Self::Rejected => "REJECTED",
-            Self::HardStop => "HARD_STOP",
-        }
-    }
-
-    pub fn is_terminal(&self) -> bool {
-        matches!(self, Self::Completed | Self::Rejected | Self::HardStop)
-    }
-
-    pub fn transition(self, event: BridgeStateEvent) -> Result<Self, BridgeStateTransitionError> {
-        use BridgeOperationState as S;
-        use BridgeStateEvent as E;
-
-        if self.is_terminal() {
-            return Err(BridgeStateTransitionError::TerminalState);
-        }
-
-        match (self, event) {
-            (_, E::Reject) => Ok(S::Rejected),
-            (_, E::EnterHardStop) => Ok(S::HardStop),
-            (S::Observed, E::ObservationAccepted) => Ok(S::WaitingForFinality),
-            (S::WaitingForFinality, E::FinalityReached) => Ok(S::WaitingForDependency),
-            (S::WaitingForDependency, E::QueueByLimit) => Ok(S::QueuedByLimit),
-            (S::WaitingForDependency, E::DependencySatisfied) => Ok(S::VerifiedReady),
-            (S::QueuedByLimit, E::DependencySatisfied) => Ok(S::VerifiedReady),
-            (S::VerifiedReady, E::BeginSigning) => Ok(S::Signing),
-            (S::Signing, E::BroadcastSubmitted) => Ok(S::Broadcast),
-            (S::Broadcast, E::BroadcastObserved) => Ok(S::WaitingSettlement),
-            (S::WaitingSettlement, E::SettlementFinalized) => Ok(S::Completed),
-            _ => Err(BridgeStateTransitionError::InvalidTransition),
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum BridgeStateEvent {
-    ObservationAccepted,
-    FinalityReached,
-    DependencySatisfied,
-    QueueByLimit,
-    BeginSigning,
-    BroadcastSubmitted,
-    BroadcastObserved,
-    SettlementFinalized,
-    Reject,
-    EnterHardStop,
-}
-
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 pub struct DeploymentIdentity {
     pub protocol_id: u32,
@@ -280,6 +207,8 @@ impl NativeOutpoint {
     }
 }
 
+// The program-facing view is derived entirely from the one accepted V4 burn
+// wire format. Redundant fields are checked against that evidence on every use.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct CanonicalBridgeMessage {
     pub version: u8,
@@ -297,113 +226,87 @@ pub struct CanonicalBridgeMessage {
     pub valid_from: u64,
     pub valid_until: u64,
     pub evidence_digest: Hash32,
+    pub burn_evidence: burn::FinalizedBurnEvidence,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DepositClaimFields {
-    pub deployment: DeploymentIdentity,
-    pub deposit_outpoint: NativeOutpoint,
-    pub amount_atomic: u64,
-    pub solana_recipient: PubkeyBytes,
+    pub evidence: burn::FinalizedBurnEvidence,
     pub epochs: MessageEpochs,
-    pub nonce: Hash32,
     pub validity: ValidityWindow,
-    pub evidence_digest: Hash32,
-}
-
-// These are the sole Borsh wire schemas; CanonicalBridgeMessage remains the
-// economic model. Destination length + fixed storage is deliberate: bounded
-// Solana instruction sizes, with exactly one accepted zero-padded encoding.
-#[derive(BorshSerialize, BorshDeserialize)]
-struct BorshBridgeMessage {
-    magic: [u8; 8],
-    version: u8,
-    action: u8,
-    direction: u8,
-    reserved: u8,
-    deployment: DeploymentIdentity,
-    operation_id: Hash32,
-    deposit_outpoint: NativeOutpoint,
-    amount_atomic: u64,
-    fee_atomic: u64,
-    destination_length: u16,
-    destination_padded: [u8; MAX_DESTINATION_LENGTH],
-    policy_epoch: u32,
-    key_epoch: u32,
-    nonce: Hash32,
-    valid_from: u64,
-    valid_until: u64,
-    evidence_digest: Hash32,
-}
-
-#[derive(BorshSerialize)]
-struct OperationIdInputs<'a> {
-    domain: [u8; 8],
-    version: u8,
-    action: u8,
-    direction: u8,
-    deployment: &'a DeploymentIdentity,
-    deposit_outpoint: &'a NativeOutpoint,
-    amount_atomic: u64,
-    fee_atomic: u64,
-    destination: &'a [u8],
-    policy_epoch: u32,
-    key_epoch: u32,
-    nonce: Hash32,
-    valid_from: u64,
-    valid_until: u64,
-    evidence_digest: Hash32,
 }
 
 impl CanonicalBridgeMessage {
     pub fn new_deposit_claim(fields: DepositClaimFields) -> Result<Self, MessageEncodeError> {
-        let mut message = Self {
+        let wire = burn::CanonicalBurnMessage {
+            magic: PROTOCOL_MAGIC,
+            version: MESSAGE_VERSION,
+            evidence: fields.evidence,
+            policy_epoch: fields.epochs.policy_epoch,
+            key_epoch: fields.epochs.key_epoch,
+            valid_from: fields.validity.valid_from,
+            valid_until: fields.validity.valid_until,
+        };
+        wire.validate()
+            .map_err(|_| MessageEncodeError::InvalidBurnEvidence)?;
+        Self::from_wire(wire)
+    }
+
+    fn from_wire(wire: burn::CanonicalBurnMessage) -> Result<Self, MessageEncodeError> {
+        let e = &wire.evidence;
+        let b = &e.binding;
+        Ok(Self {
             version: MESSAGE_VERSION,
             direction: BridgeDirection::NativeToSolana,
             action: BridgeAction::DepositClaim,
-            deployment: fields.deployment,
-            operation_id: [0u8; 32],
-            deposit_outpoint: fields.deposit_outpoint,
-            amount_atomic: fields.amount_atomic,
+            deployment: DeploymentIdentity {
+                protocol_id: b.protocol_id,
+                native_network: b.native_network,
+                native_genesis: b.native_genesis,
+                solana_deployment: b.solana_deployment,
+                manager_program_id: b.bridge_program,
+                transceiver_program_id: b.transceiver_program,
+                mint: b.mint,
+            },
+            operation_id: e.operation_id,
+            deposit_outpoint: NativeOutpoint {
+                txid: e.deposit.txid,
+                vout: e.deposit.vout,
+            },
+            amount_atomic: e.amount_atomic,
             fee_atomic: 0,
-            destination: fields.solana_recipient.to_vec(),
-            policy_epoch: fields.epochs.policy_epoch,
-            key_epoch: fields.epochs.key_epoch,
-            nonce: fields.nonce,
-            valid_from: fields.validity.valid_from,
-            valid_until: fields.validity.valid_until,
-            evidence_digest: fields.evidence_digest,
-        };
-        message.operation_id = message.derive_operation_id()?;
-        message.validate()?;
-        Ok(message)
+            destination: b.destination.to_vec(),
+            policy_epoch: wire.policy_epoch,
+            key_epoch: wire.key_epoch,
+            nonce: b.nonce,
+            valid_from: wire.valid_from,
+            valid_until: wire.valid_until,
+            evidence_digest: hash(
+                &e.to_bytes()
+                    .map_err(|_| MessageEncodeError::InvalidBurnEvidence)?,
+            )
+            .to_bytes(),
+            burn_evidence: wire.evidence,
+        })
+    }
+
+    fn wire(&self) -> burn::CanonicalBurnMessage {
+        burn::CanonicalBurnMessage {
+            magic: PROTOCOL_MAGIC,
+            version: self.version,
+            evidence: self.burn_evidence.clone(),
+            policy_epoch: self.policy_epoch,
+            key_epoch: self.key_epoch,
+            valid_from: self.valid_from,
+            valid_until: self.valid_until,
+        }
     }
 
     pub fn encode(&self) -> Result<Vec<u8>, MessageEncodeError> {
         self.validate()?;
-        let mut destination_padded = [0; MAX_DESTINATION_LENGTH];
-        destination_padded[..self.destination.len()].copy_from_slice(&self.destination);
-        let wire = BorshBridgeMessage {
-            magic: PROTOCOL_MAGIC,
-            version: self.version,
-            action: self.action as u8,
-            direction: self.direction as u8,
-            reserved: 0,
-            deployment: self.deployment.clone(),
-            operation_id: self.operation_id,
-            deposit_outpoint: self.deposit_outpoint,
-            amount_atomic: self.amount_atomic,
-            fee_atomic: self.fee_atomic,
-            destination_length: self.destination.len() as u16,
-            destination_padded,
-            policy_epoch: self.policy_epoch,
-            key_epoch: self.key_epoch,
-            nonce: self.nonce,
-            valid_from: self.valid_from,
-            valid_until: self.valid_until,
-            evidence_digest: self.evidence_digest,
-        };
-        borsh::to_vec(&wire).map_err(|_| MessageEncodeError::BorshEncoding)
+        self.wire()
+            .encode()
+            .map_err(|_| MessageEncodeError::InvalidBurnEvidence)
     }
 
     pub fn decode(bytes: &[u8]) -> Result<Self, MessageDecodeError> {
@@ -413,55 +316,23 @@ impl CanonicalBridgeMessage {
                 found: bytes.len(),
             });
         }
-        // from_slice rejects trailing data; no allocation controlled by input.
-        let wire: BorshBridgeMessage =
-            borsh::from_slice(bytes).map_err(|_| MessageDecodeError::InvalidBorsh)?;
-        if wire.magic != PROTOCOL_MAGIC {
+        if bytes[..8] != PROTOCOL_MAGIC {
             return Err(MessageDecodeError::InvalidMagic);
         }
-        if wire.version != MESSAGE_VERSION {
+        if bytes[8] != MESSAGE_VERSION {
             return Err(MessageDecodeError::UnsupportedVersion {
                 expected: MESSAGE_VERSION,
-                found: wire.version,
+                found: bytes[8],
             });
         }
-        if wire.reserved != 0 {
-            return Err(MessageDecodeError::NonZeroReservedByte);
-        }
-        let destination_len = usize::from(wire.destination_length);
-        if destination_len > MAX_DESTINATION_LENGTH {
-            return Err(MessageDecodeError::DestinationTooLong {
-                max: MAX_DESTINATION_LENGTH,
-                found: destination_len,
-            });
-        }
-        if wire.destination_padded[destination_len..]
-            .iter()
-            .any(|byte| *byte != 0)
-        {
-            return Err(MessageDecodeError::NonZeroDestinationPadding);
-        }
-        let message = Self {
-            version: wire.version,
-            action: BridgeAction::try_from(wire.action)?,
-            direction: BridgeDirection::try_from(wire.direction)?,
-            deployment: wire.deployment,
-            operation_id: wire.operation_id,
-            deposit_outpoint: wire.deposit_outpoint,
-            amount_atomic: wire.amount_atomic,
-            fee_atomic: wire.fee_atomic,
-            destination: wire.destination_padded[..destination_len].to_vec(),
-            policy_epoch: wire.policy_epoch,
-            key_epoch: wire.key_epoch,
-            nonce: wire.nonce,
-            valid_from: wire.valid_from,
-            valid_until: wire.valid_until,
-            evidence_digest: wire.evidence_digest,
-        };
-        message.validate().map_err(MessageDecodeError::Validation)?;
-        Ok(message)
+        let wire = burn::CanonicalBurnMessage::decode(bytes)
+            .map_err(|_| MessageDecodeError::InvalidBorsh)?;
+        Self::from_wire(wire).map_err(MessageDecodeError::Validation)
     }
 
+    // Operation identity is bound BEFORE address issuance. Epoch/expiry changes
+    // never create another operation; deposit and burn replay markers are also
+    // independent of operation IDs and authorization envelopes.
     pub fn encode_operation_id_inputs(&self) -> Result<Vec<u8>, MessageEncodeError> {
         if self.version != MESSAGE_VERSION {
             return Err(MessageEncodeError::UnsupportedVersion {
@@ -469,36 +340,35 @@ impl CanonicalBridgeMessage {
                 found: self.version,
             });
         }
-        validate_destination(&self.destination)?;
-        let inputs = OperationIdInputs {
-            domain: *b"KPEPID03",
-            version: MESSAGE_VERSION,
-            action: self.action as u8,
-            direction: self.direction as u8,
-            deployment: &self.deployment,
-            deposit_outpoint: &self.deposit_outpoint,
-            amount_atomic: self.amount_atomic,
-            fee_atomic: self.fee_atomic,
-            destination: &self.destination,
-            policy_epoch: self.policy_epoch,
-            key_epoch: self.key_epoch,
-            nonce: self.nonce,
-            valid_from: self.valid_from,
-            valid_until: self.valid_until,
-            evidence_digest: self.evidence_digest,
-        };
-        borsh::to_vec(&inputs).map_err(|_| MessageEncodeError::BorshEncoding)
+        self.burn_evidence
+            .binding
+            .validate()
+            .map_err(|_| MessageEncodeError::InvalidBurnEvidence)?;
+        Ok(self
+            .burn_evidence
+            .binding
+            .to_bytes()
+            .map_err(|_| MessageEncodeError::BorshEncoding)?
+            .to_vec())
     }
-
     pub fn derive_operation_id(&self) -> Result<Hash32, MessageEncodeError> {
-        Ok(Sha256::digest(self.encode_operation_id_inputs()?).into())
+        if self.version != MESSAGE_VERSION {
+            return Err(MessageEncodeError::UnsupportedVersion {
+                expected: MESSAGE_VERSION,
+                found: self.version,
+            });
+        }
+        self.burn_evidence
+            .binding
+            .operation_id()
+            .map_err(|_| MessageEncodeError::InvalidBurnEvidence)
     }
-
     pub fn message_digest(&self) -> Result<Hash32, MessageEncodeError> {
-        let encoded = self.encode()?;
-        Ok(Sha256::digest(encoded).into())
+        self.validate()?;
+        self.wire()
+            .digest()
+            .map_err(|_| MessageEncodeError::InvalidBurnEvidence)
     }
-
     pub fn validate(&self) -> Result<(), MessageEncodeError> {
         if self.version != MESSAGE_VERSION {
             return Err(MessageEncodeError::UnsupportedVersion {
@@ -506,11 +376,11 @@ impl CanonicalBridgeMessage {
                 found: self.version,
             });
         }
+        if self.fee_atomic != 0 {
+            return Err(MessageEncodeError::FeeExceedsAmount);
+        }
         if self.amount_atomic == 0 {
             return Err(MessageEncodeError::AmountZero);
-        }
-        if self.fee_atomic > self.amount_atomic {
-            return Err(MessageEncodeError::FeeExceedsAmount);
         }
         if self.policy_epoch == 0 || self.key_epoch == 0 {
             return Err(MessageEncodeError::EpochZero);
@@ -518,23 +388,15 @@ impl CanonicalBridgeMessage {
         if self.valid_until <= self.valid_from {
             return Err(MessageEncodeError::InvalidValidityWindow);
         }
-        if is_zero_hash(&self.nonce) {
-            return Err(MessageEncodeError::NonceZero);
-        }
-        if is_zero_hash(&self.evidence_digest) {
-            return Err(MessageEncodeError::EvidenceDigestZero);
-        }
-        validate_destination(&self.destination)?;
-
-        if self.deposit_outpoint.is_zero() {
-            return Err(MessageEncodeError::MissingDepositOutpoint);
-        }
-
-        let derived = self.derive_operation_id()?;
-        if self.operation_id != derived {
+        if self.operation_id != self.derive_operation_id()? {
             return Err(MessageEncodeError::OperationIdMismatch);
         }
-
+        self.wire()
+            .validate()
+            .map_err(|_| MessageEncodeError::InvalidBurnEvidence)?;
+        if Self::from_wire(self.wire())? != *self {
+            return Err(MessageEncodeError::BurnEvidenceBindingMismatch);
+        }
         Ok(())
     }
 }
@@ -552,115 +414,9 @@ pub struct ValidityWindow {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct LedgerSnapshot {
-    pub canonical_reserve: u128,
-    pub minted_supply: u128,
-    pub authorized_unminted_credits: u128,
-    pub fees_accrued: u128,
-    pub unsettled_operations: u64,
-}
-
-impl Default for LedgerSnapshot {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl LedgerSnapshot {
-    pub fn new() -> Self {
-        Self {
-            canonical_reserve: 0,
-            minted_supply: 0,
-            authorized_unminted_credits: 0,
-            fees_accrued: 0,
-            unsettled_operations: 0,
-        }
-    }
-
-    pub fn coverage_required(&self) -> Result<u128, LedgerError> {
-        checked_sum(&[self.minted_supply, self.authorized_unminted_credits])
-    }
-
-    pub fn surplus(&self) -> Result<u128, LedgerError> {
-        self.canonical_reserve
-            .checked_sub(self.coverage_required()?)
-            .ok_or(LedgerError::InsufficientBacking)
-    }
-
-    pub fn assert_invariants(&self) -> Result<(), LedgerError> {
-        if self.canonical_reserve < self.coverage_required()? {
-            return Err(LedgerError::InsufficientBacking);
-        }
-        Ok(())
-    }
-
-    pub fn record_validated_deposit(
-        &mut self,
-        gross_amount: u64,
-        bridge_fee: u64,
-    ) -> Result<(), LedgerError> {
-        if bridge_fee > gross_amount {
-            return Err(LedgerError::FeeExceedsAmount);
-        }
-        let net_amount = gross_amount - bridge_fee;
-        require_positive_amount(net_amount)?;
-        self.apply_transition(|next| {
-            next.canonical_reserve = checked_add(next.canonical_reserve, gross_amount as u128)?;
-            next.authorized_unminted_credits =
-                checked_add(next.authorized_unminted_credits, net_amount as u128)?;
-            next.fees_accrued = checked_add(next.fees_accrued, bridge_fee as u128)?;
-            next.unsettled_operations = next
-                .unsettled_operations
-                .checked_add(1)
-                .ok_or(LedgerError::Arithmetic)?;
-            Ok(())
-        })
-    }
-
-    pub fn record_mint(&mut self, amount: u64, bridge_fee: u64) -> Result<(), LedgerError> {
-        if bridge_fee != 0 {
-            return Err(LedgerError::UnexpectedFeeAtMint);
-        }
-        require_positive_amount(amount)?;
-        self.apply_transition(|next| {
-            next.authorized_unminted_credits =
-                checked_sub(next.authorized_unminted_credits, amount as u128)?;
-            next.minted_supply = checked_add(next.minted_supply, amount as u128)?;
-            next.unsettled_operations = next
-                .unsettled_operations
-                .checked_sub(1)
-                .ok_or(LedgerError::InvalidOperationCount)?;
-            Ok(())
-        })
-    }
-
-    pub fn record_reserve_donation(&mut self, amount: u64) -> Result<(), LedgerError> {
-        require_positive_amount(amount)?;
-        self.apply_transition(|next| {
-            next.canonical_reserve = checked_add(next.canonical_reserve, amount as u128)?;
-            Ok(())
-        })
-    }
-
-    // A snapshot arithmetic model, not an operation journal or mint authority.
-    // Never partially update the live snapshot when a later check fails.
-    fn apply_transition(
-        &mut self,
-        transition: impl FnOnce(&mut Self) -> Result<(), LedgerError>,
-    ) -> Result<(), LedgerError> {
-        self.assert_invariants()?;
-        let mut next = self.clone();
-        transition(&mut next)?;
-        next.assert_invariants()?;
-        *self = next;
-        Ok(())
-    }
-}
-
-pub type LedgerState = LedgerSnapshot;
-
-#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum MessageEncodeError {
+    InvalidBurnEvidence,
+    BurnEvidenceBindingMismatch,
     BorshEncoding,
     UnsupportedVersion { expected: u8, found: u8 },
     InvalidLength { expected: usize, found: usize },
@@ -690,64 +446,17 @@ pub enum MessageDecodeError {
     Validation(MessageEncodeError),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum LedgerError {
-    AmountZero,
-    Arithmetic,
-    InsufficientFunds,
-    InsufficientBacking,
-    FeeExceedsAmount,
-    UnexpectedFeeAtMint,
-    InvalidOperationCount,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum BridgeStateTransitionError {
-    InvalidTransition,
-    TerminalState,
-}
-
-fn checked_add(left: u128, right: u128) -> Result<u128, LedgerError> {
-    left.checked_add(right).ok_or(LedgerError::Arithmetic)
-}
-
-fn require_positive_amount(amount: u64) -> Result<(), LedgerError> {
-    if amount == 0 {
-        return Err(LedgerError::AmountZero);
-    }
-    Ok(())
-}
-
-fn checked_sub(left: u128, right: u128) -> Result<u128, LedgerError> {
-    left.checked_sub(right)
-        .ok_or(LedgerError::InsufficientFunds)
-}
-
-fn checked_sum(values: &[u128]) -> Result<u128, LedgerError> {
-    values
-        .iter()
-        .try_fold(0u128, |acc, value| checked_add(acc, *value))
-}
-
-fn validate_destination(destination: &[u8]) -> Result<(), MessageEncodeError> {
-    if destination.is_empty() {
-        return Err(MessageEncodeError::DestinationEmpty);
-    }
-    if destination.len() > MAX_DESTINATION_LENGTH {
-        return Err(MessageEncodeError::DestinationTooLong {
-            max: MAX_DESTINATION_LENGTH,
-            found: destination.len(),
-        });
-    }
-    Ok(())
-}
-
-fn is_zero_hash(hash: &Hash32) -> bool {
-    hash.iter().all(|byte| *byte == 0)
-}
-
 #[cfg(test)]
 mod tests {
+    mod burn_fixture {
+        use crate as bridge_messages;
+        include!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/support/burn-fixture.rs"
+        ));
+    }
+    use burn_fixture::{burn_message, TestBurnFields};
+
     use super::*;
     use std::fmt::Write as _;
 
@@ -764,7 +473,7 @@ mod tests {
     }
 
     pub fn sample_deposit_message() -> CanonicalBridgeMessage {
-        CanonicalBridgeMessage::new_deposit_claim(DepositClaimFields {
+        burn_message(TestBurnFields {
             deployment: sample_deployment(),
             deposit_outpoint: NativeOutpoint {
                 txid: [7u8; 32],
@@ -842,22 +551,26 @@ mod tests {
     }
 
     #[test]
-    fn rejects_alternate_destination_padding() {
-        let mut encoded = sample_deposit_message().encode().expect("encode");
-        let padding_index =
-            12 + DEPLOYMENT_IDENTITY_LENGTH + 32 + NATIVE_OUTPOINT_LENGTH + 8 + 8 + 2 + 32;
-        encoded[padding_index] = 1;
-        assert!(matches!(
-            CanonicalBridgeMessage::decode(&encoded),
-            Err(MessageDecodeError::NonZeroDestinationPadding)
-        ));
+    fn finalized_evidence_and_projection_cannot_disagree() {
+        let mut message = sample_deposit_message();
+        message.destination[0] ^= 1;
+        assert_eq!(
+            message.encode(),
+            Err(MessageEncodeError::BurnEvidenceBindingMismatch)
+        );
+        let mut message = sample_deposit_message();
+        message.burn_evidence.burn_height = message.burn_evidence.deposit_height + 11;
+        assert_eq!(
+            message.encode(),
+            Err(MessageEncodeError::InvalidBurnEvidence)
+        );
     }
 
     #[test]
     fn canonical_vector_prefix_is_stable() {
         let encoded = sample_deposit_message().encode().expect("encode");
-        let prefix = hex_lower(&encoded[..12]);
-        assert_eq!(prefix, "4b5045504252473303000000");
+        let prefix = hex_lower(&encoded[..9]);
+        assert_eq!(prefix, "4b5042524d53473404");
     }
 
     #[test]
@@ -871,137 +584,13 @@ mod tests {
     }
 
     #[test]
-    fn only_forward_direction_and_action_are_decodable() {
-        for tag in 1..=u8::MAX {
-            let mut encoded = sample_deposit_message().encode().expect("encode");
-            encoded[9] = tag;
-            assert_eq!(
-                CanonicalBridgeMessage::decode(&encoded),
-                Err(MessageDecodeError::InvalidAction(tag))
-            );
-            encoded[9] = 0;
-            encoded[10] = tag;
-            assert_eq!(
-                CanonicalBridgeMessage::decode(&encoded),
-                Err(MessageDecodeError::InvalidDirection(tag))
-            );
+    fn only_burn_message_domain_is_decodable() {
+        let encoded = sample_deposit_message().encode().unwrap();
+        for index in 0..9 {
+            let mut wrong = encoded.clone();
+            wrong[index] ^= 1;
+            assert!(CanonicalBridgeMessage::decode(&wrong).is_err());
         }
-    }
-
-    #[test]
-    fn state_machine_transitions() {
-        let mut state = BridgeOperationState::Observed;
-        state = state
-            .transition(BridgeStateEvent::ObservationAccepted)
-            .expect("step");
-        state = state
-            .transition(BridgeStateEvent::FinalityReached)
-            .expect("step");
-        state = state
-            .transition(BridgeStateEvent::QueueByLimit)
-            .expect("step");
-        state = state
-            .transition(BridgeStateEvent::DependencySatisfied)
-            .expect("step");
-        state = state
-            .transition(BridgeStateEvent::BeginSigning)
-            .expect("step");
-        state = state
-            .transition(BridgeStateEvent::BroadcastSubmitted)
-            .expect("step");
-        state = state
-            .transition(BridgeStateEvent::BroadcastObserved)
-            .expect("step");
-        state = state
-            .transition(BridgeStateEvent::SettlementFinalized)
-            .expect("step");
-        assert_eq!(state.as_str(), "COMPLETED");
-        assert!(state.transition(BridgeStateEvent::Reject).is_err());
-    }
-
-    #[test]
-    fn ledger_rejects_unbacked_mint_and_overflow() {
-        let mut ledger = LedgerState::new();
-        assert!(matches!(
-            ledger.record_mint(1, 0),
-            Err(LedgerError::InsufficientFunds)
-        ));
-        ledger.canonical_reserve = u128::MAX;
-        assert!(matches!(
-            ledger.record_validated_deposit(1, 0),
-            Err(LedgerError::Arithmetic)
-        ));
-    }
-
-    #[test]
-    fn failed_credit_overflow_preserves_every_field() {
-        for overflow_fee in [false, true] {
-            let mut ledger = LedgerState::new();
-            if overflow_fee {
-                ledger.fees_accrued = u128::MAX;
-            } else {
-                ledger.unsettled_operations = u64::MAX;
-            }
-            let before = ledger.clone();
-            assert_eq!(
-                ledger.record_validated_deposit(100, 1),
-                Err(LedgerError::Arithmetic)
-            );
-            assert_eq!(ledger, before);
-        }
-    }
-
-    #[test]
-    fn failed_mint_operation_count_preserves_credit_and_supply() {
-        let mut ledger = LedgerState::new();
-        ledger.record_validated_deposit(100, 0).unwrap();
-        ledger.unsettled_operations = 0;
-        let before = ledger.clone();
-        assert_eq!(
-            ledger.record_mint(100, 0),
-            Err(LedgerError::InvalidOperationCount)
-        );
-        assert_eq!(ledger, before);
-    }
-
-    #[test]
-    fn invalid_snapshot_cannot_be_silently_repaired_by_any_transition() {
-        let inconsistent = LedgerState {
-            minted_supply: 100,
-            authorized_unminted_credits: 100,
-            unsettled_operations: 3,
-            ..LedgerState::new()
-        };
-        for index in 0..4 {
-            let mut ledger = inconsistent.clone();
-            let result = match index {
-                0 => ledger.record_validated_deposit(100, 0),
-                1 => ledger.record_mint(100, 0),
-                2 => ledger.record_reserve_donation(1_000),
-                _ => ledger.record_reserve_donation(u64::MAX),
-            };
-            assert_eq!(result, Err(LedgerError::InsufficientBacking));
-            assert_eq!(ledger, inconsistent);
-        }
-    }
-
-    #[test]
-    fn zero_and_fee_exhausted_operations_never_change_accounting() {
-        let mut ledger = LedgerState::new();
-        let before = ledger.clone();
-        assert_eq!(
-            ledger.record_validated_deposit(0, 0),
-            Err(LedgerError::AmountZero)
-        );
-        assert_eq!(
-            ledger.record_validated_deposit(1, 1),
-            Err(LedgerError::AmountZero)
-        );
-        assert_eq!(ledger.record_mint(0, 0), Err(LedgerError::AmountZero));
-        assert_eq!(
-            ledger.record_reserve_donation(0),
-            Err(LedgerError::AmountZero)
-        );
-        assert_eq!(ledger, before);
+        assert!(CanonicalBridgeMessage::decode(&vec![0; 482]).is_err());
     }
 }

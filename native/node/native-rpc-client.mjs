@@ -26,6 +26,7 @@ const METHOD_ALLOWLIST = new Set([
   "getblockheader",
   "getnetworkinfo",
   "getmempoolinfo",
+  "getrawmempool",
   "getindexinfo",
   "estimatesmartfee",
   "getrawtransaction",
@@ -141,6 +142,10 @@ export class NativeRpcClient {
         result: envelope.result,
         raw,
       });
+    } catch (error) {
+      if (controller.signal.aborted || error?.name === 'TimeoutError' || error instanceof TypeError && error.message === 'fetch failed')
+        throw rpcError('NativeRpcUnavailable', method);
+      throw error;
     } finally {
       clearTimeout(timeout);
     }
@@ -527,6 +532,7 @@ function rpcError(kind, method, code = undefined) {
   return Object.assign(new Error(`${kind}:${method}${code === undefined ? "" : `:${code}`}`), {
     code: kind,
     method,
+    ...(Number.isSafeInteger(code) ? { rpcCode: code } : {}),
   });
 }
 

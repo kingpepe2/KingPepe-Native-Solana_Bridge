@@ -1,6 +1,8 @@
+> HISTORICAL RESERVE-MODEL TEST EVIDENCE. This record does not certify the current burn-and-mint source, CI, runtime, counter or production readiness. See ../development-status.md.
+
 # Forward Devnet validation
 
-Only REGTEST → Solana DEVNET is tested. No Mainnet action is authorized here.
+Only REGTEST â†’ Solana DEVNET is tested. No Mainnet action is authorized here.
 The forward-only Borsh V3 program/account layout requires new reviewed test
 identities and a clean `KPDECL02` journal. Do not relabel an earlier deployment,
 silently migrate its economic records, or regenerate its protected signing state.

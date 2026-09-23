@@ -26,6 +26,7 @@ export interface NativeOutpoint {
 }
 
 export interface CanonicalBridgeMessage {
+  burnEvidence: FinalizedBurnEvidence;
   version: number;
   action: BridgeAction;
   direction: BridgeDirection;
@@ -41,6 +42,32 @@ export interface CanonicalBridgeMessage {
   validFrom: bigint;
   validUntil: bigint;
   evidenceDigest: Uint8Array;
+}
+
+export interface BurnBinding {
+  protocolId: number;
+  nativeNetwork: number;
+  nativeGenesis: string;
+  solanaGenesis: string;
+  solanaDeployment: string;
+  bridgeProgram: string;
+  transceiverProgram: string;
+  mint: string;
+  destination: string;
+  burnPublicKey: string;
+  nonce: string;
+}
+export interface FinalizedBurnEvidence {
+  binding: BurnBinding;
+  operationId: string;
+  deposit: { txid: string; vout: number };
+  depositBlockHash: string;
+  depositHeight: number;
+  burn: { txid: string; vout: number };
+  burnBlockHash: string;
+  burnHeight: number;
+  amountAtomic: string;
+  burnCommitment: string;
 }
 
 export function encodeCanonicalBridgeMessage(input: CanonicalBridgeMessage): Uint8Array {

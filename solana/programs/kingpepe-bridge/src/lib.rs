@@ -49,8 +49,9 @@ pub const BRIDGE_CONFIG_INSTRUCTION_LENGTH: usize = 206;
 pub const BRIDGE_CONFIG_STATE_LENGTH: usize = 255;
 pub const BRIDGE_STATE_PDA_SEED_PREFIX: &[u8] = b"kingpepe-bridge-state";
 pub const DEPOSIT_CLAIM_PDA_SEED_PREFIX: &[u8] = b"kingpepe-deposit-claim";
-pub const DEPOSIT_BACKING_PDA_SEED_PREFIX: &[u8] = b"kingpepe-deposit-backing";
-pub const DEPOSIT_BACKING_MARKER_LENGTH: usize = 8 + 1 + 32 + 32;
+pub const DEPOSIT_REPLAY_PDA_SEED_PREFIX: &[u8] = b"kingpepe-deposit-replay";
+pub const BURN_REPLAY_PDA_SEED_PREFIX: &[u8] = b"kingpepe-burn-replay";
+pub const DEPOSIT_REPLAY_MARKER_LENGTH: usize = 8 + 1 + 32 + 32;
 pub const MINT_AUTHORITY_PDA_SEED_PREFIX: &[u8] = b"kingpepe-mint-authority";
 pub const BRIDGE_ACCOUNT_VERSION: u8 = 2;
 pub const BRIDGE_STATE_ACCOUNT_MAGIC: [u8; 8] = *b"KPBSTAT1";
@@ -341,7 +342,8 @@ pub struct BridgeProgram {
     state: ProgramState,
     config: Option<BridgeConfig>,
     deposit_claims: BTreeMap<Hash32, DepositClaimRecord>,
-    consumed_deposit_backing: BTreeSet<PubkeyBytes>,
+    consumed_deposit_replay: BTreeSet<PubkeyBytes>,
+    consumed_native_burns: BTreeSet<PubkeyBytes>,
     consumed_receipts: BTreeSet<Hash32>,
     minted_supply: u128,
 }
@@ -423,9 +425,11 @@ impl BridgeProgram {
         {
             return Err(BridgeError::WrongMessageKind);
         }
-        let backing = derive_deposit_backing_pda(message);
+        let deposit = derive_deposit_replay_pda(message);
+        let burn = derive_burn_replay_pda(message);
         if self.deposit_claims.contains_key(&message.operation_id)
-            || self.consumed_deposit_backing.contains(&backing)
+            || self.consumed_deposit_replay.contains(&deposit)
+            || self.consumed_native_burns.contains(&burn)
         {
             return Err(BridgeError::Replay);
         }
@@ -455,7 +459,8 @@ impl BridgeProgram {
         self.deposit_claims
             .insert(message.operation_id, record.clone());
         self.consumed_receipts.insert(digest);
-        self.consumed_deposit_backing.insert(backing);
+        self.consumed_deposit_replay.insert(deposit);
+        self.consumed_native_burns.insert(burn);
         Ok(record)
     }
 
@@ -730,14 +735,16 @@ fn process_accept_deposit_claim_accounts(
     let mint_authority_pda = next_required_account(&mut account_iter)?;
     let token_program = next_required_account(&mut account_iter)?;
     let transceiver_program = next_required_account(&mut account_iter)?;
-    let backing_marker = next_required_account(&mut account_iter)?;
+    let deposit_marker = next_required_account(&mut account_iter)?;
+    let burn_marker = next_required_account(&mut account_iter)?;
     let (payer, system_program_account) = optional_payer_and_system(&mut account_iter)?;
 
     require_writable(bridge_state)?;
     require_writable(deposit_claim)?;
     require_writable(mint)?;
     require_writable(recipient_token_account)?;
-    require_writable(backing_marker)?;
+    require_writable(deposit_marker)?;
+    require_writable(burn_marker)?;
     require_account_owner(bridge_state, program_id)?;
     require_account_len(bridge_state, BRIDGE_STATE_ACCOUNT_LENGTH)?;
 
@@ -784,31 +791,59 @@ fn process_accept_deposit_claim_accounts(
     // A new authorization envelope can never credit the same Native outpoint
     // twice for this Mint. There is no instruction which closes this marker.
     let output_index = message.deposit_outpoint.vout.to_le_bytes();
-    let backing_seeds: &[&[u8]] = &[
-        DEPOSIT_BACKING_PDA_SEED_PREFIX,
+    let deposit_seeds: &[&[u8]] = &[
+        DEPOSIT_REPLAY_PDA_SEED_PREFIX,
         &message.deployment.mint,
         &message.deployment.native_genesis,
         &message.deposit_outpoint.txid,
         &output_index,
     ];
-    let (backing_pda, backing_bump) = Pubkey::find_program_address(backing_seeds, program_id);
+    let (deposit_pda, deposit_bump) = Pubkey::find_program_address(deposit_seeds, program_id);
     ensure_program_pda_account(
-        backing_marker,
+        deposit_marker,
         payer,
         system_program_account,
         program_id,
-        &backing_pda.to_bytes(),
+        &deposit_pda.to_bytes(),
         &[
-            DEPOSIT_BACKING_PDA_SEED_PREFIX,
+            DEPOSIT_REPLAY_PDA_SEED_PREFIX,
             &message.deployment.mint,
             &message.deployment.native_genesis,
             &message.deposit_outpoint.txid,
             &output_index,
-            &[backing_bump],
+            &[deposit_bump],
         ],
-        DEPOSIT_BACKING_MARKER_LENGTH,
+        DEPOSIT_REPLAY_MARKER_LENGTH,
     )?;
-    require_zeroed_account(backing_marker)?;
+    require_zeroed_account(deposit_marker)?;
+    // A burn outpoint is independently single-use, even if a signer produces
+    // another operation ID or deposit reference. These markers cannot be closed.
+    let burn_index = message.burn_evidence.burn.vout.to_le_bytes();
+    let burn_seeds: &[&[u8]] = &[
+        BURN_REPLAY_PDA_SEED_PREFIX,
+        &message.deployment.mint,
+        &message.deployment.native_genesis,
+        &message.burn_evidence.burn.txid,
+        &burn_index,
+    ];
+    let (burn_pda, burn_bump) = Pubkey::find_program_address(burn_seeds, program_id);
+    ensure_program_pda_account(
+        burn_marker,
+        payer,
+        system_program_account,
+        program_id,
+        &burn_pda.to_bytes(),
+        &[
+            BURN_REPLAY_PDA_SEED_PREFIX,
+            &message.deployment.mint,
+            &message.deployment.native_genesis,
+            &message.burn_evidence.burn.txid,
+            &burn_index,
+            &[burn_bump],
+        ],
+        DEPOSIT_REPLAY_MARKER_LENGTH,
+    )?;
+    require_zeroed_account(burn_marker)?;
     require_account_key(transceiver_program, &config.transceiver_program_id)?;
     require_account_owner(
         receipt_account,
@@ -833,7 +868,7 @@ fn process_accept_deposit_claim_accounts(
         &[
             bridge_state,
             deposit_claim,
-            backing_marker,
+            deposit_marker,
             recipient_token_account,
         ],
     )?;
@@ -843,7 +878,11 @@ fn process_accept_deposit_claim_accounts(
         .map_err(|_| BridgeError::InvalidMessage)?;
     let receipt = read_verified_receipt_account(receipt_account)?.receipt;
     validate_receipt(&config, &receipt, &message, digest)?;
-    if message.destination.as_slice() != recipient_token_account.key.as_ref() {
+    if message.destination.as_slice()
+        != unpack_token_account(recipient_token_account)?
+            .owner
+            .as_ref()
+    {
         return Err(BridgeError::AccountMismatch.into());
     }
     validate_recipient_token_account(recipient_token_account, mint.key)?;
@@ -872,14 +911,22 @@ fn process_accept_deposit_claim_accounts(
         recipient: message.destination,
     };
     write_account_data(deposit_claim, &encode_deposit_claim_account(&record)?)?;
-    let backing_data = borsh::to_vec(&wire::DepositBackingWire {
-        magic: *b"KPBBAK01",
+    let deposit_data = borsh::to_vec(&wire::DepositReplayWire {
+        magic: *b"KPBDPT01",
         version: BRIDGE_ACCOUNT_VERSION,
         operation_id: message.operation_id,
         message_digest: digest,
     })
     .map_err(|_| EntrypointError::InvalidInstructionEncoding)?;
-    write_account_data(backing_marker, &backing_data)?;
+    write_account_data(deposit_marker, &deposit_data)?;
+    let burn_data = borsh::to_vec(&wire::DepositReplayWire {
+        magic: *b"KPBBRN01",
+        version: BRIDGE_ACCOUNT_VERSION,
+        operation_id: message.operation_id,
+        message_digest: digest,
+    })
+    .map_err(|_| EntrypointError::InvalidInstructionEncoding)?;
+    write_account_data(burn_marker, &burn_data)?;
     write_account_data(bridge_state, &encode_bridge_state_account(&state)?)?;
     Ok(())
 }
@@ -955,14 +1002,29 @@ pub fn derive_deposit_claim_pda(
     .to_bytes()
 }
 
-pub fn derive_deposit_backing_pda(message: &CanonicalBridgeMessage) -> PubkeyBytes {
+pub fn derive_deposit_replay_pda(message: &CanonicalBridgeMessage) -> PubkeyBytes {
     Pubkey::find_program_address(
         &[
-            DEPOSIT_BACKING_PDA_SEED_PREFIX,
+            DEPOSIT_REPLAY_PDA_SEED_PREFIX,
             &message.deployment.mint,
             &message.deployment.native_genesis,
             &message.deposit_outpoint.txid,
             &message.deposit_outpoint.vout.to_le_bytes(),
+        ],
+        &Pubkey::new_from_array(message.deployment.manager_program_id),
+    )
+    .0
+    .to_bytes()
+}
+
+pub fn derive_burn_replay_pda(message: &CanonicalBridgeMessage) -> PubkeyBytes {
+    Pubkey::find_program_address(
+        &[
+            BURN_REPLAY_PDA_SEED_PREFIX,
+            &message.deployment.mint,
+            &message.deployment.native_genesis,
+            &message.burn_evidence.burn.txid,
+            &message.burn_evidence.burn.vout.to_le_bytes(),
         ],
         &Pubkey::new_from_array(message.deployment.manager_program_id),
     )
@@ -1385,7 +1447,9 @@ fn validate_message_domain(
         || message.policy_epoch != config.policy_epoch
         || message.key_epoch != config.key_epoch
         || (config.environment == BridgeEnvironment::Mainnet
-            && !message.deployment.is_mainnet_bound())
+            && (!message.deployment.is_mainnet_bound()
+                || message.burn_evidence.binding.solana_genesis
+                    != bridge_messages::SOLANA_MAINNET_GENESIS))
     {
         return Err(BridgeError::MessageDomainMismatch);
     }
@@ -1685,10 +1749,16 @@ pub enum BridgeError {
 
 #[cfg(test)]
 mod tests {
+    mod burn_fixture {
+        include!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/support/burn-fixture.rs"
+        ));
+    }
+    use burn_fixture::{burn_message, TestBurnFields};
+
     use super::*;
-    use bridge_messages::{
-        DeploymentIdentity, DepositClaimFields, MessageEpochs, NativeOutpoint, ValidityWindow,
-    };
+    use bridge_messages::{DeploymentIdentity, MessageEpochs, NativeOutpoint, ValidityWindow};
     use kingpepe_transceiver::{AttestationObservation, TransceiverConfig};
     use spl_token::state::AccountState;
 
@@ -1776,7 +1846,7 @@ mod tests {
     }
 
     fn deposit_message(config: &BridgeConfig) -> CanonicalBridgeMessage {
-        CanonicalBridgeMessage::new_deposit_claim(DepositClaimFields {
+        burn_message(TestBurnFields {
             deployment: deployment(config),
             deposit_outpoint: NativeOutpoint {
                 txid: h(9),
@@ -2203,9 +2273,13 @@ mod tests {
             true,
         );
         let recipient = test_account(
-            Pubkey::new_from_array(message.destination.clone().try_into().unwrap()),
+            Pubkey::new_unique(),
             spl_token::id(),
-            token_account_data(mint_pubkey, Pubkey::new_unique(), 0),
+            token_account_data(
+                mint_pubkey,
+                Pubkey::new_from_array(message.destination.clone().try_into().unwrap()),
+                0,
+            ),
             false,
             true,
         );
@@ -2244,9 +2318,16 @@ mod tests {
             token_program,
             transceiver_program,
             test_account(
-                Pubkey::new_from_array(derive_deposit_backing_pda(&message)),
+                Pubkey::new_from_array(derive_deposit_replay_pda(&message)),
                 id(),
-                vec![0; DEPOSIT_BACKING_MARKER_LENGTH],
+                vec![0; DEPOSIT_REPLAY_MARKER_LENGTH],
+                false,
+                true,
+            ),
+            test_account(
+                Pubkey::new_from_array(derive_burn_replay_pda(&message)),
+                id(),
+                vec![0; DEPOSIT_REPLAY_MARKER_LENGTH],
                 false,
                 true,
             ),
@@ -2334,11 +2415,12 @@ mod tests {
         assert_eq!(claim.record.message_digest, digest);
         assert_eq!(claim.record.amount_atomic, message.amount_atomic);
         assert_eq!(&accounts[8].data.borrow()[9..41], &message.operation_id);
-        // Even a new operation ID, nonce and evidence cannot reuse the backing.
+        assert_eq!(&accounts[9].data.borrow()[9..41], &message.operation_id);
+        // Even a new operation ID, nonce and evidence cannot reuse the Native deposit.
         let mut replay = message.clone();
         replay.nonce = h(94);
         replay.evidence_digest = h(95);
-        replay.operation_id = replay.derive_operation_id().unwrap();
+        burn_fixture::rebind_burn_fixture(&mut replay);
         let mut replay_accounts = accounts.clone();
         replay_accounts[1] = test_account(
             Pubkey::new_from_array(derive_deposit_claim_pda(
@@ -2865,11 +2947,11 @@ mod tests {
         rotated_message.key_epoch = 9;
         rotated_message.nonce = h(90);
         rotated_message.valid_until += 10;
-        rotated_message.operation_id = rotated_message.derive_operation_id().unwrap();
+        burn_fixture::rebind_burn_fixture(&mut rotated_message);
         assert_ne!(rotated_message.operation_id, message.operation_id);
         assert_eq!(
-            derive_deposit_backing_pda(&rotated_message),
-            derive_deposit_backing_pda(&message)
+            derive_deposit_replay_pda(&rotated_message),
+            derive_deposit_replay_pda(&message)
         );
         let rotated_config = bridge.config().unwrap().clone();
         let mut rotated_transceiver = super::tests::transceiver(&rotated_config);

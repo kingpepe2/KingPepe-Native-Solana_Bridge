@@ -76,7 +76,7 @@ pub struct DepositClaimWire {
 }
 
 #[derive(BorshSerialize, BorshDeserialize)]
-pub struct DepositBackingWire {
+pub struct DepositReplayWire {
     pub magic: [u8; 8],
     pub version: u8,
     pub operation_id: Hash32,
@@ -194,10 +194,10 @@ mod tests {
             key_epoch: u32::MAX,
         }
     }
-    fn message(index: usize) -> [u8; MESSAGE_LENGTH] {
+    fn message() -> [u8; MESSAGE_LENGTH] {
         let file: serde_json::Value =
-            serde_json::from_str(include_str!("../vectors/canonical-borsh-v3.json")).unwrap();
-        let bytes = unhex(file["vectors"][index]["encodedHex"].as_str().unwrap());
+            serde_json::from_str(include_str!("../vectors/burn-borsh-v4.json")).unwrap();
+        let bytes = unhex(file["messageHex"].as_str().unwrap());
         crate::CanonicalBridgeMessage::decode(&bytes)
             .unwrap()
             .encode()
@@ -213,7 +213,7 @@ mod tests {
     }
     fn check<T: BorshSerialize + BorshDeserialize>(name: &str, value: T) {
         let file: serde_json::Value =
-            serde_json::from_str(include_str!("../vectors/abi-borsh-v3.json")).unwrap();
+            serde_json::from_str(include_str!("../vectors/abi-borsh-v4.json")).unwrap();
         let vector = file["vectors"]
             .as_array()
             .unwrap()
@@ -282,9 +282,9 @@ mod tests {
             },
         );
         check(
-            "DepositBacking",
-            DepositBackingWire {
-                magic: *b"KPBBAK01",
+            "DepositReplay",
+            DepositReplayWire {
+                magic: *b"KPBDPT01",
                 version: 2,
                 operation_id: [11; 32],
                 message_digest: [12; 32],
@@ -294,7 +294,7 @@ mod tests {
             "AcceptDepositClaim",
             AcceptDepositClaimWire {
                 tag: 2,
-                message: message(0),
+                message: message(),
             },
         );
         check("TransceiverConfig", transceiver());
@@ -317,7 +317,7 @@ mod tests {
             "VerifyMessage",
             VerifyMessageWire {
                 tag: 2,
-                message: message(0),
+                message: message(),
                 ed25519_instruction_indexes: [0, 1],
             },
         );

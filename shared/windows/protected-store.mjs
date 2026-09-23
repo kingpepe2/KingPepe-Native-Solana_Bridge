@@ -9,9 +9,8 @@ import { NATIVE_MAINNET_GENESIS } from "../network-identity.mjs";
 
 const PROTOCOL = "KINGPEPE_WINDOWS_PROTECTED_STORE_V2";
 const MAX_PAYLOAD = 1_048_576;
-const ROLES = Object.freeze(["KINGPEPE_FROST_A", "KINGPEPE_FROST_B", "ATTESTER_A", "ATTESTER_B",
-  "COORDINATOR", "BRIDGE_VALIDATOR", "SUPERVISOR", "NATIVE_OBSERVER", "SOLANA_OBSERVER", "RELAYER", "RECONCILIATION", "INDEXER", "FEE_PAYER"]);
-const PURPOSES = Object.freeze(["frost-state", "attester-seed", "attester-authorizations", "fee-payer-seed", "devnet-deployment-keys", "mainnet-deployment-keys", "native-rpc-auth", "coordinator-signing", "coordinator-jobs", "deposit-operations", "deposit-controller", "bridge-journal-key", "reconciliation-progress", "native-sweep-outbox", "solana-deposit-outbox", "service-auth", "global-integrity", "chain-progress"]);
+const ROLES = Object.freeze(["ATTESTER_A", "ATTESTER_B", "BRIDGE_VALIDATOR", "NATIVE_OBSERVER", "FEE_PAYER", "BURN_SIGNER"]);
+const PURPOSES = Object.freeze(["attester-seed", "fee-payer-seed", "devnet-deployment-keys", "mainnet-deployment-keys", "native-rpc-auth", "service-auth", "native-burn-key", "native-burn-authorizations", "burn-operations", "burn-attester-authorizations"]);
 const INSTANCES = new WeakSet();
 
 function record(value, fields) {
@@ -30,19 +29,14 @@ export function normalizeProtectedContext(value) {
   const fields = ["role", "purpose", "serviceSid", "environment", "nativeGenesis", "solanaDeployment", "instanceId", "keyEpoch"];
   const c = record(value, fields);
   if (!ROLES.includes(c.role) || !PURPOSES.includes(c.purpose)) throw new Error("ProtectedRolePurposeInvalid");
-  if (c.purpose === "frost-state" && !["KINGPEPE_FROST_A", "KINGPEPE_FROST_B"].includes(c.role)) throw new Error("ProtectedRolePurposeInvalid");
+  if (["native-burn-key", "native-burn-authorizations"].includes(c.purpose) && c.role !== "BURN_SIGNER") throw new Error("ProtectedRolePurposeInvalid");
+  if (c.purpose === "burn-operations" && c.role !== "BRIDGE_VALIDATOR") throw new Error("ProtectedRolePurposeInvalid");
   if (c.purpose === "fee-payer-seed" && c.role !== "FEE_PAYER") throw new Error("ProtectedRolePurposeInvalid");
   if (c.purpose === "devnet-deployment-keys" && (c.role !== "FEE_PAYER" || c.environment !== "devnet")) throw new Error("ProtectedDevnetDeploymentContextRequired");
   if (["mainnet-deployment-keys", "native-rpc-auth"].includes(c.purpose) && (c.environment !== "mainnet" ||
       c.nativeGenesis !== NATIVE_MAINNET_GENESIS || c.role !== (c.purpose === "native-rpc-auth" ? "NATIVE_OBSERVER" : "FEE_PAYER")))
     throw new Error("ProtectedMainnetPreparationContextRequired");
-  if (["attester-seed", "attester-authorizations"].includes(c.purpose) && !["ATTESTER_A", "ATTESTER_B"].includes(c.role)) throw new Error("ProtectedRolePurposeInvalid");
-  if (c.purpose === "global-integrity" && c.role !== "SUPERVISOR") throw new Error("ProtectedRolePurposeInvalid");
-  if (["coordinator-signing", "coordinator-jobs"].includes(c.purpose) && c.role !== "COORDINATOR") throw new Error("ProtectedRolePurposeInvalid");
-  if (["deposit-operations", "deposit-controller", "bridge-journal-key"].includes(c.purpose) && c.role !== "BRIDGE_VALIDATOR") throw new Error("ProtectedRolePurposeInvalid");
-  if (["native-sweep-outbox", "solana-deposit-outbox"].includes(c.purpose) && c.role !== "RELAYER") throw new Error("ProtectedRolePurposeInvalid");
-  if (c.purpose === "reconciliation-progress" && c.role !== "RECONCILIATION") throw new Error("ProtectedRolePurposeInvalid");
-  if (c.purpose === "chain-progress" && !["NATIVE_OBSERVER", "SOLANA_OBSERVER"].includes(c.role)) throw new Error("ProtectedRolePurposeInvalid");
+  if (["attester-seed", "burn-attester-authorizations"].includes(c.purpose) && !["ATTESTER_A", "ATTESTER_B"].includes(c.role)) throw new Error("ProtectedRolePurposeInvalid");
   if (typeof c.serviceSid !== "string" || !/^S-1-5-(?:\d{1,10}-){1,14}\d{1,10}$/u.test(c.serviceSid)) throw new Error("ProtectedServiceSidInvalid");
   if (!["localnet", "devnet", "mainnet"].includes(c.environment)) throw new Error("ProtectedEnvironmentInvalid");
   for (const key of ["nativeGenesis", "solanaDeployment", "instanceId"]) {

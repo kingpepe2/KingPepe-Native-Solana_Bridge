@@ -8,14 +8,14 @@ import { createBridgeClient } from "../solana/ts/sdk/client.mjs";
 export async function runBridgeCli(args, { client, readInput, output }) {
   const [command, subcommand] = args;
   if (command === "--help" && args.length === 1) {
-    output("bridge deposit [submit]\nbridge status\nbridge operation <id>\nRequests: public JSON on stdin. Send the Native deposit with your own wallet. No automatic transaction submission retry."); return;
+    output("bridge deposit\nbridge status\nbridge operation <id>\nDeposit request: destination, walletChain and clientNonce as public JSON on stdin. Send Native KPEPE from your own wallet to the assigned single-use address. The Bridge automatically burns the finalized deposit and mints the exact amount to the bound Solana wallet."); return;
   }
   let value;
   if (command === "status" && args.length === 1) value = await client.getBridgeStatus();
   else if (command === "operation" && args.length === 2) value = await client.getOperationStatus(subcommand);
-  else if (command === "deposit" && (args.length === 1 || args.length === 2 && subcommand === "submit")) {
+  else if (command === "deposit" && args.length === 1) {
     const input = JSON.parse(await readInput());
-    value = await client[subcommand ? "submitNativeDeposit" : "createNativeDepositRequest"](input);
+    value = await client.createOperation(input);
   } else throw new Error("UseBridgeHelp");
   output(JSON.stringify(value, null, 2));
 }

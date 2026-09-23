@@ -1,12 +1,6 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 //! Borsh preimages owned by the bridge. Native consensus bytes are opaque.
 
-pub fn deposit_intent(domains: [[u8; 32]; 7], amount: u64, counters: [u32; 4]) -> Vec<u8> {
-    // Fixed arrays preserve the existing script commitment byte-for-byte.
-    borsh::to_vec(&(*b"KPDINT01", domains, amount, counters))
-        .expect("fixed Borsh fields serialize to Vec")
-}
-
 pub fn deposit_evidence(
     transaction: &[u8],
     block_hash: [u8; 32],
@@ -20,17 +14,6 @@ pub fn deposit_evidence(
     }
     borsh::to_vec(&(transaction, block_hash, output_index, amount))
         .map_err(|_| crate::NativeProofError::InvalidEvidence)
-}
-
-pub fn reserve_allocation(
-    deposit_txid: [u8; 32],
-    deposit_vout: u32,
-    sweep_txid: [u8; 32],
-    reserve_vout: u32,
-    amount: u64,
-) -> Vec<u8> {
-    borsh::to_vec(&(deposit_txid, deposit_vout, sweep_txid, reserve_vout, amount))
-        .expect("fixed Borsh fields serialize to Vec")
 }
 
 #[cfg(test)]
@@ -54,21 +37,6 @@ mod tests {
                 .parse::<u64>()
                 .unwrap();
             let encoded = match vector["type"].as_str().unwrap() {
-                "DepositIntent" => deposit_intent(
-                    [
-                        "nativeGenesisHex",
-                        "solanaDeploymentHex",
-                        "managerProgramIdHex",
-                        "transceiverProgramIdHex",
-                        "mintHex",
-                        "recipientHex",
-                        "nonceHex",
-                    ]
-                    .map(|k| hash(&input[k])),
-                    amount,
-                    ["protocolId", "nativeNetwork", "policyEpoch", "keyEpoch"]
-                        .map(|k| number(&input[k])),
-                ),
                 "DepositEvidence" => deposit_evidence(
                     &bytes(&input["transaction"]),
                     hash(&input["blockHash"]),
@@ -76,13 +44,6 @@ mod tests {
                     amount,
                 )
                 .unwrap(),
-                "ReserveAllocation" => reserve_allocation(
-                    hash(&input["depositTxid"]),
-                    number(&input["depositVout"]),
-                    hash(&input["sweepTxid"]),
-                    number(&input["reserveVout"]),
-                    amount,
-                ),
                 _ => panic!("unknown Native input vector"),
             };
             assert_eq!(encoded, bytes(&vector["encodedHex"]));

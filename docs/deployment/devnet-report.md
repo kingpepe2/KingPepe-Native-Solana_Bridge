@@ -1,3 +1,5 @@
+> HISTORICAL RESERVE-MODEL TEST EVIDENCE. This record does not certify the current burn-and-mint source, CI, runtime, counter or production readiness. See ../development-status.md.
+
 # One-way Devnet validation
 
 A fresh KingPepe REGTEST to Solana DEVNET operation completed on 2026-09-19.

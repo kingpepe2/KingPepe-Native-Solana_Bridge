@@ -4,11 +4,8 @@ import { createHash } from "node:crypto";
 import { isTestSolanaCluster, devnetRpcEndpoint, assertDevnetGenesis } from "../../shared/solana-test-network.mjs";
 import { assertMainnetDeploymentFields, SOLANA_MAINNET_GENESIS, mainnetRpcEndpoint, assertMainnetSolanaGenesis } from "../../shared/network-identity.mjs";
 import { REGTEST_GENESIS } from "../../native/node/native-raw-evidence.mjs";
-import { setTimeout as delay } from "node:timers/promises";
 import { base58Decode, base58Encode, findProgramAddress } from "../bridge-validator/solana-deposit-claim-transaction-plan.mjs";
 import { SPL_TOKEN_PROGRAM_ID_BASE58 as TOKEN } from "../bridge-validator/localnet-solana-setup-plan.mjs";
-import { requireIntegrityGuard } from "../supervisor/protected-integrity.mjs";
-import { assertWindowsProtectedStore } from "../../shared/windows/protected-store.mjs";
 
 export const DEPLOYMENT_MONITOR_PROTOCOL = "KINGPEPE_DEPLOYMENT_MONITOR_V2";
 export const LEGACY_LOADER = "BPFLoader2111111111111111111111111111111111";
@@ -82,7 +79,7 @@ export function deploymentManifestDigest(manifest) { return deploymentDigest(Buf
 // the separately pinned on-chain program source.
 export function devnetTestManifest(record) {
   check(record?.schema === "KINGPEPE_ONE_WAY_DEVNET_DEPLOYMENT/V1" && record.scope === "DEVNET_TEST_ONLY" &&
-    record.borshSchemaVersion === 3 && record.canonicalMagic === "KPEPBRG3" && record.initialSupplyAtomic === "0" &&
+    record.borshSchemaVersion === 4 && record.canonicalMagic === "KPBRMSG4" && record.initialSupplyAtomic === "0" &&
     record.freezeAuthority === null && record.productionReady === false && record.mainnetActivation === "DISABLED", "DevnetEnrollmentRecordRejected");
   const program = (name, id) => ({ id, loader: UPGRADEABLE_LOADER, programData: record.pdas[name + "ProgramData"],
     upgradeAuthority: record.upgradeAuthority, deploymentSlot: String(record.transactions[name + "Deployment"].slot) });
@@ -263,78 +260,3 @@ export class LocalDeploymentRpc {
 
 // Real protected service wrapper. A plain callback or config boolean cannot
 // stand in for the authenticated supervisor or persistent progress store.
-export class ProtectedSolanaDeploymentMonitor {
-  #manifest; #rpc; #guard; #store; #lease; #busy = false; #closed = false; #digest; #stopped = false;
-  static async open({ manifest, rpc, integrity, store }) {
-    const self = new ProtectedSolanaDeploymentMonitor(); self.#manifest = validateDeploymentManifest(manifest);
-    requireIntegrityGuard(integrity, "SOLANA_OBSERVER"); check(rpc instanceof LocalDeploymentRpc);
-    rpc.assertEnvironment(self.#manifest.environment);
-    assertWindowsProtectedStore(store, "SOLANA_OBSERVER", "chain-progress");
-    const environment = self.#manifest.environment === "mainnet" ? "mainnet" : "localnet";
-    integrity.assertDeployment({ environment, nativeGenesis: self.#manifest.nativeGenesisHex, solanaDeployment: self.#manifest.solanaDeploymentHex, keyEpoch: self.#manifest.config.keyEpoch });
-    check(store.context.environment === environment && store.context.nativeGenesis === self.#manifest.nativeGenesisHex && store.context.solanaDeployment === self.#manifest.solanaDeploymentHex && store.context.keyEpoch === self.#manifest.config.keyEpoch);
-    self.#digest = deploymentManifestDigest(self.#manifest); self.#guard = integrity; self.#rpc = rpc; self.#store = store;
-    try { self.#lease = await store.acquireLease(); self.#progress(); return self; }
-    catch (error) {
-      try { if (error.integrityCode === "SOLANA_PROGRESS_INTEGRITY") await integrity.report(self.#digest, error.integrityCode, error.evidenceDigest); }
-      finally { await self.close(); }
-      fail("DeploymentProgressUnavailable");
-    }
-  }
-  static initialProgress(manifest) {
-    const m = validateDeploymentManifest(manifest);
-    return Buffer.from(JSON.stringify({ protocol: DEPLOYMENT_MONITOR_PROTOCOL, manifestDigest: deploymentManifestDigest(m), genesis: m.solanaGenesis, minimumSlot: m.minimumSlot, observedAt: 0, lastAdvanceAt: 0, snapshotDigest: null }));
-  }
-  #progress() {
-    check(!this.#closed && this.#lease, "DeploymentProgressUnavailable"); this.#lease.assertHeld();
-    let r;
-    try { r = this.#store.read(); } catch (error) {
-      if (error.message === "ProtectedStateRollbackDetected") different("SOLANA_PROGRESS_INTEGRITY", { reason: "RETAINED_REVISION_ROLLBACK" }); throw error;
-    }
-    let v;
-    try {
-    v = JSON.parse(r.payload.toString("utf8"));
-    keys(v, ["protocol", "manifestDigest", "genesis", "minimumSlot", "observedAt", "lastAdvanceAt", "snapshotDigest"]);
-    check(v.protocol === DEPLOYMENT_MONITOR_PROTOCOL && v.manifestDigest === this.#digest && v.genesis === this.#manifest.solanaGenesis && uint(v.minimumSlot) >= uint(this.#manifest.minimumSlot), "DeploymentProgressRollback");
-    check(Number.isSafeInteger(v.observedAt) && v.observedAt <= Date.now() && v.observedAt >= 0, "DeploymentClockRollback");
-    check(Number.isSafeInteger(v.lastAdvanceAt) && v.lastAdvanceAt >= 0 && v.lastAdvanceAt <= v.observedAt, "DeploymentClockRollback");
-    check(v.snapshotDigest === null || HASH.test(v.snapshotDigest)); return { value: v, revision: r.revision };
-    } catch { different("SOLANA_PROGRESS_INTEGRITY", { authenticatedPayloadDigest: deploymentDigest(r.payload) }); }
-    finally { r.payload.fill(0); }
-  }
-  async poll() {
-    check(!this.#busy && !this.#closed, "DeploymentMonitorUnavailable"); this.#busy = true;
-    let ticket;
-    try {
-      const old = this.#progress(); ticket = await this.#guard.beginSourceCheck(this.#digest);
-      const snapshot = await this.#rpc.snapshot(this.#manifest, old.value.minimumSlot);
-      const result = verifyDeploymentSnapshot(this.#manifest, snapshot);
-      check(uint(result.slot) >= uint(old.value.minimumSlot), "DeploymentSourceStale");
-      if (old.value.snapshotDigest !== null && result.slot === old.value.minimumSlot && old.value.snapshotDigest !== result.snapshotDigest) different("FINALIZED_SOLANA_CONFLICT", { prior: old.value.snapshotDigest, next: result.snapshotDigest, slot: result.slot });
-      const lastAdvanceAt = old.value.snapshotDigest === null || uint(result.slot) > uint(old.value.minimumSlot) ? Date.now() : old.value.lastAdvanceAt;
-      check(Date.now() - lastAdvanceAt <= this.#manifest.maximumStallMs, "DeploymentSourceStale");
-      const bytes = Buffer.from(JSON.stringify({ ...old.value, minimumSlot: result.slot, observedAt: Date.now(), lastAdvanceAt, snapshotDigest: result.snapshotDigest }));
-      try { this.#lease.assertHeld(); this.#store.write(bytes, old.revision); } finally { bytes.fill(0); }
-      const global = await this.#guard.finishSourceCheck(ticket, { state: "OBSERVED_MATCH", evidenceDigest: result.snapshotDigest }); ticket = undefined;
-      if (global.state === "HARD_STOP_INTEGRITY") this.#stopped = true;
-      return Object.freeze({ state: this.#stopped ? "HARD_STOP_INTEGRITY" : "OBSERVED_MATCH", ...result });
-    } catch (error) {
-      if (["SOLANA_GENESIS_CHANGED", "SOLANA_DEPLOYMENT_CHANGED", "FINALIZED_SOLANA_CONFLICT", "SOLANA_PROGRESS_INTEGRITY"].includes(error?.integrityCode)) {
-        this.#stopped = true;
-        await this.#guard.report(this.#digest, error.integrityCode, error.evidenceDigest);
-        return Object.freeze({ state: "HARD_STOP_INTEGRITY", reason: error.integrityCode });
-      }
-      // Malformed/outage/stale observations suspend authorization; they are not
-      // fabricated accounting deficits or acknowledged durable incidents.
-      if (ticket) {
-        try { await this.#guard.finishSourceCheck(ticket, { state: "WAITING_FOR_DEPENDENCY", evidenceDigest: this.#digest }); } catch { /* No health permission is renewed by a failed report. */ }
-      }
-      return Object.freeze({ state: this.#stopped ? "HARD_STOP_INTEGRITY" : "WAITING_FOR_DEPENDENCY", reason: "DEPLOYMENT_OBSERVATION_UNAVAILABLE" });
-    } finally { this.#busy = false; }
-  }
-  async run({ signal, intervalMs = 1000, onStatus = () => {} }) {
-    check(signal instanceof AbortSignal && Number.isSafeInteger(intervalMs) && intervalMs >= 100 && intervalMs <= 30000);
-    while (!signal.aborted && !this.#closed) { await onStatus(await this.poll()); try { await delay(intervalMs, undefined, { signal }); } catch { if (!signal.aborted) fail("DeploymentMonitorInterrupted"); } }
-  }
-  async close() { this.#closed = true; await this.#lease?.close(); this.#store?.close(); }
-}
