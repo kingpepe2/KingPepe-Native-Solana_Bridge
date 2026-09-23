@@ -7,14 +7,18 @@
   "mainnetActivation": "DISABLED",
   "productionSigningAuthorized": false,
   "productionBroadcastAuthorized": false,
-  "sourceStatus": "BURN_CONVERSION_VALIDATION_IN_PROGRESS",
+  "sourceStatus": "TEST_BURN_MINT_PASS_PUBLIC_CUTOVER_BLOCKED",
   "nativeSourceSha": "3f2621820ffefae59cbe48b350f5f8f6ec8a6da5",
   "sourceBurnProof": "PASS",
   "isolatedRegtestBurnMechanism": "PROVEN",
   "exactShaCi": {
-    "status": "PENDING",
-    "sourceSha": null,
-    "historicalReserveCiNotApplicable": true
+    "status": "PASS",
+    "sourceSha": "adcca2ba412ed45266041d73b16207f665a55c34",
+    "runId": "35931741887",
+    "requiredJobsPassed": 4,
+    "skippedSteps": 0,
+    "historicalReserveCiNotApplicable": true,
+    "evidencePublicationRequiresOwnCi": true
   },
   "borsh": {
     "version": 4,
@@ -44,18 +48,21 @@
     "nativeFeeFunding": "SEPARATE_OPERATIONAL_INPUTS",
     "bridgeFeeAtomic": "0"
   },
-  "recoveryProcedure": "PENDING_FINAL_SOURCE_RETEST",
+  "recoveryProcedure": "SAME_ACCOUNT_CLOSED_TEST_SNAPSHOT_TESTED",
   "historicalRecoveryEvidence": "PRIVATE_SOURCE_BOUND_NOT_CURRENT_SHA_CERTIFICATION",
-  "publicTestUpdate": "BURN_UI_PREPARED_NOT_YET_DEPLOYED",
+  "publicTestUpdate": "BLOCKED_UAC_CANCELLED_OR_REJECTED",
   "manualPhantomTest": "PENDING_MANUAL",
-  "freshForwardDevnet": "PENDING_NEW_BURN_MINT_RUN",
+  "freshForwardDevnet": "COMPLETED_BURN_MINT_CRASH_RECOVERY",
   "mainnetDeployment": "NOT_DEPLOYED",
   "mainnetExecutionSupport": "BLOCKED_TEST_ONLY_CONVERSION",
-  "mainnetFundingQuoteSol": null,
+  "mainnetFundingQuoteSol": "1.775622000",
   "previousReserveFundingQuoteNotApplicable": true,
   "activationApproval": "NOT_REQUESTED_THIS_TASK_EXCLUDES_MAINNET",
   "controlledActivationAmount": "NOT_APPROVED",
-  "artifactsFrozen": false,
+  "artifactsFrozen": true,
   "historyRewrite": "PUBLISHED_REACHABLE_PUBLIC_REFS_REVIEWED",
-  "providerRetainedOldSource": "ISSUE_OLD_UNREFERENCED_COMMIT_CONTENT_STILL_PUBLIC"
+  "providerRetainedOldSource": "ISSUE_OLD_UNREFERENCED_COMMIT_CONTENT_STILL_PUBLIC",
+  "retainedReserveFrostTestRuntime": "PENDING_GRACEFUL_RETIREMENT_AFTER_PUBLIC_CUTOVER",
+  "browserRendering": "PENDING_NO_CONNECTED_BROWSER",
+  "mainnetFundingQuoteScope": "CURRENT_ELF_AND_FIVE_EARLY_OPERATIONS_METADATA_COST_PENDING_REQUOTE_REQUIRED"
 }

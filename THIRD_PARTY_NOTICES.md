@@ -53,7 +53,7 @@ docs/security/windows-protected-storage.md.
 - `@noble/curves` `2.3.0`
   - License: MIT
   - Copyright: Copyright (c) 2022 Paul Miller
-  - Use: pinned runtime dependency for secp256k1 Taproot/BIP340-compatible FROST implementation and Ed25519 project attestation tests/services
+  - Use: pinned runtime dependency for secp256k1 Taproot/BIP340 single-key burn signing and Ed25519 project attestation tests/services. The retired reserve implementation historically used upstream FROST; that history does not describe current runtime use.
 
 - `@noble/hashes` `2.3.0`
   - License: MIT
@@ -63,7 +63,7 @@ docs/security/windows-protected-storage.md.
 - `@scure/base` `2.4.0`
   - License: MIT; Copyright (c) 2022 Paul Miller (https://paulmillr.com).
   - Use: pinned zero-dependency Bech32/Bech32m address codec for public wallet
-    requests; no signing or FROST algorithm change. Original license remains in
+    requests; no upstream signing algorithm change. Original license remains in
     the npm package and must accompany redistribution. No implementation copied.
   - Reference specifications: BIP-173 and BIP-350 (BSD-2-Clause). No specification
     pseudocode or vectors copied during this integration. The existing test-only

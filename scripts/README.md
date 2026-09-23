@@ -1,36 +1,12 @@
 # Project scripts
 
-Current safe utilities:
+Current commands are defined in package.json. Runtime state and build outputs must be outside every checkout.
 
-- `local-e2e-readiness.mjs` checks whether the disposable KingPepe REGTEST and
-  Solana local-validator prerequisites are available.
-- `local-e2e-orchestrator.mjs` builds a local-only execution plan for the
-  Native-to-Solana local E2E gate. It keeps Mainnet disabled, keeps runtime
-  state outside the repository, rejects wallet raw-signing RPC shortcuts, and
-  exits blocked until required executables are present. Native raw transaction
-  broadcast remains available only for transactions already signed by the
-  approved FROST path.
-- `local-e2e-bootstrap.mjs` executes only the local infrastructure bootstrap:
-  version checks, direct SBF builds, disposable local validator startup, REGTEST
-  startup, health checks, and cleanup. It does not claim that the full economic
-  Native-to-Solana E2E flow has passed.
-  It also exports a reusable harness that keeps the disposable services active
-  while an injected local Native-to-Solana flow runs, then stops those services
-  fail-closed.
-- `local-e2e-native-to-solana.mjs` is the Phase 08 Native-to-Solana command
-  runner. It composes the bootstrap harness with local REGTEST wallet funding,
-  a disposable FROST aggregate Taproot deposit/fee/reserve intent, local Native
-  source/genesis validation, raw deposit transaction identity checks,
-  UTXO/finality checks, and non-secret proof fingerprinting. It uses the
-  recovered KingPepe REGTEST facts of 8 decimals, coinbase maturity 20, and
-  Bech32m HRP `rkpepe`. It drafts an unsigned local REGTEST reserve sweep with
-  exact integer miner-fee accounting and computes BIP-341 key-path
-  `SIGHASH_DEFAULT` evidence for each FROST-controlled input. It then prepares
-  localnet-only per-input signing intents, signs each input with the disposable
-  software FROST A+B runtime, and attaches key-path Taproot witnesses without
-  using wallet raw-signing RPC shortcuts. When the local daemons are available,
-  it broadcasts the signed reserve sweep with `sendrawtransaction`, mines local
-  finality, independently validates the finalized reserve transaction, obtains
-  both project attestations, submits the Solana claim, observes finalized minting
-  and reconciles the reserve and pending credit through COMPLETED.
-  Missing tools or failed transitions are reported explicitly, not as a pass.
+- `local:proof:burn` runs the actual isolated KingPepe REGTEST source/policy, nonzero burn, UTXO, finality/reorg and restart/reindex proof.
+- `local:e2e:native-to-solana` runs real isolated REGTEST and Solana local-validator burn evidence, attestation, claim/mint, replay and conservation tests with the pinned programs.
+- `local:e2e:windows-runtime` runs the protected Windows runtime against isolated chains, including lost broadcast responses, process crash/recovery, automatic service processing and the finalized-RPC-read race.
+- `burn:service` starts the reviewed authenticated loopback TEST service using a private configuration reference. A restart never clears an existing critical/operator pause.
+- `test` runs retained canonical protocol, burn, Native RPC, Solana observation, validator and publication-policy tests. `test:windows-security` covers actual CurrentUser DPAPI/ACL protection without claiming distinct service-principal or portable recovery certification.
+- `source-audit.mjs` checks provenance coverage and publication boundaries. Separate redacted current/staged/outgoing/history secret scans and dependency-license review remain required.
+
+Use the pinned tools and commands in docs/deployment/local-e2e-build.md. Source built Native REGTEST only; no Mainnet economic action is authorized by these commands. Retired reserve/FROST runners are not current entrypoints. Missing evidence is a block, never a test pass.
