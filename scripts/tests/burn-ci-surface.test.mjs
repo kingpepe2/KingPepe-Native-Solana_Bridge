@@ -30,7 +30,8 @@ test('required CI keeps real burn/reindex/mint/replay and protected Windows cove
   for(const command of ['npm run local:proof:burn','npm run local:e2e:native-to-solana','npm run test:windows-security',
     'npm audit --audit-level=low','node scripts/source-audit.mjs','node .github/scripts/dependency-license-audit.mjs',
     'cargo clippy --locked','--log-opts=--all','r.sourceSha!==process.env.GITHUB_SHA','r.exactSource!==true',
-    'CLAIM_REPLAY_REJECTED_NO_SECOND_MINT','CRITICAL_ACCOUNTING_MISMATCH_PAUSES'])assert(ci.includes(command),command);
+    'CLAIM_REPLAY_REJECTED_NO_SECOND_MINT','CRITICAL_ACCOUNTING_MISMATCH_PAUSES',
+    'node solana/tests/mainnet-deployment-regression.mjs','r.mainnetTransactions!==0'])assert(ci.includes(command),command);
   assert(read('scripts/regtest-burn-proof.mjs').includes('FULL_REINDEX_PRESERVES_EXACT_BURN_AND_UTXO_EXCLUSION'));
   const readiness=JSON.parse(read('BRIDGE-READINESS.json'));
   assert.equal(readiness.productionReady,false);assert.equal(readiness.mainnetActivation,'DISABLED');

@@ -19,7 +19,7 @@
   "cleanup": {
     "scope": "TEAM_AUTHORIZED_AUTOMATIC_BURN_AND_MINT_CONVERSION",
     "status": "CURRENT_BURN_TEST_DEPLOYED_MAINNET_MINT_CREATED_PROGRAMS_PENDING",
-    "filesAfter": 196,
+    "filesAfter": 201,
     "removed": "Obsolete permanent reserve/FROST runtime, protocol and tests. Protected runtime backups and historical legal facts remain outside this cleanup.",
     "importedSource": "No third-party source imported. Existing dependency/API references and original classifications are preserved."
   },
@@ -886,6 +886,13 @@
       "reviewDisposition": "KEEP_CORE"
     },
     {
+      "path": "services/bridge-validator/mainnet-burn-preparation.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original dedicated-identity protected custody preparation; retained payer and attesters, fresh paused journal, no RPC or economic action.",
+      "purpose": "CORE_SECURITY",
+      "reviewDisposition": "KEEP_RUNTIME"
+    },
+    {
       "path": "services/bridge-validator/mainnet-identity-preparation.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original offline production Program/Mint and role-seed preparation using existing protected storage. Fixed public deployment identity and explicit undeployed status, no RPC, funding, attestation or transaction submission.",
@@ -898,6 +905,13 @@
       "notes": "Original unsigned standard-SPL atomic Mint/Metaplex metadata/Bridge-PDA authority setup and paused enrollment planner. Implements public instruction interfaces; no third-party source copied.",
       "purpose": "REQUIRED_FORWARD",
       "reviewDisposition": "KEEP_CURRENT"
+    },
+    {
+      "path": "services/bridge-validator/mainnet-program-plan.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Initial loader deployment public-byte plans and authoritative upload/program resume inspection; no upgrade or signer.",
+      "purpose": "CORE_SECURITY",
+      "reviewDisposition": "KEEP_RUNTIME"
     },
     {
       "path": "services/bridge-validator/mainnet-solana-setup-plan.mjs",
@@ -933,6 +947,13 @@
       "notes": "Original independent packet decoding and negative network, metadata URI, authority, pause and exact-decimal tests for production setup.",
       "purpose": "REQUIRED_TEST",
       "reviewDisposition": "KEEP_CURRENT"
+    },
+    {
+      "path": "services/bridge-validator/tests/mainnet-program-plan.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Artifact identity, packet, signer, upload resume and wrong-authority regressions.",
+      "purpose": "REQUIRED_TEST",
+      "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "services/bridge-validator/tests/mainnet-solana-setup-plan.test.mjs",
@@ -1299,6 +1320,13 @@
       "reviewDisposition": "KEEP_TEST"
     },
     {
+      "path": "solana/tests/mainnet-deployment-regression.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Fresh isolated local-validator deployment of final artifacts, interrupted upload and existing-Mint initialization proof.",
+      "purpose": "REQUIRED_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
       "path": "solana/tests/support/burn-fixture.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original synthetic public Rust burn fixture builders for current program/evidence security regressions; no private key material.",
@@ -1371,6 +1399,13 @@
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original private parent-IPC TEST actor for actual process crash/restart of concrete protected burn services; no deployed user route.",
       "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "tests/windows/mainnet-burn-preparation.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original isolated CurrentUser DPAPI preparation test; no certification of actual production service identity.",
+      "purpose": "REQUIRED_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
