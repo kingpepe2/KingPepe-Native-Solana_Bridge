@@ -1,4 +1,10 @@
-# Current development status
+# Current Mainnet deployment status
+
+The current public production presentation is **MAINNET BRIDGE — ACTIVATION PENDING**: KingPepe Native MAINNET → irreversible Native burn → exact 1:1 Solana MAINNET mint. The existing official Mint is shown prominently. Public deposits, wallet connection and address issuance are disabled until final Program/config deployment and controlled activation pass. The separate pending status backend verifies only the Mainnet zero-supply baseline and has no economic capability. [Public pre-activation behavior](deployment/public-mainnet-pending.md) describes this boundary.
+
+The reviewed Explorer implementation passed 35 affected gateway, wallet and supply tests. Browser/Phantom manual acceptance remains pending. Historical REGTEST/DEVNET proofs below retain their original networks, amounts and source identities; their counter is never imported into production.
+
+## Retained source-bound implementation and deployment evidence
 
 The Team-authorized metadata update preserves the existing Mainnet Mint, metadata account/URI and approved logo. The canonical JSON now includes the exact burn-and-mint description, project website, Bridge, X and GitHub links. All four destinations returned HTTP 200; three fresh metadata reads matched the published hash. Finalized before/after queries confirmed unchanged Mint and metadata account bytes, 8 decimals, zero supply, Bridge-PDA mint authority and no freeze authority. No on-chain update or SOL expenditure was required. The GitHub description now uses burn-and-mint wording; current deployment status remains explicit below.
 
@@ -6,7 +12,7 @@ The current non-funding implementation provides a protected Mainnet runtime, dur
 
 The Team removed mandatory Windows Service/SCM hosting and offline recovery provisioning. `OFFLINE_RECOVERY_BACKUP = NOT_REQUIRED_BY_TEAM_DECISION`; `RECOVERY_RISK = ACCEPTED_BY_KINGPEPE_TEAM`. No offline backup or server-loss recovery is claimed. The old SCM proof service is not a dependency of the verified private process host. Each published implementation milestone requires its own exact-SHA CI.
 
-Architecture: ONE_WAY_AUTOMATIC_BURN_AND_MINT. Source verification, isolated Native burn proof, real REGTEST -> DEVNET burn/mint and crash-after-burn recovery passed at their recorded source identities. Public TEST files and gateway are deployed. The Native RPC cookie fix passed its exact-SHA CI and reviewed read-only recovery; the TEST service is healthy with MATCH reconciliation. Browser acceptance remains pending. Mainnet deployment has started with the zero-supply Mint and metadata; programs and activation remain pending. productionReady=false and mainnetActivation=DISABLED.
+Architecture: ONE_WAY_AUTOMATIC_BURN_AND_MINT. Source verification, isolated Native burn proof, real REGTEST -> DEVNET burn/mint and crash-after-burn recovery passed at their recorded source identities. The retained TEST deployment and its evidence are historical; the current public target is Mainnet activation pending. The Native RPC cookie fix passed its exact-SHA CI and reviewed read-only recovery; the TEST service is healthy with MATCH reconciliation. Browser acceptance remains pending. Mainnet deployment has started with the zero-supply Mint and metadata; programs and activation remain pending. productionReady=false and mainnetActivation=DISABLED.
 
 Runtime source `adcca2ba412ed45266041d73b16207f665a55c34` passed all four required jobs and every step in CI 35931741887. [Current burn TEST evidence](deployment/burn-devnet-report.md) records the initial finalized-read race, its fix, the same-operation read-only recovery, and the subsequent fresh successful crash-recovery operation. The [new TEST manifest](deployment/burn-devnet.json) identifies actual programs/Mint and artifact hashes. Historical reserve evidence certifies only its named source and remains labelled.
 

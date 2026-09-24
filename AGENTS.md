@@ -14,7 +14,7 @@ The Team's current architecture is ONE_WAY_AUTOMATIC_BURN_AND_MINT. Its source a
 - Persist exact plans, reservations and signed packets before broadcast. Recover ambiguous responses from chain state. Critical contradiction persists a pause; no automatic economic repair.
 - Secrets, RPC credentials, wallets, journals, private paths and backups never enter source/public artifacts. No plaintext production fallback. Cloudflare is not key storage.
 - Original code is proprietary All Rights Reserved. Preserve third-party notices and historical grants. Authorized reverse-history cleanup must not rewrite unrelated repositories or pretend cached unreferenced GitHub objects have been erased.
-- Wallet Standard connects a recipient; no private wallet material or reverse signing flow. TEST uses solana:devnet. Public gateway is authenticated loopback only, strict schemas/origin/rate/size/timeout checks, sanitized errors, no arbitrary RPC/signing/admin API.
+- Wallet Standard connects a recipient; no private wallet material or reverse signing flow. The public Mainnet presentation is ACTIVATION PENDING with deposits disabled. Production uses solana:mainnet; test chains remain in development and historical evidence. The economic gateway is authenticated loopback only, strict schemas/origin/rate/size/timeout checks, sanitized errors, no arbitrary RPC/signing/admin API. The pre-activation status backend is read-only and has no operation or signing capability.
 
 ## Validation and publication
 
@@ -24,7 +24,7 @@ Pins: scripts/local-e2e-toolchain.json, Node24.21/npm11.19, Solana Rust1.89, Nat
 - npm run test:windows-security (real CurrentUser DPAPI; not distinct-principal or portable-backup certification).
 - Locked Solana and Native proof check/test/fmt/Clippy; retained SBF builds.
 - npm run local:proof:burn; npm run local:e2e:native-to-solana; npm run local:e2e:windows-runtime.
-- Fresh REGTEST -> DEVNET burn/mint, crash-after-burn recovery, exact supply delta and reconciliation, public TEST UI/gateway/security verification.
+- Retain source-bound REGTEST -> DEVNET burn/mint, crash-after-burn recovery, exact supply delta and reconciliation evidence. Verify the current Mainnet activation-pending UI/gateway separately; never mix development counters or enable deposits before controlled activation.
 - Guardrails, source/provenance/license and current/history secret scans; review diff, explicit staging, coherent milestone commit, authorized push, exact-SHA CI with no required skipped step. Encoding changes and callers land together.
 
 Current truth: docs/development-status.md and BRIDGE-READINESS.json. Never reuse reserve-model CI or recovery evidence as burn-model certification. Production upgrade policy remains SINGLE_KEY_WITH_REVIEW_CONTROL, no timelock/window, specific Team approval per upgrade. No external audit is claimed or required by Team. Continue the authorized initial Mainnet deployment; preserve state and report concrete funding or technical blockers. Runtime readiness must describe actual completed verification, not authorization alone.

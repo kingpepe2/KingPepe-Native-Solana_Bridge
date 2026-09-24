@@ -1,15 +1,17 @@
 [![bannerkingpepe.png](https://i.postimg.cc/Xvzs6s0Y/bannerkingpepe.png)](https://postimg.cc/CZbGjH13)
 # KingPepe Native -> Solana Bridge
 
-The current source implements **ONE_WAY_AUTOMATIC_BURN_AND_MINT**. The public [KingPepe Bridge](https://kingpepe.net/bridge) remains REGTEST -> DEVNET. Mainnet deployment has started with the verified zero-supply KPEPE Mint; the Bridge programs and production processing are not yet deployed or activated. See [current validation and deployment status](docs/development-status.md).
+**KingPepe Native MAINNET → irreversible Native burn → verified burn evidence → Solana MAINNET KPEPE mint.** The Bridge is **ONE WAY**, with exact **1:1** minting and a maximum supply of **21,000,000 KPEPE**.
+
+**MAINNET DEPLOYMENT STATUS: ACTIVATION PENDING.** The official Solana KPEPE Mint exists. The public [KingPepe Bridge](https://kingpepe.net/bridge) must not be treated as active until final Mainnet Program deployment and controlled activation complete. **DO NOT SEND KPEPE YET.** Public deposit-address issuance and economic endpoints are disabled. The status will change to **MAINNET BRIDGE ACTIVE** only after successful controlled activation. See [current deployment status](docs/development-status.md).
 
 The official Solana Mainnet KPEPE Mint is [`4QkWKqTMyPEyEb8RMKv3XrcHJ5jbS7k4uQhXVoirphZW`](https://explorer.solana.com/address/4QkWKqTMyPEyEb8RMKv3XrcHJ5jbS7k4uQhXVoirphZW). It uses standard SPL Token, 8 decimals, initial supply 0 and no freeze authority. Its Mint authority is the expected Bridge PDA; the program controlling that PDA still awaits deployment. No Mainnet Native deposit or burn has occurred. [Deployment evidence](docs/deployment/mainnet.json) distinguishes the created Mint from pending programs and activation.
 
 Official project links: [KingPepe Website](https://kingpepe.carrd.co/), [KingPepe Bridge](https://kingpepe.net/bridge), [KingPepe on X (@Kingpepe111)](https://x.com/kingpepe111), and [KingPepe Native -> Solana Bridge GitHub](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge). The existing Mint's [canonical metadata](https://kingpepe.net/metadata/kpepe-mainnet.json) preserves the approved logo and describes irreversible Native burn followed by verified exact 1:1 Solana minting.
 
-## Transfer
+## Production flow after activation
 
-Connect a Solana Wallet Standard wallet on the configured TEST chain (`solana:devnet`). The Bridge binds the wallet destination before issuing a unique, single-use Native deposit address. Send from your own Native wallet. The deposit is authorization; there is no separate approval button and the website cannot spend your wallet.
+After activation, connect a Solana Wallet Standard wallet on Mainnet (`solana:mainnet`). The Bridge binds the wallet destination before issuing a unique, single-use KingPepe Native Mainnet deposit address. Your Native deposit authorizes the operation; there is no separate approval button and the website cannot spend your wallet. Wallet connection and address issuance remain disabled in the current activation-pending presentation.
 
 After 12 Native deposit confirmations and the pre-burn checks, the next processing cycle signs and broadcasts an exact-value OP_RETURN burn. Separate Bridge operational inputs pay its miner fee. After 12 burn confirmations, two project attesters sign canonical Borsh V4 burn evidence. Solana verifies the attestation, consumes the deposit and burn exactly once, and mints to the original wallet. Finalized execution and matching reconciliation complete the operation.
 
@@ -23,7 +25,7 @@ KingPepe Native's source monetary maximum is **21,000,000 KPEPE**. Both Native a
 
 Cumulative Bridge-created Solana units must not exceed either 21M or verified finalized Native burns. Finalized burns awaiting mint are explicit pending obligations. Every completed operation has equal burn and mint amounts. Holder-initiated SPL burns reduce live token supply without reopening the cumulative issuance cap or creating a redemption entitlement. See [the accounting equation and source evidence](docs/security/monetary-supply.md).
 
-The public counter uses completed, canonically accounted burn/mint operations. It does not count requests, observed deposits or pending burns. TEST and future production journals/Mints remain isolated. Missing, stale or contradictory accounting is displayed as unavailable, not as healthy progress.
+The Mainnet counter starts at **0 KPEPE bridged / 21,000,000 KPEPE maximum**, independently verified against the existing zero-supply Mainnet Mint. Pending mode can report only this verified zero baseline; unavailable or contradictory chain data displays **Unavailable**. After activation, completed canonical Mainnet burn/mint accounting supplies the counter. Requests, observed deposits and unminted burns do not increment it. Development journals and Mints remain separate. See [public pre-activation behavior](docs/deployment/public-mainnet-pending.md).
 
 `productionLimitPolicy=UNBOUNDED_BY_TEAM_DECISION` means no arbitrary per-transfer or time-window monetary cap. Finality, the 21M ceiling, conservation, replay checks and reconciliation remain mandatory. Storage and fee-funding exhaustion hold new work safely; they never reduce the user's burn amount.
 

@@ -7,15 +7,15 @@
   "mainnetActivation": "DISABLED",
   "productionSigningAuthorized": false,
   "productionBroadcastAuthorized": false,
-  "sourceStatus": "MAINNET_MINT_CREATED_PROGRAMS_PENDING_TEST_RUNTIME_UNCHANGED",
+  "sourceStatus": "MAINNET_PUBLIC_PRESENTATION_ACTIVATION_PENDING_DEPOSITS_DISABLED",
   "productionAuthorizationFlagScope": "NATIVE_BURN_AND_NORMAL_BRIDGE_ECONOMIC_RUNTIME",
   "nativeSourceSha": "3f2621820ffefae59cbe48b350f5f8f6ec8a6da5",
   "sourceBurnProof": "PASS",
   "isolatedRegtestBurnMechanism": "PROVEN",
   "exactShaCi": {
     "status": "PASS",
-    "sourceSha": "1e8c6f6bccc077dc2c3e4fb5159dc9f5281e6243",
-    "runId": "36051653223",
+    "sourceSha": "2c86b89088fb8cd475003197730c67d734a4a1a5",
+    "runId": "36055398437",
     "requiredJobsPassed": 4,
     "skippedSteps": 0,
     "historicalReserveCiNotApplicable": true,
@@ -57,7 +57,7 @@
   },
   "recoveryProcedure": "SAME_ACCOUNT_CLOSED_TEST_SNAPSHOT_TESTED",
   "historicalRecoveryEvidence": "PRIVATE_SOURCE_BOUND_NOT_CURRENT_SHA_CERTIFICATION",
-  "publicTestUpdate": "DEPLOYED_TEST_ONLY_BROWSER_ACCEPTANCE_PENDING",
+  "publicTestUpdate": "HISTORICAL_TEST_EVIDENCE_PRESERVED_NOT_PUBLIC_PRODUCTION",
   "manualPhantomTest": "PENDING_MANUAL",
   "freshForwardDevnet": "COMPLETED_BURN_MINT_CRASH_RECOVERY",
   "mainnetDeployment": "PARTIAL_MINT_AND_METADATA_FINALIZED_PROGRAMS_PENDING_FUNDING",
@@ -90,5 +90,13 @@
     "runtimeSourcesUnchanged": true,
     "automaticCycleBurnLatencyMs": 9954,
     "productionTransactions": 0
-  }
+  },
+  "publicNetwork": "MAINNET",
+  "publicBridgeActivation": "PENDING",
+  "publicDepositsAccepted": false,
+  "publicMainnetCounterBaselineAtomic": "0",
+  "publicMainnetCounterSource": "MAINNET_PREACTIVATION_ZERO_BASELINE",
+  "publicPresentationEvidence": "docs/deployment/public-mainnet-pending.md",
+  "publicExplorerSourceSha": "daa7d6e103ff84753d2d31a4f42293924e02a57c",
+  "publicExplorerGatewayTestsPassed": 35
 }

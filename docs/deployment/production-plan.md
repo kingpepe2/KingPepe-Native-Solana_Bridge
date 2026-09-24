@@ -1,6 +1,6 @@
 # One-way burn-and-mint production execution
 
-The Team explicitly authorized the initial Mainnet deployment and controlled activation, and directed use of the funded retained payer for safe independent steps. This supersedes the earlier TEST-only stopping point; no second generic activation approval is required. Authorization does not bypass failed economic or security prerequisites. Keep productionReady=false, mainnetActivation=DISABLED and the Native economic runtime signing/broadcast flags disabled until the controlled real burn/mint and normal runtime enablement pass. The public Bridge remains TEST during partial deployment.
+The Team explicitly authorized the initial Mainnet deployment and controlled activation, and directed use of the funded retained payer for safe independent steps. This supersedes the earlier TEST-only stopping point; no second generic activation approval is required. Authorization does not bypass failed economic or security prerequisites. Keep productionReady=false, mainnetActivation=DISABLED and the Native economic runtime signing/broadcast flags disabled until the controlled real burn/mint and normal runtime enablement pass. The public Bridge presents MAINNET with ACTIVATION PENDING during partial deployment. Public wallet/deposit-address issuance and economic endpoints stay disabled; the independently verified production zero baseline replaces the development counter.
 
 ## New production bindings
 

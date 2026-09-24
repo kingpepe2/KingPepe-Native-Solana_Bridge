@@ -7,7 +7,7 @@
   "genesis": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
   "productionReady": false,
   "mainnetActivation": "DISABLED",
-  "publicBridgeEnvironment": "REGTEST_DEVNET",
+  "publicBridgeEnvironment": "MAINNET_ACTIVATION_PENDING",
   "sourceSha": "f5d6c34948a153777016ae41a8a8a673d5d9c4e0",
   "exactShaCi": {
     "runId": "36022276097",
@@ -73,5 +73,9 @@
     "totalUsedLamports": "14810600",
     "remainingBalanceLamports": "36856547"
   },
-  "resumeRule": "Verify existing Mint, metadata and finalized creation transaction; do not recreate. Requote and fund the same payer for pending programs and initialization. Production runtime stays disabled until its controlled activation passes."
+  "resumeRule": "Verify existing Mint, metadata and finalized creation transaction; do not recreate. Requote and fund the same payer for pending programs and initialization. Production runtime stays disabled until its controlled activation passes.",
+  "publicDepositsAccepted": false,
+  "publicCounterBaselineAtomic": "0",
+  "publicPresentationSourceSha": "daa7d6e103ff84753d2d31a4f42293924e02a57c",
+  "publicPresentationVerifiedAt": "2026-09-24T22:01:14.815Z"
 }

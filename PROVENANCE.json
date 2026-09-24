@@ -18,8 +18,8 @@
   },
   "cleanup": {
     "scope": "TEAM_AUTHORIZED_AUTOMATIC_BURN_AND_MINT_CONVERSION",
-    "status": "CURRENT_BURN_TEST_DEPLOYED_MAINNET_MINT_CREATED_PROGRAMS_PENDING",
-    "filesAfter": 201,
+    "status": "MAINNET_PUBLIC_ACTIVATION_PENDING_EXISTING_MINT_PRESERVED",
+    "filesAfter": 202,
     "removed": "Obsolete permanent reserve/FROST runtime, protocol and tests. Protected runtime backups and historical legal facts remain outside this cleanup.",
     "importedSource": "No third-party source imported. Existing dependency/API references and original classifications are preserved."
   },
@@ -254,6 +254,13 @@
       "notes": "Original current one-way automatic burn-and-mint documentation for docs/deployment/production-plan.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "KEEP_LEGAL_AND_CURRENT_CONTRACT"
+    },
+    {
+      "path": "docs/deployment/public-mainnet-pending.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original public Mainnet activation-pending presentation, disabled economic gateway and independently verified zero baseline; preserves historical development evidence.",
+      "purpose": "REQUIRED_DOCUMENTATION",
+      "reviewDisposition": "KEEP_CURRENT_FORWARD"
     },
     {
       "path": "docs/development-status.md",
