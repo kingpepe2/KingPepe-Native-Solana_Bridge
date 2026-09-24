@@ -5,6 +5,8 @@ The current source implements **ONE_WAY_AUTOMATIC_BURN_AND_MINT**. The public [K
 
 The official Solana Mainnet KPEPE Mint is [`4QkWKqTMyPEyEb8RMKv3XrcHJ5jbS7k4uQhXVoirphZW`](https://explorer.solana.com/address/4QkWKqTMyPEyEb8RMKv3XrcHJ5jbS7k4uQhXVoirphZW). It uses standard SPL Token, 8 decimals, initial supply 0 and no freeze authority. Its Mint authority is the expected Bridge PDA; the program controlling that PDA still awaits deployment. No Mainnet Native deposit or burn has occurred. [Deployment evidence](docs/deployment/mainnet.json) distinguishes the created Mint from pending programs and activation.
 
+Official project links: [KingPepe Website](https://kingpepe.carrd.co/), [KingPepe Bridge](https://kingpepe.net/bridge), [KingPepe on X (@Kingpepe111)](https://x.com/kingpepe111), and [KingPepe Native -> Solana Bridge GitHub](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge). The existing Mint's [canonical metadata](https://kingpepe.net/metadata/kpepe-mainnet.json) preserves the approved logo and describes irreversible Native burn followed by verified exact 1:1 Solana minting.
+
 ## Transfer
 
 Connect a Solana Wallet Standard wallet on the configured TEST chain (`solana:devnet`). The Bridge binds the wallet destination before issuing a unique, single-use Native deposit address. Send from your own Native wallet. The deposit is authorization; there is no separate approval button and the website cannot spend your wallet.
