@@ -7,14 +7,14 @@
   "mainnetActivation": "DISABLED",
   "productionSigningAuthorized": false,
   "productionBroadcastAuthorized": false,
-  "sourceStatus": "TEST_BURN_MINT_PASS_PUBLIC_DEPLOYED_RPC_RECOVERY_PENDING",
+  "sourceStatus": "TEST_BURN_MINT_PASS_PUBLIC_DEPLOYED_BROWSER_ACCEPTANCE_PENDING",
   "nativeSourceSha": "3f2621820ffefae59cbe48b350f5f8f6ec8a6da5",
   "sourceBurnProof": "PASS",
   "isolatedRegtestBurnMechanism": "PROVEN",
   "exactShaCi": {
     "status": "PASS",
-    "sourceSha": "adcca2ba412ed45266041d73b16207f665a55c34",
-    "runId": "35931741887",
+    "sourceSha": "cb5a6af1691366443d69fb3a1f5450a0b6cdc751",
+    "runId": "35960715676",
     "requiredJobsPassed": 4,
     "skippedSteps": 0,
     "historicalReserveCiNotApplicable": true,
@@ -63,7 +63,7 @@
   "historyRewrite": "PUBLISHED_REACHABLE_PUBLIC_REFS_REVIEWED",
   "providerRetainedOldSource": "ISSUE_OLD_UNREFERENCED_COMMIT_CONTENT_STILL_PUBLIC",
   "retainedReserveFrostTestRuntime": "RETIRED_PRIVATE_STATE_PRESERVED",
-  "nativeRpcRestartRecovery": "COOKIE_REFRESH_FIX_REQUIRES_CURRENT_CI_AND_REVIEWED_PAUSE_RECOVERY",
+  "nativeRpcRestartRecovery": "PASS_REVIEWED_READ_ONLY_SAME_OPERATIONS_NO_NEW_TRANSACTIONS",
   "browserRendering": "PENDING_NO_CONNECTED_BROWSER",
   "mainnetFundingQuoteScope": "CURRENT_ELF_AND_FIVE_EARLY_OPERATIONS_METADATA_COST_PENDING_REQUOTE_REQUIRED"
 }
