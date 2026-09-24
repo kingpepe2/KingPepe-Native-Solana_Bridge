@@ -29,7 +29,7 @@ test('private Devnet process binding requires a valid endpoint and cannot enable
     assert.throws(()=>new BurnSolanaRpc(options),/^Error: DevnetRpcEndpointRejected$/);
     process.env.SOLANA_DEVNET_RPC_URL='https://devnet.invalid.example/';
     assert.doesNotThrow(()=>new BurnSolanaRpc(options));
-    assert.throws(()=>new BurnSolanaRpc({...options,environment:'mainnet'}),/TestOnly/);
+    assert.throws(()=>new BurnSolanaRpc({...options,environment:'mainnet'}),/GenesisRejected/);
     assert.throws(()=>new BurnSolanaRpc({...options,environment:'localnet'}),/EndpointRejected/);
     assert.throws(()=>new BurnSolanaRpc({...options,expectedGenesis:base58Encode(Buffer.alloc(32,77))}),/GenesisRejected/);
     process.env.SOLANA_DEVNET_RPC_URL='invalid-private-value';

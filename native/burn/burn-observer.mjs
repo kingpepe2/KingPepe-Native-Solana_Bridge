@@ -1,12 +1,13 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
-// Bounded REGTEST discovery. Observations never substitute for the independent
+// Bounded Native discovery. Observations never substitute for the independent
 // raw header/Merkle verifier required before burn or attestation.
 import {createHash} from 'node:crypto';
 import {NativeRpcClient} from '../node/native-rpc-client.mjs';
 import {parseNativeTransactionHex} from '../node/native-taproot-transaction.mjs';
 import {burnHash,requireBurn as check,nativeAmountRpcString,validateNativeBurnTransaction} from './burn-protocol.mjs';
 import {verifyNativeBurnSignatures} from './burn-key.mjs';
-import {validateRegtestBurnNetwork} from './burn-evidence.mjs';
+import {validateNativeBurnNetwork} from './burn-evidence.mjs';
+import {nativeIdentity} from '../../shared/network-identity.mjs';
 
 const sha256d=b=>createHash('sha256').update(createHash('sha256').update(b).digest()).digest();
 function merkle(ids) {
@@ -19,12 +20,13 @@ function remembered(op) {
   const rows=[...(op.deposit?[op.deposit]:[]),...(op.exception?.deposits??[])];
   return [...new Map(rows.map(v=>[`${v.txid}:${v.vout}`,v])).values()];
 }
-export class RegtestBurnObserver {
-  #rpc;
-  constructor(rpc){check(rpc instanceof NativeRpcClient,'NativeBurnRpcRequired');this.#rpc=rpc;}
+export class NativeBurnObserver {
+  #rpc;#identity;
+  constructor(rpc,environment){check(rpc instanceof NativeRpcClient,'NativeBurnRpcRequired');this.#rpc=rpc;this.#identity=nativeIdentity(environment);}
+  get nativeGenesis(){return this.#identity.genesis;}
   async network(){
     const c=await this.#rpc.getBlockchainInfo();
-    validateRegtestBurnNetwork(c,(await this.#rpc.call('getblockhash',[0])).result);
+    validateNativeBurnNetwork(c,(await this.#rpc.call('getblockhash',[0])).result,this.#identity.environment);
     return {height:c.blocks,hash:burnHash(c.bestblockhash)};
   }
   async discover(state) {
@@ -35,7 +37,7 @@ export class RegtestBurnObserver {
     // do not become mint credit; a changed accepted basis pauses in the journal.
     for(const op of state.operations)for(const prior of remembered(op)) {
       let tx;
-      try{tx=await this.#rpc.getRawTransaction(prior.txid,true);}catch(e){if(e.rpcCode===-5)continue;throw e;}
+      try{tx=await this.#rpc.getRawTransaction(prior.txid,true,this.#identity.environment==='mainnet'?(prior.blockHash??undefined):undefined);}catch(e){if(e.rpcCode===-5)continue;throw e;}
       if(tx.confirmations<0)continue;
       const raw=parseNativeTransactionHex(tx.hex);check(raw.txidHex===prior.txid,'BURN_DEPOSIT_TRANSACTION_CHANGED');
       const out=raw.outputs[prior.vout];check(out?.scriptPubKeyHex===op.depositScriptHex&&out.amountAtomic===prior.amountAtomic,'BURN_DEPOSIT_TRANSACTION_CHANGED');
@@ -91,15 +93,34 @@ export class RegtestBurnObserver {
       if(reserved.has(`${u.txid}:${u.vout}`))continue;
       const coin=await this.#rpc.getUtxoObservation({txid:u.txid,vout:u.vout,includeMempool:true});
       if(!coin.unspent||coin.coinbase||coin.confirmations<12)continue;
-      const tx=parseNativeTransactionHex(await this.#rpc.getRawTransaction(u.txid,false)),out=tx.outputs[u.vout];
+      const blockHash=this.#identity.environment==='mainnet'?burnHash((await this.#rpc.call('getblockhash',[tip.height-coin.confirmations+1])).result):undefined;
+      const tx=parseNativeTransactionHex(await this.#rpc.getRawTransaction(u.txid,false,blockHash)),out=tx.outputs[u.vout];
       check(tx.txidHex===u.txid&&out?.scriptPubKeyHex===scriptPubKeyHex&&out.amountAtomic===coin.valueAtomic,'BURN_FEE_COIN_CHANGED');
       coins.push({txid:u.txid,vout:u.vout,amountAtomic:out.amountAtomic,scriptPubKeyHex});
     }
     return coins.sort((a,b)=>BigInt(a.amountAtomic)<BigInt(b.amountAtomic)?-1:BigInt(a.amountAtomic)>BigInt(b.amountAtomic)?1:a.txid.localeCompare(b.txid));
   }
-  async burnStatus(plan) {
+  async preparePlan(plan){
+    if(this.#identity.environment!=='mainnet')return plan;
+    const tip=await this.network(),hints={};
+    for(const input of plan.inputs){
+      const coin=await this.#rpc.getUtxoObservation({...input,includeMempool:true});
+      check(coin.unspent&&!coin.coinbase&&coin.confirmations>=12&&coin.bestBlockHash===tip.hash&&
+        coin.valueAtomic===input.amountAtomic&&coin.scriptPubKeyHex===input.scriptPubKeyHex,'NativeBurnInputUnavailable');
+      hints[input.txid]=burnHash((await this.#rpc.call('getblockhash',[tip.height-coin.confirmations+1])).result);
+    }
+    check((await this.network()).hash===tip.hash,'NativeBurnSourceChanged');
+    // Immutable lookup hints travel with the exact signed plan. They grant no
+    // admission: each verifier rereads the raw blocks and proves membership.
+    return {...structuredClone(plan),transactionBlockHints:hints};
+  }
+  async burnStatus(plan,burnBlockHash) {
     await this.network();let tx;
-    try{tx=await this.#rpc.getRawTransaction(plan.txid,true);}catch(e){if(e.rpcCode===-5)return {found:false,confirmations:0};throw e;}
+    if(this.#identity.environment==='mainnet'){
+      const found=await this.#rpc.locateMainnetTransaction({txid:plan.txid,vout:1,blockHash:burnBlockHash});
+      if(found.state!=='OBSERVED')return {found:false,confirmations:0,transactionAbsenceProven:false};
+      tx={hex:found.rawTransactionHex,confirmations:found.confirmations};
+    }else try{tx=await this.#rpc.getRawTransaction(plan.txid,true);}catch(e){if(e.rpcCode===-5)return {found:false,confirmations:0};throw e;}
     const parsed=parseNativeTransactionHex(tx.hex);check(parsed.txidHex===plan.txid&&parsed.strippedHex===plan.unsignedTransactionHex,'BURN_TRANSACTION_CHANGED');
     verifyNativeBurnSignatures({rawTransactionHex:tx.hex,inputs:plan.inputs});
     return {found:tx.confirmations===undefined||tx.confirmations>=0,confirmations:tx.confirmations??0,rawTransactionHex:tx.hex};
@@ -113,4 +134,7 @@ export class RegtestBurnObserver {
     const txid=(await this.#rpc.call('sendrawtransaction',[signedHex,nativeAmountRpcString(maximumRateAtomicPerKvB),plan.maxburnamount])).result;
     check(txid===plan.txid,'BURN_BROADCAST_ID_MISMATCH');return txid;
   }
+}
+export class RegtestBurnObserver extends NativeBurnObserver {
+  constructor(rpc){super(rpc,'localnet');}
 }

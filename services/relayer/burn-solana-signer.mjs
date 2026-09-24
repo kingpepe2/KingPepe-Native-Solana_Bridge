@@ -34,6 +34,7 @@ export function associatedTokenCreationMessage({binding,feePayerHex,recentBlockh
 export function burnSolanaPlanOptions({context,binding,feePayerHex,encodedMessageHex,attestations,recentBlockhash,lastValidBlockHeight}) {
   const c=assertBurnBindingContext(binding,context);
   return {environment:c.environment,cluster:c.environment,solanaGenesis:base58Encode(h(binding.solanaGenesis)),
+    ...(c.environment==='mainnet'?{protocolId:binding.protocolId,nativeNetwork:binding.nativeNetwork,nativeGenesis:binding.nativeGenesis,solanaDeployment:binding.solanaDeployment}:{}),
     managerProgramIdHex:binding.bridgeProgram,transceiverProgramIdHex:binding.transceiverProgram,mintHex:binding.mint,
     tokenProgramIdBase58:TOKEN,feePayerHex,encodedMessageHex,attestations,recentBlockhashBase58:recentBlockhash,lastValidBlockHeight};
 }

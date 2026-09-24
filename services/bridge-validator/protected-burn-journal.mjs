@@ -1,7 +1,7 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 // Existing DPAPI/revision/process-exclusion storage, dedicated burn state format.
 import {assertWindowsProtectedStore} from '../../shared/windows/protected-store.mjs';
-import {REGTEST_GENESIS} from '../../native/node/native-raw-evidence.mjs';
+import {nativeIdentity} from '../../shared/network-identity.mjs';
 import {validateBurnJournalState} from './burn-journal-state.mjs';
 
 const instances=new WeakSet();
@@ -12,8 +12,8 @@ export class ProtectedBurnJournal {
   #store;#lease;#closed=false;#busy=false;
   static async open(store) {
     assertWindowsProtectedStore(store,'BRIDGE_VALIDATOR','burn-operations');
-    if(!['localnet','devnet'].includes(store.context.environment)||store.context.nativeGenesis!==REGTEST_GENESIS)
-      throw new Error('BurnJournalTestBindingRequired');
+    if(store.context.nativeGenesis!==nativeIdentity(store.context.environment).genesis)
+      throw new Error('BurnJournalNetworkBindingRequired');
     const instance=new ProtectedBurnJournal();instance.#store=store;
     instance.#lease=await store.acquireLease();instances.add(instance);
     try{instance.read();return instance;}catch(error){await instance.close();throw error;}
@@ -25,6 +25,7 @@ export class ProtectedBurnJournal {
       const text=payload.toString('utf8'),raw=JSON.parse(text);
       if(JSON.stringify(raw)!==text)throw new Error('BurnJournalNonCanonical');
       const state=validateBurnJournalState(raw),context=this.#store.context;
+      if(context.environment==='mainnet'&&!state.deliveryPolicy)throw new Error('BurnJournalMainnetPolicyRequired');
       if(state.deployment.nativeGenesis!==context.nativeGenesis||state.deployment.solanaDeployment!==context.solanaDeployment)
         throw new Error('BurnJournalDeploymentChanged');
       if(state.deliveryPolicy&&(state.deliveryPolicy.context.environment!==context.environment||

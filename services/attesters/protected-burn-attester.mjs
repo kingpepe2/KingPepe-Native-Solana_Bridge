@@ -4,7 +4,7 @@
 import {createHash} from 'node:crypto';
 import {ed25519} from '@noble/curves/ed25519.js';
 import {assertWindowsProtectedStore} from '../../shared/windows/protected-store.mjs';
-import {RegtestNativeBurnVerifier,requireFinalizedNativeBurn} from '../../native/burn/burn-evidence.mjs';
+import {NativeBurnVerifier,requireFinalizedNativeBurn} from '../../native/burn/burn-evidence.mjs';
 import {burnOperationId,burnAmount,requireBurn as check,encodeFinalizedBurnEvidence} from '../../native/burn/burn-protocol.mjs';
 import {decodeCanonicalBridgeMessage,stableJson} from '../../shared/protocol/canonical-message.mjs';
 import {MAX_KPEPE_SUPPLY_ATOMIC} from '../../shared/monetary-supply.mjs';
@@ -20,7 +20,7 @@ export class ProtectedBurnAttester {
   static async open({keyStore,authorizationStore,verifier,context,role}) {
     const c=validateBurnContext(context);check(['ATTESTER_A','ATTESTER_B'].includes(role),'BurnAttesterRoleRejected');
     assertWindowsProtectedStore(keyStore,role,'attester-seed');assertWindowsProtectedStore(authorizationStore,role,'burn-attester-authorizations');
-    check(verifier instanceof RegtestNativeBurnVerifier,'IndependentBurnVerifierRequired');
+    check(verifier instanceof NativeBurnVerifier&&verifier.nativeGenesis===c.deployment.nativeGenesis,'IndependentBurnVerifierRequired');
     for(const store of [keyStore,authorizationStore])check(store.context.environment===c.environment&&
       store.context.nativeGenesis===c.deployment.nativeGenesis&&store.context.solanaDeployment===c.deployment.solanaDeployment&&store.context.keyEpoch===c.keyEpoch,'BurnAttesterStorageContext');
     const self=new ProtectedBurnAttester();self.#key=keyStore;self.#store=authorizationStore;self.#context=c;self.#role=role;self.#verifier=verifier;
@@ -78,7 +78,7 @@ export class ProtectedBurnAttester {
     try{
       const m=decodeCanonicalBridgeMessage(Buffer.from(encodedMessageHex,'hex'));assertBurnMessageContext(m,this.#context);
       check(m.operationIdHex===burnOperationId(binding),'BurnAttesterOperationChanged');
-      const final=await this.#verifier.verifyFinalizedBurn({binding,plan});requireFinalizedNativeBurn(final,binding,plan);
+      const final=await this.#verifier.verifyFinalizedBurn({binding,plan,burnBlockHash:m.burnEvidence.burnBlockHash});requireFinalizedNativeBurn(final,binding,plan);
       check(encodeFinalizedBurnEvidence(m.burnEvidence).toString('hex')===final.evidenceHex,'BurnAttesterRawEvidenceMismatch');
       const now=BigInt(Math.floor(Date.now()/1000));check(m.validFrom<=now&&now<=m.validUntil,'BurnAttesterMessageExpired');
       let {state,revision}=this.#read();const row=state.records.find(r=>r.operationId===m.operationIdHex);

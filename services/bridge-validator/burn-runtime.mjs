@@ -2,8 +2,8 @@
 // Automatic TEST burn -> mint. All economic adapters are concrete, protected
 // instances; public callers cannot replace a verifier, signer or RPC endpoint.
 import {ed25519} from '@noble/curves/ed25519.js';
-import {RegtestBurnObserver} from '../../native/burn/burn-observer.mjs';
-import {RegtestNativeBurnVerifier} from '../../native/burn/burn-evidence.mjs';
+import {NativeBurnObserver} from '../../native/burn/burn-observer.mjs';
+import {NativeBurnVerifier} from '../../native/burn/burn-evidence.mjs';
 import {NativeBurnFeePolicy} from '../../native/burn/burn-fees.mjs';
 import {burnOperationalDestination} from '../../native/burn/burn-key.mjs';
 import {burnOperationId,burnHash,encodeFinalizedBurnEvidence,requireBurn as check} from '../../native/burn/burn-protocol.mjs';
@@ -40,9 +40,10 @@ export class BurnRuntime {
   #accountingVerifiedAt=0;#liveMintSupplyAtomic=null;
   constructor({journal,observer,verifier,fees,burnSigner,attesters,solana,solanaSigner,onEvent=()=>{}}) {
     requireProtectedBurnJournal(journal);requireProtectedNativeBurnSigner(burnSigner);requireBurnSolanaAdapter(solana);requireProtectedBurnSolanaSigner(solanaSigner);
-    check(observer instanceof RegtestBurnObserver&&verifier instanceof RegtestNativeBurnVerifier&&fees instanceof NativeBurnFeePolicy,'ConcreteBurnAdaptersRequired');
+    check(observer instanceof NativeBurnObserver&&verifier instanceof NativeBurnVerifier&&fees instanceof NativeBurnFeePolicy,'ConcreteBurnAdaptersRequired');
     check(Array.isArray(attesters)&&attesters.length===2,'BurnRuntimeAttestersRequired');attesters.forEach(requireProtectedBurnAttester);
     this.#context=validateBurnContext(solana.policy.context);
+    check(observer.nativeGenesis===this.#context.deployment.nativeGenesis&&verifier.nativeGenesis===observer.nativeGenesis,'BurnRuntimeNativeNetworkBinding');
     check(burnSigner.publicKeyHex===this.#context.deployment.burnPublicKey&&solanaSigner.publicKeyHex===solana.policy.feePayerHex&&
       attesters.every((a,i)=>a.role===['ATTESTER_A','ATTESTER_B'][i]&&a.publicKeyHex===this.#context.attesters[i]),'BurnRuntimeRoleBinding');
     const state=journal.read();check(state.deliveryPolicy&&stableJson(state.deliveryPolicy.context)===stableJson(this.#context)&&
@@ -106,6 +107,7 @@ export class BurnRuntime {
   // Operator-only local method. No public gateway route exposes resume/pause.
   resumeReviewedTestRuntime() {
     return this.#exclusive(async()=>{
+      check(this.#context.environment!=='mainnet','BurnRuntimeTestResumeRejected');
       check(this.#health.reconciliation==='MATCH','BurnRuntimeReviewIncomplete');
       this.#update(state=>{check(!state.operations.some(op=>op.exception?.reason==='ACCEPTED_DEPOSIT_BASIS_CHANGED'),'BurnRuntimeContradictionUnresolved');
         state.paused=false;state.pauseReason='REVIEWED_TEST_RUNTIME';});
@@ -122,10 +124,10 @@ export class BurnRuntime {
       let finalized=0n;
       for(const op of this.#journal.read().operations){
         if(!op.broadcastAttempted)continue;
-        const burn=await this.#observer.burnStatus(op.plan);this.#observed.set(op.operationId,{...(this.#observed.get(op.operationId)??{}),burnConfirmations:burn.confirmations});
+        const burn=await this.#observer.burnStatus(op.plan,op.burnEvidence?.burnBlockHash);this.#observed.set(op.operationId,{...(this.#observed.get(op.operationId)??{}),burnConfirmations:burn.confirmations});
         if(op.burnEvidence)check(burn.found&&burn.confirmations>=12,'FINALIZED_BURN_DISAPPEARED');
         if(!burn.found||burn.confirmations<12)continue;
-        const proof=await this.#verifier.verifyFinalizedBurn({binding:op.binding,plan:op.plan});
+        const proof=await this.#verifier.verifyFinalizedBurn({binding:op.binding,plan:op.plan,burnBlockHash:op.burnEvidence?.burnBlockHash});
         if(op.burnEvidence)check(sameEvidence(op.burnEvidence,proof.evidence),'FINALIZED_BURN_CHANGED');
         else {this.#update(state=>retainFinalBurn(state,op.operationId,proof.evidence));this.#emit('BURN_FINALIZED',op.operationId);}
         finalized+=BigInt(proof.evidence.amountAtomic);
@@ -216,8 +218,9 @@ export class BurnRuntime {
       this.#emit('DEPOSIT_FINALITY_REACHED',id);
       const operational=burnOperationalDestination(op.binding),reserved=new Set(this.#journal.read().operations.flatMap(o=>o.plan?.inputs.map(i=>`${i.txid}:${i.vout}`)??[]));
       const feeCoins=await this.#observer.operationalCoins(operational.scriptPubKeyHex,reserved);
-      const {plan}=await this.#fees.selectPlan({operationId:id,deposit:{txid:op.deposit.txid,vout:op.deposit.vout,amountAtomic:op.deposit.amountAtomic,scriptPubKeyHex:op.depositScriptHex},
+      const selected=await this.#fees.selectPlan({operationId:id,deposit:{txid:op.deposit.txid,vout:op.deposit.vout,amountAtomic:op.deposit.amountAtomic,scriptPubKeyHex:op.depositScriptHex},
         operationalScriptHex:operational.scriptPubKeyHex,feeCoins});
+      const plan=await this.#observer.preparePlan(selected.plan);
       await this.#verifier.verifyDepositAdmission({binding:op.binding,plan});
       this.#update(state=>retainBurnPlan(state,id,plan));this.#emit('BURN_CONSTRUCTED',id,{txid:plan.txid});op=this.#op(id);
     }
@@ -241,7 +244,7 @@ export class BurnRuntime {
       this.#update(state=>markBurnBroadcast(state,id,true));this.#emit('BURN_BROADCAST',id,{txid:op.plan.txid});return;
     }
     if(op.mintReceipt)return;
-    const final=await this.#verifier.verifyFinalizedBurn({binding:op.binding,plan:op.plan});check(sameEvidence(final.evidence,op.burnEvidence),'FINALIZED_BURN_CHANGED');
+    const final=await this.#verifier.verifyFinalizedBurn({binding:op.binding,plan:op.plan,burnBlockHash:op.burnEvidence.burnBlockHash});check(sameEvidence(final.evidence,op.burnEvidence),'FINALIZED_BURN_CHANGED');
     const clock=await this.#solana.clock(),now=BigInt(Math.floor(Date.now()/1000));
     if(op.attestationDraftHex&&message(op.attestationDraftHex).validUntil<clock&&message(op.attestationDraftHex).validUntil<now){
       for(const row of op.solanaPacket??[]){

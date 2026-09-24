@@ -1,9 +1,10 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
-// Dedicated single-key signer on existing DPAPI storage. No Mainnet admission.
+// Dedicated single-key signer on existing DPAPI storage. Every signature needs
+// fresh admission from the concrete Native network verifier.
 import {createHash} from 'node:crypto';
 import {schnorr} from '@noble/curves/secp256k1.js';
 import {assertWindowsProtectedStore} from '../../shared/windows/protected-store.mjs';
-import {REGTEST_GENESIS} from '../node/native-raw-evidence.mjs';
+import {nativeIdentity} from '../../shared/network-identity.mjs';
 import {requireBurnDepositAdmission} from './burn-evidence.mjs';
 import {requireBurn as check,burnOperationId,validateNativeBurnTransaction} from './burn-protocol.mjs';
 import {signNativeBurnWithKey,verifyNativeBurnSignatures} from './burn-key.mjs';
@@ -19,7 +20,7 @@ export class ProtectedNativeBurnSigner {
     assertWindowsProtectedStore(keyStore,'BURN_SIGNER','native-burn-key');
     assertWindowsProtectedStore(authorizationStore,'BURN_SIGNER','native-burn-authorizations');
     const k=keyStore.context,a=authorizationStore.context;
-    check(['localnet','devnet'].includes(k.environment)&&k.nativeGenesis===REGTEST_GENESIS,'BurnSignerTestBindingRequired');
+    check(k.nativeGenesis===nativeIdentity(k.environment).genesis,'BurnSignerNetworkBindingRequired');
     for(const field of ['environment','nativeGenesis','solanaDeployment','serviceSid','keyEpoch'])check(k[field]===a[field],'BurnSignerContextChanged');
     const instance=new ProtectedNativeBurnSigner();instance.#key=keyStore;instance.#authorizations=authorizationStore;
     instance.#lease=await authorizationStore.acquireLease();

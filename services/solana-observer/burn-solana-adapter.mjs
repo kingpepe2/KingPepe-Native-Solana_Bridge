@@ -87,7 +87,7 @@ export class BurnSolanaAdapter {
       const amount=bytes.readBigUInt64LE(64);total+=amount;check(total<=MAX_KPEPE_SUPPLY_ATOMIC,'BurnBalanceSupplyRejected');
       return {address:token,amountAtomic:amount.toString()};
     });
-    return {address,chain:this.#policy.context.environment==='devnet'?'solana:devnet':'solana:localnet',mint,decimals:8,
+    return {address,chain:`solana:${this.#policy.context.environment}`,mint,decimals:8,
       solLamports:BigInt(lamports).toString(),kpepeAtomic:total.toString(),tokenAccounts,commitment:'finalized'};
   }
   async observe(binding,plan=null,attestation=null) {
@@ -158,7 +158,8 @@ export class BurnSolanaAdapter {
       messageDigestHex:decodeCanonicalBridgeMessage(h(op.attestation.encodedMessageHex)).messageDigestHex,
       mintedAmountAtomic:op.deposit.amountAtomic,solanaRecipientHex:op.binding.destination}};
     const proof=verifyDepositMintExecution(actual,observation,{environment:this.#policy.context.environment,cluster:this.#policy.context.environment,
-      solanaGenesis:this.#policy.manifest.solanaGenesis,managerProgramIdHex:op.binding.bridgeProgram,transceiverProgramIdHex:op.binding.transceiverProgram,mintHex:op.binding.mint,nativeDecimals:8});
+      solanaGenesis:this.#policy.manifest.solanaGenesis,protocolId:op.binding.protocolId,nativeNetwork:op.binding.nativeNetwork,nativeGenesis:op.binding.nativeGenesis,
+      solanaDeployment:op.binding.solanaDeployment,managerProgramIdHex:op.binding.bridgeProgram,transceiverProgramIdHex:op.binding.transceiverProgram,mintHex:op.binding.mint,nativeDecimals:8});
     return {operationId:op.operationId,amountAtomic:proof.amountAtomic,destination:op.binding.destination,mint:op.binding.mint,
       signature:packet.signature,slot:String(actual.slot),commitment:'finalized'};
   }

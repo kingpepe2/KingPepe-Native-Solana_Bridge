@@ -107,6 +107,12 @@ export function validateBurnInputs(inputs) {
   });
   return Object.freeze(normalized);
 }
+export function validateBurnPlanBlockHints(plan) {
+  const hints=plan.transactionBlockHints,ids=[...new Set(plan.inputs.map(i=>i.txid))].sort();
+  requireBurn(hints&&!Array.isArray(hints)&&Object.keys(hints).sort().join()===ids.join(),'NativeBurnBlockHintsRequired');
+  Object.values(hints).forEach(burnHash);
+  return hints;
+}
 export function validateBurnFeePolicy(input) {
   exact(input,'minimumRateAtomicPerKvB,normalRateAtomicPerKvB,maximumRateAtomicPerKvB,maximumAbsoluteFeeAtomic,dustRelayAtomicPerKvB');
   const p = Object.fromEntries(Object.entries(input).map(([k,v]) => [k,burnAmount(v).toString()]));

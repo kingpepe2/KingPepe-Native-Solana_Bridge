@@ -2,15 +2,21 @@
 // Fresh raw-chain/Merkle verification, independent of serialized journal flags.
 import { createHash } from 'node:crypto';
 import { NativeRpcClient } from '../node/native-rpc-client.mjs';
-import { REGTEST_GENESIS, collectRegtestEvidence, encodeRegtestEvidence, verifyRegtestEvidencePacket } from '../node/native-raw-evidence.mjs';
+import { collectRegtestEvidence, encodeRegtestEvidence, verifyRegtestEvidencePacket,
+  collectMainnetEvidence, encodeMainnetEvidence, verifyMainnetEvidencePacket } from '../node/native-raw-evidence.mjs';
+import { nativeIdentity } from '../../shared/network-identity.mjs';
 import { parseNativeTransactionHex } from '../node/native-taproot-transaction.mjs';
 import { burnDepositDestination, burnOperationalDestination, verifyNativeBurnSignatures } from './burn-key.mjs';
 import { requireBurn as check, validateNativeBurnTransaction, encodeFinalizedBurnEvidence, nativeBurnCommitment,
-  burnEvidenceDigest, burnOperationId, BURN_CONFIRMATIONS } from './burn-protocol.mjs';
+  burnEvidenceDigest, burnOperationId, validateBurnPlanBlockHints, BURN_CONFIRMATIONS } from './burn-protocol.mjs';
 
 const DEPOSIT_ADMISSIONS=new WeakMap(), FINALIZED_BURNS=new WeakMap();
 export function validateRegtestBurnNetwork(chain,genesis) {
-  check(chain?.chain==='regtest'&&genesis===REGTEST_GENESIS,'BURN_NATIVE_NETWORK_MISMATCH');
+  return validateNativeBurnNetwork(chain,genesis,'localnet');
+}
+export function validateNativeBurnNetwork(chain,genesis,environment) {
+  const identity=nativeIdentity(environment);
+  check(chain?.chain===identity.rpcChain&&genesis===identity.genesis,'BURN_NATIVE_NETWORK_MISMATCH');
   check(typeof chain.initialblockdownload==='boolean'&&Number.isSafeInteger(chain.blocks)&&chain.blocks>=0&&
     Number.isSafeInteger(chain.headers)&&chain.headers>=chain.blocks,'BURN_NATIVE_CHAIN_STATE_REJECTED');
   check(chain.initialblockdownload===false&&chain.blocks===chain.headers,'BURN_NATIVE_SYNCHRONIZING');
@@ -31,24 +37,27 @@ function freeze(value) {
   for(const child of Object.values(value)) if(child&&typeof child==='object') freeze(child);
   return Object.freeze(value);
 }
-export class RegtestNativeBurnVerifier {
-  #rpc;#executable;
-  constructor({rpc,executable}) {
+export class NativeBurnVerifier {
+  #rpc;#executable;#identity;
+  constructor({rpc,executable,environment}) {
     check(rpc instanceof NativeRpcClient,'NativeBurnRpcRequired');
-    this.#rpc=rpc;this.#executable=executable;
+    this.#rpc=rpc;this.#executable=executable;this.#identity=nativeIdentity(environment);
   }
+  get nativeGenesis(){return this.#identity.genesis;}
   async assertNetwork() {
     const chain=await this.#rpc.getBlockchainInfo();
-    return validateRegtestBurnNetwork(chain,(await this.#rpc.call('getblockhash',[0])).result);
+    return validateNativeBurnNetwork(chain,(await this.#rpc.call('getblockhash',[0])).result,this.#identity.environment);
   }
-  async #bundle(ids) {
-    const bundle=await collectRegtestEvidence({rpc:this.#rpc,transactionIds:[...new Set(ids)],minimumConfirmations:BURN_CONFIRMATIONS});
-    const verified=await verifyRegtestEvidencePacket({executable:this.#executable,packet:encodeRegtestEvidence(bundle)});
+  async #bundle(ids,transactionBlockHints) {
+    const mainnet=this.#identity.environment==='mainnet';
+    const bundle=await (mainnet?collectMainnetEvidence:collectRegtestEvidence)({rpc:this.#rpc,transactionIds:[...new Set(ids)],minimumConfirmations:BURN_CONFIRMATIONS,transactionBlockHints});
+    const verified=await (mainnet?verifyMainnetEvidencePacket:verifyRegtestEvidencePacket)({executable:this.#executable,packet:(mainnet?encodeMainnetEvidence:encodeRegtestEvidence)(bundle)});
     check(verified.tipHeight===bundle.tipHeight&&verified.tipHash===bundle.tipHash,'NativeBurnProofChanged');
     return {bundle,verified};
   }
   #checkPlan(binding,plan) {
-    check(binding.nativeGenesis===REGTEST_GENESIS&&plan.operationId===burnOperationId(binding),'NativeBurnNetworkOrOperationRejected');
+    check(binding.nativeGenesis===this.#identity.genesis&&binding.nativeNetwork===this.#identity.domain&&plan.operationId===burnOperationId(binding),'NativeBurnNetworkOrOperationRejected');
+    if(this.#identity.environment==='mainnet')validateBurnPlanBlockHints(plan);
     const deposit=burnDepositDestination(binding),operational=burnOperationalDestination(binding);
     check(plan.inputs[0].scriptPubKeyHex===deposit.scriptPubKeyHex&&plan.operationalScriptHex===operational.scriptPubKeyHex,'NativeBurnDestinationChanged');
     validateNativeBurnTransaction({rawTransactionHex:plan.unsignedTransactionHex,operationId:plan.operationId,inputs:plan.inputs,
@@ -66,7 +75,7 @@ export class RegtestNativeBurnVerifier {
   }
   async verifyDepositAdmission({binding,plan}) {
     binding=structuredClone(binding);plan=structuredClone(plan);this.#checkPlan(binding,plan);
-    const {bundle,verified}=await this.#bundle(plan.inputs.map(i=>i.txid));
+    const {bundle,verified}=await this.#bundle(plan.inputs.map(i=>i.txid),plan.transactionBlockHints);
     this.#inputs(bundle,plan);
     for(const input of plan.inputs) {
       const coin=await this.#rpc.getUtxoObservation({...input,includeMempool:true});
@@ -78,9 +87,18 @@ export class RegtestNativeBurnVerifier {
     DEPOSIT_ADMISSIONS.set(result,{binding:burnOperationId(binding),plan:digest(plan),observedAt:result.observedAt});
     return result;
   }
-  async verifyFinalizedBurn({binding,plan}) {
+  async verifyFinalizedBurn({binding,plan,burnBlockHash}) {
     binding=structuredClone(binding);plan=structuredClone(plan);this.#checkPlan(binding,plan);
-    const {bundle,verified}=await this.#bundle([...plan.inputs.map(i=>i.txid),plan.txid]);
+    let hints=plan.transactionBlockHints;
+    if(this.#identity.environment==='mainnet'){
+      // The change output locates a newly mined burn without txindex. Once
+      // finalized, the durable burn evidence provides its independently checked
+      // block location even after that operational change has been spent.
+      const location=await this.#rpc.locateMainnetTransaction({txid:plan.txid,vout:1,blockHash:burnBlockHash});
+      check(location.state==='OBSERVED'&&location.confirmations>=BURN_CONFIRMATIONS&&location.blockHash,'NativeBurnNotFinal');
+      hints={...hints,[plan.txid]:location.blockHash};
+    }
+    const {bundle,verified}=await this.#bundle([...plan.inputs.map(i=>i.txid),plan.txid],hints);
     const inputs=this.#inputs(bundle,plan),burn=bundle.proofs.find(p=>parseNativeTransactionHex(p.rawTransactionHex).txidHex===plan.txid);
     check(burn&&bundle.tipHeight-burn.blockHeight+1>=BURN_CONFIRMATIONS,'NativeBurnNotFinal');
     const signed=parseNativeTransactionHex(burn.rawTransactionHex);
@@ -99,4 +117,8 @@ export class RegtestNativeBurnVerifier {
     FINALIZED_BURNS.set(result,{binding:burnOperationId(binding),plan:digest(plan)});
     return result;
   }
+}
+// Preserve the explicit REGTEST constructor used by the retained proof runner.
+export class RegtestNativeBurnVerifier extends NativeBurnVerifier {
+  constructor(options){super({...options,environment:'localnet'});}
 }

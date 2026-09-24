@@ -6,6 +6,7 @@ import { secp256k1, schnorr } from '@noble/curves/secp256k1.js';
 import { burnHash, requireBurn, validateNativeBurnTransaction, burnOperationId } from './burn-protocol.mjs';
 import { taprootKeyPathSighashDefault, attachKeyPathTaprootWitnesses, parseNativeTransactionHex } from '../node/native-taproot-transaction.mjs';
 import { witnessAddressFromScript } from '../node/witness-address.mjs';
+import { NATIVE_MAINNET_GENESIS } from '../../shared/network-identity.mjs';
 
 const order = secp256k1.Point.Fn.ORDER;
 const scalarBytes = n => Buffer.from(n.toString(16).padStart(64,'0'),'hex');
@@ -23,13 +24,13 @@ function derivation(publicKeyHex, nativeGenesis, operationId) {
   requireBurn(!child.equals(secp256k1.Point.ZERO),'NativeBurnDerivationRejected');
   return { tweak, publicKeyHex:Buffer.from(child.toBytes(true)).subarray(1).toString('hex') };
 }
-export function burnDepositDestination(binding, hrp = 'rkpepe') {
+export function burnDepositDestination(binding, hrp = binding.nativeGenesis === NATIVE_MAINNET_GENESIS ? 'kpepe' : 'rkpepe') {
   const operationId = burnOperationId(binding);
   const child = derivation(binding.burnPublicKey,binding.nativeGenesis,operationId);
   const scriptPubKeyHex = '5120'+child.publicKeyHex;
   return Object.freeze({operationId,scriptPubKeyHex,address:witnessAddressFromScript(scriptPubKeyHex,hrp)});
 }
-export function burnOperationalDestination({ burnPublicKey, nativeGenesis }, hrp = 'rkpepe') {
+export function burnOperationalDestination({ burnPublicKey, nativeGenesis }, hrp = nativeGenesis === NATIVE_MAINNET_GENESIS ? 'kpepe' : 'rkpepe') {
   const child = derivation(burnPublicKey,nativeGenesis,null), scriptPubKeyHex = '5120'+child.publicKeyHex;
   return Object.freeze({scriptPubKeyHex,address:witnessAddressFromScript(scriptPubKeyHex,hrp)});
 }

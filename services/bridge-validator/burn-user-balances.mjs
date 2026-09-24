@@ -1,7 +1,7 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 // Read-only public addresses; no wallet secrets or RPC forwarding.
 import {NativeRpcClient,SOURCE_READY} from '../../native/node/native-rpc-client.mjs';
-import {REGTEST_GENESIS} from '../../native/node/native-raw-evidence.mjs';
+import {nativeIdentity} from '../../shared/network-identity.mjs';
 import {scriptFromWitnessAddress} from '../../native/node/witness-address.mjs';
 import {BurnSolanaAdapter} from '../solana-observer/burn-solana-adapter.mjs';
 import {base58Decode,base58Encode} from './solana-deposit-claim-transaction-plan.mjs';
@@ -16,7 +16,8 @@ export class BurnUserBalances {
   assertBurnContext(context){check(stableJson(context)===stableJson(this.#solana.policy.context),'BurnBalanceContextMismatch');}
   async read(network,address){
     check(network==='native'||network==='solana','BurnBalanceNetworkRejected');
-    if(network==='native'){scriptFromWitnessAddress(address,'rkpepe');address=address.toLowerCase();}
+    const identity=nativeIdentity(this.#solana.policy.context.environment);
+    if(network==='native'){scriptFromWitnessAddress(address,identity.hrp);address=address.toLowerCase();}
     else{check(typeof address==='string'&&base58Decode(address).length===32&&base58Encode(base58Decode(address))===address,'BurnBalanceAddressRejected');}
     const key=network+':'+address,time=Date.now(),cached=this.#cache.get(key);
     if(cached&&time>=cached.at&&time-cached.at<20000)return structuredClone(cached.value);
@@ -25,11 +26,11 @@ export class BurnUserBalances {
       let value;
       if(network==='solana')value=await this.#solana.publicBalance(address);
       else {
-        const observe=()=>this.#native.getSourceSnapshot({expectedNetwork:'regtest',expectedGenesisHash:REGTEST_GENESIS});
+        const observe=()=>this.#native.getSourceSnapshot({expectedNetwork:identity.rpcChain,expectedGenesisHash:identity.genesis});
         const before=await observe();check(before.state===SOURCE_READY,'BurnBalanceNetworkRejected');
-        const balance=await this.#native.scanAddressBalance(address),after=await observe();
+        const balance=await (identity.environment==='mainnet'?this.#native.scanMainnetAddressBalance(address):this.#native.scanAddressBalance(address)),after=await observe();
         check(after.state===SOURCE_READY&&before.bestHash===after.bestHash&&balance.bestBlockHash===after.bestHash,'BurnBalanceSourceChanged');
-        value={address,network:'REGTEST',decimals:8,amountAtomic:balance.amountAtomic,kind:'CONFIRMED_UTXO'};
+        value={address,network:identity.network.toUpperCase(),decimals:8,amountAtomic:balance.amountAtomic,kind:'CONFIRMED_UTXO'};
       }
       if(this.#cache.size>=128)this.#cache.delete(this.#cache.keys().next().value);
       this.#cache.set(key,{at:Date.now(),value});return structuredClone(value);

@@ -1,6 +1,8 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
-// Private transport for the TEST conversion. Mainnet construction is rejected.
+// Private network-bound transport. Mainnet endpoints enter only through the
+// protected launcher's process configuration, never a browser or public file.
 import {devnetRpcEndpoint,DEVNET_SOLANA_GENESIS} from '../../shared/solana-test-network.mjs';
+import {mainnetRpcEndpoint,SOLANA_MAINNET_GENESIS} from '../../shared/network-identity.mjs';
 import {base58Decode} from '../bridge-validator/solana-deposit-claim-transaction-plan.mjs';
 import {requireBurn as check} from '../../native/burn/burn-protocol.mjs';
 const METHODS=new Set(['getGenesisHash','getHealth','getMultipleAccounts','getAccountInfo','getLatestBlockhash','getBlockHeight',
@@ -8,7 +10,7 @@ const METHODS=new Set(['getGenesisHash','getHealth','getMultipleAccounts','getAc
 export class BurnSolanaRpc {
   #endpoint;#genesis;#id=0;
   constructor({environment,endpoint,expectedGenesis}) {
-    check(['localnet','devnet'].includes(environment),'BurnSolanaTestOnly');
+    check(['localnet','devnet','mainnet'].includes(environment),'BurnSolanaEnvironmentRejected');
     check(base58Decode(expectedGenesis).length===32,'BurnSolanaGenesisRejected');
     if(environment==='devnet'){
       check(expectedGenesis===DEVNET_SOLANA_GENESIS,'BurnSolanaGenesisRejected');
@@ -18,7 +20,11 @@ export class BurnSolanaRpc {
       const value=endpoint==='ENV:SOLANA_DEVNET_RPC_URL'?process.env.SOLANA_DEVNET_RPC_URL:endpoint;
       this.#endpoint=devnetRpcEndpoint(value,expectedGenesis);
     }
-    else {
+    else if(environment==='mainnet'){
+      check(expectedGenesis===SOLANA_MAINNET_GENESIS,'BurnSolanaGenesisRejected');
+      check(endpoint==='ENV:SOLANA_MAINNET_RPC_URL','BurnSolanaProtectedMainnetEndpointRequired');
+      this.#endpoint=mainnetRpcEndpoint(process.env.SOLANA_MAINNET_RPC_URL,expectedGenesis);
+    }else {
       let u;try{u=new URL(endpoint);}catch{throw new Error('BurnSolanaEndpointRejected');}
       check(u.protocol==='http:'&&u.hostname==='127.0.0.1'&&Number(u.port)>=1024&&u.pathname==='/'&&!u.search&&!u.hash&&!u.username&&!u.password,'BurnSolanaEndpointRejected');
       this.#endpoint=u.href;

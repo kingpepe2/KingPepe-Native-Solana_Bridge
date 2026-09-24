@@ -18,8 +18,8 @@
   },
   "cleanup": {
     "scope": "TEAM_AUTHORIZED_AUTOMATIC_BURN_AND_MINT_CONVERSION",
-    "status": "CURRENT_SOURCE_CONVERTED_TEST_RUNTIME_PASS_PUBLIC_CUTOVER_PENDING",
-    "filesAfter": 182,
+    "status": "CURRENT_BURN_TEST_DEPLOYED_MAINNET_ADAPTERS_PREPARED",
+    "filesAfter": 185,
     "removed": "Obsolete permanent reserve/FROST runtime, protocol and tests. Protected runtime backups and historical legal facts remain outside this cleanup.",
     "importedSource": "No third-party source imported. Existing dependency/API references and original classifications are preserved."
   },
@@ -307,7 +307,7 @@
     {
       "path": "native/burn/burn-evidence.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original independently verified REGTEST deposit/burn admission over exact raw transactions, headers, Merkle proofs and the retained Native proof executable; no RPC finality assertion substitutes for proof.",
+      "notes": "Original independently verified REGTEST/Mainnet deposit/burn admission over raw transactions, headers and Merkle proofs; Mainnet spent inputs retain checked block hints, not trusted finality flags.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
@@ -328,7 +328,7 @@
     {
       "path": "native/burn/burn-observer.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original bounded REGTEST block/mempool discovery, retired-address exception observation, exact burn lookup and ambiguity-safe broadcast recovery.",
+      "notes": "Original bounded network-bound Native block/mempool discovery and ambiguity-safe burn recovery; Mainnet uses retained and UTXO-derived block locations without requiring txindex.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
@@ -394,6 +394,13 @@
       "notes": "Original durable state, immutable destination, multiple/late deposit, reorg, exactly-once recovery and conservation regressions.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "native/burn/tests/burn-mainnet-admission.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original synthetic Mainnet network/context, no-index block-hint journal recovery, protected endpoint and wrong-cluster regressions. No production transaction or retained private material.",
+      "purpose": "REQUIRED_TEST",
+      "reviewDisposition": "KEEP_CURRENT"
     },
     {
       "path": "native/burn/tests/burn-protocol.test.mjs",
@@ -762,7 +769,7 @@
     {
       "path": "services/bridge-validator/burn-context.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original TEST network, exact deployment and role/context validation for the automatic burn runtime.",
+      "notes": "Original exact deployment/domain/network admission for TEST and Mainnet burn messages; contexts cannot be relabeled across genesis or program/Mint identities.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
@@ -830,6 +837,13 @@
       "reviewDisposition": "KEEP_CORE"
     },
     {
+      "path": "services/bridge-validator/mainnet-metadata-setup-plan.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original unsigned standard-SPL atomic Mint/Metaplex metadata/Bridge-PDA authority setup and paused enrollment planner. Implements public instruction interfaces; no third-party source copied.",
+      "purpose": "REQUIRED_FORWARD",
+      "reviewDisposition": "KEEP_CURRENT"
+    },
+    {
       "path": "services/bridge-validator/mainnet-solana-setup-plan.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original unsigned Mainnet zero-supply Mint/config and existing mode transaction preparation; pinned deployment identity, paused initial state, no keys, RPC, signatures or submission.",
@@ -856,6 +870,13 @@
       "notes": "Phase 08 tests for localnet Solana setup transaction planning, SPL Token initialize instruction encoding, PDA initialization account ordering, and injected runtime signer validation.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "services/bridge-validator/tests/mainnet-metadata-setup-plan.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original independent packet decoding and negative network, metadata URI, authority, pause and exact-decimal tests for production setup.",
+      "purpose": "REQUIRED_TEST",
+      "reviewDisposition": "KEEP_CURRENT"
     },
     {
       "path": "services/bridge-validator/tests/mainnet-solana-setup-plan.test.mjs",
@@ -888,7 +909,7 @@
     {
       "path": "services/solana-observer/burn-solana-rpc.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original bounded TEST-only Solana transport with genesis verification, strict methods/send options and sanitized errors.",
+      "notes": "Original private Solana transport with exact genesis checks; Mainnet endpoint comes exclusively from protected process configuration.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },

@@ -1,6 +1,7 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 // Pure forward burn journal transitions. This is durable bookkeeping, not proof.
-import { burnOperationId, burnHash, burnUint, burnAmount, validateBurnBinding, validateNativeBurnTransaction, encodeFinalizedBurnEvidence, requireBurn as check } from '../../native/burn/burn-protocol.mjs';
+import { burnOperationId, burnHash, burnUint, burnAmount, validateBurnBinding, validateBurnPlanBlockHints, validateNativeBurnTransaction, encodeFinalizedBurnEvidence, requireBurn as check } from '../../native/burn/burn-protocol.mjs';
+import { NATIVE_MAINNET_GENESIS } from '../../shared/network-identity.mjs';
 import { burnDepositDestination, verifyNativeBurnSignatures } from '../../native/burn/burn-key.mjs';
 import { MAX_KPEPE_SUPPLY_ATOMIC } from '../../shared/monetary-supply.mjs';
 import { parseNativeTransactionHex } from '../../native/node/native-taproot-transaction.mjs';
@@ -84,6 +85,10 @@ export function retainBurnPlan(state,id,plan) {
   if(op.plan) { check(same(op.plan,plan),'BurnJournalPlanChanged'); return; }
   check(plan.operationId===id && plan.inputs[0].txid===op.deposit.txid && plan.inputs[0].vout===op.deposit.vout &&
     plan.inputs[0].amountAtomic===op.deposit.amountAtomic && plan.inputs[0].scriptPubKeyHex===op.depositScriptHex,'BurnJournalDepositBindingChanged');
+  if(op.binding.nativeGenesis===NATIVE_MAINNET_GENESIS){
+    const hints=validateBurnPlanBlockHints(plan);
+    check(hints[op.deposit.txid]===op.deposit.blockHash,'BurnJournalDepositBlockChanged');
+  }
   validateNativeBurnTransaction({rawTransactionHex:plan.unsignedTransactionHex,operationId:id,inputs:plan.inputs,
     operationalScriptHex:plan.operationalScriptHex,expectedFeeAtomic:plan.feeAtomic,maximumFeeAtomic:plan.maximumFeeAtomic});
   const incoming=new Set(plan.inputs.map(i=>`${i.txid}:${i.vout}`));

@@ -21,7 +21,7 @@ const mutateAccount = (snapshot, index, offset) => {
 test("burn conversion cannot enable Mainnet by relabeling TEST configuration", () => {
   const f = burnFixture();
   try {
-    assert.throws(() => new BurnSolanaRpc({ ...options, environment: 'mainnet' }), /BurnSolanaTestOnly/);
+    assert.throws(() => new BurnSolanaRpc({ ...options, environment: 'mainnet' }), /BurnSolanaProtectedMainnetEndpointRequired/);
     assert.throws(() => new BurnSolanaRpc({ ...options, environment: 'devnet' }), /BurnSolanaGenesisRejected/);
     assert.throws(() => validateBurnContext({ ...f.context, environment: 'mainnet' }));
   } finally { f.destroy(); }
