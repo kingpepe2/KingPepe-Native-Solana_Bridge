@@ -39,6 +39,8 @@ const METHOD_ALLOWLIST = new Set([
 export class NativeRpcClient {
   #endpoint;
   #authHeader;
+  #authCookieFile;
+  #repoRoot;
   #fetchFn;
   #timeoutMs;
   #maximumResponseBytes;
@@ -49,6 +51,8 @@ export class NativeRpcClient {
       localOnly: options.localOnly !== false,
     });
     this.#authHeader = buildAuthorizationHeader(options);
+    this.#authCookieFile = options.authCookieFile || undefined;
+    this.#repoRoot = options.repoRoot;
     this.#fetchFn = options.fetchFn ?? globalThis.fetch;
     if (typeof this.#fetchFn !== "function") {
       throw new Error("NativeRpcFetchUnavailable");
@@ -83,6 +87,23 @@ export class NativeRpcClient {
     return `${url.protocol}//${url.hostname}:${url.port}`;
   }
 
+  #authorizationHeader(method) {
+    if (this.#authCookieFile === undefined) return this.#authHeader;
+    // The Native node replaces its cookie at restart. Never reuse the previous
+    // cookie, fall back to anonymous access, or retry an economic RPC here.
+    try { return readAuthorizationHeaderFromCookieFile(this.#authCookieFile, this.#repoRoot); }
+    catch (error) {
+      if (error.message === "NativeRpcAuthCookieUnreadable") throw rpcError("NativeRpcUnavailable", method);
+      throw error;
+    }
+  }
+
+  #httpFailure(method, status) {
+    // Rotation can race the read above. The next normal processing cycle must
+    // re-observe chain state; a 401 is not a successful or absent transaction.
+    return rpcError(this.#authCookieFile !== undefined && status === 401 ? "NativeRpcUnavailable" : "NativeRpcHttpFailure", method, status);
+  }
+
   async call(method, params = []) {
     if (!METHOD_ALLOWLIST.has(method)) {
       throw new Error(`NativeRpcMethodNotAllowed:${method}`);
@@ -95,12 +116,13 @@ export class NativeRpcClient {
     const id = this.#nextId;
     this.#nextId += 1;
     try {
+      const authorization = this.#authorizationHeader(method);
       const response = await this.#fetchFn(this.#endpoint, {
         method: "POST",
         redirect: "error", // Never forward RPC credentials, observations or signed bytes to another endpoint.
         headers: {
           "content-type": "application/json",
-          ...(this.#authHeader === undefined ? {} : { authorization: this.#authHeader }),
+          ...(authorization === undefined ? {} : { authorization }),
         },
         body: JSON.stringify({
           jsonrpc: JSON_RPC_VERSION,
@@ -116,7 +138,7 @@ export class NativeRpcClient {
       const httpFailure = !response.ok;
       if (httpFailure && ![400, 404, 500].includes(response.status)) {
         await response.body?.cancel();
-        throw rpcError("NativeRpcHttpFailure", method, response.status);
+        throw this.#httpFailure(method, response.status);
       }
       const raw = await readBoundedRpcResponse(response, this.#maximumResponseBytes);
       let envelope;
@@ -173,10 +195,11 @@ export class NativeRpcClient {
     const requests = params.map(value => ({ jsonrpc: JSON_RPC_VERSION, id: this.#nextId++, method, params: value }));
     const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), this.#timeoutMs);
     try {
+      const authorization = this.#authorizationHeader(method);
       const response = await this.#fetchFn(this.#endpoint, { method: "POST", redirect: "error",
-        headers: { "content-type": "application/json", ...(this.#authHeader === undefined ? {} : { authorization: this.#authHeader }) },
+        headers: { "content-type": "application/json", ...(authorization === undefined ? {} : { authorization }) },
         body: JSON.stringify(requests), signal: controller.signal });
-      if (!response.ok) { await response.body?.cancel(); throw rpcError("NativeRpcHttpFailure", method, response.status); }
+      if (!response.ok) { await response.body?.cancel(); throw this.#httpFailure(method, response.status); }
       let envelopes;
       try { envelopes = JSON.parse(await readBoundedRpcResponse(response, this.#maximumResponseBytes)); }
       catch { throw rpcError("NativeRpcInvalidEnvelope", method); }

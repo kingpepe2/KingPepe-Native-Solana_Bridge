@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { writeFileSync } from "node:fs";
+import { writeFileSync, renameSync } from "node:fs";
 import { mkdtemp } from "node:fs/promises";
 import http from "node:http";
 import os from "node:os";
@@ -325,6 +325,67 @@ test("HTTP and malformed RPC failures cannot be reclassified as transaction-not-
   }
   const oversized = new NativeRpcClient({ maximumResponseBytes: 64, fetchFn: async () => new Response("x".repeat(65), { status: 500 }) });
   await assert.rejects(oversized.getBlockchainInfo(), /NativeRpcResponseTooLarge/u);
+});
+
+test("retained RPC client reads rotated cookies for observations and header batches", async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "kingpepe-native-cookie-"));
+  const authCookieFile = path.join(tempRoot, ".cookie");
+  let cookie = `_cookie:${randomUUID()}`;
+  writeFileSync(authCookieFile, cookie, "utf8");
+  const requests = [];
+  const client = new NativeRpcClient({ authCookieFile, repoRoot: REPO_ROOT, fetchFn: async (_url, init) => {
+    assert.equal(init.headers.authorization, `Basic ${Buffer.from(cookie).toString("base64")}`);
+    const request = JSON.parse(init.body); requests.push(request);
+    if (Array.isArray(request)) return Response.json(request.map(({ id, method }) => ({ id, error: null,
+      result: method === "getblockhash" ? BEST_BLOCK : "00".repeat(80) })));
+    return Response.json({ id: request.id, error: null, result: { chain: "regtest" } });
+  } });
+  assert.equal((await client.getBlockchainInfo()).chain, "regtest");
+  cookie = `_cookie:${randomUUID()}`; writeFileSync(authCookieFile, cookie, "utf8");
+  assert.equal((await client.getBlockchainInfo()).chain, "regtest");
+  assert.equal((await client.getHeadersByHeight(1, 1))[0].hash, BEST_BLOCK);
+  assert.equal(requests.length, 4);
+});
+
+test("missing or malformed replacement cookie never sends stale or anonymous requests", async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "kingpepe-native-cookie-gap-"));
+  const authCookieFile = path.join(tempRoot, ".cookie"), oldCookie = path.join(tempRoot, "retired-cookie");
+  writeFileSync(authCookieFile, `_cookie:${randomUUID()}`, "utf8");
+  let calls = 0;
+  const client = new NativeRpcClient({ authCookieFile, repoRoot: REPO_ROOT, fetchFn: async (_url, init) => {
+    calls++; const { id } = JSON.parse(init.body); return Response.json({ id, error: null, result: { chain: "regtest" } });
+  } });
+  renameSync(authCookieFile, oldCookie);
+  await assert.rejects(client.getBlockchainInfo(), { code: "NativeRpcUnavailable" });
+  await assert.rejects(client.getHeadersByHeight(1, 1), { code: "NativeRpcUnavailable" });
+  writeFileSync(authCookieFile, "malformed", "utf8");
+  await assert.rejects(client.getBlockchainInfo(), /NativeRpcAuthCookieMalformed/u);
+  assert.equal(calls, 0);
+  writeFileSync(authCookieFile, `_cookie:${randomUUID()}`, "utf8");
+  assert.equal((await client.getBlockchainInfo()).chain, "regtest"); assert.equal(calls, 1);
+});
+
+test("cookie rotation racing a request holds processing without retrying a broadcast", async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "kingpepe-native-cookie-race-"));
+  const authCookieFile = path.join(tempRoot, ".cookie");
+  let cookie = `_cookie:${randomUUID()}`, reject = true;
+  writeFileSync(authCookieFile, cookie, "utf8");
+  const methods = [];
+  const client = new NativeRpcClient({ authCookieFile, repoRoot: REPO_ROOT, fetchFn: async (_url, init) => {
+    const request = JSON.parse(init.body); methods.push(Array.isArray(request) ? request[0].method : request.method);
+    assert.equal(init.headers.authorization, `Basic ${Buffer.from(cookie).toString("base64")}`);
+    if (reject) {
+      cookie = `_cookie:${randomUUID()}`; writeFileSync(authCookieFile, cookie, "utf8");
+      return new Response("untrusted authentication failure", { status: 401 });
+    }
+    return Response.json({ id: request.id, error: null, result: { chain: "regtest" } });
+  } });
+  await assert.rejects(client.call("sendrawtransaction", ["00"]), { code: "NativeRpcUnavailable", rpcCode: 401 });
+  assert.deepEqual(methods, ["sendrawtransaction"]);
+  await assert.rejects(client.getHeadersByHeight(1, 1), { code: "NativeRpcUnavailable", rpcCode: 401 });
+  reject = false;
+  assert.equal((await client.getBlockchainInfo()).chain, "regtest");
+  assert.deepEqual(methods, ["sendrawtransaction", "getblockhash", "getblockchaininfo"]);
 });
 
 async function withRpcServer(callback, options = {}) {

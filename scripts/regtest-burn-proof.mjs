@@ -70,8 +70,8 @@ try{
   const deposit=burnDepositDestination(binding),fees=burnOperationalDestination(binding);
   const depositTxid=await harness('sendtoaddress',[deposit.address,'0.00100000'],'user');
   const feeTxid=await harness('sendtoaddress',[fees.address,'0.01000000'],'user');await mine(1);
-  let rpc=new NativeRpcClient({endpoint,authCookieFile:cookie,repoRoot});
-  let verifier=new RegtestNativeBurnVerifier({rpc,executable:process.env.KINGPEPE_TEST_NATIVE_VERIFIER});
+  const rpc=new NativeRpcClient({endpoint,authCookieFile:cookie,repoRoot});
+  const verifier=new RegtestNativeBurnVerifier({rpc,executable:process.env.KINGPEPE_TEST_NATIVE_VERIFIER});
   const coin=async(txid,scriptPubKeyHex)=>{
     const tx=parseNativeTransactionHex(await rpc.getRawTransaction(txid,false)),vout=tx.outputs.findIndex(o=>o.scriptPubKeyHex===scriptPubKeyHex);
     assert(vout>=0);return {txid,vout,amountAtomic:tx.outputs[vout].amountAtomic,scriptPubKeyHex};
@@ -103,15 +103,14 @@ try{
     feeFundingVout:inputs[1].vout,feeFundingAtomic:inputs[1].amountAtomic,changeAtomic:plan.changeAtomic,virtualBytes:plan.virtualBytes,
     burnScriptHex:plan.burnScriptHex,evidenceHex:final.evidenceHex,canonicalMessageHex:message.toString('hex'),messageDigest:burnMessageDigest(message)};
   const spend=await rpc.getUtxoObservation({txid,vout:0,includeMempool:true});assert.equal(spend.unspent,false);pass('BURN_UTXO_EXCLUDED');
+  const priorCookieDigest=createHash('sha256').update(readFileSync(cookie)).digest('hex');
   await stop();await start();
-  rpc=new NativeRpcClient({endpoint,authCookieFile:cookie,repoRoot});
-  verifier=new RegtestNativeBurnVerifier({rpc,executable:process.env.KINGPEPE_TEST_NATIVE_VERIFIER});
+  assert.notEqual(createHash('sha256').update(readFileSync(cookie)).digest('hex'),priorCookieDigest);
   const afterRestart=await verifier.verifyFinalizedBurn({binding,plan});assert.equal(afterRestart.evidenceHex,final.evidenceHex);pass('RESTART_REVERIFIES_IDENTICAL_FINAL_BURN');
+  pass('RETAINED_RPC_CLIENT_RECOVERS_ROTATED_NATIVE_COOKIE');
   await assert.rejects(verifier.verifyDepositAdmission({binding,plan}));pass('SPENT_DEPOSIT_CANNOT_BURN_AGAIN');
   const retained=await rpc.getRawTransaction(txid,false);assert.equal(retained,signed);pass('BROADCAST_RECOVERY_FINDS_SAME_BURN_WITHOUT_RESUBMISSION');
   await stop();await start(['-reindex=1']);
-  rpc=new NativeRpcClient({endpoint,authCookieFile:cookie,repoRoot});
-  verifier=new RegtestNativeBurnVerifier({rpc,executable:process.env.KINGPEPE_TEST_NATIVE_VERIFIER});
   for(let n=0;n<240;n++) {
     try {
       const rebuilt=await verifier.verifyFinalizedBurn({binding,plan});assert.equal(rebuilt.evidenceHex,final.evidenceHex);
