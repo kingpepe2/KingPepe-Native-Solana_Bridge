@@ -49,6 +49,6 @@ test('DPAPI burn key and forward journal remain encrypted, role-bound and recove
   assert.equal(journal.read().operations[0].depositAddress,operation.depositAddress);
   assert.equal(journal.read().operations[0].binding.destination,binding.destination);
   journal.pause('TEST_PAUSE');assert.equal(journal.read().paused,true);
-  // Same-account storage/ACL recovery is proven here. Distinct service identity
-  // and portable offline backup require separate deployment evidence.
+  // Same-account storage/ACL recovery is proven here. Actual runtime isolation
+  // needs separate evidence; this does not certify server-loss recovery.
 });

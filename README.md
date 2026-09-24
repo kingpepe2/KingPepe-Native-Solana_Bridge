@@ -27,7 +27,9 @@ The public counter uses completed, canonically accounted burn/mint operations. I
 
 ## Trust and recovery
 
-Native burn custody uses **SINGLE_KEY_ACCEPTED_RISK**. The root signs independently derived operation addresses and a separate operational fee address. It is server-side and DPAPI-protected; it is separate from Solana payer, upgrade authority and attester keys. No FROST is used. Compromise before burn may permit theft of temporarily held deposits and operational fees; key loss may prevent processing. Cloudflare does not store or protect that key. Dedicated service identity separation and encrypted offline recovery must be proven before production.
+Native burn custody uses **SINGLE_KEY_ACCEPTED_RISK**. The root signs independently derived operation addresses and a separate operational fee address. It is server-side and DPAPI-protected; it is separate from Solana payer, upgrade authority and attester keys. No FROST is used. Compromise before burn may permit theft of temporarily held deposits and operational fees. The private automatic signer must prove access isolation from Explorer, restart safety and the existing burn admission controls; Windows Service/SCM hosting is not required.
+
+**OFFLINE_RECOVERY_BACKUP = NOT_REQUIRED_BY_TEAM_DECISION; RECOVERY_RISK = ACCEPTED_BY_KINGPEPE_TEAM.** No offline backup is claimed. Loss of the only usable burn signing material may leave confirmed but unburned Native deposits unavailable for automatic processing/recovery. Cloudflare does not mitigate that risk or protect the key. Removing the offline-copy and SCM requirements does not waive protected storage, automatic signer verification or any burn/mint invariant.
 
 The journal and exact signed transactions persist before broadcast. After an ambiguous response, recovery checks the existing Native transaction or Solana claim before retrying the same action. A finalized burn remains a mint obligation after restart. Critical contradictions persistently pause economic processing; there is no automatic economic repair.
 

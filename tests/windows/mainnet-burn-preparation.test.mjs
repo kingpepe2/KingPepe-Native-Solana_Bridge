@@ -18,7 +18,8 @@ test('dedicated-identity preparation preserves supplied payer/attesters, creates
   assert.throws(()=>prepareMainnetBurnStores({...options,explorerSid:sid}),/Rejected/);assert(!existsSync(options.root));
   assert.throws(()=>prepareMainnetBurnStores({...options,feePayer:pub(seeds[0])}),/Rejected/);assert(!existsSync(options.root));
   assert.throws(()=>prepareMainnetBurnStores({...options,imports:{...options.imports,nativeRpc:Buffer.from(JSON.stringify({endpoint:'http://127.0.0.1:18443/',username:'invalid:user',password:'TEST'}))}}),/Rejected/);assert(!existsSync(options.root));
-  const prepared=prepareMainnetBurnStores(options);assert.equal(prepared.productionReady,false);assert.equal(prepared.offlineRecoveryBackup,'NOT_PROVISIONED');
+  const prepared=prepareMainnetBurnStores(options);assert.equal(prepared.productionReady,false);assert.equal(prepared.mainnetActivation,'DISABLED');
+  assert.equal(prepared.windowsServiceRequired,false);assert.equal(prepared.offlineRecoveryBackup,'NOT_REQUIRED_BY_TEAM_DECISION');assert.equal(prepared.recoveryRisk,'ACCEPTED_BY_KINGPEPE_TEAM');
   assert.equal(prepared.depositAddressesIssued,0);assert.match(prepared.operationalFeeAddress,/^kpepe1p/u);
   const journal=await ProtectedBurnJournal.open(new WindowsProtectedStore(prepared.stores.journal));
   try{assert.equal(journal.read().paused,true);assert.equal(journal.read().mainnetControl.mode,'PREPARED');assert.deepEqual(journal.read().operations,[]);}finally{await journal.close();}

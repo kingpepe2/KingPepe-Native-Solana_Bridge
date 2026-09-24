@@ -1,5 +1,5 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
-// Local protected preparation under the dedicated Windows service identity.
+// Local protected preparation under the isolated Windows runtime identity.
 // No RPC, wallet funding, operation, transaction, listener or activation.
 import {randomBytes} from 'node:crypto';import {existsSync,mkdirSync} from 'node:fs';import path from 'node:path';
 import {schnorr} from '@noble/curves/secp256k1.js';import {ed25519} from '@noble/curves/ed25519.js';
@@ -55,6 +55,7 @@ export function prepareMainnetBurnStores({root,repoRoot,expectedServiceSid,explo
       nativeRpcStore:store('native-rpc','NATIVE_OBSERVER','native-rpc-auth',imports.nativeRpc),
       solanaRpcStore:store('solana-rpc','BRIDGE_VALIDATOR','solana-rpc-url',imports.solanaRpc),accessTokenStore:store('service-auth','BRIDGE_VALIDATOR','service-auth',token),
       operationalFeeAddress:burnOperationalDestination(deployment).address,depositAddressesIssued:0,transactionsSubmitted:0,
-      offlineRecoveryBackup:'NOT_PROVISIONED',productionReady:false,mainnetActivation:'DISABLED'};
+      windowsServiceRequired:false,offlineRecoveryBackup:'NOT_REQUIRED_BY_TEAM_DECISION',recoveryRisk:'ACCEPTED_BY_KINGPEPE_TEAM',
+      productionReady:false,mainnetActivation:'DISABLED'};
   }finally{burnSecret.fill(0);token.fill(0);}
 }

@@ -1,10 +1,14 @@
-# Offline burn recovery
+# Accepted recovery risk and optional offline tooling
 
-The Team has not provisioned a recovery recipient or an offline destination. `OFFLINE_RECOVERY_BACKUP = NOT_PROVISIONED`. Neither a local encrypted file nor a copied DPAPI directory satisfies server-loss recovery. This external requirement does not prevent implementation, program builds, protected service preparation or deployment planning. Normal public Mainnet activation requires the real encrypted offline copy and its recovery evidence.
+The Team removed offline recovery provisioning from deployment and activation requirements. `OFFLINE_RECOVERY_BACKUP = NOT_REQUIRED_BY_TEAM_DECISION`; `RECOVERY_RISK = ACCEPTED_BY_KINGPEPE_TEAM`. No recovery certificate, fingerprint or off-server destination is required. No offline backup exists or is claimed. Do not generate a local substitute or request provisioning to satisfy the obsolete gate.
+
+The Team accepts that loss of the only usable production burn signing material may leave confirmed but unburned Native deposits unavailable for automatic processing/recovery. Cloudflare does not mitigate that risk. Process restart and journal/chain recovery while the required keys remain usable are still mandatory. Neither a local encrypted file nor a copied DPAPI directory proves server-loss recovery.
+
+The following is retained optional tooling documentation, not an activation checklist or a current request to the Team. It can be used only if separately provisioned later. Its historical TEST evidence does not certify production recovery.
 
 The implemented manual export uses a public X.509 certificate in PEM format, RSA 4096 bits, with key encipherment usage and `CA:FALSE`. The Team verifies its SHA-256 DER certificate fingerprint separately. It encrypts a quiescent complete snapshot using standard CMS AuthEnvelopedData, AES-256-GCM and RSA-OAEP with SHA-256/MGF1-SHA-256. This is supported by the reviewed OpenSSL tool; its executable digest is checked. There is no recovery private-key parameter in the server export.
 
-## What the Team provides
+## Optional future recipient provisioning
 
 On a trusted computer disconnected from networks, use a verified OpenSSL 3.5 or later installation. In an offline working directory, generate a dedicated recovery key and public certificate:
 
@@ -19,11 +23,11 @@ Provide only `KingPepe-Recovery-public.pem`, its independently checked fingerpri
 
 ## Export and verification
 
-Stop the economic service cleanly, retain its pause, and run the reviewed local export under the dedicated service identity. It acquires the existing protected-store leases; an active writer prevents capture. The complete snapshot includes the burn root, burn authorizations and signed packets, two attesters and their authorization journals, fee payer, operation journal, private service configuration, protected RPC bindings and gateway token. The upgrade/deployment authority is a separate recovery role and must retain its own approved protected backup.
+If an optional export is separately provisioned, stop the private economic process cleanly, retain its pause, and run the reviewed local export under its isolated runtime identity. It acquires the existing protected-store leases; an active writer prevents capture. The complete snapshot includes the burn root, burn authorizations and signed packets, two attesters and their authorization journals, fee payer, operation journal, private runtime configuration, protected RPC bindings and gateway token. The upgrade/deployment authority remains a separate role; this policy does not assert a backup for that role either.
 
 `exportBurnRecovery` decrypts the DPAPI payloads only in memory, validates network/key bindings and the paused journal, and sends bytes directly to OpenSSL's inherited stdin. Only CMS ciphertext is written by the operator. The receipt records the certificate fingerprint, ciphertext digest, source SHA, operation count and journal checkpoint. Keep this receipt with a separately trusted inventory; public-key encryption alone does not authenticate who created a replacement snapshot. Verify the ciphertext digest after the off-server copy. Export receipts deliberately say `offlineCopy: NOT_PROVISIONED` until the actual external copy and operator evidence exist.
 
-No production export or offline copy is claimed merely because the TEST cryptographic round trip passes. Retain the accepted single-server risk until the external copy is provisioned. Keep snapshots current under the existing manual or OS-scheduled recovery policy; this change creates no backup service.
+No production export or offline copy is claimed merely because the TEST cryptographic round trip passes. The accepted loss risk remains explicit and does not create an external activation blocker. If optional snapshots are used later, keep them current through manual or existing OS-scheduled procedures; this tooling creates no backup service.
 
 ## Recovery drill and replacement server
 

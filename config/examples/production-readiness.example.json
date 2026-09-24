@@ -8,8 +8,12 @@
   "productionBroadcastAuthorized": false,
   "burnKeyCustodyModel": "SINGLE_KEY_ACCEPTED_RISK",
   "keyStorage": "DPAPI_PROTECTED_SERVER_SIDE",
-  "dedicatedServiceIdentity": "REQUIRED_NOT_PROVISIONED_BY_TEMPLATE",
-  "offlineRecovery": "ENCRYPTED_TESTED_REQUIRED_NOT_CERTIFIED_BY_TEMPLATE",
+  "burnSignerHostingModel": "PRIVATE_SERVER_SIDE_PROCESS_ACTUAL_VERIFICATION_REQUIRED",
+  "windowsServiceRequired": false,
+  "windowsRestartRequiredForActivation": false,
+  "runtimeIsolation": "EXPLORER_DENIED_REQUIRES_ACTUAL_EVIDENCE",
+  "offlineRecoveryBackup": "NOT_REQUIRED_BY_TEAM_DECISION",
+  "recoveryRisk": "ACCEPTED_BY_KINGPEPE_TEAM",
   "productionLimitPolicy": "UNBOUNDED_BY_TEAM_DECISION",
   "nativeDepositConfirmations": 12,
   "nativeBurnConfirmations": 12,
@@ -27,7 +31,7 @@
   "productionIdentities": {
     "bridgeProgramId": null,
     "transceiverProgramId": null,
-    "mint": null,
+    "mint": "4QkWKqTMyPEyEb8RMKv3XrcHJ5jbS7k4uQhXVoirphZW",
     "bridgePda": null,
     "configPdas": null,
     "requiredTokenProgram": "STANDARD_SPL_TOKEN_PROGRAM",
@@ -36,6 +40,6 @@
     "requiredFreezeAuthority": null
   },
   "externalSecurityAuditCompleted": false,
-  "activationApproval": "FUTURE_EXPLICIT_TEAM_APPROVAL_NOT_REQUESTED_IN_TEST_TASK",
+  "activationApproval": "TEAM_EXPLICIT_INITIAL_DEPLOYMENT_AND_CONTROLLED_ACTIVATION_AUTHORIZED",
   "productionPlan": "docs/deployment/production-plan.md"
 }
