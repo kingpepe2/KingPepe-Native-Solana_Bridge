@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { base58Encode, base58Decode } from "../solana-deposit-claim-transaction-plan.mjs";
-import { buildMainnetSolanaSetupTransactionPlan, buildMainnetModeTransactionPlan } from "../mainnet-solana-setup-plan.mjs";
+import { buildMainnetSolanaSetupTransactionPlan, buildMainnetModeTransactionPlan, buildMainnetExistingMintInitializationPlan } from "../mainnet-solana-setup-plan.mjs";
 import { decodeBridgeAbi } from "../../../shared/protocol/solana-bridge-abi.mjs";
 import { NATIVE_MAINNET_GENESIS, NATIVE_MAINNET_DOMAIN, SOLANA_MAINNET_GENESIS, SOLANA_DEVNET_GENESIS,
   mainnetDeploymentIdentity } from "../../../shared/network-identity.mjs";
@@ -43,6 +43,16 @@ function decodeMessage(plan) {
   const instructions = Array.from({ length: short() }, () => ({ program: keys[take(1)[0]], accounts: [...take(short())].map(i => keys[i]), data: take(short()) }));
   assert.equal(p, b.length); return { header, keys, blockhash, instructions };
 }
+
+test('existing official Mint initialization creates only program configuration and preserves Mint/metadata',()=>{
+  const {mintRentLamports,...input}=fixture();const plan=buildMainnetExistingMintInitializationPlan(input),wire=decodeMessage(plan);
+  assert.equal(plan.protocol,'KINGPEPE_MAINNET_EXISTING_MINT_INITIALIZATION_V1');
+  assert.deepEqual(plan.instructions.map(i=>i.role),['transceiverInitialize','bridgeInitialize']);
+  assert.equal(wire.instructions.length,2);
+  assert.deepEqual(wire.instructions,decodeMessage(buildMainnetSolanaSetupTransactionPlan(fixture())).instructions.slice(2));
+  assert.equal(plan.initialSupplyAtomic,'0');assert.equal(plan.depositsPaused,true);
+  assert.throws(()=>buildMainnetExistingMintInitializationPlan({...input,mintRentLamports}),/Rejected/);
+});
 
 test("Mainnet setup wire creates only an eight-decimal zero-supply Mint and paused forward configurations", () => {
   const c = fixture(), plan = buildMainnetSolanaSetupTransactionPlan(c), wire = decodeMessage(plan);

@@ -20,7 +20,7 @@ export function validateBurnSolanaPolicy(input) {
     m.solanaDeploymentHex===d.solanaDeployment&&m.manager.id===base58Encode(h(d.bridgeProgram))&&m.transceiver.id===base58Encode(h(d.transceiverProgram))&&
     m.mint.id===base58Encode(h(d.mint))&&m.mint.decimals===8&&m.config.keyEpoch===p.context.keyEpoch&&m.config.policyEpoch===p.context.policyEpoch&&
     m.config.protocolId===d.protocolId&&m.config.nativeNetwork===d.nativeNetwork&&m.config.attesters.every((a,i)=>a===base58Encode(h(p.context.attesters[i])))&&
-    !m.config.depositsPaused&&m.config.transceiverActive,'BurnSolanaPolicyBinding');
+    (m.environment==='mainnet'||!m.config.depositsPaused)&&m.config.transceiverActive,'BurnSolanaPolicyBinding');
   check(p.artifacts&&Object.keys(p.artifacts).sort().join()==='manager,transceiver','BurnSolanaArtifactsRequired');
   for(const artifact of Object.values(p.artifacts))check(artifact&&Object.keys(artifact).sort().join()==='byteLength,sha256'&&
     /^[0-9a-f]{64}$/u.test(artifact.sha256)&&Number.isSafeInteger(artifact.byteLength)&&artifact.byteLength>4&&artifact.byteLength<=2_097_152,'BurnSolanaArtifactRejected');

@@ -19,7 +19,7 @@
   "cleanup": {
     "scope": "TEAM_AUTHORIZED_AUTOMATIC_BURN_AND_MINT_CONVERSION",
     "status": "CURRENT_BURN_TEST_DEPLOYED_MAINNET_MINT_CREATED_PROGRAMS_PENDING",
-    "filesAfter": 186,
+    "filesAfter": 192,
     "removed": "Obsolete permanent reserve/FROST runtime, protocol and tests. Protected runtime backups and historical legal facts remain outside this cleanup.",
     "importedSource": "No third-party source imported. Existing dependency/API references and original classifications are preserved."
   },
@@ -235,6 +235,13 @@
       "reviewDisposition": "SIMPLIFY"
     },
     {
+      "path": "docs/deployment/mainnet-runtime.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original Mainnet burn runtime lifecycle, protected service composition, operator preparation and regression coverage; no production secret or on-chain execution evidence.",
+      "purpose": "REQUIRED_DOCUMENTATION",
+      "reviewDisposition": "KEEP_CURRENT_FORWARD"
+    },
+    {
       "path": "docs/deployment/mainnet.json",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
       "notes": "Verified public Mainnet Mint creation, metadata, transaction and source/CI evidence. Pending program and runtime state is explicit; no private deployment material.",
@@ -408,6 +415,13 @@
       "notes": "Original synthetic Mainnet network/context, no-index block-hint journal recovery, protected endpoint and wrong-cluster regressions. No production transaction or retained private material.",
       "purpose": "REQUIRED_TEST",
       "reviewDisposition": "KEEP_CURRENT"
+    },
+    {
+      "path": "native/burn/tests/burn-mainnet-lifecycle.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original Mainnet burn runtime lifecycle, protected service composition, operator preparation and regression coverage; no production secret or on-chain execution evidence.",
+      "purpose": "REQUIRED_RUNTIME_OR_TEST",
+      "reviewDisposition": "KEEP_CURRENT_FORWARD"
     },
     {
       "path": "native/burn/tests/burn-protocol.test.mjs",
@@ -786,6 +800,27 @@
       "notes": "Original one-way immutable operation, deposit, burn, attestation, claim, mint and exception state machine with exact cumulative conservation.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
+    },
+    {
+      "path": "services/bridge-validator/burn-mainnet-lifecycle.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original Mainnet burn runtime lifecycle, protected service composition, operator preparation and regression coverage; no production secret or on-chain execution evidence.",
+      "purpose": "REQUIRED_RUNTIME_OR_TEST",
+      "reviewDisposition": "KEEP_CURRENT_FORWARD"
+    },
+    {
+      "path": "services/bridge-validator/burn-mainnet-operator.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original Mainnet burn runtime lifecycle, protected service composition, operator preparation and regression coverage; no production secret or on-chain execution evidence.",
+      "purpose": "REQUIRED_RUNTIME_OR_TEST",
+      "reviewDisposition": "KEEP_CURRENT_FORWARD"
+    },
+    {
+      "path": "services/bridge-validator/burn-mainnet-service.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original Mainnet burn runtime lifecycle, protected service composition, operator preparation and regression coverage; no production secret or on-chain execution evidence.",
+      "purpose": "REQUIRED_RUNTIME_OR_TEST",
+      "reviewDisposition": "KEEP_CURRENT_FORWARD"
     },
     {
       "path": "services/bridge-validator/burn-runtime.mjs",
@@ -1288,6 +1323,13 @@
       "notes": "Original synthetic account/parser fixture, explicitly not executable bytecode or chain proof.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "SIMPLIFY"
+    },
+    {
+      "path": "tests/windows/burn-mainnet-composition.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original Mainnet burn runtime lifecycle, protected service composition, operator preparation and regression coverage; no production secret or on-chain execution evidence.",
+      "purpose": "REQUIRED_RUNTIME_OR_TEST",
+      "reviewDisposition": "KEEP_CURRENT_FORWARD"
     },
     {
       "path": "tests/windows/burn-protection.test.mjs",

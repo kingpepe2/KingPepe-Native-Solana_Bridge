@@ -58,7 +58,7 @@
   "mainnetDeploymentEvidence": "docs/deployment/mainnet.json",
   "mainnetMint": "4QkWKqTMyPEyEb8RMKv3XrcHJ5jbS7k4uQhXVoirphZW",
   "mainnetMintInitialSupplyAtomic": "0",
-  "mainnetExecutionSupport": "ADAPTERS_PREPARED_SERVICE_AND_CUSTODY_INTEGRATION_PENDING",
+  "mainnetExecutionSupport": "PROTECTED_SERVICE_AND_DURABLE_ACTIVATION_IMPLEMENTED_DEPLOYMENT_CUSTODY_PENDING",
   "mainnetFundingQuoteSol": "1.795339560",
   "previousReserveFundingQuoteNotApplicable": true,
   "activationApproval": "TEAM_EXPLICIT_INITIAL_DEPLOYMENT_AND_CONTROLLED_ACTIVATION_AUTHORIZED",
@@ -70,5 +70,6 @@
   "nativeRpcRestartRecovery": "PASS_REVIEWED_READ_ONLY_SAME_OPERATIONS_NO_NEW_TRANSACTIONS",
   "browserRendering": "PENDING_NO_CONNECTED_BROWSER",
   "mainnetFundingQuoteScope": "FRESH_V3_ELF_MAINNET_RENT_MESSAGE_FEES_DEPLOYED_METADATA_SIMULATION_CONTROLLED_OPERATION_AND_BOUNDED_HEADROOM",
-  "currentChangeRequiresExactShaCi": true
+  "currentChangeRequiresExactShaCi": true,
+  "mainnetRuntimeDocumentation": "docs/deployment/mainnet-runtime.md"
 }

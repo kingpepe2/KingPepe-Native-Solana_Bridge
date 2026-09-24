@@ -9,6 +9,7 @@ import {decodeCanonicalBridgeMessage} from '../../shared/protocol/canonical-mess
 import {validateBurnContext,assertBurnMessageContext} from './burn-context.mjs';
 import {verifyBurnAttestationPair} from '../attesters/burn-attestation-codec.mjs';
 import {verifyBurnSolanaPacket} from '../relayer/burn-solana-signer.mjs';
+import {initialMainnetLifecycle,validateMainnetLifecycle} from './burn-mainnet-lifecycle.mjs';
 
 export const BURN_JOURNAL_PROTOCOL = 'KINGPEPE_AUTOMATIC_BURN_JOURNAL_V1';
 export const BURN_STATES = Object.freeze(['DEPOSIT_ADDRESS_ISSUED','DEPOSIT_OBSERVED','DEPOSIT_FINALIZED','BURN_READY','BURN_BROADCAST','BURN_FINALIZED','ATTESTED','CLAIMED','MINTED','COMPLETED']);
@@ -17,7 +18,8 @@ const integer = n => check(Number.isSafeInteger(n) && n >= 0,'BurnJournalInteger
 function sameBinding(a,b) { return burnOperationId(a) === burnOperationId(b); }
 export function initialBurnJournal(binding,deliveryPolicy=null) {
   const {nonce:_nonce,destination:_destination,...deployment} = validateBurnBinding(binding);
-  return {protocol:BURN_JOURNAL_PROTOCOL,deployment,deliveryPolicy,nativeScan:null,paused:true,pauseReason:'INITIAL_REVIEW_REQUIRED',operations:[]};
+  return {protocol:BURN_JOURNAL_PROTOCOL,deployment,deliveryPolicy,nativeScan:null,paused:true,pauseReason:'INITIAL_REVIEW_REQUIRED',operations:[],
+    ...(deployment.nativeGenesis===NATIVE_MAINNET_GENESIS?{mainnetControl:initialMainnetLifecycle()}:{} )};
 }
 function deploymentMatches(state,binding) {
   check(Object.entries(state.deployment).every(([k,v]) => binding[k] === v),'BurnJournalDeploymentChanged');
@@ -208,7 +210,8 @@ export function reconcileBurnAccounting(state,{finalizedNativeBurnAtomic,bridgeI
 }
 
 export function validateBurnJournalState(input) {
-  check(input&&Object.keys(input).sort().join()==='deliveryPolicy,deployment,nativeScan,operations,pauseReason,paused,protocol','BurnJournalFieldsRejected');
+  const mainnet=input?.deployment?.nativeGenesis===NATIVE_MAINNET_GENESIS;
+  check(input&&Object.keys(input).sort().join()===(mainnet?'deliveryPolicy,deployment,mainnetControl,nativeScan,operations,pauseReason,paused,protocol':'deliveryPolicy,deployment,nativeScan,operations,pauseReason,paused,protocol'),'BurnJournalFieldsRejected');
   check(input.protocol===BURN_JOURNAL_PROTOCOL&&typeof input.paused==='boolean'&&typeof input.pauseReason==='string'&&
     /^[A-Z0-9_]{1,96}$/u.test(input.pauseReason),'BurnJournalVersionRejected');
   check(Array.isArray(input.operations)&&input.operations.length<=512,'BurnJournalStorageCapacity');
@@ -273,6 +276,7 @@ export function validateBurnJournalState(input) {
     }
   }
   reconstructed.paused=input.paused;reconstructed.pauseReason=input.pauseReason;
+  if(mainnet){reconstructed.mainnetControl=structuredClone(input.mainnetControl);validateMainnetLifecycle(reconstructed);}
   burnJournalAccounting(reconstructed);
   return structuredClone(reconstructed);
 }

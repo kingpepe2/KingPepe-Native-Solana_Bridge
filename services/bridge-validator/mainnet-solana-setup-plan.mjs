@@ -1,7 +1,7 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
 // Public-data transaction preparation only. No key, RPC, signer or sender.
 // The deployment operator must independently verify the live cluster/programs
-// and obtain Team approval before signing or submitting these exact bytes.
+// and the authorized deployment scope before signing/submitting these bytes.
 import { createHash } from "node:crypto";
 import { assertMainnetDeploymentFields, SOLANA_MAINNET_GENESIS } from "../../shared/network-identity.mjs";
 import { encodeBridgeAbi } from "../../shared/protocol/solana-bridge-abi.mjs";
@@ -57,24 +57,35 @@ function message(c, accountKeys, readonlySigned, readonlyUnsigned, instructions)
 }
 
 export function buildMainnetSolanaSetupTransactionPlan(input) {
+  return buildInitialization(input,true);
+}
+// The official Mint can exist before program deployment. This path contains
+// no system-create-Mint or SPL initialize-Mint instruction, so restart cannot
+// recreate or replace the already verified official identity/metadata.
+export function buildMainnetExistingMintInitializationPlan(input) {
+  return buildInitialization(input,false);
+}
+function buildInitialization(input,createMintAccount) {
   const c = structuredClone(input);
-  fields(c, [...IDENTITY_FIELDS, "attesterPublicKeysHex", "decimals", "nativeDecimals", "policyEpoch", "keyEpoch", "mintRentLamports"]);
+  fields(c, [...IDENTITY_FIELDS, "attesterPublicKeysHex", "decimals", "nativeDecimals", "policyEpoch", "keyEpoch", ...(createMintAccount?["mintRentLamports"]:[])]);
   const i = identity(c);
   check(c.decimals === 8 && c.nativeDecimals === 8, "MainnetSetupDecimalsRequired");
-  epoch(c.policyEpoch); epoch(c.keyEpoch); check(uint(c.mintRentLamports) > 0n);
+  epoch(c.policyEpoch); epoch(c.keyEpoch); if(createMintAccount)check(uint(c.mintRentLamports) > 0n);
   check(Array.isArray(c.attesterPublicKeysHex) && c.attesterPublicKeysHex.length === 2 &&
     c.attesterPublicKeysHex.every(v => typeof v === "string" && /^[0-9a-f]{64}$/u.test(v) && !/^0+$/u.test(v)));
   const attesters = c.attesterPublicKeysHex.map(v => Buffer.from(v, "hex"));
   check(new Set([...attesters, i.manager, i.transceiver, i.mint, i.payer].map(k => k.toString("hex"))).size === 6);
   const token = Buffer.from(base58Decode(SPL_TOKEN_PROGRAM_ID_BASE58));
-  const createMint = Buffer.alloc(52); createMint.writeBigUInt64LE(uint(c.mintRentLamports), 4);
+  const createMint = Buffer.alloc(52); if(createMintAccount)createMint.writeBigUInt64LE(uint(c.mintRentLamports), 4);
   createMint.writeBigUInt64LE(BigInt(MINT_ACCOUNT_LENGTH), 12); token.copy(createMint, 20);
   const mintAuthority = Buffer.from(base58Decode(i.pdas.mintAuthority));
   const accounts = [c.feePayerBase58, c.mintBase58, i.pdas.bridgeState, i.pdas.transceiverConfig, i.pdas.mintAuthority,
     SPL_TOKEN_PROGRAM_ID_BASE58, SYSTEM_PROGRAM_ID_BASE58, c.transceiverProgramIdBase58, c.managerProgramIdBase58];
   const instructions = [
+    ...(createMintAccount?[
     instruction("systemCreateMint", 6, [0, 1], createMint),
     instruction("splInitializeMint2", 5, [1], Buffer.concat([Buffer.from([20, 8]), mintAuthority, Buffer.from([0])])),
+    ]:[]),
     instruction("transceiverInitialize", 7, [3, 1, 0, 6], encodeBridgeAbi("TransceiverInitialize", { tag: 1,
       config: { transceiverProgramId: i.transceiver, managerProgramId: i.manager, mint: i.mint,
         solanaDeployment: Buffer.from(c.solanaDeploymentHex, "hex"), protocolId: c.protocolId, nativeNetwork: c.nativeNetwork,
@@ -85,7 +96,7 @@ export function buildMainnetSolanaSetupTransactionPlan(input) {
         mintAuthorityPda: mintAuthority, decimals: 8, nativeDecimals: 8 },
       policy: { policyEpoch: c.policyEpoch, keyEpoch: c.keyEpoch, depositsPaused: true, hardStop: false, mainnetActivationEnabled: false } })),
   ];
-  return Object.freeze({ protocol: "KINGPEPE_MAINNET_ZERO_SUPPLY_SETUP_V1", scope: "UNSIGNED_MAINNET_PREPARATION",
+  return Object.freeze({ protocol: createMintAccount?"KINGPEPE_MAINNET_ZERO_SUPPLY_SETUP_V1":"KINGPEPE_MAINNET_EXISTING_MINT_INITIALIZATION_V1", scope: "UNSIGNED_MAINNET_PREPARATION",
     environment: "mainnet", initialSupplyAtomic: "0", decimals: 8, freezeAuthority: null, pdas: Object.freeze(i.pdas),
     mintAuthority: i.pdas.mintAuthority, depositsPaused: true, productionReady: false, mainnetActivation: "DISABLED",
     ...message(c, accounts, 0, 5, instructions) });

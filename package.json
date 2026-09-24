@@ -16,6 +16,7 @@
   "scripts": {
     "bridge": "node cli/bridge.mjs",
     "burn:service": "node services/bridge-validator/burn-service.mjs",
+    "burn:mainnet-service": "node services/bridge-validator/burn-mainnet-service.mjs",
     "local:proof:burn": "node scripts/regtest-burn-proof.mjs",
     "local:e2e:native-to-solana": "node solana/tests/burn-chain-regression.mjs",
     "local:e2e:windows-runtime": "node solana/tests/burn-runtime-regression.mjs",

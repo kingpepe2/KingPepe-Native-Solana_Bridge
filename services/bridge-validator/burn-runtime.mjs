@@ -1,5 +1,5 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
-// Automatic TEST burn -> mint. All economic adapters are concrete, protected
+// Automatic burn -> mint. All economic adapters are concrete, protected
 // instances; public callers cannot replace a verifier, signer or RPC endpoint.
 import {ed25519} from '@noble/curves/ed25519.js';
 import {NativeBurnObserver} from '../../native/burn/burn-observer.mjs';
@@ -13,6 +13,8 @@ import {requireProtectedBurnSolanaSigner} from '../relayer/burn-solana-signer.mj
 import {requireBurnSolanaAdapter} from '../solana-observer/burn-solana-adapter.mjs';
 import {requireProtectedBurnJournal} from './protected-burn-journal.mjs';
 import {validateBurnContext} from './burn-context.mjs';
+import {nativeIdentity} from '../../shared/network-identity.mjs';
+import {beginMainnetControlled,enableMainnetNormal,requireMainnetEconomicOperation,mainnetRuntimeFlags} from './burn-mainnet-lifecycle.mjs';
 import {encodeBurnMessage} from '../../shared/protocol/burn-message.mjs';
 import {decodeCanonicalBridgeMessage,stableJson} from '../../shared/protocol/canonical-message.mjs';
 import {burnJournalRecord,issueBurnDeposit,recordBurnDeposits,retainBurnPlan,retainSignedBurn,markBurnBroadcast,
@@ -73,16 +75,58 @@ export class BurnRuntime {
     for(const row of scan.observations)this.#observed.set(row.id,{...(this.#observed.get(row.id)??{}),deposits:row.observations});
     return scan;
   }
-  createOperation({destinationHex,nonce}) {
-    return this.#exclusive(async()=>{
+  #destination(destinationHex,nonce){
       burnHash(destinationHex);burnHash(nonce);
       // Connected Wallet Standard account is the recipient. An off-curve PDA
       // or an internal authority is not accepted as an interactive wallet.
       ed25519.Point.fromBytes(Buffer.from(destinationHex,'hex'));
       check(![this.#context.deployment.burnPublicKey,...this.#context.attesters,this.#solanaSigner.publicKeyHex,
         this.#context.deployment.bridgeProgram,this.#context.deployment.transceiverProgram,this.#context.deployment.mint].includes(destinationHex),'BurnDestinationRoleOverlap');
+  }
+  #freshAccounting(){return Date.now()>=this.#accountingVerifiedAt&&Date.now()-this.#accountingVerifiedAt<=30000;}
+  #mainnetMode(){const c=this.#solana.policy.manifest.config;return c.depositsPaused?0:c.mainnetProgramState;}
+  async #readyForMainnetTransition(){
+    check(this.#context.environment==='mainnet'&&this.#health.reconciliation==='MATCH'&&this.#freshAccounting(),'BurnMainnetReviewIncomplete');
+    check(!this.#journal.read().operations.some(op=>op.exception),'BurnMainnetExceptionUnresolved');
+    await this.#observer.network();await this.#solana.deployment();this.#solanaSigner.ready();this.#attesters.forEach(a=>a.ready());
+  }
+  // Local operator methods only. They are not exposed by the loopback/public API.
+  // Run with the service stopped; protected journal/signing leases exclude a
+  // simultaneous writer. On-chain mode changes are verified before admission.
+  beginControlledMainnet({destinationHex,nonce,amountAtomic}) {
+    return this.#exclusive(async()=>{
+      await this.#readyForMainnetTransition();this.#destination(destinationHex,nonce);
+      check(this.#mainnetMode()===4,'BurnMainnetControlledChainModeRequired');
+      const native=await this.#observer.network();
+      const id=this.#update(state=>{
+        const id=beginMainnetControlled(state,{destinationHex,nonce,amountAtomic});
+        state.paused=false;state.pauseReason='MAINNET_CONTROLLED';
+        issueBurnDeposit(state,{...this.#context.deployment,destination:destinationHex,nonce},native.height);return id;
+      });
+      this.#health={state:'HEALTHY',reconciliation:'MATCH',reason:null};return this.operation(id);
+    });
+  }
+  enableNormalMainnet() {
+    return this.#exclusive(async()=>{
+      await this.#readyForMainnetTransition();check(this.#mainnetMode()===5,'BurnMainnetActiveChainModeRequired');
+      this.#update(state=>{enableMainnetNormal(state);state.paused=false;state.pauseReason='MAINNET_NORMAL';});
+      this.#health={state:'HEALTHY',reconciliation:'MATCH',reason:null};return this.status();
+    });
+  }
+  resumeReviewedMainnetRuntime() {
+    return this.#exclusive(async()=>{
+      await this.#readyForMainnetTransition();const state=this.#journal.read();
+      check(state.mainnetControl.mode!=='PREPARED'&&this.#mainnetMode()===(state.mainnetControl.mode==='NORMAL'?5:4),'BurnMainnetResumeModeRequired');
+      this.#update(s=>{s.paused=false;s.pauseReason='MAINNET_REVIEWED_RESUME';});
+      this.#health={state:'HEALTHY',reconciliation:'MATCH',reason:null};
+    });
+  }
+  createOperation({destinationHex,nonce}) {
+    return this.#exclusive(async()=>{
+      this.#destination(destinationHex,nonce);
       const binding={...this.#context.deployment,destination:destinationHex,nonce},id=burnOperationId(binding),state=this.#journal.read();
       const known=state.operations.find(op=>op.operationId===id);if(known)return this.operation(id);
+      if(this.#context.environment==='mainnet')check(state.mainnetControl.mode==='NORMAL'&&this.#mainnetMode()===5,'BurnMainnetPublicAdmissionClosed');
       check(this.#health.state==='HEALTHY'&&!state.paused&&Date.now()>=this.#accountingVerifiedAt&&
         Date.now()-this.#accountingVerifiedAt<=30000,'BurnGatewayNotReady');
       const native=await this.#observer.network();await this.#solana.deployment();this.#solanaSigner.ready();this.#attesters.forEach(a=>a.ready());
@@ -100,8 +144,9 @@ export class BurnRuntime {
   status() {
     const state=this.#journal.read(),fresh=Date.now()>=this.#accountingVerifiedAt&&Date.now()-this.#accountingVerifiedAt<=30000;
     return {architecture:'ONE_WAY_AUTOMATIC_BURN_AND_MINT',environment:this.#context.environment,
-      nativeNetwork:'REGTEST',solanaNetwork:this.#context.environment.toUpperCase(),mintHex:this.#context.deployment.mint,
-      paused:state.paused,...structuredClone(this.#health),productionReady:false,mainnetActivation:'DISABLED',
+      nativeNetwork:nativeIdentity(this.#context.environment).network.toUpperCase(),solanaNetwork:this.#context.environment.toUpperCase(),mintHex:this.#context.deployment.mint,
+      paused:state.paused,...structuredClone(this.#health),activationMode:state.mainnetControl?.mode??'TEST',
+      ...mainnetRuntimeFlags(state,{healthy:this.#health.state==='HEALTHY',fresh,reconciliation:this.#health.reconciliation,programState:this.#mainnetMode()}),
       accounting:this.#health.reconciliation==='MATCH'&&fresh?{...burnJournalAccounting(state),observedAt:this.#accountingVerifiedAt,liveMintSupplyAtomic:this.#liveMintSupplyAtomic}:null};
   }
   // Operator-only local method. No public gateway route exposes resume/pause.
@@ -115,7 +160,7 @@ export class BurnRuntime {
     });
   }
   pause(){return this.#exclusive(()=>{this.#journal.pause('OPERATOR_PAUSE');this.#health={state:'PAUSED',reconciliation:this.#health.reconciliation,reason:'OPERATOR_PAUSE'};});}
-  cycle(){return this.#exclusive(async()=>{
+  cycle({readOnly=false}={}){check(typeof readOnly==='boolean','BurnRuntimeCycleOptionsRejected');return this.#exclusive(async()=>{
     try{
       const scan=await this.#discover();
       if(!scan.caughtUp){this.#health={state:'PENDING',reconciliation:null,reason:'NATIVE_DISCOVERY_CATCHING_UP'};return this.status();}
@@ -161,7 +206,7 @@ export class BurnRuntime {
       this.#accountingVerifiedAt=Date.now();this.#liveMintSupplyAtomic=deployed.mintSupplyAtomic;
       const paused=this.#journal.read().paused;
       this.#health={state:paused?'PAUSED':'HEALTHY',reconciliation:'MATCH',reason:paused?this.#journal.read().pauseReason:null};
-      if(paused)return this.status();
+      if(paused||readOnly)return this.status();
       for(const op of this.#journal.read().operations){
         if(op.retired||op.exception&&!op.broadcastAttempted)continue;
         try{await this.#advance(op.operationId);}
@@ -213,6 +258,10 @@ export class BurnRuntime {
   }
   async #advance(id) {
     let op=this.#op(id);
+    if(this.#context.environment==='mainnet'){
+      const state=this.#journal.read();requireMainnetEconomicOperation(state,id,op.deposit?.amountAtomic??null);
+      check(this.#mainnetMode()===(state.mainnetControl.mode==='NORMAL'?5:4),'BurnMainnetEconomicModeMismatch');
+    }
     if(!op.plan){
       if(!op.deposit||op.deposit.confirmations<12)return;
       this.#emit('DEPOSIT_FINALITY_REACHED',id);

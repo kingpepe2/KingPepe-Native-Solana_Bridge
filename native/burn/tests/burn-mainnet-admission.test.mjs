@@ -11,6 +11,7 @@ import {burnDepositDestination,burnOperationalDestination,signNativeBurnWithKey}
 import {burnOperationId,planNativeBurn,validateBurnPlanBlockHints} from '../burn-protocol.mjs';
 import {validateBurnContext} from '../../../services/bridge-validator/burn-context.mjs';
 import {initialBurnJournal,issueBurnDeposit,recordBurnDeposits,retainBurnPlan,validateBurnJournalState} from '../../../services/bridge-validator/burn-journal-state.mjs';
+import {beginMainnetControlled} from '../../../services/bridge-validator/burn-mainnet-lifecycle.mjs';
 import {BurnSolanaRpc} from '../../../services/solana-observer/burn-solana-rpc.mjs';
 import {base58Encode,base58Decode} from '../../../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs';
 import {NATIVE_MAINNET_GENESIS,NATIVE_MAINNET_DOMAIN,SOLANA_MAINNET_GENESIS,SOLANA_DEVNET_GENESIS,mainnetDeploymentIdentity} from '../../../shared/network-identity.mjs';
@@ -70,7 +71,8 @@ function rpcFixture(x){
 test('Mainnet plans retain spent-input block locations across journal restart before burn',async()=>{
  const x=fixture();try{const r=rpcFixture(x),observer=new NativeBurnObserver(r.client,'mainnet');
   const plan=await observer.preparePlan(x.plan);assert.deepEqual(validateBurnPlanBlockHints(plan),Object.fromEntries(plan.inputs.map(i=>[i.txid,r.block])));
-  const state=initialBurnJournal(x.binding,{context:x.context,feePayerHex:x.f.policy.feePayerHex});state.paused=false;
+  const state=initialBurnJournal(x.binding,{context:x.context,feePayerHex:x.f.policy.feePayerHex});
+  beginMainnetControlled(state,{destinationHex:x.binding.destination,nonce:x.binding.nonce,amountAtomic:x.f.deposit.amountAtomic});state.paused=false;
   const op=issueBurnDeposit(state,x.binding,199);
   recordBurnDeposits(state,op.operationId,[{...x.f.deposit,blockHash:r.block,height:200,confirmations:12}]);
   retainBurnPlan(state,op.operationId,plan);

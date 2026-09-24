@@ -32,10 +32,10 @@ export class BurnUserApi {
     if(balances!==undefined){check(balances instanceof BurnUserBalances,'BurnBalanceReaderRequired');balances.assertBurnContext(runtime.publicContext());this.#balances=balances;}
   }
   getBridgeStatus(){
-    const s=this.#runtime.status();return {architecture:s.architecture,state:s.state==='HEALTHY'?'ACTIVE':s.state,environment:s.environment,nativeNetwork:s.nativeNetwork,
-      solanaNetwork:s.solanaNetwork,walletChain:s.environment==='devnet'?'solana:devnet':'solana:localnet',mint:base58Encode(Buffer.from(s.mintHex,'hex')),
+    const s=this.#runtime.status();return {architecture:s.architecture,state:s.state==='HEALTHY'?(s.environment==='mainnet'&&!s.productionReady?'CONTROLLED':'ACTIVE'):s.state,environment:s.environment,nativeNetwork:s.nativeNetwork,
+      solanaNetwork:s.solanaNetwork,walletChain:`solana:${s.environment}`,mint:base58Encode(Buffer.from(s.mintHex,'hex')),
       nativeDepositConfirmations:12,nativeBurnConfirmations:12,decimals:8,symbol:'KPEPE',bridgeFeeAtomic:'0',supply:publicBurnSupply(s),
-      productionReady:false,mainnetActivation:'DISABLED'};
+      productionReady:s.productionReady===true,mainnetActivation:s.mainnetActivation==='ENABLED'?'ENABLED':'DISABLED'};
   }
   async createOperation(input){
     check(input&&Object.keys(input).sort().join()==='clientNonce,destination,walletChain','BurnUserFieldsRejected');

@@ -66,3 +66,16 @@ test('runtime diagnostics retain structured failure codes without RPC bodies or 
   const privateUrl=new URL('https://invalid.example');privateUrl.username='test-user';privateUrl.password='PRIVATE_TEST_SENTINEL';
   assert.equal(burnRuntimeErrorCode(new Error(privateUrl.href)),'BURN_VALIDATION_FAILED');
 });
+
+test('Mainnet public status uses Mainnet wallet chain and cannot advertise controlled processing as normal activation',async t=>{
+  const {runtime,api,input,calls}=publicFixture(t),before=runtime.status();
+  const mainnet={...before,environment:'mainnet',nativeNetwork:'MAINNET',solanaNetwork:'MAINNET',productionReady:false,mainnetActivation:'DISABLED'};
+  runtime.status=()=>mainnet;
+  assert.equal(api.getBridgeStatus().walletChain,'solana:mainnet');
+  assert.equal(api.getBridgeStatus().state,'CONTROLLED');assert.equal(api.getBridgeStatus().productionReady,false);
+  for(const walletChain of ['solana:devnet','solana:localnet'])await assert.rejects(api.createOperation({...input,walletChain}),/WrongWalletNetwork/);
+  assert.equal(calls.length,0);
+  await api.createOperation({...input,walletChain:'solana:mainnet'});assert.equal(calls.length,1);
+  mainnet.productionReady=true;mainnet.mainnetActivation='ENABLED';assert.equal(api.getBridgeStatus().state,'ACTIVE');
+  assert.equal(api.getBridgeStatus().mainnetActivation,'ENABLED');
+});

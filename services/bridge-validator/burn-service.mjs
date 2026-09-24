@@ -11,11 +11,12 @@ import {listenBurnUserApi} from './burn-user-http.mjs';
 import {burnRuntimeErrorCode} from './burn-runtime.mjs';
 import {requireBurn as check} from '../../native/burn/burn-protocol.mjs';
 
-export function loadBurnServiceConfiguration(file) {
+export function loadBurnServiceConfiguration(file,{mainnet=false}={}) {
   file=validateRuntimeFile(file);check(statSync(file).size<=65536,'BurnServiceConfigurationLimit');
   let c;try{c=JSON.parse(readFileSync(file,'utf8'));}catch{throw new Error('BurnServiceConfigurationRejected');}
   check(c&&Object.keys(c).sort().join()==='accessTokenStore,intervalMs,mainnetActivation,port,productionReady,runtime','BurnServiceConfigurationFields');
-  check(c.productionReady===false&&c.mainnetActivation==='DISABLED'&&['localnet','devnet'].includes(c.runtime?.policy?.context?.environment),'BurnServiceTestOnly');
+  check(typeof mainnet==='boolean'&&c.productionReady===false&&c.mainnetActivation==='DISABLED'&&
+    (mainnet?c.runtime?.policy?.context?.environment==='mainnet':['localnet','devnet'].includes(c.runtime?.policy?.context?.environment)),'BurnServiceEnvironmentRejected');
   check(Number.isSafeInteger(c.port)&&c.port>=1024&&c.port<=65535&&Number.isSafeInteger(c.intervalMs)&&c.intervalMs>=1000&&c.intervalMs<=10000,'BurnServiceLoopConfiguration');
   const context=c.accessTokenStore?.context,expected=c.runtime.policy.context;
   check(context?.role==='BRIDGE_VALIDATOR'&&context.purpose==='service-auth'&&context.environment===expected.environment&&
@@ -23,9 +24,9 @@ export function loadBurnServiceConfiguration(file) {
   return c;
 }
 
-export async function runBurnService(file,{resumeReviewedTest=false,signal,log=()=>{}}={}) {
-  check(typeof resumeReviewedTest==='boolean'&&typeof log==='function','BurnServiceOptionsRejected');
-  const configuration=loadBurnServiceConfiguration(file);
+export async function runBurnService(file,{mainnet=false,resumeReviewedTest=false,signal,log=()=>{}}={}) {
+  check(typeof mainnet==='boolean'&&typeof resumeReviewedTest==='boolean'&&!(mainnet&&resumeReviewedTest)&&typeof log==='function','BurnServiceOptionsRejected');
+  const configuration=loadBurnServiceConfiguration(file,{mainnet});
   const service=await openBurnServiceRuntime(configuration.runtime,event=>log(event));
   let server,tokenStore,secret;
   try {
@@ -36,7 +37,9 @@ export async function runBurnService(file,{resumeReviewedTest=false,signal,log=(
     tokenStore=new WindowsProtectedStore(configuration.accessTokenStore);secret=tokenStore.read().payload;
     server=await listenBurnUserApi({api:service.api,accessToken:secret,port:configuration.port});
     secret.fill(0);secret=null;tokenStore.close();tokenStore=null;
-    log({event:'TEST_SERVICE_LISTENING',environment:configuration.runtime.policy.context.environment,productionReady:false,mainnetActivation:'DISABLED'});
+    const status=service.runtime.status();
+    log({event:mainnet?'MAINNET_SERVICE_LISTENING':'TEST_SERVICE_LISTENING',environment:configuration.runtime.policy.context.environment,
+      productionReady:status.productionReady,mainnetActivation:status.mainnetActivation});
     let health='';
     while(!signal?.aborted) {
       const result=await service.runtime.cycle(),next=JSON.stringify([result.state,result.reconciliation,result.reason]);
