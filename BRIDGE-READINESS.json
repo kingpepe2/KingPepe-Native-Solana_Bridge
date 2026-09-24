@@ -55,7 +55,7 @@
   "freshForwardDevnet": "COMPLETED_BURN_MINT_CRASH_RECOVERY",
   "mainnetDeployment": "NOT_DEPLOYED",
   "mainnetExecutionSupport": "ADAPTERS_PREPARED_SERVICE_AND_CUSTODY_INTEGRATION_PENDING",
-  "mainnetFundingQuoteSol": "1.795349560",
+  "mainnetFundingQuoteSol": "1.795339560",
   "previousReserveFundingQuoteNotApplicable": true,
   "activationApproval": "TEAM_EXPLICIT_INITIAL_DEPLOYMENT_AND_CONTROLLED_ACTIVATION_AUTHORIZED",
   "controlledActivationAmount": "DERIVE_SMALLEST_VALID_MEANINGFUL_AMOUNT_BEFORE_EXECUTION",
