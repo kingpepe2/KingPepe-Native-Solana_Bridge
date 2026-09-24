@@ -10,7 +10,7 @@ import { NATIVE_MAINNET_GENESIS } from "../network-identity.mjs";
 const PROTOCOL = "KINGPEPE_WINDOWS_PROTECTED_STORE_V2";
 const MAX_PAYLOAD = 1_048_576;
 const ROLES = Object.freeze(["ATTESTER_A", "ATTESTER_B", "BRIDGE_VALIDATOR", "NATIVE_OBSERVER", "FEE_PAYER", "BURN_SIGNER"]);
-const PURPOSES = Object.freeze(["attester-seed", "fee-payer-seed", "devnet-deployment-keys", "mainnet-deployment-keys", "native-rpc-auth", "service-auth", "native-burn-key", "native-burn-authorizations", "burn-operations", "burn-attester-authorizations"]);
+const PURPOSES = Object.freeze(["attester-seed", "fee-payer-seed", "devnet-deployment-keys", "mainnet-deployment-keys", "native-rpc-auth", "solana-rpc-url", "service-auth", "native-burn-key", "native-burn-authorizations", "burn-operations", "burn-attester-authorizations"]);
 const INSTANCES = new WeakSet();
 
 function record(value, fields) {
@@ -35,6 +35,8 @@ export function normalizeProtectedContext(value) {
   if (c.purpose === "devnet-deployment-keys" && (c.role !== "FEE_PAYER" || c.environment !== "devnet")) throw new Error("ProtectedDevnetDeploymentContextRequired");
   if (["mainnet-deployment-keys", "native-rpc-auth"].includes(c.purpose) && (c.environment !== "mainnet" ||
       c.nativeGenesis !== NATIVE_MAINNET_GENESIS || c.role !== (c.purpose === "native-rpc-auth" ? "NATIVE_OBSERVER" : "FEE_PAYER")))
+    throw new Error("ProtectedMainnetPreparationContextRequired");
+  if (c.purpose === "solana-rpc-url" && (c.environment !== "mainnet" || c.nativeGenesis !== NATIVE_MAINNET_GENESIS || c.role !== "BRIDGE_VALIDATOR"))
     throw new Error("ProtectedMainnetPreparationContextRequired");
   if (["attester-seed", "burn-attester-authorizations"].includes(c.purpose) && !["ATTESTER_A", "ATTESTER_B"].includes(c.role)) throw new Error("ProtectedRolePurposeInvalid");
   if (typeof c.serviceSid !== "string" || !/^S-1-5-(?:\d{1,10}-){1,14}\d{1,10}$/u.test(c.serviceSid)) throw new Error("ProtectedServiceSidInvalid");

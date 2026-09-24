@@ -19,7 +19,7 @@ import {requireBurn as check} from '../../native/burn/burn-protocol.mjs';
 
 export async function openBurnServiceRuntime(options,onEvent=()=>{}) {
   const mainnet=options?.policy?.context?.environment==='mainnet';
-  check(options&&Object.keys(options).sort().join()===(mainnet?'feePolicy,nativeRpcStore,nativeVerifierExecutable,policy,solanaEndpoint,stores':'feePolicy,nativeRpcOptions,nativeVerifierExecutable,policy,solanaEndpoint,stores'),'BurnServiceFieldsRejected');
+  check(options&&Object.keys(options).sort().join()===(mainnet?'feePolicy,nativeRpcStore,nativeVerifierExecutable,policy,solanaEndpoint,solanaRpcStore,stores':'feePolicy,nativeRpcOptions,nativeVerifierExecutable,policy,solanaEndpoint,stores'),'BurnServiceFieldsRejected');
   const {nativeRpcOptions,nativeVerifierExecutable,policy,solanaEndpoint,stores,feePolicy}=options;
   validateBurnContext(policy.context);
   check(stores&&Object.keys(stores).sort().join()==='attesterKey0,attesterKey1,attesterState0,attesterState1,burnKey,burnState,journal,payer','BurnServiceStoresRejected');
@@ -34,11 +34,17 @@ export async function openBurnServiceRuntime(options,onEvent=()=>{}) {
   try{
     const environment=policy.context.environment;
     const nativeStore=mainnet?remember(new WindowsProtectedStore(options.nativeRpcStore)):null;
+    let endpoint=solanaEndpoint;
     if(mainnet){
       const c=nativeStore.context,d=policy.context.deployment;
       check(c.environment==='mainnet'&&c.nativeGenesis===d.nativeGenesis&&c.solanaDeployment===d.solanaDeployment&&
         c.serviceSid===stores.journal.context.serviceSid,'BurnServiceNativeCredentialBinding');
       check(solanaEndpoint==='ENV:SOLANA_MAINNET_RPC_URL','BurnServiceProtectedSolanaEndpointRequired');
+      const solanaStore=remember(new WindowsProtectedStore(options.solanaRpcStore)),sc=solanaStore.context;
+      check(sc.role==='BRIDGE_VALIDATOR'&&sc.purpose==='solana-rpc-url'&&sc.environment==='mainnet'&&
+        sc.nativeGenesis===d.nativeGenesis&&sc.solanaDeployment===d.solanaDeployment&&sc.serviceSid===c.serviceSid,
+        'BurnServiceSolanaCredentialBinding');
+      endpoint=solanaStore;
     }
     const client=()=>mainnet?NativeRpcClient.fromProtectedMainnetCredentials(nativeStore):new NativeRpcClient(nativeRpcOptions);
     const rpc=client(),verifier=new NativeBurnVerifier({rpc,executable:nativeVerifierExecutable,environment});
@@ -49,7 +55,7 @@ export async function openBurnServiceRuntime(options,onEvent=()=>{}) {
       keyStore:new WindowsProtectedStore(stores['attesterKey'+index]),authorizationStore:new WindowsProtectedStore(stores['attesterState'+index]),
       verifier:new NativeBurnVerifier({rpc:client(),executable:nativeVerifierExecutable,environment})})));
     const solanaSigner=remember(new ProtectedBurnSolanaSigner({store:new WindowsProtectedStore(stores.payer),context:policy.context,feePayerHex:policy.feePayerHex}));
-    const solana=new BurnSolanaAdapter({policy,endpoint:solanaEndpoint});
+    const solana=new BurnSolanaAdapter({policy,endpoint});
     const runtime=new BurnRuntime({journal,observer:new NativeBurnObserver(rpc,environment),verifier,fees:new NativeBurnFeePolicy({rpc,policy:feePolicy}),
       burnSigner,attesters,solanaSigner,solana,onEvent});
     const api=new BurnUserApi({runtime,balances:new BurnUserBalances({nativeRpc:client(),solana})});

@@ -5,6 +5,7 @@ import {devnetRpcEndpoint,DEVNET_SOLANA_GENESIS} from '../../shared/solana-test-
 import {mainnetRpcEndpoint,SOLANA_MAINNET_GENESIS} from '../../shared/network-identity.mjs';
 import {base58Decode} from '../bridge-validator/solana-deposit-claim-transaction-plan.mjs';
 import {requireBurn as check} from '../../native/burn/burn-protocol.mjs';
+import {assertWindowsProtectedStore} from '../../shared/windows/protected-store.mjs';
 const METHODS=new Set(['getGenesisHash','getHealth','getMultipleAccounts','getAccountInfo','getLatestBlockhash','getBlockHeight',
   'getMinimumBalanceForRentExemption','getSignatureStatuses','getTransaction','getBalance','getTokenAccountsByOwner','getFeeForMessage','getSlot','getBlockTime','sendTransaction']);
 export class BurnSolanaRpc {
@@ -22,8 +23,17 @@ export class BurnSolanaRpc {
     }
     else if(environment==='mainnet'){
       check(expectedGenesis===SOLANA_MAINNET_GENESIS,'BurnSolanaGenesisRejected');
-      check(endpoint==='ENV:SOLANA_MAINNET_RPC_URL','BurnSolanaProtectedMainnetEndpointRequired');
-      this.#endpoint=mainnetRpcEndpoint(process.env.SOLANA_MAINNET_RPC_URL,expectedGenesis);
+      if(endpoint==='ENV:SOLANA_MAINNET_RPC_URL')this.#endpoint=mainnetRpcEndpoint(process.env.SOLANA_MAINNET_RPC_URL,expectedGenesis);
+      else{
+        // A concrete DPAPI store is admitted, never a URL or browser-shaped
+        // object. Service composition also binds its deployment and SID.
+        try{assertWindowsProtectedStore(endpoint,'BRIDGE_VALIDATOR','solana-rpc-url');}
+        catch{throw Error('BurnSolanaProtectedMainnetEndpointRequired');}
+        check(endpoint.context.environment==='mainnet','BurnSolanaProtectedMainnetEndpointRequired');
+        const {payload}=endpoint.read();
+        try{check(payload.length<=4096,'BurnSolanaProtectedMainnetEndpointRequired');this.#endpoint=mainnetRpcEndpoint(payload.toString('utf8'),expectedGenesis);}
+        finally{payload.fill(0);}
+      }
     }else {
       let u;try{u=new URL(endpoint);}catch{throw new Error('BurnSolanaEndpointRejected');}
       check(u.protocol==='http:'&&u.hostname==='127.0.0.1'&&Number(u.port)>=1024&&u.pathname==='/'&&!u.search&&!u.hash&&!u.username&&!u.password,'BurnSolanaEndpointRejected');

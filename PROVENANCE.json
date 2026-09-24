@@ -19,7 +19,7 @@
   "cleanup": {
     "scope": "TEAM_AUTHORIZED_AUTOMATIC_BURN_AND_MINT_CONVERSION",
     "status": "CURRENT_BURN_TEST_DEPLOYED_MAINNET_MINT_CREATED_PROGRAMS_PENDING",
-    "filesAfter": 192,
+    "filesAfter": 196,
     "removed": "Obsolete permanent reserve/FROST runtime, protocol and tests. Protected runtime backups and historical legal facts remain outside this cleanup.",
     "importedSource": "No third-party source imported. Existing dependency/API references and original classifications are preserved."
   },
@@ -261,6 +261,13 @@
       "notes": "Original current one-way automatic burn-and-mint documentation for docs/development-status.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "SIMPLIFY"
+    },
+    {
+      "path": "docs/security/burn-offline-recovery.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Explicit unprovisioned external backup and offline public certificate generation/recovery procedure.",
+      "purpose": "REQUIRED_DOCUMENTATION",
+      "reviewDisposition": "KEEP_DOCUMENTATION"
     },
     {
       "path": "docs/security/deposit-operation-recovery.md",
@@ -823,6 +830,13 @@
       "reviewDisposition": "KEEP_CURRENT_FORWARD"
     },
     {
+      "path": "services/bridge-validator/burn-recovery.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Manual quiescent full-state encrypted export and paused fresh-root DPAPI import.",
+      "purpose": "CORE_SECURITY",
+      "reviewDisposition": "KEEP_RUNTIME"
+    },
+    {
       "path": "services/bridge-validator/burn-runtime.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original serialized automatic TEST processing, complete pre-burn gate, persistent pause, chain-state recovery and reconciliation-driven completed supply.",
@@ -1089,6 +1103,13 @@
       "reviewDisposition": "KEEP_SECURITY"
     },
     {
+      "path": "shared/windows/cms-recovery.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Reviewed-tool CMS authenticated public-certificate encryption; no recovery private key interface.",
+      "purpose": "CORE_SECURITY",
+      "reviewDisposition": "KEEP_RUNTIME"
+    },
+    {
       "path": "shared/windows/protected-executable.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original source/executable hash and path binding with fail-closed cache validation; no generated binaries or operational state are tracked.",
@@ -1336,6 +1357,13 @@
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original real Windows DPAPI/ACL, protected role, single-key and journal recovery tests under the current test account; not distinct-service-identity certification.",
       "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "tests/windows/burn-recovery.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Isolated TEST certificate encrypted recovery, retained pending burn and ciphertext mutation regression.",
+      "purpose": "REQUIRED_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {

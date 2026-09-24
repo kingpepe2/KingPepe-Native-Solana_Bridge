@@ -19,7 +19,7 @@ test('protected production composition opens its own paused journal and cannot i
   const f=burnFixture({mainnet:true}),root=mkdtempSync(path.join(os.tmpdir(),'kingpepe-mainnet-composition-')),sid=windowsCurrentServiceSid();
   const repoRoot=path.resolve(import.meta.dirname,'../..');let service;
   const priorEndpoint=process.env.SOLANA_MAINNET_RPC_URL;
-  process.env.SOLANA_MAINNET_RPC_URL='https://mainnet-fixture.invalid.example/';
+  delete process.env.SOLANA_MAINNET_RPC_URL; // Runtime must use its DPAPI store.
   t.mock.method(globalThis,'fetch',async()=>{throw Error('NO_NETWORK_IN_PROTECTED_COMPOSITION_TEST');});
   t.after(async()=>{await service?.close();f.destroy();assert.equal(path.dirname(root),path.resolve(os.tmpdir()));
     assert(path.basename(root).startsWith('kingpepe-mainnet-composition-'));rmSync(root,{recursive:true});
@@ -38,13 +38,15 @@ test('protected production composition opens its own paused journal and cannot i
     stores['attesterState'+i]=store('attester-state-'+i,role,'burn-attester-authorizations',initialBurnAttesterState(f.context,role));
   }
   const rpc=store('native-rpc','NATIVE_OBSERVER','native-rpc-auth',Buffer.from(JSON.stringify({endpoint:'http://127.0.0.1:18443',username:'isolated-test',password:randomBytes(32).toString('hex')})));
+  const solanaRpc=store('solana-rpc','BRIDGE_VALIDATOR','solana-rpc-url',Buffer.from('https://mainnet-fixture.invalid.example/'));
   const token=store('service-auth','BRIDGE_VALIDATOR','service-auth',randomBytes(32));
   const feePolicy={minimumRelayAtomicPerKvB:'100',normalAtomicPerKvB:'1000',maximumAtomicPerKvB:'10000000',maximumFeeAtomic:'5800000'};
-  const options={stores,nativeRpcStore:rpc,nativeVerifierExecutable:path.join(root,'unused-verifier.exe'),policy:f.policy,solanaEndpoint:'ENV:SOLANA_MAINNET_RPC_URL',feePolicy};
+  const options={stores,nativeRpcStore:rpc,solanaRpcStore:solanaRpc,nativeVerifierExecutable:path.join(root,'unused-verifier.exe'),policy:f.policy,solanaEndpoint:'ENV:SOLANA_MAINNET_RPC_URL',feePolicy};
   const file=path.join(root,'service.json'),c={runtime:options,accessTokenStore:token,port:54012,intervalMs:1000,productionReady:false,mainnetActivation:'DISABLED'};
   writeFileSync(file,JSON.stringify(c));assert.throws(()=>loadBurnServiceConfiguration(file),/EnvironmentRejected/);
   assert.equal(loadBurnServiceConfiguration(file,{mainnet:true}).runtime.policy.context.environment,'mainnet');
   await assert.rejects(openBurnServiceRuntime({...options,nativeRpcOptions:{}}),/FieldsRejected/);
+  await assert.rejects(openBurnServiceRuntime({...options,solanaRpcStore:rpc}),/SolanaCredentialBinding/);
   // Missing authoritative fee policy is rejected before any runtime is usable.
   await assert.rejects(openBurnServiceRuntime(options),/NativeFeePolicy|BurnFeeSourcePolicy/);
   // All leases opened before that failure must be released, including journal.

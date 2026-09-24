@@ -1,6 +1,6 @@
 # Mainnet burn runtime
 
-The existing standard-SPL Mainnet Mint is `4QkWKqTMyPEyEb8RMKv3XrcHJ5jbS7k4uQhXVoirphZW` (8 decimals, initial supply zero, freeze authority None). This document describes deployment support, not an activated production service. Program/config deployment, dedicated Windows identity and offline recovery verification remain separate prerequisites.
+The existing standard-SPL Mainnet Mint is `4QkWKqTMyPEyEb8RMKv3XrcHJ5jbS7k4uQhXVoirphZW` (8 decimals, initial supply zero, freeze authority None). This document describes deployment support, not an activated production service. Program/config deployment, dedicated Windows identity and offline recovery verification remain separate prerequisites. The Team reports the recovery recipient and external destination as NOT_PROVISIONED; implementation continues independently of that external requirement. See the [offline recovery procedure](../security/burn-offline-recovery.md).
 
 `burn-mainnet-service.mjs` composes the production Native verifier/observer, two independent attester verifiers, protected burn signer, protected payer, journal, Solana artifact/config verifier and authenticated loopback user API. Native credentials enter only through the Mainnet observer DPAPI store. Solana credentials enter only through the protected server environment. No browser request can select either RPC or network.
 

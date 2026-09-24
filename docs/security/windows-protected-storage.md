@@ -10,4 +10,6 @@ The V2 store authenticates revisions, flushes an encrypted candidate and atomica
 
 Before production: generate/import only through the reviewed protected path, bind to the dedicated identity, restrict ACL, retain encrypted offline recovery material outside Git/web roots, and test restore with TEST keys and the journal under the intended replacement identity. Verify public identities and chain continuity without a second burn/mint. A copied DPAPI blob by itself is not a portable backup.
 
+The [portable offline recovery procedure](burn-offline-recovery.md) exports a complete paused snapshot through public-certificate CMS encryption. The Team's actual recipient and offline destination are NOT_PROVISIONED. The importer creates fresh DPAPI stores under the executing replacement identity and retains a mandatory recovery pause. The production service also reads its Solana RPC credential from its own protected store, independent of Explorer's environment.
+
 Single-key compromise before burn may steal or redirect funds; loss may stop processing. Authorized process memory contains plaintext while signing. Cloudflare is only a web perimeter. No HSM, multisig, rollback-anchor framework or claim of complete memory erasure is introduced. Production preparation remains blocked until its own identity and recovery evidence passes.
