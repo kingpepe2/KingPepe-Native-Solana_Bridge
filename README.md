@@ -1,7 +1,9 @@
 [![bannerkingpepe.png](https://i.postimg.cc/Xvzs6s0Y/bannerkingpepe.png)](https://postimg.cc/CZbGjH13)
 # KingPepe Native -> Solana Bridge
 
-The current source implements **ONE_WAY_AUTOMATIC_BURN_AND_MINT** for TEST validation. Mainnet is not deployed or activated. The public TEST site is [KingPepe Bridge](https://kingpepe.net/bridge); publication of this conversion's source does not itself switch its runtime. See [current validation and deployment status](docs/development-status.md).
+The current source implements **ONE_WAY_AUTOMATIC_BURN_AND_MINT**. The public [KingPepe Bridge](https://kingpepe.net/bridge) remains REGTEST -> DEVNET. Mainnet deployment has started with the verified zero-supply KPEPE Mint; the Bridge programs and production processing are not yet deployed or activated. See [current validation and deployment status](docs/development-status.md).
+
+The official Solana Mainnet KPEPE Mint is [`4QkWKqTMyPEyEb8RMKv3XrcHJ5jbS7k4uQhXVoirphZW`](https://explorer.solana.com/address/4QkWKqTMyPEyEb8RMKv3XrcHJ5jbS7k4uQhXVoirphZW). It uses standard SPL Token, 8 decimals, initial supply 0 and no freeze authority. Its Mint authority is the expected Bridge PDA; the program controlling that PDA still awaits deployment. No Mainnet Native deposit or burn has occurred. [Deployment evidence](docs/deployment/mainnet.json) distinguishes the created Mint from pending programs and activation.
 
 ## Transfer
 
@@ -33,7 +35,7 @@ Native header/Merkle checks and configured RPC observations have their stated tr
 
 ## Development
 
-[Validation commands](docs/deployment/local-e2e-build.md), [protocol](docs/architecture/protocol-messages.md), [recovery](docs/security/deposit-operation-recovery.md), [key protection](docs/security/windows-protected-storage.md), [future production plan](docs/deployment/production-plan.md).
+[Validation commands](docs/deployment/local-e2e-build.md), [protocol](docs/architecture/protocol-messages.md), [recovery](docs/security/deposit-operation-recovery.md), [key protection](docs/security/windows-protected-storage.md), [production execution plan](docs/deployment/production-plan.md).
 
 All runtime state, keys, credentials, backups and build outputs stay outside Git. Historical CI certifies only its named source. New commits require matching CI.
 

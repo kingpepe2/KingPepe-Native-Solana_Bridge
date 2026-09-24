@@ -18,8 +18,8 @@
   },
   "cleanup": {
     "scope": "TEAM_AUTHORIZED_AUTOMATIC_BURN_AND_MINT_CONVERSION",
-    "status": "CURRENT_BURN_TEST_DEPLOYED_MAINNET_ADAPTERS_PREPARED",
-    "filesAfter": 185,
+    "status": "CURRENT_BURN_TEST_DEPLOYED_MAINNET_MINT_CREATED_PROGRAMS_PENDING",
+    "filesAfter": 186,
     "removed": "Obsolete permanent reserve/FROST runtime, protocol and tests. Protected runtime backups and historical legal facts remain outside this cleanup.",
     "importedSource": "No third-party source imported. Existing dependency/API references and original classifications are preserved."
   },
@@ -233,6 +233,13 @@
       "notes": "Original current one-way automatic burn-and-mint documentation for docs/deployment/local-e2e-build.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "SIMPLIFY"
+    },
+    {
+      "path": "docs/deployment/mainnet.json",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Verified public Mainnet Mint creation, metadata, transaction and source/CI evidence. Pending program and runtime state is explicit; no private deployment material.",
+      "purpose": "REQUIRED_DOCUMENTATION",
+      "reviewDisposition": "KEEP_DOCUMENTATION"
     },
     {
       "path": "docs/deployment/production-plan.md",
