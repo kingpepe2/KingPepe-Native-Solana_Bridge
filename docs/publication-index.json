@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "documents": [
+    {
+      "path": "AGENTS.md",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "BRIDGE-READINESS.json",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "PROVENANCE.json",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "README.md",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "SECURITY.md",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "THIRD_PARTY_NOTICES.md",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "UPSTREAM-REFERENCES.json",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "docs/architecture/attestation-and-observation.md",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "docs/architecture/native-validation.md",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "docs/architecture/ntt-comparison.md",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "docs/architecture/protocol-messages.md",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "docs/architecture/solana-programs.md",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "docs/deployment/historical-validation.md",
+      "classification": "HISTORICAL_TEST_EVIDENCE"
+    },
+    {
+      "path": "docs/deployment/local-e2e-build.md",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "docs/deployment/mainnet.json",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "docs/deployment/public-mainnet-pending.md",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "docs/deployment/source-audit-2026-09-25.md",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "docs/development-status.md",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "docs/public-documentation-policy.md",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "docs/publication-index.json",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "docs/security/monetary-supply.md",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "docs/user-access.md",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "native/node/README.md",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "native/proof/README.md",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "scripts/README.md",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "services/attesters/README.md",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "services/bridge-validator/README.md",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "services/reconciliation/README.md",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "shared/README.md",
+      "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "solana/tests/README.md",
+      "classification": "PUBLIC_SAFE"
+    }
+  ]
+}

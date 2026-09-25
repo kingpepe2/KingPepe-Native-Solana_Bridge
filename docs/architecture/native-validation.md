@@ -1,11 +1,7 @@
-# Native burn verification
+# Native burn validation
 
-`native/proof` verifies bounded raw Native headers, work, transaction serialization/txid and Merkle membership. KingPepe source/genesis and consensus parameters are pinned; REGTEST and Mainnet rules are distinct. The Mainnet runtime requires explicit protected Mainnet configuration and lifecycle admission; development entrypoints cannot be relabelled as Mainnet. Public Mainnet activation remains pending, with no deposits accepted.
+The Bridge verifies the actual KingPepe Native network and transaction evidence. It does not infer KingPepe behavior from another blockchain. The authoritative source and development tool versions are pinned for reproducible validation.
 
-`native/burn/burn-evidence.mjs` verifies the original deposit and operational fee inputs against the exact plan. Before signing it requires canonical chain evidence, twelve deposit confirmations, fresh unspent observations, exact scripts, full deposit amount, approved change and bounded miner fee. Admission capabilities are process-private and short-lived; copying a result or supplying a browser flag cannot authorize signing.
+The Native burn amount remains verifiable on-chain even though the burned output cannot be spent. Deposit observation and burn broadcast alone are insufficient for Solana minting: verified burn finality is required. A changed, orphaned or invalid burn cannot authorize a corresponding mint.
 
-After broadcast, each attester independently fetches deposit/fee parents and the actual burn, verifies BIP341 signatures, the exact canonical OP_RETURN script/commitment, deposit/burn identity and exact amount, and twelve burn confirmations. A burn is excluded from the spendable UTXO set; its amount remains provable in the transaction and block. Missing, orphaned or changed evidence cannot authorize mint.
-
-Native raw evidence uses the retained KPNEVD02 header/Merkle packet. This is not full block-script validation or independent fork choice: canonical-chain selection and UTXO observations trust the configured validating Native node. The Solana program trusts project attesters for Native proof. These trust boundaries are not external-audit claims.
-
-Source proof locations at Native commit 3f2621820ffefae59cbe48b350f5f8f6ec8a6da5: script/script.h CScript::IsUnspendable; script/solver.cpp Solver; policy/policy.cpp IsStandardTx/GetDustThreshold; policy/policy.h datacarrier defaults; kernel/mempool_options.h and node/mempool_args.cpp effective limits; rpc/mempool.cpp sendrawtransaction/submitpackage maxburnamount; coins.cpp CCoinsViewCache::AddCoin; validation.cpp AddCoins/connect/disconnect/replay. The datacarrier default is enabled, with MAX_OP_RETURN_RELAY=100000 aggregate script bytes and transaction weight limits. The Bridge uses only a 57-byte script.
+Tests of Native policy and reorganization handling use isolated development chains. They do not constitute a Mainnet transfer or independent audit certification.

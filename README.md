@@ -1,48 +1,52 @@
-[![bannerkingpepe.png](https://i.postimg.cc/Xvzs6s0Y/bannerkingpepe.png)](https://postimg.cc/CZbGjH13)
-# KingPepe Native -> Solana Bridge
+[![KingPepe](https://i.postimg.cc/Xvzs6s0Y/bannerkingpepe.png)](https://kingpepe.carrd.co/)
+# KingPepe Native → Solana Bridge
 
-**KingPepe Native MAINNET → irreversible Native burn → verified burn evidence → Solana MAINNET KPEPE mint.** The Bridge is **ONE WAY**, with exact **1:1** minting and a maximum supply of **21,000,000 KPEPE**.
+**MAINNET BRIDGE — ACTIVATION PENDING. DO NOT SEND KPEPE YET.**
 
-**MAINNET DEPLOYMENT STATUS: ACTIVATION PENDING.** The official Solana KPEPE Mint exists. The public [KingPepe Bridge](https://kingpepe.net/bridge) must not be treated as active until final Mainnet Program deployment and controlled activation complete. **DO NOT SEND KPEPE YET.** Public deposit-address issuance and economic endpoints are disabled. The status will change to **MAINNET BRIDGE ACTIVE** only after successful controlled activation. See [current deployment status](docs/development-status.md).
+The official KPEPE Solana Mint exists. The Bridge is completing Mainnet deployment and controlled activation. Public deposit addresses are not being issued, and deposits are not accepted. The public status will change to **MAINNET BRIDGE ACTIVE** only after activation succeeds.
 
-The official Solana Mainnet KPEPE Mint is [`4QkWKqTMyPEyEb8RMKv3XrcHJ5jbS7k4uQhXVoirphZW`](https://explorer.solana.com/address/4QkWKqTMyPEyEb8RMKv3XrcHJ5jbS7k4uQhXVoirphZW). It uses standard SPL Token, 8 decimals, initial supply 0 and no freeze authority. Its Mint authority is the expected Bridge PDA; the program controlling that PDA still awaits deployment. No Mainnet Native deposit or burn has occurred. [Deployment evidence](docs/deployment/mainnet.json) distinguishes the created Mint from pending programs and activation.
+KingPepe Bridge is **ONE WAY: KingPepe Native Mainnet → Solana Mainnet**. Native KPEPE is irreversibly burned before the corresponding amount of KPEPE is minted **1:1** on Solana. The maximum KingPepe supply is **21,000,000 KPEPE**.
 
-Official project links: [KingPepe Website](https://kingpepe.carrd.co/), [KingPepe Bridge](https://kingpepe.net/bridge), [KingPepe on X (@Kingpepe111)](https://x.com/kingpepe111), and [KingPepe Native -> Solana Bridge GitHub](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge). The existing Mint's [canonical metadata](https://kingpepe.net/metadata/kpepe-mainnet.json) preserves the approved logo and describes irreversible Native burn followed by verified exact 1:1 Solana minting.
+## Official token and links
 
-## Production flow after activation
+**Official KPEPE Solana Mint:** [`4QkWKqTMyPEyEb8RMKv3XrcHJ5jbS7k4uQhXVoirphZW`](https://explorer.solana.com/address/4QkWKqTMyPEyEb8RMKv3XrcHJ5jbS7k4uQhXVoirphZW).
 
-After activation, connect a Solana Wallet Standard wallet on Mainnet (`solana:mainnet`). The Bridge binds the wallet destination before issuing a unique, single-use KingPepe Native Mainnet deposit address. Your Native deposit authorizes the operation; there is no separate approval button and the website cannot spend your wallet. Wallet connection and address issuance remain disabled in the current activation-pending presentation.
+Name: **KingPepe**. Symbol: **KPEPE**. Standard SPL Token, **8 decimals**, no freeze authority. The Mint address identifies the token; it is not a Native deposit address.
 
-After 12 Native deposit confirmations and the pre-burn checks, the next processing cycle signs and broadcasts an exact-value OP_RETURN burn. Separate Bridge operational inputs pay its miner fee. After 12 burn confirmations, two project attesters sign canonical Borsh V4 burn evidence. Solana verifies the attestation, consumes the deposit and burn exactly once, and mints to the original wallet. Finalized execution and matching reconciliation complete the operation.
+- [KingPepe Website](https://kingpepe.carrd.co/)
+- [KingPepe Bridge](https://kingpepe.net/bridge)
+- [KingPepe on X (@Kingpepe111)](https://x.com/kingpepe111)
+- [KingPepe Native → Solana Bridge GitHub](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge)
+- [Official token metadata](https://kingpepe.net/metadata/kpepe-mainnet.json)
 
-**A successful Native burn is irreversible.** The Bridge fee is **0**. The deposit is not reduced by the Bridge: confirmed deposit = finalized Native burn = Solana mint. Late deposits to retired addresses and multiple separate deposits enter an exception state; they are not automatically burned or minted. Transfers are not batched. Wallet disconnect or account changes cannot redirect an existing operation.
+## How the Bridge works after activation
 
-Solana -> Native redemption, withdrawal and Native payout are not provided. Wallet connection never requests a private key, seed phrase or wallet file. Native public-address balance lookup is informational.
+1. Connect Phantom or a compatible Solana Wallet Standard wallet.
+2. Receive a unique KingPepe Native deposit address bound to that Solana wallet.
+3. Send Native KPEPE to the issued address.
+4. Wait for **12 Native deposit confirmations**.
+5. The Bridge automatically burns the Native amount irreversibly.
+6. After verified Native burn finality, the exact corresponding amount is minted on Solana.
+7. The KPEPE arrives in the originally bound Solana wallet, and the operation completes after verification.
 
-## Supply and accounting
+There is no separate “Approve to Bridge” step. **Bridge fee: 0.** The Bridge does not reduce the user's deposited amount. Network transaction fees are separate from the bridged amount.
 
-KingPepe Native's source monetary maximum is **21,000,000 KPEPE**. Both Native and Solana use 8 decimals: **2,100,000,000,000,000 base units**. This is a monetary ceiling, not a Bridge mint allocation.
+**A successful Native burn is irreversible.** No Solana → Native redemption is offered. Disconnecting or changing wallets does not redirect an existing operation. Deposit addresses are single-use; do not send another transfer to a completed operation's address. The Bridge never asks for a wallet's private credentials.
 
-Cumulative Bridge-created Solana units must not exceed either 21M or verified finalized Native burns. Finalized burns awaiting mint are explicit pending obligations. Every completed operation has equal burn and mint amounts. Holder-initiated SPL burns reduce live token supply without reopening the cumulative issuance cap or creating a redemption entitlement. See [the accounting equation and source evidence](docs/security/monetary-supply.md).
+## Supply and progress
 
-The Mainnet counter starts at **0 KPEPE bridged / 21,000,000 KPEPE maximum**, independently verified against the existing zero-supply Mainnet Mint. Pending mode can report only this verified zero baseline; unavailable or contradictory chain data displays **Unavailable**. After activation, completed canonical Mainnet burn/mint accounting supplies the counter. Requests, observed deposits and unminted burns do not increment it. Development journals and Mints remain separate. See [public pre-activation behavior](docs/deployment/public-mainnet-pending.md).
+For each completed operation, the confirmed Native deposit, finalized Native burn and Solana mint amounts are equal. Cumulative Bridge issuance cannot exceed verified finalized Native burns or **21,000,000 KPEPE**. Pending burns awaiting mint are not counted as completed transfers.
 
-`productionLimitPolicy=UNBOUNDED_BY_TEAM_DECISION` means no arbitrary per-transfer or time-window monetary cap. Finality, the 21M ceiling, conservation, replay checks and reconciliation remain mandatory. Storage and fee-funding exhaustion hold new work safely; they never reduce the user's burn amount.
+The Mainnet counter currently shows **0 KPEPE bridged / 21,000,000 KPEPE maximum**. Development activity is excluded. See [current status](docs/development-status.md), [user guidance](docs/user-access.md) and [supply accounting](docs/security/monetary-supply.md).
 
-## Trust and recovery
+## Security information
 
-Native burn custody uses **SINGLE_KEY_ACCEPTED_RISK**. The root signs independently derived operation addresses and a separate operational fee address. It is server-side and DPAPI-protected; it is separate from Solana payer, upgrade authority and attester keys. No FROST is used. Compromise before burn may permit theft of temporarily held deposits and operational fees. The private automatic signer must prove access isolation from Explorer, restart safety and the existing burn admission controls; Windows Service/SCM hosting is not required.
+Custody, upgrade, and recovery controls are documented internally. Relevant security-assurance information will be published alongside the results of an independent security audit.
 
-**OFFLINE_RECOVERY_BACKUP = NOT_REQUIRED_BY_TEAM_DECISION; RECOVERY_RISK = ACCEPTED_BY_KINGPEPE_TEAM.** No offline backup is claimed. Loss of the only usable burn signing material may leave confirmed but unburned Native deposits unavailable for automatic processing/recovery. Cloudflare does not mitigate that risk or protect the key. Removing the offline-copy and SCM requirements does not waive protected storage, automatic signer verification or any burn/mint invariant.
+No independent security audit has been completed or is claimed. Source review and automated tests are not independent audit certification. Report suspected vulnerabilities through the private reporting guidance in [SECURITY.md](SECURITY.md).
 
-The journal and exact signed transactions persist before broadcast. After an ambiguous response, recovery checks the existing Native transaction or Solana claim before retrying the same action. A finalized burn remains a mint obligation after restart. Critical contradictions persistently pause economic processing; there is no automatic economic repair.
+## Source and licensing
 
-Native header/Merkle checks and configured RPC observations have their stated trust boundaries. Solana relies on two authorized project attesters for Native burn evidence, rather than running Native consensus itself. The upgrade model is `SINGLE_KEY_WITH_REVIEW_CONTROL`, with no fixed timelock or waiting window. The upgrade authority can replace program logic. Specific Team approval is required for production upgrades. No independent external audit is claimed.
+Build and regression information is in [development validation](docs/deployment/local-e2e-build.md). Public documentation follows the [documentation policy](docs/public-documentation-policy.md).
 
-## Development
-
-[Validation commands](docs/deployment/local-e2e-build.md), [protocol](docs/architecture/protocol-messages.md), [recovery](docs/security/deposit-operation-recovery.md), [key protection](docs/security/windows-protected-storage.md), [production execution plan](docs/deployment/production-plan.md).
-
-All runtime state, keys, credentials, backups and build outputs stay outside Git. Historical CI certifies only its named source. New commits require matching CI.
-
-Original code: Copyright (c) 2026 KingPepe Team. All Rights Reserved. Preserve [LICENSE](LICENSE), [third-party notices](THIRD_PARTY_NOTICES.md), and [provenance](PROVENANCE.json). Historical license grants are not revoked. Report security concerns privately to the KingPepe Team; do not post secrets in public issues.
+Original code: Copyright (c) 2026 KingPepe Team. All Rights Reserved. Preserve [LICENSE](LICENSE), [third-party notices](THIRD_PARTY_NOTICES.md) and [provenance](PROVENANCE.json). Historical license grants remain valid.

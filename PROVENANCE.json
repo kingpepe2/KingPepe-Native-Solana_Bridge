@@ -1,6 +1,5 @@
 {
   "schemaVersion": "1.0",
-  "generatedAt": "2026-09-24T00:00:00Z",
   "project": "KingPepe Native - Solana Bridge",
   "purpose": "Exact file-by-file origin and retained bridge-purpose classification; implementation evidence is recorded separately.",
   "provenancePolicy": {
@@ -16,522 +15,416 @@
     "historicalLicensing": "Previously distributed Apache-licensed versions retain their historical grants. The authorized source-history rewrite does not revoke those grants or third-party terms.",
     "thirdPartyBoundary": "Required upstream terms and selected BIP-341 vector attribution remain. Reference/API use does not transfer upstream ownership."
   },
+  "generatedAt": "2026-09-25T00:00:00Z",
   "cleanup": {
-    "scope": "TEAM_AUTHORIZED_AUTOMATIC_BURN_AND_MINT_CONVERSION",
-    "status": "MAINNET_PUBLIC_ACTIVATION_PENDING_EXISTING_MINT_PRESERVED",
-    "filesAfter": 204,
-    "removed": "Obsolete permanent reserve/FROST runtime, protocol and tests. Protected runtime backups and historical legal facts remain outside this cleanup.",
-    "importedSource": "No third-party source imported. Existing dependency/API references and original classifications are preserved."
+    "scope": "PUBLIC_DOCUMENTATION_POLICY",
+    "filesAfter": 191,
+    "originalRecords": "Preserved internally without rewriting historical facts.",
+    "functionalImplementation": "Preserved."
   },
   "trackedFiles": [
     {
       "path": ".gitattributes",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Original text-only LF checkout policy for reproducible Windows/WSL source inspection; binary files are not normalized.",
+      "notes": "Original KingPepe build, publication or configuration metadata; upstream identity and license terms remain unchanged.",
       "purpose": "REQUIRED_BUILD",
       "reviewDisposition": "KEEP_TOOLING"
     },
     {
       "path": ".github/scripts/dependency-license-audit.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Declared dependency-license metadata and proprietary local-package boundary validation; not third-party source copying or external legal review.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "REQUIRED_TOOLING",
       "reviewDisposition": "KEEP_TOOLING"
     },
     {
       "path": ".github/scripts/guardrails.py",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Repository guardrail script developed for local policy enforcement.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "REQUIRED_TOOLING",
       "reviewDisposition": "KEEP_TOOLING"
     },
     {
       "path": ".github/workflows/ci.yml",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "CI workflow configuration, pinned tooling, full-history secret scan and SBF builds. The tar --no-same-owner flag is a THIRD_PARTY_TERM, not a KingPepe governance role.",
+      "notes": "Original KingPepe build, publication or configuration metadata; upstream identity and license terms remain unchanged.",
       "purpose": "REQUIRED_BUILD",
       "reviewDisposition": "KEEP_TOOLING"
     },
     {
       "path": ".gitignore",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Original publication-boundary exclusions for secrets, FROST/attester state, wallets, databases, ledgers, backups and generated build/test outputs.",
+      "notes": "Original KingPepe build, publication or configuration metadata; upstream identity and license terms remain unchanged.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_TOOLING"
     },
     {
       "path": ".npmrc",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Exact package engine enforcement only; no registry credentials or private endpoints.",
+      "notes": "Original KingPepe build, publication or configuration metadata; upstream identity and license terms remain unchanged.",
       "purpose": "REQUIRED_BUILD",
       "reviewDisposition": "KEEP_TOOLING"
     },
     {
       "path": "AGENTS.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original repository working instructions for the approved TEST-only automatic burn-and-mint conversion and retained production approval boundary.",
+      "notes": "Original KingPepe public documentation or sanitized historical summary.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "SIMPLIFY"
     },
     {
       "path": "BRIDGE-READINESS.json",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Original source-bound readiness with burn proof status, new TEST gates, single-key risk, no inherited reserve certification and Mainnet disabled.",
+      "notes": "Original KingPepe build, publication or configuration metadata; upstream identity and license terms remain unchanged.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "SIMPLIFY"
     },
     {
       "path": "LICENSE",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Repository proprietary rights statement.",
+      "notes": "Original KingPepe public documentation or sanitized historical summary.",
       "purpose": "THIRD_PARTY_LEGAL",
       "reviewDisposition": "KEEP_LEGAL"
     },
     {
       "path": "PROVENANCE.json",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Per-file provenance, licensing context and retained simplification classifications, including required repository-file restoration.",
+      "notes": "Original KingPepe build, publication or configuration metadata; upstream identity and license terms remain unchanged.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "SIMPLIFY"
     },
     {
       "path": "README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original current TEST burn-and-mint architecture, exact separately funded fees, supply conservation, public cutover status and explicit incomplete production readiness.",
+      "notes": "Original KingPepe public documentation or sanitized historical summary.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "SECURITY.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Concise responsible-disclosure guidance and non-secret publication posture; no internal runtime architecture or operational configuration.",
+      "notes": "Original KingPepe public documentation or sanitized historical summary.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "KEEP_SECURITY"
     },
     {
       "path": "THIRD_PARTY_NOTICES.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Third-party attribution index for external references.",
+      "notes": "Original KingPepe public documentation or sanitized historical summary.",
       "purpose": "THIRD_PARTY_LEGAL",
       "reviewDisposition": "KEEP_LEGAL"
     },
     {
       "path": "UPSTREAM-REFERENCES.json",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original current one-way automatic burn-and-mint documentation for UPSTREAM-REFERENCES.json; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
+      "notes": "Original KingPepe public documentation or sanitized historical summary.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "KEEP_LEGAL"
     },
     {
       "path": "cli/bridge.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original minimal public JSON user-request and status CLI; no wallet signing or secret import.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "REQUIRED_TOOLING",
       "reviewDisposition": "KEEP_CORE"
     },
     {
-      "path": "config/examples/localnet.example.json",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Original non-secret TEST burn configuration with placeholder protected single-key burn, attester and Solana references; not production provisioning.",
-      "purpose": "REQUIRED_TOOLING",
-      "reviewDisposition": "KEEP_TOOLING"
-    },
-    {
-      "path": "config/examples/production-readiness.example.json",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Original unconfigured planning checklist, explicitly not a loadable runtime config. Separate protected role and local variable references, paused existing-journal preparation, final Team upgrade/audit policy, retained runtime/readiness/activation gates and public placeholders only; the template provisions no secret.",
-      "purpose": "REQUIRED_DOCUMENTATION",
-      "reviewDisposition": "KEEP_LEGAL_AND_CURRENT_CONTRACT"
-    },
-    {
-      "path": "config/schemas/bridge-local.schema.json",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Original minimal schema for the non-secret localnet example; excludes Devnet/Mainnet configuration and does not change runtime validation.",
-      "purpose": "REQUIRED_TOOLING",
-      "reviewDisposition": "KEEP_TOOLING"
-    },
-    {
       "path": "docs/architecture/attestation-and-observation.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original current one-way automatic burn-and-mint documentation for docs/architecture/attestation-and-observation.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
+      "notes": "Original KingPepe public documentation or sanitized historical summary.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "SIMPLIFY"
     },
     {
       "path": "docs/architecture/native-validation.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original current one-way automatic burn-and-mint documentation for docs/architecture/native-validation.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
+      "notes": "Original KingPepe public documentation or sanitized historical summary.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "docs/architecture/ntt-comparison.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original current one-way automatic burn-and-mint documentation for docs/architecture/ntt-comparison.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
+      "notes": "Original KingPepe public documentation or sanitized historical summary.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "docs/architecture/protocol-messages.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original current one-way automatic burn-and-mint documentation for docs/architecture/protocol-messages.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
+      "notes": "Original KingPepe public documentation or sanitized historical summary.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "docs/architecture/solana-programs.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original current one-way automatic burn-and-mint documentation for docs/architecture/solana-programs.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
+      "notes": "Original KingPepe public documentation or sanitized historical summary.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "SIMPLIFY"
     },
     {
-      "path": "docs/deployment/burn-devnet-report.md",
+      "path": "docs/deployment/historical-validation.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Current source-bound burn TEST results, preserved failed-operation diagnosis/recovery and explicit public/production blockers.",
-      "purpose": "REQUIRED_DOCUMENTATION",
-      "reviewDisposition": "KEEP_LEGAL_AND_CURRENT_CONTRACT"
-    },
-    {
-      "path": "docs/deployment/burn-devnet.json",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Verified public burn TEST identities, artifact hashes, source relationship and real operation evidence; no secrets or Mainnet identity claim.",
-      "purpose": "REQUIRED_DOCUMENTATION",
-      "reviewDisposition": "KEEP_LEGAL_AND_CURRENT_CONTRACT"
-    },
-    {
-      "path": "docs/deployment/devnet-report.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original historical reserve-model deployment evidence retained with an explicit superseded notice; does not validate the new burn architecture.",
-      "purpose": "REQUIRED_DOCUMENTATION",
-      "reviewDisposition": "KEEP_LEGAL_AND_CURRENT_CONTRACT"
-    },
-    {
-      "path": "docs/deployment/devnet.json",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Public test-only finalized Devnet identities, transactions, Borsh version and program binary build evidence; no endpoint credentials, keys or operational state.",
-      "purpose": "REQUIRED_DOCUMENTATION",
-      "reviewDisposition": "KEEP_LEGAL_AND_CURRENT_CONTRACT"
-    },
-    {
-      "path": "docs/deployment/devnet.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original historical reserve-model deployment evidence retained with an explicit superseded notice; does not validate the new burn architecture.",
-      "purpose": "REQUIRED_DOCUMENTATION",
-      "reviewDisposition": "KEEP_LEGAL_AND_CURRENT_CONTRACT"
-    },
-    {
-      "path": "docs/deployment/final-oneway-audit.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original historical reserve-model deployment evidence retained with an explicit superseded notice; does not validate the new burn architecture.",
-      "purpose": "CORE_BRIDGE",
-      "reviewDisposition": "KEEP_SECURITY"
+      "notes": "Original KingPepe public documentation or sanitized historical summary."
     },
     {
       "path": "docs/deployment/local-e2e-build.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original current one-way automatic burn-and-mint documentation for docs/deployment/local-e2e-build.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
+      "notes": "Original KingPepe public documentation or sanitized historical summary.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "SIMPLIFY"
-    },
-    {
-      "path": "docs/deployment/mainnet-runtime.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original Mainnet burn runtime lifecycle, protected service composition, operator preparation and regression coverage; no production secret or on-chain execution evidence.",
-      "purpose": "REQUIRED_DOCUMENTATION",
-      "reviewDisposition": "KEEP_CURRENT_FORWARD"
     },
     {
       "path": "docs/deployment/mainnet.json",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Verified public Mainnet Mint creation, metadata, transaction and source/CI evidence. Pending program and runtime state is explicit; no private deployment material.",
+      "notes": "Original KingPepe build, publication or configuration metadata; upstream identity and license terms remain unchanged.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "KEEP_DOCUMENTATION"
-    },
-    {
-      "path": "docs/deployment/production-plan.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original current one-way automatic burn-and-mint documentation for docs/deployment/production-plan.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
-      "purpose": "REQUIRED_DOCUMENTATION",
-      "reviewDisposition": "KEEP_LEGAL_AND_CURRENT_CONTRACT"
     },
     {
       "path": "docs/deployment/public-mainnet-pending.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original public Mainnet activation-pending presentation, disabled economic gateway and independently verified zero baseline; preserves historical development evidence.",
+      "notes": "Original KingPepe public documentation or sanitized historical summary.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "KEEP_CURRENT_FORWARD"
     },
     {
+      "path": "docs/deployment/source-audit-2026-09-25.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original KingPepe public documentation or sanitized historical summary."
+    },
+    {
       "path": "docs/development-status.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original current one-way automatic burn-and-mint documentation for docs/development-status.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
+      "notes": "Original KingPepe public documentation or sanitized historical summary.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "SIMPLIFY"
     },
     {
-      "path": "docs/security/burn-offline-recovery.md",
+      "path": "docs/public-documentation-policy.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Explicit unprovisioned external backup and offline public certificate generation/recovery procedure.",
-      "purpose": "REQUIRED_DOCUMENTATION",
-      "reviewDisposition": "KEEP_DOCUMENTATION"
+      "notes": "Original KingPepe public documentation or sanitized historical summary."
     },
     {
-      "path": "docs/security/deposit-operation-recovery.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original current one-way automatic burn-and-mint documentation for docs/security/deposit-operation-recovery.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
-      "purpose": "REQUIRED_DOCUMENTATION",
-      "reviewDisposition": "SIMPLIFY"
-    },
-    {
-      "path": "docs/security/local-deposit-accounting.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original current one-way automatic burn-and-mint documentation for docs/security/local-deposit-accounting.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
-      "purpose": "REQUIRED_DOCUMENTATION",
-      "reviewDisposition": "KEEP_SECURITY"
+      "path": "docs/publication-index.json",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Original KingPepe build, publication or configuration metadata; upstream identity and license terms remain unchanged."
     },
     {
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
       "path": "docs/security/monetary-supply.md",
       "reviewDisposition": "KEEP_SECURITY",
       "purpose": "CORE_BRIDGE",
-      "notes": "Original current one-way automatic burn-and-mint documentation for docs/security/monetary-supply.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim."
-    },
-    {
-      "path": "docs/security/native-mainnet-observation.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original current one-way automatic burn-and-mint documentation for docs/security/native-mainnet-observation.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
-      "purpose": "REQUIRED_DOCUMENTATION",
-      "reviewDisposition": "KEEP_CORE"
-    },
-    {
-      "path": "docs/security/program-upgrades.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original current one-way automatic burn-and-mint documentation for docs/security/program-upgrades.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
-      "purpose": "REQUIRED_DOCUMENTATION",
-      "reviewDisposition": "KEEP_LEGAL_AND_CURRENT_CONTRACT"
-    },
-    {
-      "path": "docs/security/solana-deployment-monitor.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original current one-way automatic burn-and-mint documentation for docs/security/solana-deployment-monitor.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
-      "purpose": "REQUIRED_DOCUMENTATION",
-      "reviewDisposition": "SIMPLIFY"
-    },
-    {
-      "path": "docs/security/windows-protected-storage.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original current one-way automatic burn-and-mint documentation for docs/security/windows-protected-storage.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
-      "purpose": "REQUIRED_DOCUMENTATION",
-      "reviewDisposition": "SIMPLIFY"
+      "notes": "Original KingPepe public documentation or sanitized historical summary."
     },
     {
       "path": "docs/user-access.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original current one-way automatic burn-and-mint documentation for docs/user-access.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
+      "notes": "Original KingPepe public documentation or sanitized historical summary.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/burn/burn-evidence.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original independently verified REGTEST/Mainnet deposit/burn admission over raw transactions, headers and Merkle proofs; Mainnet spent inputs retain checked block hints, not trusted finality flags.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/burn/burn-fees.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original checked integer selection of separate operational fee inputs, actual transaction size quotes, source-derived ceilings and pre-broadcast fee revalidation.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/burn/burn-key.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original domain-separated single-key deposit/operational derivation and exact Taproot transaction signing using the retained Noble BIP340 implementation. Native sighash rules are not changed.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/burn/burn-observer.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original bounded network-bound Native block/mempool discovery and ambiguity-safe burn recovery; Mainnet uses retained and UTXO-derived block locations without requiring txindex.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/burn/burn-protocol.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original versioned burn binding, operation commitment, exact two-class-input transaction validation and finalized burn evidence codec. No third-party implementation copied.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/burn/burn-source-policy.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original policy projection of the verified KingPepe source fee constants and measured maximum eight-input burn size; fallback zero remains disabled.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/burn/protected-burn-signer.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original DPAPI single-key signing with durable operation/input authorization before signing, exact transaction binding and protected idempotent recovery.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/burn/tests/burn-balances.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original tests of exact configured Mint, finalized balances, deployment integrity and sanitized public projections.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "native/burn/tests/burn-borsh.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original cross-language V4 vector and field mutation regressions for signed finalized burn evidence.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "native/burn/tests/burn-delivery.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original attestation renewal, lost/expired packet recovery, destination ATA resolution, post-burn stray deposit and network/artifact identity regressions.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "native/burn/tests/burn-fees.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original source fee-unit, insufficient-estimation-history, minimum-floor, measured size and safety-ceiling regressions.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "native/burn/tests/burn-fixture.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original synthetic public operation and burn fixture builders; ephemeral test signing material is created at runtime and never published.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "native/burn/tests/burn-journal.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original durable state, immutable destination, multiple/late deposit, reorg, exactly-once recovery and conservation regressions.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "native/burn/tests/burn-mainnet-admission.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original synthetic Mainnet network/context, no-index block-hint journal recovery, protected endpoint and wrong-cluster regressions. No production transaction or retained private material.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "REQUIRED_TEST",
       "reviewDisposition": "KEEP_CURRENT"
     },
     {
       "path": "native/burn/tests/burn-mainnet-lifecycle.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original Mainnet burn runtime lifecycle, protected service composition, operator preparation and regression coverage; no production secret or on-chain execution evidence.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "REQUIRED_RUNTIME_OR_TEST",
       "reviewDisposition": "KEEP_CURRENT_FORWARD"
     },
     {
       "path": "native/burn/tests/burn-protocol.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original burn construction, full user-value conservation, fee isolation, domain binding, integer cap and overage/extra-output regressions.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "native/burn/tests/burn-public-api.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original wallet-bound API and authenticated loopback validation, origin, rate/body limit, reverse-route absence and diagnostic sanitization tests.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "native/burn/tests/burn-solana-plan.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original real packet encoding tests for full V4 receipts, claims, exact recipient ATA and deposit/burn replay markers within Solana transaction limits.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "native/burn/tests/burn-supply.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original completed-accounting counter, cap, remaining amount, conservation, secret projection and network isolation regressions.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "native/node/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original current one-way automatic burn-and-mint documentation for native/node/README.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
+      "notes": "Original KingPepe public documentation or sanitized historical summary.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/node/native-fee-policy.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original integer-only dynamic node fee observation, exact Taproot transaction weight and bounded fee quotation. Missing estimates or excessive fees reject without a fixed fallback. No production cap values are supplied.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/node/native-raw-evidence.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Canonical evidence encoder, local node collector, Rust process boundary and independently evaluated signing/reserve policies; no keys or broadcast authority.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/node/native-rpc-client.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 loopback-first KingPepe JSON-RPC adapter for local REGTEST observation, UTXO checks, controlled local broadcast, endpoint/auth boundary enforcement, and exact atomic amount parsing.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/node/native-taproot-transaction.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 local Native transaction parser/serializer, BIP-341 key-path SIGHASH_DEFAULT evidence helper, and Taproot witness attachment boundary. It is KingPepe-specific source informed by public BIP-341 Taproot rules and does not contain keys, signing material, or operational state.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/node/native-tapscript.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original bounded public Taproot tree/control-block implementation against BIP341 standard facts using the pinned curve dependency; no upstream implementation copied. Public NUMS point is not an operational wallet identity.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/node/tests/mainnet-evidence.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original Mainnet raw-proof network, Borsh, bounded read-only RPC batch, cache/reorg, lookup-hint, capability and 12-confirmation admission regression tests; historical public-chain fixture is not an economic Bridge operation.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "native/node/tests/mainnet-policy.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original isolated regression tests for exact network binding, integer fee conversion, relay floor, malformed or missing estimates, excessive fees and witness-aware transaction size; no real signing or broadcasts.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "native/node/tests/native-raw-evidence.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Explicit encoder and source-boundary models with malformed-input/resource/substitution tests. Fixtures are not claimed as full consensus-valid Native blocks.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "native/node/tests/native-rpc-client.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 Native RPC adapter tests using a disposable loopback HTTP server and temporary non-production auth cookie outside the repository.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
@@ -545,7 +438,7 @@
     {
       "path": "native/node/witness-address.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original bounded public Native witness-address adapter using the pinned scure-base package API; no upstream implementation copied.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
@@ -559,98 +452,98 @@
     {
       "path": "native/proof/Cargo.toml",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Crate dependency and package metadata for Native proof validation.",
+      "notes": "Original KingPepe build, publication or configuration metadata; upstream identity and license terms remain unchanged.",
       "purpose": "REQUIRED_BUILD",
       "reviewDisposition": "KEEP_TOOLING"
     },
     {
       "path": "native/proof/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original current one-way automatic burn-and-mint documentation for native/proof/README.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
+      "notes": "Original KingPepe public documentation or sanitized historical summary.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/proof/src/bin/kingpepe-native-evidence.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "REGTEST-only bounded stdin verifier; emits fixed-shape non-secret digests/counts and generic failure.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/proof/src/bridge_inputs.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original retained canonical Native deposit evidence wire codec; obsolete reserve intent structures removed.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/proof/src/bytes.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Hex, byte-order, and SHA256d helpers for Native proof validation.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/proof/src/chain.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "KingPepe Native mainnet/regtest parameters, header-chain finality, activation, and chainwork validation.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/proof/src/deposit.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Temporary deposit evidence validation against transaction, Merkle, finality, and UTXO observations.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/proof/src/difficulty.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "KingPepe Native difficulty retargeting and compact target checks based on reviewed source facts.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/proof/src/evidence.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Bounded REGTEST raw-header/Merkle evidence verification and negative tests, using pinned Native consensus facts; not copied upstream implementation or full block/UTXO validation.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/proof/src/header.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Native block-header parsing, compact target encoding, PoW, and block-proof arithmetic.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/proof/src/lib.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Native proof crate API surface and typed errors.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/proof/src/merkle.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Native transaction Merkle branch reconstruction and verification.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/proof/src/node.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Native source and UTXO observation trust-boundary validation.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "native/proof/src/transaction.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Bounded KingPepe Native transaction parser and txid/wtxid calculation.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
@@ -685,364 +578,374 @@
     {
       "path": "package.json",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Root Node package metadata and test/local E2E scripts.",
+      "notes": "Original KingPepe build, publication or configuration metadata; upstream identity and license terms remain unchanged.",
       "purpose": "REQUIRED_BUILD",
       "reviewDisposition": "KEEP_TOOLING"
     },
     {
       "path": "rust-toolchain.toml",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Pinned Native workspace toolchain nightly-2023-10-29 and required development components; Solana retains its separate 1.89.0 pin.",
+      "notes": "Original KingPepe build, publication or configuration metadata; upstream identity and license terms remain unchanged.",
       "purpose": "REQUIRED_BUILD",
       "reviewDisposition": "KEEP_TOOLING"
     },
     {
       "path": "scripts/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Added by phase-02 structure pass; classification assigned by path/type.",
+      "notes": "Original KingPepe public documentation or sanitized historical summary.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "KEEP_TOOLING"
     },
     {
       "path": "scripts/local-e2e-toolchain.json",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Pinned isolated development tools and upstream archive integrity references; no deployment identities or state.",
+      "notes": "Original KingPepe build, publication or configuration metadata; upstream identity and license terms remain unchanged.",
       "purpose": "REQUIRED_TOOLING",
       "reviewDisposition": "KEEP_TOOLING"
     },
     {
+      "path": "scripts/public-documentation-policy.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations."
+    },
+    {
       "path": "scripts/regtest-burn-proof.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original isolated real nonzero REGTEST burn proof with exact broadcast ceiling, headers/Merkle verification, UTXO exclusion, reorg, restart and full reindex.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "scripts/source-audit.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original exact provenance coverage and non-secret publication-boundary checks.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "REQUIRED_TOOLING",
       "reviewDisposition": "KEEP_TOOLING"
     },
     {
       "path": "scripts/source-identity.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original read-only source identity helper supporting a Windows Git worktree viewed from WSL without changing repository metadata.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "scripts/tests/burn-ci-surface.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original publication regression requiring removal of retired callable reserve/FROST/reverse surfaces and preservation of all current source-bound burn/reindex/replay/Windows CI gates.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "scripts/tests/dependency-license-audit.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original negative tests for missing/changed license metadata, dependency source and local publication boundary.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "scripts/tests/protected-store-contract.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original portable context/capability rejection tests with explicitly synthetic non-operational identity values.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
+      "path": "scripts/tests/public-documentation-policy.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations."
+    },
+    {
       "path": "scripts/tests/runtime-path-boundary.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original real-filesystem boundary regressions on isolated external temporary roots. Public markers and ephemeral cookie fixture only; no operational shares or upstream code.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "scripts/tests/source-audit.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original executable publication/provenance guard regressions; synthetic non-operational values only.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "scripts/tests/source-health-window.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original pure freshness/replay/role/restart tests with explicit non-chain fixtures and a unit clock; no operational state.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "services/attesters/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original current one-way automatic burn-and-mint documentation for services/attesters/README.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
+      "notes": "Original KingPepe public documentation or sanitized historical summary.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "services/attesters/burn-attestation-codec.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original bounded V4 Ed25519 attestation domain/context/signature verification. Cryptographic primitives use the retained Noble dependency.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "services/attesters/protected-burn-attester.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original DPAPI attester with independent finalized Native burn verification, durable evidence binding and controlled same-evidence renewal.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "services/bridge-validator/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original current one-way automatic burn-and-mint documentation for services/bridge-validator/README.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
+      "notes": "Original KingPepe public documentation or sanitized historical summary.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "services/bridge-validator/burn-context.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original exact deployment/domain/network admission for TEST and Mainnet burn messages; contexts cannot be relabeled across genesis or program/Mint identities.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "services/bridge-validator/burn-journal-state.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original one-way immutable operation, deposit, burn, attestation, claim, mint and exception state machine with exact cumulative conservation.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "services/bridge-validator/burn-mainnet-lifecycle.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original Mainnet burn runtime lifecycle, protected service composition, operator preparation and regression coverage; no production secret or on-chain execution evidence.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "REQUIRED_RUNTIME_OR_TEST",
       "reviewDisposition": "KEEP_CURRENT_FORWARD"
     },
     {
       "path": "services/bridge-validator/burn-mainnet-operator.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original Mainnet burn runtime lifecycle, protected service composition, operator preparation and regression coverage; no production secret or on-chain execution evidence.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "REQUIRED_RUNTIME_OR_TEST",
       "reviewDisposition": "KEEP_CURRENT_FORWARD"
     },
     {
       "path": "services/bridge-validator/burn-mainnet-service.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original Mainnet burn runtime lifecycle, protected service composition, operator preparation and regression coverage; no production secret or on-chain execution evidence.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "REQUIRED_RUNTIME_OR_TEST",
       "reviewDisposition": "KEEP_CURRENT_FORWARD"
     },
     {
       "path": "services/bridge-validator/burn-recovery.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Manual quiescent full-state encrypted export and paused fresh-root DPAPI import.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_RUNTIME"
     },
     {
       "path": "services/bridge-validator/burn-runtime.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original serialized automatic TEST processing, complete pre-burn gate, persistent pause, chain-state recovery and reconciliation-driven completed supply.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "services/bridge-validator/burn-service-runtime.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original concrete protected TEST composition of Native verifier, single-key signer, independent attesters, Solana signer, journal and read-only balances.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "services/bridge-validator/burn-service.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original private TEST service configuration, automatic processing loop, authenticated listener and graceful store shutdown; startup cannot clear a retained safety pause.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "services/bridge-validator/burn-user-api.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original minimum forward public projection, immutable wallet-bound operation creation and authoritative completed burn/mint supply counter.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "services/bridge-validator/burn-user-balances.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original bounded cached read-only Native public address and finalized exact-Mint Solana balance queries.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "services/bridge-validator/burn-user-http.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original authenticated loopback HTTP transport with strict routes, origin/host validation, bounded requests and sanitized errors; no signing/admin/RPC endpoint.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "services/bridge-validator/localnet-solana-setup-plan.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 localnet-only Solana setup transaction planner for zero-supply KPEPE Mint, recipient SPL token account, transceiver config PDA, and bridge state PDA initialization with injected runtime signers.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "services/bridge-validator/mainnet-burn-preparation.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original dedicated-identity protected custody preparation; retained payer and attesters, fresh paused journal, no RPC or economic action.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_RUNTIME"
     },
     {
       "path": "services/bridge-validator/mainnet-identity-preparation.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original offline production Program/Mint and role-seed preparation using existing protected storage. Fixed public deployment identity and explicit undeployed status, no RPC, funding, attestation or transaction submission.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "services/bridge-validator/mainnet-metadata-setup-plan.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original unsigned standard-SPL atomic Mint/Metaplex metadata/Bridge-PDA authority setup and paused enrollment planner. Implements public instruction interfaces; no third-party source copied.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "REQUIRED_FORWARD",
       "reviewDisposition": "KEEP_CURRENT"
     },
     {
       "path": "services/bridge-validator/mainnet-program-plan.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Initial loader deployment public-byte plans and authoritative upload/program resume inspection; no upgrade or signer.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_RUNTIME"
     },
     {
       "path": "services/bridge-validator/mainnet-solana-setup-plan.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original unsigned Mainnet zero-supply Mint/config and existing mode transaction preparation; pinned deployment identity, paused initial state, no keys, RPC, signatures or submission.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "services/bridge-validator/protected-burn-journal.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original DPAPI journal wrapper enforcing context, exclusive access, full state validation and durable transitions.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "services/bridge-validator/solana-deposit-claim-transaction-plan.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original exact Solana transaction compiler for full V4 burn evidence, receipt, wallet ATA and operation/deposit/burn replay-bound claim accounts.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "services/bridge-validator/tests/localnet-solana-setup-plan.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Phase 08 tests for localnet Solana setup transaction planning, SPL Token initialize instruction encoding, PDA initialization account ordering, and injected runtime signer validation.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "services/bridge-validator/tests/mainnet-metadata-setup-plan.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original independent packet decoding and negative network, metadata URI, authority, pause and exact-decimal tests for production setup.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "REQUIRED_TEST",
       "reviewDisposition": "KEEP_CURRENT"
     },
     {
       "path": "services/bridge-validator/tests/mainnet-program-plan.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Artifact identity, packet, signer, upload resume and wrong-authority regressions.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "REQUIRED_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "services/bridge-validator/tests/mainnet-solana-setup-plan.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Unsigned Mainnet message decoding, network/domain/identity substitution, policy override, integer-bound and Rust-vector agreement regressions with synthetic public identities.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "services/reconciliation/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original current one-way automatic burn-and-mint documentation for services/reconciliation/README.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
+      "notes": "Original KingPepe public documentation or sanitized historical summary.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "services/relayer/burn-solana-signer.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original DPAPI TEST Solana fee-payer signer restricted to verified Native admission and canonical finalized-burn ATA/receipt/claim plans.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "services/solana-observer/burn-solana-adapter.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original exact program-byte/Mint/PDA checks, pre-burn availability and funding gate, finalized transaction inspection and recovery of canonical burn/mint execution.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "services/solana-observer/burn-solana-rpc.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original private Solana transport with exact genesis checks; Mainnet endpoint comes exclusively from protected process configuration.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "services/solana-observer/deployment-integrity.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original strict manifest, bounded read-only RPC, executable/config checks and protected monitor integration. No upstream implementation copied.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "SIMPLIFY"
     },
     {
       "path": "services/solana-observer/deposit-mint-execution.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original exact signed-packet, reported MintToChecked CPI and atomic balance-delta verification. Reuses existing original packet builder and external pinned Noble Ed25519.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "services/solana-observer/tests/deployment-integrity.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original parser, substitution, exact-integer and bounded HTTP regressions; not chain evidence.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "SIMPLIFY"
     },
     {
       "path": "services/solana-observer/tests/deposit-mint-execution.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original real ephemeral packet-signature tests; reported execution is explicitly a synthetic parser fixture.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "services/solana-observer/tests/devnet-admission.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original test-network admission, pre-send genesis, credential redaction and forward Borsh deployment parser regressions. Synthetic enrollment records are not real-chain evidence.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "services/solana-observer/tests/mainnet-admission.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original isolated Mainnet domain, zero-start, processing-mode, finalized claim and sanitized RPC regressions. Fixtures are not live deployment evidence.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "shared/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Shared utility documentation updated for Phase 07 canonical-message helpers.",
+      "notes": "Original KingPepe public documentation or sanitized historical summary.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "KEEP_SECURITY"
     },
@@ -1051,124 +954,124 @@
       "path": "shared/monetary-supply.mjs",
       "reviewDisposition": "KEEP_SECURITY",
       "purpose": "CORE_BRIDGE",
-      "notes": "Original exact monetary ceiling and completed reconciled issuance projection; no signing or RPC authority."
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations."
     },
     {
       "path": "shared/network-identity.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original explicit Mainnet/test network admission helpers using pinned Native consensus identities and published Solana genesis/Wallet Standard chain constants; no upstream code copied. Production Native Borsh domain uses the pinned P2P magic as a little-endian u32; legacy TEST domain is unchanged.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "shared/protocol/burn-message.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original fixed canonical V4 Borsh message for finalized Native burn evidence and attestation validity epochs.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "shared/protocol/canonical-message.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original canonical V4 finalized-burn message view; legacy reserve wire encodings are rejected rather than ambiguously accepted.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_SECURITY"
     },
     {
       "path": "shared/protocol/codec-helpers.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original checked codec input, integer, byte and bounded-string helpers retained independently of retired reserve message formats.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "shared/protocol/native-inputs.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original Borsh hash-preimage schemas for Native deposit intent, evidence and reserve allocation; Native consensus transaction bytes remain opaque.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "shared/protocol/solana-bridge-abi.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original strict instruction/account Borsh codecs including deposit and burn replay state for finalized-burn issuance.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "shared/runtime-path-boundary.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original shared component-aware runtime path checks with existing-parent resolution, linked-file rejection and filesystem identity comparison. Node APIs used without copied implementation.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_SECURITY"
     },
     {
       "path": "shared/solana-test-network.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original explicit test-cluster and HTTPS endpoint admission shared by retained Solana clients; compares actual Devnet genesis without exposing provider credentials.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "shared/source-health-window.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original bounded one-use current-supervisor-generation source admission state; no transfer or consensus authority.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_SECURITY"
     },
     {
       "path": "shared/windows/ProtectedStore.cs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original Windows CurrentUser DPAPI, fixed-volume single-principal ACL, atomic encrypted state/revision and simple process lock using installed OS APIs; no Microsoft sample or implementation imported.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_SECURITY"
     },
     {
       "path": "shared/windows/ProtectedStoreExecutable.cs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original bounded/redacted executable entry for the existing reviewed Windows DPAPI/ACL/CAS implementation; no copied upstream implementation.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_SECURITY"
     },
     {
       "path": "shared/windows/cms-recovery.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Reviewed-tool CMS authenticated public-certificate encryption; no recovery private key interface.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_RUNTIME"
     },
     {
       "path": "shared/windows/protected-executable.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original source/executable hash and path binding with fail-closed cache validation; no generated binaries or operational state are tracked.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_SECURITY"
     },
     {
       "path": "shared/windows/protected-helper-build.ps1",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original one-time per-process compilation of adjacent reviewed source with the installed Windows Framework compiler into an atomic private external directory.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_SECURITY"
     },
     {
       "path": "shared/windows/protected-lease-driver.ps1",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original fixed private-parent-pipe helper holding an existing restrictive Windows lifetime file handle; no Microsoft code imported.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_SECURITY"
     },
     {
       "path": "shared/windows/protected-store.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original bounded Node-to-Windows protected-store adapter and process lock; no plaintext fallback, registry witness or persistent fence.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_SECURITY"
     },
     {
       "path": "solana/Anchor.toml",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Anchor workspace configuration with deterministic non-production localnet Program IDs.",
+      "notes": "Original KingPepe build, publication or configuration metadata; upstream identity and license terms remain unchanged.",
       "purpose": "REQUIRED_BUILD",
       "reviewDisposition": "KEEP_TOOLING"
     },
@@ -1182,49 +1085,49 @@
     {
       "path": "solana/Cargo.toml",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Workspace dependency and crate manifest.",
+      "notes": "Original KingPepe build, publication or configuration metadata; upstream identity and license terms remain unchanged.",
       "purpose": "REQUIRED_BUILD",
       "reviewDisposition": "KEEP_TOOLING"
     },
     {
       "path": "solana/modules/bridge-messages/Cargo.toml",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Bridge message module manifest.",
+      "notes": "Original KingPepe build, publication or configuration metadata; upstream identity and license terms remain unchanged.",
       "purpose": "REQUIRED_BUILD",
       "reviewDisposition": "KEEP_TOOLING"
     },
     {
       "path": "solana/modules/bridge-messages/src/abi.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original stable Borsh instructions/account layouts for the current one-way burn message and replay markers.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "solana/modules/bridge-messages/src/burn.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original Rust canonical burn binding/evidence codec and validation matching TypeScript; bounded stack preimages use the Solana SHA256 syscall wrapper.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_SECURITY",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "solana/modules/bridge-messages/src/lib.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original canonical protocol validation and fixed complete V4 burn evidence message, checked domains and cumulative supply bound.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "solana/modules/bridge-messages/tests/burn_heap_budget.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original allocation-budget regression preventing canonical evidence processing from exhausting the standard SBF heap.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "solana/modules/bridge-messages/tests/messages_smoke.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original canonical message/accounting tests, shared Borsh vectors and bounded single-bit corruption rejection.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
@@ -1252,257 +1155,196 @@
     {
       "path": "solana/programs/kingpepe-bridge/Cargo.toml",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Bridge manager program manifest with cdylib/lib crate types, pinned solana-program and spl-token no-entrypoint dependencies, and no-entrypoint test feature; direct sha2 dependency removed after moving mint authority derivation to real Solana PDA primitives.",
+      "notes": "Original KingPepe build, publication or configuration metadata; upstream identity and license terms remain unchanged.",
       "purpose": "REQUIRED_BUILD",
       "reviewDisposition": "KEEP_TOOLING"
     },
     {
       "path": "solana/programs/kingpepe-bridge/src/lib.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original Solana forward mint manager with full finalized-burn message binding, operation/deposit/burn replay rejection, exact Mint/PDA/token ownership and cumulative 21M issuance.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "solana/programs/kingpepe-bridge/tests/bridge_smoke.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Bridge manager smoke test.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "solana/programs/kingpepe-bridge/tests/mainnet_setup.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Independent Rust decoding and program initialization validation of TypeScript Mainnet setup bytes, paused zero-supply policy and existing mode instruction variants.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "solana/programs/kingpepe-transceiver/Cargo.toml",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Transceiver program manifest with cdylib/lib crate types, solana-program dependency, and no-entrypoint test feature.",
+      "notes": "Original KingPepe build, publication or configuration metadata; upstream identity and license terms remain unchanged.",
       "purpose": "REQUIRED_BUILD",
       "reviewDisposition": "KEEP_TOOLING"
     },
     {
       "path": "solana/programs/kingpepe-transceiver/src/lib.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original two-Ed25519-attester Solana receipt verification of complete canonical V4 burn evidence and one-time manager consumption.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "solana/programs/kingpepe-transceiver/tests/transceiver_smoke.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Transceiver smoke test.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "solana/rust-toolchain.toml",
       "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Rust toolchain pinning for reproducibility.",
+      "notes": "Original KingPepe build, publication or configuration metadata; upstream identity and license terms remain unchanged.",
       "purpose": "REQUIRED_BUILD",
       "reviewDisposition": "KEEP_TOOLING"
     },
     {
       "path": "solana/tests/README.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Original current one-way automatic burn-and-mint documentation for solana/tests/README.md; TEST evidence and future Mainnet requirements are distinguished, with no production activation claim.",
+      "notes": "Original KingPepe public documentation or sanitized historical summary.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "solana/tests/burn-chain-regression.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original isolated real Native/Solana chain test: exact nonzero burn, finality/reorg, canonical attestation, replay rejection, exact mint, pending burn accounting and critical mismatch pause.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "solana/tests/burn-runtime-regression.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original real Windows DPAPI runtime and authenticated automatic service regression with lost RPC responses, actual process crash after finalized burn, exact recovery, address exceptions and counter refresh.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "solana/tests/mainnet-deployment-regression.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Fresh isolated local-validator deployment of final artifacts, interrupted upload and existing-Mint initialization proof.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "REQUIRED_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "solana/tests/support/burn-fixture.rs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original synthetic public Rust burn fixture builders for current program/evidence security regressions; no private key material.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "solana/tests/support/fund-empty-test-accounts.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Isolated local-validator adversarial transfers to unused deterministic accounts; no production identities or secrets.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "REQUIRED_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "solana/ts/lib/protocol.ts",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original typed TypeScript facade over the shared Borsh codec; obsolete duplicate encoder removed.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "solana/ts/scripts/verify-vectors.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original Node canonical Borsh vector, strict decoding and bounded single-bit corruption checks used by CI without production secrets.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "solana/ts/sdk/bridge.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original forward wallet-bound operation request and unique Native deposit binding validation; no user signing or burn administration API.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "solana/ts/sdk/client.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original bounded authenticated loopback user API client; no signing or automatic economic retry.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_BRIDGE",
       "reviewDisposition": "KEEP_CORE"
     },
     {
       "path": "solana/ts/sdk/mainnet-control.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original bounded offline Mainnet processing-mode instruction construction; no signing, submission or public administration endpoint."
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations."
     },
     {
       "path": "tests/integration/deployment-fixture.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original synthetic account/parser fixture, explicitly not executable bytecode or chain proof.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "SIMPLIFY"
     },
     {
       "path": "tests/windows/burn-mainnet-composition.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original Mainnet burn runtime lifecycle, protected service composition, operator preparation and regression coverage; no production secret or on-chain execution evidence.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "REQUIRED_RUNTIME_OR_TEST",
       "reviewDisposition": "KEEP_CURRENT_FORWARD"
     },
     {
       "path": "tests/windows/burn-protection.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original real Windows DPAPI/ACL, protected role, single-key and journal recovery tests under the current test account; not distinct-service-identity certification.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "tests/windows/burn-recovery.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Isolated TEST certificate encrypted recovery, retained pending burn and ciphertext mutation regression.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "REQUIRED_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "tests/windows/burn-runtime-actor.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original private parent-IPC TEST actor for actual process crash/restart of concrete protected burn services; no deployed user route.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "tests/windows/mainnet-burn-preparation.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original isolated CurrentUser DPAPI preparation test; no certification of actual production service identity.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "REQUIRED_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "tests/windows/protected-executable-actor.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original isolated executable-integrity test actor; generated code remains external, with no production identity or secrets.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "tests/windows/protected-executable.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original actual Windows executable hash, hard-link, ACL, corruption and no-fallback tests under the current test principal.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     },
     {
       "path": "tests/windows/protected-storage.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original Windows CurrentUser DPAPI/ACL protected-store and journal tests with isolated TEST material; no distinct-principal or production portability certification.",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
-    },
-    {
-      "path": "docs/deployment/source-audit-2026-09-25.md",
-      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
-      "notes": "Project source-audit findings, corrected production artifacts and explicit evidence/activation limits."
     }
-  ],
-  "simplificationReview": {
-    "baseSha": "ab15b2f38084f024e49d8fae9a13182dfe85721d",
-    "filesBefore": 246,
-    "filesAfter": 240,
-    "scope": "FINAL_SIMPLIFICATION_ONLY",
-    "removedFiles": [
-      {
-        "path": "services/attesters/index.mjs",
-        "reviewDisposition": "DELETE_REDUNDANT",
-        "reason": "Unused re-export module; retained callers import concrete implementations."
-      },
-      {
-        "path": "services/bridge-validator/index.mjs",
-        "reviewDisposition": "DELETE_REDUNDANT",
-        "reason": "Unused re-export module; retained callers import concrete implementations."
-      },
-      {
-        "path": "services/solana-observer/index.mjs",
-        "reviewDisposition": "DELETE_REDUNDANT",
-        "reason": "Unused re-export module; retained callers import concrete implementations."
-      },
-      {
-        "path": "native/frost/coordinator/README.md",
-        "reviewDisposition": "DELETE_REDUNDANT",
-        "reason": "Role documentation duplicated by docs/security/software-frost.md."
-      },
-      {
-        "path": "native/frost/policy/README.md",
-        "reviewDisposition": "DELETE_REDUNDANT",
-        "reason": "Role documentation duplicated by docs/security/software-frost.md."
-      },
-      {
-        "path": "native/frost/signer/README.md",
-        "reviewDisposition": "DELETE_REDUNDANT",
-        "reason": "Role documentation duplicated by docs/security/software-frost.md."
-      }
-    ],
-    "retainedSecurity": "Historical pre-burn review retained exact FROST A+B and nonce tombstones. The current burn conversion supersedes that signing model; protected secrets, operation binding, persist-before-broadcast, replay protection, pause and reconciliation remain required."
-  },
-  "repositoryRepair": {
-    "baseSha": "45fca8492ac186361195f4001f4354ebcf56778c",
-    "restoredFromSha": "95cd02126be2f056b0da94f3120556453866caae",
-    "scope": "REQUIRED_REPOSITORY_TOOLING_AND_PUBLICATION_PROTECTIONS_ONLY",
-    "restoredFiles": [
-      ".gitattributes",
-      ".gitignore",
-      ".npmrc",
-      "LICENSE",
-      "SECURITY.md",
-      "rust-toolchain.toml",
-      "package-lock.json",
-      "config/examples/localnet.example.json",
-      "config/schemas/bridge-local.schema.json"
-    ],
-    "runtimeChanged": false
-  }
+  ]
 }

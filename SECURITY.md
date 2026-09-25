@@ -1,13 +1,9 @@
 # Security and responsible disclosure
 
-This bridge is Development / Pre-Activation software. Mainnet activation and
-production signing are disabled. Local tests are not production certification.
+The public Mainnet Bridge is **ACTIVATION PENDING**. Deposits are not accepted. Do not send KPEPE until the official Bridge announces that it is active.
 
-Report suspected vulnerabilities privately to the KingPepe Team through an
-established official contact. If you do not have a private reporting channel,
-ask the maintainers how to report securely without posting exploit details.
-Do not test against production systems, wallets or funds without authorization.
+Custody, upgrade, and recovery controls are documented internally. Relevant security-assurance information will be published alongside the results of an independent security audit.
 
-Never include private keys, signing material, wallet credentials, operational
-state or backups in public issues, source, logs or artifacts. Keep private
-configuration outside source checkouts. Scan changes for secrets before publication.
+No independent security audit has been completed or is claimed. Automated tests and internal source review do not constitute independent audit certification.
+
+Report suspected vulnerabilities privately to the KingPepe Team through an established official contact. If no private reporting channel is available, ask the maintainers how to report securely without posting exploit details. Do not test against production systems, wallets or funds without authorization. Never include private credentials in public issues, logs or artifacts.

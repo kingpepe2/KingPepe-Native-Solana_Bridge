@@ -1,9 +1,7 @@
-# One-way Solana programs
+# Solana KPEPE representation
 
-`kingpepe-transceiver` verifies canonical V4 finalized-burn bytes and two distinct configured Ed25519 attestations. `kingpepe-bridge` consumes that verification, checks the bound wallet and exact Mint/Program/PDA/account owners, and performs exact MintToChecked. It has no reverse redemption instruction.
+The Bridge uses standard SPL Token with eight decimals. No Token-2022 extension is required. The existing official Mainnet KPEPE Mint is preserved; Mainnet Bridge program deployment and controlled activation remain pending.
 
-The Bridge retains separate operation, deposit and burn replay markers. The deposit marker records consumption, not reserve backing. Native burn outpoint and operation cannot authorize a second mint. Checked cumulative issuance is bounded by 21M; current SPL supply must not exceed that counter. Direct SPL holder burns never reopen the counter.
+The Solana implementation validates finalized-burn evidence and the originally bound recipient before exact minting. Replay protection and checked accounting enforce one mint per eligible burn and the 21,000,000 KPEPE cumulative maximum. No reverse redemption instruction is provided.
 
-The standard SPL Token Program is sufficient: no Token-2022 extension is required. Fresh enrollment requires eight decimals, zero supply, Bridge PDA mint authority and no freeze authority. The existing official Mainnet Mint must be reused; program/configuration deployment and controlled activation are still pending. Historical reserve-model and burn TEST artifact evidence remains labelled with its actual network and source, separate from production.
-
-Program upgrades remain subject to [the Team's specific review/approval procedure](../security/program-upgrades.md). Code, source SHA and pinned v3 artifact hashes must match actual deployed bytes before economic admission.
+Source and reproducible artifacts must correspond to the deployed programs before activation. Pending build identities are not advertised as deployed programs.

@@ -1,3 +1,3 @@
-# Burn/mint reconciliation
+# Burn/mint accounting
 
-The active implementation is `services/bridge-validator/burn-journal-state.mjs` with independent chain observations in `burn-runtime.mjs`. Finalized Native burns equal completed/finalized mint obligations plus pending unminted burns. Live official SPL supply cannot exceed cumulative Bridge issuance; issuance cannot exceed verified burns or 21M. Operational fee coins are not issuance credit. A contradiction records a persistent pause; no automatic economic repair exists.
+Reconciles finalized Native burns, pending mint obligations and completed Solana issuance. Cumulative issuance cannot exceed verified burns or 21,000,000 KPEPE. Pending work is not reported as completed.

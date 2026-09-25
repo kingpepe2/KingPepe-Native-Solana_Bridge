@@ -1,85 +1,28 @@
 {
-  "schemaVersion": 1,
-  "architecture": "ONE_WAY_AUTOMATIC_BURN_AND_MINT",
-  "deploymentState": "PARTIAL_MINT_CREATED_PROGRAMS_PENDING",
-  "recordedAt": "2026-09-24T15:58:28.512Z",
+  "schemaVersion": 2,
   "network": "MAINNET-BETA",
-  "genesis": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
-  "productionReady": false,
-  "mainnetActivation": "DISABLED",
-  "publicBridgeEnvironment": "MAINNET_ACTIVATION_PENDING",
-  "sourceSha": "f5d6c34948a153777016ae41a8a8a673d5d9c4e0",
-  "exactShaCi": {
-    "runId": "36022276097",
-    "conclusion": "PASS",
-    "jobs": 4,
-    "steps": 65,
-    "skippedRequiredSteps": 0
-  },
+  "activation": "PENDING",
+  "publicDepositsAccepted": false,
+  "architecture": "ONE_WAY_AUTOMATIC_BURN_AND_MINT",
   "mint": {
     "address": "4QkWKqTMyPEyEb8RMKv3XrcHJ5jbS7k4uQhXVoirphZW",
     "tokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
     "decimals": 8,
     "initialSupplyAtomic": "0",
     "verifiedSupplyAtomic": "0",
-    "mintAuthority": "DigqtVexs6EDwvZ3wDASNykyj4SpTZzyGEvFtzya7QKr",
     "freezeAuthority": null,
     "creationSignature": "4C39PNE3EKZYckYctz12tkxNo3wjK59ySiq4fmgQLDLLX4uAEVBRq1Zji35LTAVpkPEZUHvA21iyNoaFuCvbFUv7",
-    "creationSlot": 450075833,
-    "verification": "FINALIZED",
-    "verificationSlot": 450076186
+    "creationSlot": 450075833
   },
   "metadata": {
-    "address": "H5zfyrNAgaTAZd7TfXE4t1YZGqw7Hgi3suqgmsHEiw1X",
     "name": "KingPepe",
     "symbol": "KPEPE",
     "uri": "https://kingpepe.net/metadata/kpepe-mainnet.json",
     "imageUri": "https://i.postimg.cc/G28mCc8N/King-Pepe-Icon-500x500.png",
-    "jsonSha256": "6eb6436de38eb5026c71158ed946af01832c368c0160001f1188900eef29bd1b",
-    "imageSha256": "188ea40a2d8b49144f06a18dedcfdefb1256707d214a9f9716035296554ab77a",
-    "updateAuthority": "4QkWKqTMyPEyEb8RMKv3XrcHJ5jbS7k4uQhXVoirphZW",
-    "initialJsonSha256": "1a19fe44cbfe31d30aa018057b701a80acf666dfb3f2ad5d9d9a43ab43063a22",
-    "jsonUpdatedAt": "2026-09-24T19:47:14.081Z",
-    "jsonUpdateSignature": "NOT_REQUIRED",
-    "externalUrl": "https://kingpepe.carrd.co/",
-    "jsonUpdatePreservedMintAndMetadataAccountBytes": true
+    "externalUrl": "https://kingpepe.carrd.co/"
   },
-  "programs": [
-    {
-      "role": "manager",
-      "address": "HE7xPmLi7GamnPaGPUq7QGQYkPSqTzZj8RzLQgNR7MG5",
-      "state": "NOT_DEPLOYED",
-      "artifactBytes": 161680,
-      "artifactSha256": "51cca88da2c74e91c76f8c111dfbd5c4335d0bcf2ba0cb49430ba48d1553dd0d",
-      "deploymentSignature": null,
-      "artifactSourceSha": "e3c7f298435b722b3577cedf84f6a7d749ed8fac"
-    },
-    {
-      "role": "transceiver",
-      "address": "Acs5DprQHxTGYP3MEvatLXkcfWJAYa73kSjo9CqJ238Q",
-      "state": "NOT_DEPLOYED",
-      "artifactBytes": 181472,
-      "artifactSha256": "ba84137b56ad8c8aee7a72b760e5a2718cf41b7adae4df350073f20de78d59b6",
-      "deploymentSignature": null,
-      "artifactSourceSha": "e3c7f298435b722b3577cedf84f6a7d749ed8fac"
-    }
-  ],
-  "configInitialization": "PENDING_PROGRAM_DEPLOYMENT",
-  "controlledNativeBurnAndSolanaMint": "NOT_STARTED",
-  "funding": {
-    "feePayer": "47EPgcpqc11Bo3ghi22LrTA2AERFLnuXccnZhTqoEkFb",
-    "receivedLamports": "51667147",
-    "transactionFeeLamports": "10000",
-    "accountAndRentFundingLamports": "4800600",
-    "metadataProtocolFeeLamports": "10000000",
-    "totalUsedLamports": "14810600",
-    "remainingBalanceLamports": "36856547"
-  },
-  "resumeRule": "Verify existing Mint, metadata and finalized creation transaction; do not recreate. Requote and fund the same payer for pending programs and initialization. Production runtime stays disabled until its controlled activation passes.",
-  "publicDepositsAccepted": false,
+  "bridgePrograms": "DEPLOYMENT_PENDING",
+  "controlledActivation": "NOT_STARTED",
   "publicCounterBaselineAtomic": "0",
-  "publicPresentationSourceSha": "daa7d6e103ff84753d2d31a4f42293924e02a57c",
-  "publicPresentationVerifiedAt": "2026-09-24T22:01:14.815Z",
-  "sourceShaScope": "HISTORICAL_MINT_CREATION_SOURCE_NOT_CURRENT_DEPLOYMENT_CANDIDATE",
-  "auditRecord": "docs/deployment/source-audit-2026-09-25.md"
+  "maximumSupplyAtomic": "2100000000000000"
 }

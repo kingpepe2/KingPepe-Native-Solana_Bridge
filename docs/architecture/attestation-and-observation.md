@@ -1,7 +1,7 @@
-# Burn observation and attestation
+# Verified burn before mint
 
-A Native deposit is authorization to the permanently bound Solana recipient, not mint proof. The Native observer discovers the operation's unique address, preserves transaction/block identity and counts confirmations. It holds multiple or late deposits as explicit exceptions. Only finalized deposits with healthy journal, attesters, actual Solana configuration, accounting and separate fee funding enter automatic burn construction.
+A Native deposit authorizes bridging to its originally bound Solana destination. Deposit observation alone is not permission to mint. After 12 deposit confirmations, automatic processing burns the exact amount. Only verified Native burn finality can make that amount eligible for the corresponding Solana mint.
 
-A finalized Native burn produces the full V4 evidence described in [protocol messages](protocol-messages.md). Two distinct Ed25519 project identities independently verify Native evidence and sign the same canonical bytes. Protected authorization state prevents cross-operation, amount or destination substitution. Renewal after expiry keeps the same burn and operation and cannot bypass on-chain replay state.
+The operation's identity, destination and exact amount remain bound throughout the lifecycle. Duplicate observation or submission cannot create another economic burn or mint. Completion requires confirmed execution and matching accounting. Missing evidence is not treated as successful verification.
 
-Deployment verification compares the complete on-chain program bytes with the frozen artifacts. Runtime Solana observation checks the enrolled deployment slot, loader and upgrade authority, program layout, configuration, exact SPL Mint, replay/claim accounts, destination ATA and signed execution metadata. It does not recompute artifact hashes every cycle. A receipt alone is not completion. Ambiguous submissions recover from signature/account state before any replacement. Reconciliation accounts for finalized burns pending mint and completed issuance separately.
+Custody, upgrade, and recovery controls are documented internally. Relevant security-assurance information will be published alongside the results of an independent security audit.

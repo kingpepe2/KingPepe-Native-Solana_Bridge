@@ -5,31 +5,18 @@ Notices for previously distributed integrations are retained below; they do not
 make a removed dependency or historical component part of the current runtime.
 The current dependency inventory is defined by the manifests and lockfiles.
 
-The original process-lock helper calls existing .NET FileStream/FileShare and
-Windows handle APIs. It imports no implementation or sample code; the installed
-OS/runtime's terms remain unchanged. The signer adapter preserves the pinned
-Noble cryptographic implementation rather than replacing its signature scheme.
-
-The original service IPC adapter uses the existing Node runtime's TLS/OpenSSL
-implementation. Disposable Windows certificate tests invoke installed Git for
-Windows OpenSSL; no upstream code, runtime binary, certificate or private key is
-vendored. Their distribution licenses/notices remain applicable. This does not
-grant KingPepe-exclusive rights over Node, OpenSSL or Git for Windows.
-
-The original Windows protected-store adapter invokes DPAPI, .NET Framework and
-Windows filesystem security APIs. It does not copy Microsoft implementation or
-sample code, and does not vendor Microsoft assemblies or binaries. The installed
-OS/runtime retains its applicable terms; no exclusive KingPepe rights over it are
-claimed. API references and review limits are in UPSTREAM-REFERENCES.json and
-docs/security/windows-protected-storage.md.
+Original project adapters use installed Node.js, OpenSSL, Git for Windows,
+Microsoft Windows and .NET APIs. No implementation, sample code or runtime binary
+from those products is vendored here. Their applicable licenses and distribution
+notices remain unchanged; no exclusive KingPepe rights over them are claimed.
 
 - Node.js `24.21.0` and its built-in SQLite `3.53.4`
   - Node license: MIT, with separately licensed bundled components retained in
     the runtime distribution's LICENSE. Node is not KingPepe-exclusive code.
   - SQLite deliverable code is dedicated to the public domain by its authors:
     https://www.sqlite.org/copyright.html.
-  - Use: external pinned Node runtime. Earlier local accounting used built-in
-    SQLite; the current burn journal uses protected serialized state instead.
+  - Use: external pinned Node runtime. Historical development used built-in
+    SQLite; this does not make it a current application dependency.
     No Node/SQLite source or binary is vendored and no database addon is added.
     Existing distribution notices must accompany any future redistributed runtime.
   - References and archive checksums: `UPSTREAM-REFERENCES.json` and
@@ -57,7 +44,7 @@ docs/security/windows-protected-storage.md.
 - `@noble/curves` `2.3.0`
   - License: MIT
   - Copyright: Copyright (c) 2022 Paul Miller
-  - Use: pinned runtime dependency for secp256k1 Taproot/BIP340 single-key burn signing and Ed25519 project attestation tests/services. The retired reserve implementation historically used upstream FROST; that history does not describe current runtime use.
+  - Use: pinned cryptographic dependency; required upstream copyright and MIT terms are retained. Historical distribution notices remain applicable to previously distributed versions.
 
 - `@noble/hashes` `2.3.0`
   - License: MIT
@@ -76,7 +63,7 @@ docs/security/windows-protected-storage.md.
 
 - `@wallet-standard/app` / `@wallet-standard/base` `1.1.1`
   - License: Apache-2.0; upstream: https://github.com/wallet-standard/wallet-standard
-  - Use: standard discovery/connection of user-controlled localnet wallets.
+  - Use: standard discovery/connection of compatible user wallets.
     The application serves the installed, unmodified `wallets.js` module and
     its upstream LICENSE from `/licenses/wallet-standard`; no source is vendored
     or claimed as KingPepe code. The browser also serves the unmodified pinned
