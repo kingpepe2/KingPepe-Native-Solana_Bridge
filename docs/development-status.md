@@ -4,6 +4,8 @@ The current public production presentation is **MAINNET BRIDGE — ACTIVATION PE
 
 The reviewed Explorer implementation passed 35 affected gateway, wallet and supply tests. Browser/Phantom manual acceptance remains pending. Historical REGTEST/DEVNET proofs below retain their original networks, amounts and source identities; their counter is never imported into production.
 
+The [2026-09-25 full source audit](deployment/source-audit-2026-09-25.md) found and fixed pre-funded Solana account handling and its completion-verifier bound. The corrected Transceiver is 181,472 bytes with a new hash; earlier artifact/funding figures below are retained historical evidence. Refresh the frozen release and funding quote, and require exact-SHA CI before deployment. No Mainnet transaction was sent during the audit.
+
 ## Retained source-bound implementation and deployment evidence
 
 The Team-authorized metadata update preserves the existing Mainnet Mint, metadata account/URI and approved logo. The canonical JSON now includes the exact burn-and-mint description, project website, Bridge, X and GitHub links. All four destinations returned HTTP 200; three fresh metadata reads matched the published hash. Finalized before/after queries confirmed unchanged Mint and metadata account bytes, 8 decimals, zero supply, Bridge-PDA mint authority and no freeze authority. No on-chain update or SOL expenditure was required. The GitHub description now uses burn-and-mint wording; current deployment status remains explicit below.

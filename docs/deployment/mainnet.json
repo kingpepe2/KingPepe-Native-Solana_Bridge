@@ -51,15 +51,17 @@
       "state": "NOT_DEPLOYED",
       "artifactBytes": 161680,
       "artifactSha256": "51cca88da2c74e91c76f8c111dfbd5c4335d0bcf2ba0cb49430ba48d1553dd0d",
-      "deploymentSignature": null
+      "deploymentSignature": null,
+      "artifactSourceSha": "e3c7f298435b722b3577cedf84f6a7d749ed8fac"
     },
     {
       "role": "transceiver",
       "address": "Acs5DprQHxTGYP3MEvatLXkcfWJAYa73kSjo9CqJ238Q",
       "state": "NOT_DEPLOYED",
-      "artifactBytes": 178712,
-      "artifactSha256": "ef00d9df4f4c119c6fd4f501c9f61f96c22817bfc3b5b88997e8ba37cff08417",
-      "deploymentSignature": null
+      "artifactBytes": 181472,
+      "artifactSha256": "ba84137b56ad8c8aee7a72b760e5a2718cf41b7adae4df350073f20de78d59b6",
+      "deploymentSignature": null,
+      "artifactSourceSha": "e3c7f298435b722b3577cedf84f6a7d749ed8fac"
     }
   ],
   "configInitialization": "PENDING_PROGRAM_DEPLOYMENT",
@@ -77,5 +79,7 @@
   "publicDepositsAccepted": false,
   "publicCounterBaselineAtomic": "0",
   "publicPresentationSourceSha": "daa7d6e103ff84753d2d31a4f42293924e02a57c",
-  "publicPresentationVerifiedAt": "2026-09-24T22:01:14.815Z"
+  "publicPresentationVerifiedAt": "2026-09-24T22:01:14.815Z",
+  "sourceShaScope": "HISTORICAL_MINT_CREATION_SOURCE_NOT_CURRENT_DEPLOYMENT_CANDIDATE",
+  "auditRecord": "docs/deployment/source-audit-2026-09-25.md"
 }

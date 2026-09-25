@@ -19,7 +19,7 @@
   "cleanup": {
     "scope": "TEAM_AUTHORIZED_AUTOMATIC_BURN_AND_MINT_CONVERSION",
     "status": "MAINNET_PUBLIC_ACTIVATION_PENDING_EXISTING_MINT_PRESERVED",
-    "filesAfter": 202,
+    "filesAfter": 204,
     "removed": "Obsolete permanent reserve/FROST runtime, protocol and tests. Protected runtime backups and historical legal facts remain outside this cleanup.",
     "importedSource": "No third-party source imported. Existing dependency/API references and original classifications are preserved."
   },
@@ -1442,6 +1442,11 @@
       "notes": "Original Windows CurrentUser DPAPI/ACL protected-store and journal tests with isolated TEST material; no distinct-principal or production portability certification.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "docs/deployment/source-audit-2026-09-25.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Project source-audit findings, corrected production artifacts and explicit evidence/activation limits."
     }
   ],
   "simplificationReview": {

@@ -87,9 +87,10 @@
     "sourceSha": "9c2fcd168b663788634494ddf676a1c426ec8f91",
     "checksPassed": 17,
     "productionCustodySourceSha": "1e8c6f6bccc077dc2c3e4fb5159dc9f5281e6243",
-    "runtimeSourcesUnchanged": true,
+    "runtimeSourcesUnchanged": false,
     "automaticCycleBurnLatencyMs": 9954,
-    "productionTransactions": 0
+    "productionTransactions": 0,
+    "scope": "HISTORICAL_LIMITED_IDENTITY_PROOF_REUSE_CUSTODY_REFRESH_RELEASE_BEFORE_ACTIVATION"
   },
   "publicNetwork": "MAINNET",
   "publicBridgeActivation": "PENDING",
@@ -98,5 +99,19 @@
   "publicMainnetCounterSource": "MAINNET_PREACTIVATION_ZERO_BASELINE",
   "publicPresentationEvidence": "docs/deployment/public-mainnet-pending.md",
   "publicExplorerSourceSha": "daa7d6e103ff84753d2d31a4f42293924e02a57c",
-  "publicExplorerGatewayTestsPassed": 35
+  "publicExplorerGatewayTestsPassed": 35,
+  "sourceAudit": {
+    "baseSha": "a919a38821c4415b94eefa68a84ba3649281bac2",
+    "implementationSha": "e3c7f298435b722b3577cedf84f6a7d749ed8fac",
+    "report": "docs/deployment/source-audit-2026-09-25.md",
+    "publicationRequiresExactShaCi": true,
+    "mainnetTransactionsDuringAudit": 0
+  },
+  "currentIsolatedRuntimeProof": {
+    "implementationSha": "e3c7f298435b722b3577cedf84f6a7d749ed8fac",
+    "windowsRuntimeChecksPassed": 17,
+    "chainChecksPassed": 15,
+    "deploymentChecksPassed": 8,
+    "productionTransactions": 0
+  }
 }
