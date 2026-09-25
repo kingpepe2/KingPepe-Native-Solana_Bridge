@@ -1,6 +1,6 @@
 # Native burn verification
 
-`native/proof` verifies bounded raw Native headers, work, transaction serialization/txid and Merkle membership. KingPepe source/genesis and consensus parameters are pinned; REGTEST and Mainnet rules are distinct. The current runtime admission is REGTEST-only. Read-only Mainnet proof support is preparation, not a Mainnet burn engine.
+`native/proof` verifies bounded raw Native headers, work, transaction serialization/txid and Merkle membership. KingPepe source/genesis and consensus parameters are pinned; REGTEST and Mainnet rules are distinct. The Mainnet runtime requires explicit protected Mainnet configuration and lifecycle admission; development entrypoints cannot be relabelled as Mainnet. Public Mainnet activation remains pending, with no deposits accepted.
 
 `native/burn/burn-evidence.mjs` verifies the original deposit and operational fee inputs against the exact plan. Before signing it requires canonical chain evidence, twelve deposit confirmations, fresh unspent observations, exact scripts, full deposit amount, approved change and bounded miner fee. Admission capabilities are process-private and short-lived; copying a result or supplying a browser flag cannot authorize signing.
 

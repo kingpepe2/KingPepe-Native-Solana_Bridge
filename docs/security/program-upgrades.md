@@ -35,7 +35,7 @@ custody material remain private.
 The Phase-19 local preparation record is in `BRIDGE-READINESS.json`. Its public
 authority address may be published; its protected key, local configuration and
 storage paths must not be. Successful local key/permission checks do not certify
-the remaining production RPC, burn signer, runtime, backup or deployment configuration.
+the remaining production RPC, burn signer, runtime or deployment configuration.
 CurrentUser DPAPI custody is account-bound, not proof of replacement-host recovery.
 
 ## Required procedure for each upgrade
@@ -91,6 +91,10 @@ external review as a mandatory roadmap gate: `externalSecurityReview =
 NOT_REQUIRED_BY_TEAM`, `externalSecurityAuditCompleted = false`. This is not a
 claim that an audit occurred or that unaudited risks were resolved. Known unsafe
 production blockers still prevent activation. Phase 19 requires all retained
-readiness gates, verified production upgrade-authority configuration and explicit
-`KINGPEPE_TEAM_ACTIVATION_APPROVAL` before production deployment. That one-time
-activation approval does not pre-approve later program upgrades.
+readiness gates and verified production upgrade-authority configuration. The Team
+has supplied the initial `KINGPEPE_TEAM_ACTIVATION_APPROVAL`; the public Bridge
+remains activation pending until deployment and controlled verification complete.
+The latest source-audit instruction prohibits deployment transactions during the
+audit. Initial activation approval does not pre-approve later program upgrades.
+Offline recovery provisioning and Windows Service/SCM hosting are not activation
+requirements under the final Team policy; actual signer security still is.

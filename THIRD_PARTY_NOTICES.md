@@ -1,6 +1,9 @@
 # Third-party notices
 
 This repository tracks selected upstream references for architectural guidance.
+Notices for previously distributed integrations are retained below; they do not
+make a removed dependency or historical component part of the current runtime.
+The current dependency inventory is defined by the manifests and lockfiles.
 
 The original process-lock helper calls existing .NET FileStream/FileShare and
 Windows handle APIs. It imports no implementation or sample code; the installed
@@ -25,8 +28,9 @@ docs/security/windows-protected-storage.md.
     the runtime distribution's LICENSE. Node is not KingPepe-exclusive code.
   - SQLite deliverable code is dedicated to the public domain by its authors:
     https://www.sqlite.org/copyright.html.
-  - Use: external pinned runtime for the original local accounting journal;
-    no Node/SQLite source or binary is vendored and no database addon is added.
+  - Use: external pinned Node runtime. Earlier local accounting used built-in
+    SQLite; the current burn journal uses protected serialized state instead.
+    No Node/SQLite source or binary is vendored and no database addon is added.
     Existing distribution notices must accompany any future redistributed runtime.
   - References and archive checksums: `UPSTREAM-REFERENCES.json` and
     `scripts/local-e2e-toolchain.json`. Built-in SQLite is not covered by the

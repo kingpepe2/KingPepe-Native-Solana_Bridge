@@ -1341,6 +1341,13 @@
       "reviewDisposition": "KEEP_TEST"
     },
     {
+      "path": "solana/tests/support/fund-empty-test-accounts.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Isolated local-validator adversarial transfers to unused deterministic accounts; no production identities or secrets.",
+      "purpose": "REQUIRED_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
       "path": "solana/ts/lib/protocol.ts",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original typed TypeScript facade over the shared Borsh codec; obsolete duplicate encoder removed.",

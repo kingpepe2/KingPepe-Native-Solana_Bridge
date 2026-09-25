@@ -15,6 +15,7 @@ import {sourceIdentity} from '../../scripts/source-identity.mjs';
 import {decodeBridgeAbi} from '../../shared/protocol/solana-bridge-abi.mjs';
 import {buildMainnetProgramStep,inspectMainnetProgramUpload} from '../../services/bridge-validator/mainnet-program-plan.mjs';
 import {buildMainnetSolanaSetupTransactionPlan,buildMainnetExistingMintInitializationPlan} from '../../services/bridge-validator/mainnet-solana-setup-plan.mjs';
+import {fundEmptyTestAccounts} from './support/fund-empty-test-accounts.mjs';
 const repoRoot=path.resolve(import.meta.dirname,'../..'),root=validateRuntimeStateRoot(process.env.KINGPEPE_DEPLOYMENT_TEST_ROOT,repoRoot);
 assert(process.platform==='linux'&&!existsSync(root));
 const artifactRoot=process.env.KINGPEPE_BURN_SBF_ROOT;assert(path.isAbsolute(artifactRoot??''));
@@ -81,7 +82,13 @@ try{
   await finalized([await send({...initial,messageBase64:mintMessage.toString('base64')})]);
   const existing=buildMainnetExistingMintInitializationPlan(common);
   assert.deepEqual(existing.instructions.map(i=>i.role),['transceiverInitialize','bridgeInitialize']);
+  await finalized(await fundEmptyTestAccounts({rpc,payer,addresses:[existing.pdas.bridgeState,existing.pdas.transceiverConfig]}));
+  // A public transfer to an empty PDA cannot seize or prevent enrollment.
+  const enrollmentSimulation=await rpc('simulateTransaction',[packet(existing).packet.toString('base64'),{encoding:'base64',sigVerify:false,replaceRecentBlockhash:true}]);
+  writeFileSync(path.join(root,'prefunded-enrollment-simulation.json'),JSON.stringify(enrollmentSimulation.value,null,2));
+  assert.equal(enrollmentSimulation.value.err,null);
   await finalized([await send(existing)]);pass('EXISTING_MINT_INITIALIZATION_PRESERVES_MINT');
+  pass('PREFUNDED_EMPTY_CONFIGURATION_PDAS_INITIALIZE_SAFELY');
   // The local fixture is already initialized. Reinitialization fails simulation
   // and is never sent, preserving the one existing Mint and config accounts.
   const simulated=await rpc('simulateTransaction',[packet(existing).packet.toString('base64'),{encoding:'base64',sigVerify:false,replaceRecentBlockhash:true}]);

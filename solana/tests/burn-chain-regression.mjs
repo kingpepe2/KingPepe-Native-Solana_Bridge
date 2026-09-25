@@ -22,7 +22,8 @@ import {nativeBurnSourceFeePolicy} from '../../native/burn/burn-source-policy.mj
 import {parseNativeTransactionHex} from '../../native/node/native-taproot-transaction.mjs';
 import {encodeBurnMessage} from '../../shared/protocol/burn-message.mjs';
 import {decodeCanonicalBridgeMessage} from '../../shared/protocol/canonical-message.mjs';
-import {BurnSolanaAdapter} from '../../services/solana-observer/burn-solana-adapter.mjs';
+import {BurnSolanaAdapter,burnSolanaAddresses} from '../../services/solana-observer/burn-solana-adapter.mjs';
+import {fundEmptyTestAccounts} from './support/fund-empty-test-accounts.mjs';
 import {ATTESTATION_PROTOCOL,ATTESTATION_MODE,BURN_SIGNED_BYTES,verifyBurnAttestationPair} from '../../services/attesters/burn-attestation-codec.mjs';
 import {associatedTokenCreationMessage,burnSolanaPlanOptions,verifyBurnSolanaPacket} from '../../services/relayer/burn-solana-signer.mjs';
 import {base58Encode,base58Decode,findProgramAddress,prepareSignedLocalnetSolanaDepositClaimTransaction,prepareSignedLocalnetSolanaDepositReceiptTransaction} from '../../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs';
@@ -113,7 +114,10 @@ try{
   const {plan}=await fees.selectPlan({operationId:id,deposit,operationalScriptHex:operational.scriptPubKeyHex,feeCoins:[feeCoin]});
   await assert.rejects(verifier.verifyDepositAdmission({binding,plan}));assert.equal((await adapter.deployment()).mintSupplyAtomic,'0');pass('DEPOSIT_OBSERVATION_CANNOT_AUTHORIZE_BURN_OR_MINT');
   await mine(11);const admission=await verifier.verifyDepositAdmission({binding,plan});requireBurnDepositAdmission(admission,binding,plan);
+  const futureAccounts=burnSolanaAddresses(binding,plan);
+  for(const signature of await fundEmptyTestAccounts({rpc:solana,payer,addresses:Object.values(futureAccounts)}))await finalized(signature);
   await adapter.preBurn(binding,plan,'0');
+  pass('PREFUNDED_EMPTY_OPERATION_ACCOUNTS_ARE_NOT_CLAIMS');
   const ataBlock=await adapter.latestBlockhash(),ata=associatedTokenCreationMessage({binding,feePayerHex:pub(payer),...ataBlock});
   const ataSig=ed25519.sign(ata.message,payer);await finalized(await solana('sendTransaction',[Buffer.concat([Buffer.of(1),Buffer.from(ataSig),ata.message]).toString('base64'),{encoding:'base64',preflightCommitment:'finalized',skipPreflight:false}]));
   // Admission is refreshed after ATA finality before the irreversible TEST burn.
@@ -138,14 +142,22 @@ try{
   const attestation={encodedMessageHex:hex(encoded),attestations:[attesterA,attesterB].map((seed,i)=>({protocol:ATTESTATION_PROTOCOL,mode:ATTESTATION_MODE,role:['ATTESTER_A','ATTESTER_B'][i],keyEpoch:1,policyEpoch:1,
     attesterPublicKeyHex:pub(seed),messageDigestHex:message.messageDigestHex,operationIdHex:id,signedBytes:BURN_SIGNED_BYTES,signatureHex:hex(ed25519.sign(encoded,seed)),state:'VERIFIED_READY'}))};
   verifyBurnAttestationPair(attestation.attestations,attestation.encodedMessageHex,context.attesters);
+  const receiptAddress=burnSolanaAddresses(binding,plan,attestation).receipt;
+  for(const signature of await fundEmptyTestAccounts({rpc:solana,payer,addresses:[receiptAddress]}))await finalized(signature);
+  const prefunded=await adapter.observe(binding,plan,attestation);
+  assert.equal(prefunded.receiptExists,false);assert.equal(prefunded.claimExists,false);
   prepareBurnAuthorization(state,id,attestation.encodedMessageHex);retainBurnAttestation(state,id,attestation);
   async function packet(kind){const block=await adapter.latestBlockhash(),options={...burnSolanaPlanOptions({context,binding,feePayerHex:pub(payer),...attestation,...block}),feePayerSigner:signer(payer)};
     const signedPacket=await(kind==='CLAIM'?prepareSignedLocalnetSolanaDepositClaimTransaction:prepareSignedLocalnetSolanaDepositReceiptTransaction)(options);
     const p={kind,...block,messageDigestHex:message.messageDigestHex,preparedTransactionBase64:signedPacket.preparedTransactionBase64,signature:signedPacket.signatures[0].signatureBase58};
     verifyBurnSolanaPacket(p,context,binding,pub(payer),attestation);return p;}
   const receipt=await packet('RECEIPT');await finalized(await adapter.send(receipt,binding,attestation));
+  pass('PREFUNDED_EMPTY_RECEIPT_INITIALIZES_AFTER_FINALIZED_BURN');
   assert.equal((await adapter.deployment()).mintSupplyAtomic,'0');pass('ATTESTATION_RECEIPT_ALONE_DOES_NOT_MINT');
   const claim=await packet('CLAIM');await finalized(await adapter.send(claim,binding,attestation));
+  const claimExecution=await solana('getTransaction',[claim.signature,{encoding:'base64',commitment:'finalized',maxSupportedTransactionVersion:0}]);
+  writeFileSync(path.join(root,'prefunded-claim-execution.json'),JSON.stringify(claimExecution,null,2)+'\n');
+  assert.equal(claimExecution.meta.innerInstructions[0].instructions.length,10);
   // Deliberately ignore submission result as a service would after a lost reply.
   const reopened=new BurnSolanaAdapter({policy,endpoint:solanaEndpoint}),observed=await reopened.observe(binding,plan,attestation);
   const mint=await reopened.mintReceipt(state.operations[0],claim,observed);retainBurnMint(state,id,mint);completeBurnOperation(state,id);

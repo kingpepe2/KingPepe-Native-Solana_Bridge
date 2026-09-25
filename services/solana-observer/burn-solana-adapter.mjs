@@ -31,6 +31,15 @@ function accountBytes(account,owner,length) {
   check(account&&account.owner===owner&&!account.executable&&Array.isArray(account.data)&&account.data.length===2&&account.data[1]==='base64','BURN_SOLANA_ACCOUNT_OWNER');
   const bytes=Buffer.from(account.data[0],'base64');check(bytes.toString('base64')===account.data[0]&&(length===undefined||bytes.length===length),'BURN_SOLANA_ACCOUNT_ENCODING');return bytes;
 }
+function initializedOperationAccount(account) {
+  // A public SOL transfer can create an empty System account at any derived
+  // PDA/ATA. It is neither an initialized token account nor replay evidence.
+  // Ignore only this exact vacant shape; occupied/foreign accounts still pass
+  // through the ordinary owner, encoding and immutable-binding validation.
+  if(account?.owner==='11111111111111111111111111111111'&&account.executable===false&&
+    Array.isArray(account.data)&&account.data.length===2&&account.data[0]===''&&account.data[1]==='base64')return null;
+  return account;
+}
 export function verifyBurnDeploymentSnapshot(policy,snapshot) {
   const p=validateBurnSolanaPolicy(policy),addresses=deploymentAddresses(p.manifest);
   const verified=verifyDeploymentSnapshot(p.manifest,{...snapshot,accounts:snapshot.accounts.slice(0,addresses.length)});
@@ -94,7 +103,7 @@ export class BurnSolanaAdapter {
     assertBurnBindingContext(binding,this.#policy.context);const addresses=burnSolanaAddresses(binding,plan,attestation),base=deploymentAddresses(this.#policy.manifest);
     const snapshot=await this.#rpc.snapshot([...base,...Object.values(addresses)],this.#minimumSlot);
     const verified=verifyBurnDeploymentSnapshot(this.#policy,snapshot);this.#minimumSlot=verified.slot;
-    const accounts=Object.fromEntries(Object.keys(addresses).map((name,i)=>[name,snapshot.accounts[base.length+i]]));
+    const accounts=Object.fromEntries(Object.keys(addresses).map((name,i)=>[name,initializedOperationAccount(snapshot.accounts[base.length+i])]));
     const result={...verified,ataExists:accounts.destinationToken!==null,claimExists:accounts.claim!==null,receiptExists:false,addresses};
     if(accounts.destinationToken){const bytes=accountBytes(accounts.destinationToken,TOKEN,165);
       check(hex(bytes.subarray(0,32))===binding.mint&&hex(bytes.subarray(32,64))===binding.destination&&bytes[108]===1&&bytes.readUInt32LE(109)===0,'BURN_SOLANA_DESTINATION_MISMATCH');

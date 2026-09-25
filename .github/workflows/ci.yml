@@ -136,7 +136,8 @@ jobs:
           node --input-type=module -e '
             import {readFileSync} from "node:fs";
             const r=JSON.parse(readFileSync(process.env.KINGPEPE_DEPLOYMENT_TEST_ROOT+"/evidence.json","utf8"));
-            if(r.sourceSha!==process.env.GITHUB_SHA||r.exactSource!==true||r.result!=="PASS"||r.mainnetTransactions!==0||r.checks.length!==7)process.exit(1);
+            if(r.sourceSha!==process.env.GITHUB_SHA||r.exactSource!==true||r.result!=="PASS"||r.mainnetTransactions!==0||r.checks.length!==8||
+              !r.checks.includes("PREFUNDED_EMPTY_CONFIGURATION_PDAS_INITIALIZE_SAFELY"))process.exit(1);
           '
       - name: Build exact Native source for isolated regtest
         shell: bash
@@ -187,6 +188,7 @@ jobs:
             const r=JSON.parse(readFileSync(process.env.KINGPEPE_BURN_TEST_ROOT+"/evidence.json","utf8"));
             if(r.sourceSha!==process.env.GITHUB_SHA||r.exactSource!==true||r.state!=="COMPLETED"||r.accounting.state!=="MATCH")process.exit(1);
             for(const check of ["DEPOSIT_OBSERVATION_CANNOT_AUTHORIZE_BURN_OR_MINT","MAXBURNAMOUNT_ONE_UNIT_OVERAGE_REJECTED",
+              "PREFUNDED_EMPTY_OPERATION_ACCOUNTS_ARE_NOT_CLAIMS","PREFUNDED_EMPTY_RECEIPT_INITIALIZES_AFTER_FINALIZED_BURN",
               "BROADCAST_IS_NOT_MINT_AUTHORIZATION","ELEVEN_CONFIRMATIONS_AND_ORPHANED_BURN_REJECTED",
               "FINALIZED_EXACT_BURN_UNSPENDABLE_NO_SECOND_BURN","FINALIZED_BURN_RELOAD_RETAINS_PENDING_MINT_OBLIGATION",
               "ATTESTATION_RECEIPT_ALONE_DOES_NOT_MINT","FINALIZED_EXACT_MINT_TO_ORIGINAL_WALLET",

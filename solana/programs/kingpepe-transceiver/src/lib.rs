@@ -17,6 +17,7 @@ use solana_program::{
     account_info::AccountInfo,
     declare_id,
     entrypoint::ProgramResult,
+    program::invoke,
     program::invoke_signed,
     program_error::ProgramError,
     program_pack::Pack,
@@ -733,6 +734,10 @@ fn ensure_program_pda_account<'a>(
         system_program_account.ok_or(EntrypointError::NotEnoughAccounts)?;
     require_signer(payer)?;
     require_writable(payer)?;
+    require_account_owner(payer, &system_program::id())?;
+    if payer.key == account.key || payer.data_len() != 0 {
+        return Err(EntrypointError::InvalidAccountData);
+    }
     if system_program_account.key != &system_program::id() {
         return Err(EntrypointError::AccountKeyMismatch);
     }
@@ -741,18 +746,47 @@ fn ensure_program_pda_account<'a>(
     let lamports = Rent::get()
         .map_err(|_| EntrypointError::RentUnavailable)?
         .minimum_balance(expected_len);
-    let instruction =
-        system_instruction::create_account(payer.key, account.key, lamports, space, program_id);
-    invoke_signed(
-        &instruction,
-        &[
-            payer.clone(),
-            account.clone(),
-            system_program_account.clone(),
-        ],
-        &[signer_seeds],
-    )
-    .map_err(|_| EntrypointError::SystemCpiFailed)?;
+    if account.lamports() == 0 {
+        let instruction =
+            system_instruction::create_account(payer.key, account.key, lamports, space, program_id);
+        invoke_signed(
+            &instruction,
+            &[
+                payer.clone(),
+                account.clone(),
+                system_program_account.clone(),
+            ],
+            &[signer_seeds],
+        )
+        .map_err(|_| EntrypointError::SystemCpiFailed)?;
+    } else {
+        // Unsolicited SOL at this exact empty System PDA must not block
+        // enrollment or a receipt after Native value has already been burned.
+        let missing = lamports.saturating_sub(account.lamports());
+        if missing > 0 {
+            invoke(
+                &system_instruction::transfer(payer.key, account.key, missing),
+                &[
+                    payer.clone(),
+                    account.clone(),
+                    system_program_account.clone(),
+                ],
+            )
+            .map_err(|_| EntrypointError::SystemCpiFailed)?;
+        }
+        invoke_signed(
+            &system_instruction::allocate(account.key, space),
+            &[account.clone(), system_program_account.clone()],
+            &[signer_seeds],
+        )
+        .map_err(|_| EntrypointError::SystemCpiFailed)?;
+        invoke_signed(
+            &system_instruction::assign(account.key, program_id),
+            &[account.clone(), system_program_account.clone()],
+            &[signer_seeds],
+        )
+        .map_err(|_| EntrypointError::SystemCpiFailed)?;
+    }
     require_account_owner(account, program_id)?;
     require_account_len(account, expected_len)
 }

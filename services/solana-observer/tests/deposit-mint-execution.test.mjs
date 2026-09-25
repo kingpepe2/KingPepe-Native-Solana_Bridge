@@ -34,6 +34,21 @@ before(async () => {
 test("exact signed claim packet agrees with reported MintToChecked and integer balance delta", () => {
   assert.equal(verifyDepositMintExecution(fixture.result, fixture.observation, fixture.config).amountAtomic, "100000");
 });
+test('three prefunded replay accounts allow bounded System CPIs plus exactly one mint',()=>{
+  const v=structuredClone(fixture),mint=v.result.meta.innerInstructions[0].instructions[0];
+  const creation=[2,5,6].flatMap(index=>[
+    {programIdIndex:12,accounts:[0,index],data:base58Encode(Buffer.concat([Buffer.from([2,0,0,0]),Buffer.alloc(8,1)])),stackHeight:2},
+    {programIdIndex:12,accounts:[index],data:base58Encode(Buffer.concat([Buffer.from([8,0,0,0]),Buffer.alloc(8,1)])),stackHeight:2},
+    {programIdIndex:12,accounts:[index],data:base58Encode(Buffer.concat([Buffer.from([1,0,0,0]),Buffer.from(v.config.managerProgramIdHex,'hex')])),stackHeight:2},
+  ]);
+  v.result.meta.innerInstructions[0].instructions=[...creation,mint];
+  assert.equal(verifyDepositMintExecution(v.result,v.observation,v.config).amountAtomic,'100000');
+  for(const change of [
+    r=>r.meta.innerInstructions[0].instructions.unshift(creation[0]),
+    r=>{r.meta.innerInstructions[0].instructions[0].programIdIndex=10;},
+    r=>{r.meta.innerInstructions[0].instructions[0].stackHeight=3;},
+  ]){const invalid=structuredClone(v.result);change(invalid);assert.throws(()=>verifyDepositMintExecution(invalid,v.observation,v.config),/SOLANA_CLAIM_EXECUTION_MISMATCH/);}
+});
 for (const [name, change] of [
   ["unrelated transaction signature", v => { v.observation.transaction.signature = base58Encode(Buffer.alloc(64, 3)); }],
   ["wrong transaction slot", v => { v.result.slot = 11; }],

@@ -8,7 +8,7 @@ import {decodeCanonicalBridgeMessage} from '../../../shared/protocol/canonical-m
 import {prepareBurnAuthorization,retainBurnAttestation,retainBurnSolanaPacket,markBurnSolanaPacket,validateBurnJournalState,burnPacketAttestation,recordBurnDeposits,retainBurnMint,completeBurnOperation} from '../../../services/bridge-validator/burn-journal-state.mjs';
 import {associatedTokenCreationMessage,burnSolanaPlanOptions,verifyBurnSolanaPacket} from '../../../services/relayer/burn-solana-signer.mjs';
 import {base58Encode,prepareSignedLocalnetSolanaDepositClaimTransaction,prepareSignedLocalnetSolanaDepositReceiptTransaction} from '../../../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs';
-import {validateBurnSolanaPolicy,verifyBurnDeploymentSnapshot} from '../../../services/solana-observer/burn-solana-adapter.mjs';
+import {BurnSolanaAdapter,burnSolanaAddresses,validateBurnSolanaPolicy,verifyBurnDeploymentSnapshot} from '../../../services/solana-observer/burn-solana-adapter.mjs';
 import {BurnSolanaRpc} from '../../../services/solana-observer/burn-solana-rpc.mjs';
 import {validateRegtestBurnNetwork} from '../burn-evidence.mjs';
 import {REGTEST_GENESIS} from '../../node/native-raw-evidence.mjs';
@@ -112,4 +112,30 @@ test('private TEST Solana transport validates actual genesis and sanitizes crede
   instructionError='ProgramFailedToComplete';await assert.rejects(rpc.genesis(),e=>e.message==='BURN_SOLANA_PROGRAM_REJECTED'&&e.instructionFailure==='2:ProgramFailedToComplete');
   instructionError='PrivateCredentialValue';await assert.rejects(rpc.genesis(),e=>e.message==='BURN_SOLANA_PROGRAM_REJECTED'&&e.instructionFailure==='2:UnknownInstructionError'&&!JSON.stringify(e).includes('PrivateCredential'));
   assert.throws(()=>new BurnSolanaRpc({environment:'mainnet',endpoint:'https://invalid.example',expectedGenesis:f.manifest.solanaGenesis}));
+});
+test('unsolicited SOL at future operation accounts is not a claim; occupied or foreign accounts still fail closed',async t=>{
+  const f=burnFixture();t.after(f.destroy);const authorization=f.authorize();
+  const addresses=burnSolanaAddresses(f.binding,f.plan,authorization);
+  const empty={owner:'11111111111111111111111111111111',executable:false,lamports:1000000,data:['','base64']};
+  const accounts=new Map(Object.values(addresses).map(address=>[address,structuredClone(empty)]));
+  const server=http.createServer(async(req,res)=>{
+    let body='';for await(const part of req)body+=part;const input=JSON.parse(body);
+    assert(['getGenesisHash','getMultipleAccounts'].includes(input.method));
+    const result=input.method==='getGenesisHash'?f.manifest.solanaGenesis:
+      {context:{slot:10},value:[...f.snapshot.accounts,...input.params[0].slice(f.snapshot.accounts.length).map(address=>accounts.get(address))]};
+    res.end(JSON.stringify({jsonrpc:'2.0',id:input.id,result}));
+  });
+  await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>{server.closeAllConnections();server.close();});
+  const adapter=new BurnSolanaAdapter({policy:f.policy,endpoint:`http://127.0.0.1:${server.address().port}`});
+  for(const attestation of [null,authorization]){
+    const observed=await adapter.observe(f.binding,f.plan,attestation);
+    assert.equal(observed.claimExists,false);assert.equal(observed.receiptExists,false);assert.equal(observed.ataExists,false);
+  }
+  for(const address of Object.values(addresses)){
+    for(const mutation of [{owner:f.manifest.manager.id},{data:['AA==','base64']},{executable:true},{data:['','jsonParsed']},{data:['','base64','extra']}]){
+      accounts.set(address,{...empty,...mutation});
+      await assert.rejects(adapter.observe(f.binding,f.plan,authorization));
+    }
+    accounts.set(address,structuredClone(empty));
+  }
 });

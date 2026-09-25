@@ -48,7 +48,12 @@ export function verifyDepositMintExecution(result, observation, config) {
     stage = "MINT_CPI";
     const groups = result.meta.innerInstructions;
     check(Array.isArray(groups) && groups.length === 1 && groups[0]?.index === 0);
-    const instructions = groups[0].instructions; check(Array.isArray(instructions) && instructions.length <= 8);
+    // Three replay PDAs can each need transfer/allocate/assign when an outsider
+    // pre-funds them, followed by the single MintToChecked CPI. The canonical
+    // claim can call only System and Token, directly at stack height two.
+    const instructions = groups[0].instructions;
+    check(Array.isArray(instructions) && instructions.length <= 10 &&
+      instructions.every(i => i?.stackHeight === 2 && [9, 12].includes(i.programIdIndex)));
     const mintCalls = instructions.filter(i => i?.programIdIndex === 9);
     check(mintCalls.length === 1);
     const mint = mintCalls[0], data = Buffer.alloc(10); data[0] = 14; data.writeBigUInt64LE(message.amountAtomic, 1); data[9] = config.nativeDecimals;

@@ -1,3 +1,5 @@
+> HISTORICAL BURN-MODEL TEST EVIDENCE. This source-bound record describes the TEST deployment at the stated checkpoint. For current Mainnet activation-pending status and public counter, see [development status](../development-status.md).
+
 # Burn-and-mint TEST validation
 
 Recorded 2026-09-24 (Asia/Dubai). Current TEST runtime source `cb5a6af1691366443d69fb3a1f5450a0b6cdc751` passed [CI 35960715676](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/35960715676): all four required jobs and every step, none skipped. The fresh Devnet economic operation was recorded at `adcca2ba412ed45266041d73b16207f665a55c34`, which passed [CI 35931741887](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge/actions/runs/35931741887). The later cookie fix changed no program bytes or encoding. This report is an evidence-only publication; its own commit requires matching CI. Mainnet is not deployed or activated.

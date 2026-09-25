@@ -4,6 +4,6 @@
 
 The Bridge retains separate operation, deposit and burn replay markers. The deposit marker records consumption, not reserve backing. Native burn outpoint and operation cannot authorize a second mint. Checked cumulative issuance is bounded by 21M; current SPL supply must not exceed that counter. Direct SPL holder burns never reopen the counter.
 
-The standard SPL Token Program is sufficient: no Token-2022 extension is required. Fresh enrollment requires eight decimals, zero supply, Bridge PDA mint authority and no freeze authority. Production enrollment remains prohibited in this task. Both existing public reserve-model TEST artifacts and new burn TEST artifacts must be labelled accurately and isolated.
+The standard SPL Token Program is sufficient: no Token-2022 extension is required. Fresh enrollment requires eight decimals, zero supply, Bridge PDA mint authority and no freeze authority. The existing official Mainnet Mint must be reused; program/configuration deployment and controlled activation are still pending. Historical reserve-model and burn TEST artifact evidence remains labelled with its actual network and source, separate from production.
 
 Program upgrades remain subject to [the Team's specific review/approval procedure](../security/program-upgrades.md). Code, source SHA and pinned v3 artifact hashes must match actual deployed bytes before economic admission.

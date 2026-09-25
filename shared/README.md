@@ -21,7 +21,9 @@ This helper does not create keys, reset journals, enforce Windows ACLs or prove
 cross-process fencing. A precheck followed by a file operation is not an atomic
 security boundary against concurrent directory replacement. Filesystem identity
 checks cover tested case aliases; they are not comprehensive mount/clone
-detection. Privileged host compromise remains a shared A+B risk. The pinned
-[Node filesystem documentation](https://raw.githubusercontent.com/nodejs/node/v22.23.2/doc/api/fs.md)
+detection. Privileged host compromise affects the single-key burn signer and
+the separate attester/payer roles. The pinned
+[Node filesystem documentation](https://raw.githubusercontent.com/nodejs/node/v24.21.0/doc/api/fs.md)
 describes pathname aliasing and check/use races. Service permissions, protected
-storage, authenticated journals and rollback assurance remain separate work.
+storage and authenticated journals are separate controls; full-host rollback
+protection is not certified.

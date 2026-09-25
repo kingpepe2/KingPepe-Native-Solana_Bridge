@@ -1,5 +1,5 @@
 // Copyright (c) 2026 KingPepe Team. All Rights Reserved.
-// TEST-only automatic service. SIGINT/SIGTERM drain the active cycle before
+// Explicitly admitted automatic service. SIGINT/SIGTERM drain the active cycle before
 // closing protected stores. A critical pause persists across restarts.
 import {readFileSync,statSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
