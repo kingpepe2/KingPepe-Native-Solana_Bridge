@@ -1,9 +1,9 @@
 [![KingPepe](https://i.postimg.cc/Xvzs6s0Y/bannerkingpepe.png)](https://kingpepe.carrd.co/)
 # KingPepe Native → Solana Bridge
 
-**MAINNET BRIDGE — ACTIVATION PENDING. DO NOT SEND KPEPE YET.**
+**KINGPEPE MAINNET BRIDGE — ACTIVE.**
 
-The official KPEPE Solana Mint exists. The Bridge is completing Mainnet deployment and controlled activation. Public deposit addresses are not being issued, and deposits are not accepted. The public status will change to **MAINNET BRIDGE ACTIVE** only after activation succeeds.
+The public Mainnet Bridge is active. Deployment and controlled activation have completed. Open the official [Bridge](https://kingpepe.net/bridge), connect your Solana wallet, and use the unique Native deposit address issued for your operation after the current availability checks pass.
 
 KingPepe Bridge is **ONE WAY: KingPepe Native Mainnet → Solana Mainnet**. Native KPEPE is irreversibly burned before the corresponding amount of KPEPE is minted **1:1** on Solana. The maximum KingPepe supply is **21,000,000 KPEPE**.
 
@@ -19,7 +19,7 @@ Name: **KingPepe**. Symbol: **KPEPE**. Standard SPL Token, **8 decimals**, no fr
 - [KingPepe Native → Solana Bridge GitHub](https://github.com/kingpepe2/KingPepe-Native-Solana_Bridge)
 - [Official token metadata](https://kingpepe.net/metadata/kpepe-mainnet.json)
 
-## How the Bridge works after activation
+## How the Bridge works
 
 1. Connect Phantom or a compatible Solana Wallet Standard wallet.
 2. Receive a unique KingPepe Native deposit address bound to that Solana wallet.
@@ -37,7 +37,7 @@ There is no separate “Approve to Bridge” step. **Bridge fee: 0.** The Bridge
 
 For each completed operation, the confirmed Native deposit, finalized Native burn and Solana mint amounts are equal. Cumulative Bridge issuance cannot exceed verified finalized Native burns or **21,000,000 KPEPE**. Pending burns awaiting mint are not counted as completed transfers.
 
-The Mainnet counter currently shows **0 KPEPE bridged / 21,000,000 KPEPE maximum**. Development activity is excluded. See [current status](docs/development-status.md), [user guidance](docs/user-access.md) and [supply accounting](docs/security/monetary-supply.md).
+The [live Bridge](https://kingpepe.net/bridge) shows verified completed Mainnet issuance, the remaining amount below the **21,000,000 KPEPE maximum**, and operation progress. Development activity is excluded. The [public status API](https://kingpepe.net/api/v1/bridge/status) reports current availability and verified accounting. See [current status](docs/development-status.md), [user guidance](docs/user-access.md) and [supply accounting](docs/security/monetary-supply.md).
 
 ## Security information
 

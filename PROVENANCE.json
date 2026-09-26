@@ -183,7 +183,7 @@
       "reviewDisposition": "KEEP_DOCUMENTATION"
     },
     {
-      "path": "docs/deployment/public-mainnet-pending.md",
+      "path": "docs/deployment/public-mainnet.md",
       "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
       "notes": "Original KingPepe public documentation or sanitized historical summary.",
       "purpose": "REQUIRED_DOCUMENTATION",

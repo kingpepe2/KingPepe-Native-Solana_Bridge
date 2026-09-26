@@ -2,7 +2,7 @@
 
 Preserve the one-way Burn → Mint protocol, exact accounting, finality, replay protection and restart safety. Keep user-facing behavior simple. Preserve unrelated work; do not reset, clean, restore or stash a checkout. Historical records are not current deployment evidence.
 
-The public Mainnet Bridge is activation pending. Source review or documentation changes do not authorize economic actions. Follow the current Team instruction for the task and retain all economic safety checks. Never infer activation from a presentation change.
+The public Mainnet Bridge is active following completed deployment and controlled activation. Current availability must still be verified through the official status API. Source review or documentation changes do not authorize economic actions. Follow the current Team instruction for the task and retain all economic safety checks. Never infer activation from a presentation change.
 
 ## Permanent publication policy
 

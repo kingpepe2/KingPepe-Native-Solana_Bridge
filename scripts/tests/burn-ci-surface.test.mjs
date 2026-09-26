@@ -34,5 +34,10 @@ test('required CI keeps real burn/reindex/mint/replay and protected Windows cove
     'node solana/tests/mainnet-deployment-regression.mjs','r.mainnetTransactions!==0'])assert(ci.includes(command),command);
   assert(read('scripts/regtest-burn-proof.mjs').includes('FULL_REINDEX_PRESERVES_EXACT_BURN_AND_UTXO_EXCLUSION'));
   const readiness=JSON.parse(read('BRIDGE-READINESS.json'));
-  assert.equal(readiness.productionReady,false);assert.equal(readiness.mainnetActivation,'DISABLED');
+  assert.equal(readiness.publicBridgeActivation,'ACTIVE');assert.equal(readiness.publicNetwork,'MAINNET');
+  assert.equal(readiness.productionReady,true);assert.equal(readiness.mainnetActivation,'ENABLED');
+  assert.equal(readiness.publicStatusUrl,'https://kingpepe.net/api/v1/bridge/status');
+  // Published activation facts cannot promote isolated CI fixtures to Mainnet.
+  assert.equal(JSON.parse(read('scripts/local-e2e-toolchain.json')).environment,'LOCALNET_REGTEST_ONLY');
+  assert(ci.includes('productionReady:false,mainnetActivation:"DISABLED"'));
 });

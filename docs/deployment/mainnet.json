@@ -1,15 +1,14 @@
 {
   "schemaVersion": 2,
   "network": "MAINNET-BETA",
-  "activation": "PENDING",
-  "publicDepositsAccepted": false,
+  "activation": "ACTIVE",
+  "publicDepositsAccepted": true,
   "architecture": "ONE_WAY_AUTOMATIC_BURN_AND_MINT",
   "mint": {
     "address": "4QkWKqTMyPEyEb8RMKv3XrcHJ5jbS7k4uQhXVoirphZW",
     "tokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
     "decimals": 8,
     "initialSupplyAtomic": "0",
-    "verifiedSupplyAtomic": "0",
     "freezeAuthority": null,
     "creationSignature": "4C39PNE3EKZYckYctz12tkxNo3wjK59ySiq4fmgQLDLLX4uAEVBRq1Zji35LTAVpkPEZUHvA21iyNoaFuCvbFUv7",
     "creationSlot": 450075833
@@ -21,8 +20,9 @@
     "imageUri": "https://i.postimg.cc/G28mCc8N/King-Pepe-Icon-500x500.png",
     "externalUrl": "https://kingpepe.carrd.co/"
   },
-  "bridgePrograms": "DEPLOYMENT_PENDING",
-  "controlledActivation": "NOT_STARTED",
-  "publicCounterBaselineAtomic": "0",
+  "bridgePrograms": "DEPLOYED_VERIFIED",
+  "controlledActivation": "PASS",
+  "publicStatusUrl": "https://kingpepe.net/api/v1/bridge/status",
+  "statusScope": "Published activation status; current availability and verified totals come from the live status API.",
   "maximumSupplyAtomic": "2100000000000000"
 }

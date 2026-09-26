@@ -62,12 +62,12 @@
       "classification": "PUBLIC_SAFE"
     },
     {
-      "path": "docs/deployment/public-mainnet-pending.md",
+      "path": "docs/deployment/public-mainnet.md",
       "classification": "PUBLIC_SAFE"
     },
     {
       "path": "docs/deployment/source-audit-2026-09-25.md",
-      "classification": "PUBLIC_SAFE"
+      "classification": "HISTORICAL_TEST_EVIDENCE"
     },
     {
       "path": "docs/development-status.md",

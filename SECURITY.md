@@ -1,6 +1,6 @@
 # Security and responsible disclosure
 
-The public Mainnet Bridge is **ACTIVATION PENDING**. Deposits are not accepted. Do not send KPEPE until the official Bridge announces that it is active.
+The public Mainnet Bridge is **ACTIVE**. Use only the official [Bridge](https://kingpepe.net/bridge), verify its current availability, and send Native KPEPE only to the unique deposit address issued for your bound operation.
 
 Custody, upgrade, and recovery controls are documented internally. Relevant security-assurance information will be published alongside the results of an independent security audit.
 
