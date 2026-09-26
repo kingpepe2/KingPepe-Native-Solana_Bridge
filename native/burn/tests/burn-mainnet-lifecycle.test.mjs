@@ -6,6 +6,7 @@ import {burnFixture} from './burn-fixture.mjs';
 import {initialBurnJournal,validateBurnJournalState,retainBurnMint,completeBurnOperation} from '../../../services/bridge-validator/burn-journal-state.mjs';
 import {beginMainnetControlled,enableMainnetNormal,requireMainnetEconomicOperation,mainnetRuntimeFlags} from '../../../services/bridge-validator/burn-mainnet-lifecycle.mjs';
 import {verifyBurnDeploymentSnapshot} from '../../../services/solana-observer/burn-solana-adapter.mjs';
+import {decodeBridgeAbi,encodeBridgeAbi} from '../../../shared/protocol/solana-bridge-abi.mjs';
 
 test('Mainnet journal starts closed, rejects TEST relabeling and binds exactly one controlled operation across restart',t=>{
   const f=burnFixture({mainnet:true});t.after(f.destroy);
@@ -50,4 +51,24 @@ test('production runtime verification accepts only its exact reviewed on-chain m
   assert.throws(()=>verifyBurnDeploymentSnapshot(changed,f.snapshot),/SOLANA_DEPLOYMENT_CHANGED/);
   changed.artifacts.manager.sha256='ff'.repeat(32);
   assert.throws(()=>verifyBurnDeploymentSnapshot(changed,f.snapshot));
+});
+
+test('verifying initialized disabled production cannot open deposits or bypass controlled activation',t=>{
+  const f=burnFixture({mainnet:true});t.after(f.destroy);
+  const policy=structuredClone(f.policy),snapshot=structuredClone(f.snapshot);
+  Object.assign(policy.manifest.config,{mainnetProgramState:1,depositsPaused:true,mainnetActivationEnabled:false});
+  const bridge=decodeBridgeAbi('BridgeState',Buffer.from(snapshot.accounts[3].data[0],'base64'));
+  bridge.state=1;bridge.config.policy.depositsPaused=true;
+  snapshot.accounts[3].data[0]=encodeBridgeAbi('BridgeState',bridge).toString('base64');
+  const journal=initialBurnJournal(f.binding,f.state.deliveryPolicy),before=JSON.stringify(journal);
+  assert.equal(verifyBurnDeploymentSnapshot(policy,snapshot).managerMintedAtomic,'0');
+  for(const programState of [0,1,4,5,255])assert.deepEqual(mainnetRuntimeFlags(journal,
+    {healthy:true,fresh:true,reconciliation:'MATCH',programState}),{productionReady:false,mainnetActivation:'DISABLED'});
+  assert.throws(()=>requireMainnetEconomicOperation(journal,f.id,'100000'),/NotActivated/);
+  assert.throws(()=>enableMainnetNormal(journal),/ControlledCompletionRequired/);
+  assert.equal(journal.paused,true);assert.equal(journal.mainnetControl.mode,'PREPARED');
+  assert.equal(journal.operations.length,0);assert.equal(JSON.stringify(journal),before);
+  // Even a manifest declaring CONTROLLED must match the actual disabled bytes.
+  const relabeled=structuredClone(policy);Object.assign(relabeled.manifest.config,{mainnetProgramState:4,depositsPaused:false});
+  assert.throws(()=>verifyBurnDeploymentSnapshot(relabeled,snapshot),/SOLANA_DEPLOYMENT_CHANGED/);
 });

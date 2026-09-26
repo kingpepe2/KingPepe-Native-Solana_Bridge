@@ -63,9 +63,11 @@ export function validateDeploymentManifest(input) {
       transceiverProgramId: Buffer.from(key(m.transceiver.id)).toString("hex"), mint: Buffer.from(key(m.mint.id)).toString("hex") });
     check(m.solanaGenesis === SOLANA_MAINNET_GENESIS && m.mint.decimals === 8 && m.config.policyEpoch > 0 && m.config.keyEpoch > 0,
       "MainnetDeploymentBindingRejected");
-    check([0, 4, 5].includes(m.config.mainnetProgramState) &&
+    // ProgramState encodes Uninitialized as 0 and Phase0Disabled as 1.
+    // An enrolled Mainnet deployment must never admit the uninitialized state.
+    check([1, 4, 5].includes(m.config.mainnetProgramState) &&
       m.config.mainnetActivationEnabled === (m.config.mainnetProgramState === 5) &&
-      (m.config.mainnetProgramState !== 0 || m.config.depositsPaused), "MainnetDeploymentModeRejected");
+      (m.config.mainnetProgramState !== 1 || m.config.depositsPaused), "MainnetDeploymentModeRejected");
     check([m.manager, m.transceiver].every(p => p.loader === UPGRADEABLE_LOADER && p.upgradeAuthority !== null) &&
       m.manager.upgradeAuthority === m.transceiver.upgradeAuthority, "MainnetUpgradeAuthorityBindingRejected");
   }
@@ -165,7 +167,7 @@ export function verifyDeploymentSnapshot(manifest, snapshot) {
   if (bridge.owner !== m.manager.id || bridge.executable || bridgeBytes.length !== 281 || !bridgeBytes.subarray(0, 265).equals(expected.bridge)) different("SOLANA_DEPLOYMENT_CHANGED", bridge, "BRIDGE_CONFIGURATION");
   if (transceiver.owner !== m.transceiver.id || transceiver.executable || !transceiverBytes.equals(expected.transceiver)) different("SOLANA_DEPLOYMENT_CHANGED", transceiver, "TRANSCEIVER_CONFIGURATION");
   const bridgeState = decodeBridgeAbi("BridgeState", bridgeBytes);
-  if (m.environment === "mainnet" && m.config.mainnetProgramState === 0 &&
+  if (m.environment === "mainnet" && m.config.mainnetProgramState === 1 &&
       (mintBytes.readBigUInt64LE(36) !== 0n || bridgeState.mintedSupply !== 0n))
     different("SOLANA_DEPLOYMENT_CHANGED", { initialSupplyNotZero: true }, "MAINNET_ZERO_START");
   return Object.freeze({ protocol: DEPLOYMENT_MONITOR_PROTOCOL, trust: "RPC_OBSERVATION", slot: String(snapshot.slot),

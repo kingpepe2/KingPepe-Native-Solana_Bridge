@@ -28,7 +28,7 @@ test("burn conversion cannot enable Mainnet by relabeling TEST configuration", (
 });
 
 test("Mainnet deployment observations bind complete genesis/domain, modes, authority, Mint and zero start", () => {
-  for (const state of [0, 4, 5]) {
+  for (const state of [1, 4, 5]) {
     const { manifest, snapshot } = fixture(state);
     assert.equal(verifyDeploymentSnapshot(manifest, snapshot).mintSupplyAtomic, "0");
     for (const [index, offset] of [[3, 9], [3, 10], [3, 75], [3, 264], [4, 145], [5, 13], [2, 4], [2, 44], [2, 46]]) {
@@ -46,6 +46,49 @@ test("Mainnet deployment observations bind complete genesis/domain, modes, autho
     assert.throws(() => verifyDeploymentSnapshot(manifest, changed), e => e.violation === "MAINNET_ZERO_START");
   }
   assert.throws(() => validateDeploymentManifest({ ...manifest, config: { ...manifest.config, depositsPaused: false } }), /MainnetDeploymentModeRejected/);
+});
+
+test("initialized disabled Mainnet state is 1; uninitialized and invalid state values fail closed", () => {
+  const { manifest, snapshot } = fixture();
+  assert.equal(manifest.config.mainnetProgramState, 1);
+  assert.equal(Buffer.from(snapshot.accounts[3].data[0], "base64")[9], 1);
+  assert.equal(manifest.config.depositsPaused, true);
+  assert.equal(manifest.config.mainnetActivationEnabled, false);
+  const before = JSON.stringify({ manifest, snapshot });
+  const verified = verifyDeploymentSnapshot(manifest, snapshot);
+  assert.equal(verified.mintSupplyAtomic, "0");
+  assert.equal(verified.managerMintedAtomic, "0");
+  assert.equal(JSON.stringify({ manifest, snapshot }), before);
+  for (const state of [0, 2, 3, 6, 255]) {
+    const changed = structuredClone(snapshot), account = Buffer.from(changed.accounts[3].data[0], "base64");
+    account[9] = state; changed.accounts[3].data[0] = account.toString("base64");
+    assert.throws(() => verifyDeploymentSnapshot(manifest, changed),
+      error => error.integrityCode === "SOLANA_DEPLOYMENT_CHANGED" && error.violation === "BRIDGE_CONFIGURATION");
+    // Relabeling the reviewed manifest cannot authorize these states either.
+    const relabeled = { ...manifest, config: { ...manifest.config, mainnetProgramState: state } };
+    assert.throws(() => verifyDeploymentSnapshot(relabeled, changed), /MainnetDeploymentModeRejected/);
+  }
+  for (const state of [-1, 256, "1", null, undefined])
+    assert.throws(() => validateDeploymentManifest({ ...manifest, config: { ...manifest.config, mainnetProgramState: state } }), /MainnetDeploymentModeRejected/);
+  for (const patch of [{ depositsPaused: false }, { mainnetActivationEnabled: true }])
+    assert.throws(() => validateDeploymentManifest({ ...manifest, config: { ...manifest.config, ...patch } }), /MainnetDeploymentModeRejected/);
+});
+
+test("initialized disabled Mainnet still rejects Program, Mint, PDA and configuration substitution", () => {
+  const { manifest, snapshot } = fixture();
+  for (const [index, offset, violation] of [[0, 4, "PROGRAMDATA_BINDING"], [2, 4, "MINT_BINDING"],
+    [3, 107, "BRIDGE_CONFIGURATION"], [3, 258, "BRIDGE_CONFIGURATION"], [4, 177, "TRANSCEIVER_CONFIGURATION"]]) {
+    const changed = structuredClone(snapshot); mutateAccount(changed, index, offset);
+    assert.throws(() => verifyDeploymentSnapshot(manifest, changed),
+      error => error.integrityCode === "SOLANA_DEPLOYMENT_CHANGED" && error.violation === violation);
+  }
+  const foreignPda = structuredClone(snapshot); foreignPda.accounts[3].owner = manifest.transceiver.id;
+  assert.throws(() => verifyDeploymentSnapshot(manifest, foreignPda),
+    error => error.integrityCode === "SOLANA_DEPLOYMENT_CHANGED" && error.violation === "BRIDGE_CONFIGURATION");
+  const absentPda = structuredClone(snapshot); absentPda.accounts[3] = null;
+  assert.throws(() => verifyDeploymentSnapshot(manifest, absentPda),
+    error => error.integrityCode === "SOLANA_DEPLOYMENT_CHANGED" && error.violation === "CONFIGURATION_ABSENT");
+  assert.throws(() => validateDeploymentManifest({ ...manifest, config: { ...manifest.config, bridgePda: manifest.mint.id } }), /DeploymentInputRejected/);
 });
 
 test("explicit Mainnet RPC uses HTTPS and rechecks genesis before and after finalized observations", async t => {

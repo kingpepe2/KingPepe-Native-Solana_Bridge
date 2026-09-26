@@ -33,15 +33,15 @@ export function deploymentFixture() {
   return { manifest, snapshot: { genesis: manifest.solanaGenesis, slot: 10, accounts: [...programs, record(token, false, mintBytes), record(manager, false, bridge), record(transceiver, false, config), ...data] } };
 }
 
-export function mainnetDeploymentFixture(state = 0) {
+export function mainnetDeploymentFixture(state = 1) {
   const { manifest: m, snapshot: s } = deploymentFixture();
   m.environment = "mainnet"; m.nativeGenesisHex = NATIVE_MAINNET_GENESIS; m.solanaGenesis = SOLANA_MAINNET_GENESIS;
   m.solanaDeploymentHex = mainnetDeploymentIdentity({ manager: m.manager.id, transceiver: m.transceiver.id, mint: m.mint.id });
   Object.assign(m.config, { protocolId: 1, nativeNetwork: NATIVE_MAINNET_DOMAIN, mainnetProgramState: state,
-    mainnetActivationEnabled: state === 5, depositsPaused: state === 0 });
+    mainnetActivationEnabled: state === 5, depositsPaused: state === 1 });
   const bridge = decodeBridgeAbi("BridgeState", Buffer.from(s.accounts[3].data[0], "base64"));
   bridge.state = state; bridge.config.binding.environment = 2; bridge.config.binding.solanaDeployment = Buffer.from(m.solanaDeploymentHex, "hex");
-  Object.assign(bridge.config.policy, { depositsPaused: state === 0,  mainnetActivationEnabled: state === 5 });
+  Object.assign(bridge.config.policy, { depositsPaused: state === 1,  mainnetActivationEnabled: state === 5 });
   s.accounts[3].data[0] = encodeBridgeAbi("BridgeState", bridge).toString("base64");
   const transceiver = decodeBridgeAbi("TransceiverState", Buffer.from(s.accounts[4].data[0], "base64"));
   Object.assign(transceiver.config, { protocolId: 1, nativeNetwork: NATIVE_MAINNET_DOMAIN,
