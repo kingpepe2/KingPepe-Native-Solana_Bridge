@@ -57,13 +57,25 @@ function encodeNativeEvidence(bundle, profile) {
     return { transaction, blockHeight: positive(proof.blockHeight, profile.maximumHeaders), transactionIndex,
       transactionIds: ids.map(txid => hex(txid, 32)) };
   });
-  const packet = Buffer.from(serialize(NATIVE_EVIDENCE_SCHEMA, {
-    magic: Buffer.from("KPNEVD02"), genesisHash: hex(profile.genesis, 32), tipHash: hex(bundle.tipHash, 32),
-    tipHeight: integer(bundle.tipHeight, profile.maximumHeaders), chainwork: hex(bundle.chainworkHex, 32),
-    minimumConfirmations: positive(bundle.minimumConfirmations, MAX_HEADERS),
-    headers: headers.map(header => hex(header, 80)), proofs: wireProofs,
-  }));
-  if (packet.length !== byteLength) throw new Error("RAW_NATIVE_EVIDENCE_LENGTH");
+  // Identical Borsh wire format, using bounded bulk byte copies. The generic
+  // serializer visits every header byte as a separate u8, blocking the event
+  // loop for seconds on Mainnet on every fresh proof. Encoding is still not
+  // verification: every packet goes through the unchanged independent verifier.
+  const packet = Buffer.alloc(byteLength);
+  let offset = 0;
+  const bytes = value => { offset += value.copy(packet, offset); };
+  const u32 = value => { packet.writeUInt32LE(value, offset); offset += 4; };
+  bytes(Buffer.from("KPNEVD02")); bytes(hex(profile.genesis, 32)); bytes(hex(bundle.tipHash, 32));
+  u32(integer(bundle.tipHeight, profile.maximumHeaders)); bytes(hex(bundle.chainworkHex, 32));
+  u32(positive(bundle.minimumConfirmations, MAX_HEADERS)); u32(headers.length);
+  for (const header of headers) bytes(hex(header, 80));
+  u32(wireProofs.length);
+  for (const proof of wireProofs) {
+    u32(proof.transaction.length); bytes(proof.transaction);
+    u32(proof.blockHeight); u32(proof.transactionIndex); u32(proof.transactionIds.length);
+    for (const txid of proof.transactionIds) bytes(txid);
+  }
+  if (offset !== byteLength) throw new Error("RAW_NATIVE_EVIDENCE_LENGTH");
   return packet;
 }
 

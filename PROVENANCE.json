@@ -415,6 +415,13 @@
       "reviewDisposition": "KEEP_TEST"
     },
     {
+      "path": "native/node/tests/native-evidence-bulk-codec.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe differential wire-format regression; uses the existing Borsh dependency API without copying its implementation.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
       "path": "native/node/tests/native-raw-evidence.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
