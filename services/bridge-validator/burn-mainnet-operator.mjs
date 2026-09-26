@@ -10,17 +10,19 @@ import {burnRuntimeErrorCode} from './burn-runtime.mjs';
 import {requireBurn as check} from '../../native/burn/burn-protocol.mjs';
 
 export async function runMainnetBurnOperator(configurationFile,action,controlledFile){
-  check(['inspect','prepare-controlled','enable-normal','pause','resume-reviewed'].includes(action),'BurnMainnetOperatorActionRejected');
-  check((action==='prepare-controlled')===(controlledFile!==undefined),'BurnMainnetOperatorArgumentsRejected');
+  check(['inspect','prepare-controlled','adopt-exact-received','enable-normal','pause','resume-reviewed'].includes(action),'BurnMainnetOperatorActionRejected');
+  const bindingRequired=['prepare-controlled','adopt-exact-received'].includes(action);
+  check(bindingRequired===(controlledFile!==undefined),'BurnMainnetOperatorArgumentsRejected');
   const c=loadBurnServiceConfiguration(configurationFile,{mainnet:true}),service=await openBurnServiceRuntime(c.runtime);
   try{
     if(action==='pause'){await service.runtime.pause();return service.runtime.status();}
     await service.runtime.cycle({readOnly:true});
-    if(action==='prepare-controlled'){
+    if(bindingRequired){
       const file=validateRuntimeFile(controlledFile);check(statSync(file).size<=1024,'BurnMainnetControlledFileLimit');
       let a;try{a=JSON.parse(readFileSync(file,'utf8'));}catch{throw Error('BurnMainnetControlledFileRejected');}
-      check(a&&Object.keys(a).sort().join()==='amountAtomic,destinationHex,nonce','BurnMainnetControlledFileRejected');
-      return await service.runtime.beginControlledMainnet(a);
+      check(a&&Object.keys(a).sort().join()===(action==='prepare-controlled'?'amountModel,destinationHex,nonce':'amountModel,destinationHex,nonce,operationId')&&
+        a.amountModel==='EXACT_RECEIVED','BurnMainnetControlledFileRejected');
+      return action==='prepare-controlled'?await service.runtime.beginControlledMainnet(a):await service.runtime.adoptExactReceivedMainnet(a);
     }
     if(action==='enable-normal')return await service.runtime.enableNormalMainnet();
     if(action==='resume-reviewed')await service.runtime.resumeReviewedMainnetRuntime();

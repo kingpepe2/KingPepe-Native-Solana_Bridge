@@ -72,7 +72,7 @@ test('Mainnet plans retain spent-input block locations across journal restart be
  const x=fixture();try{const r=rpcFixture(x),observer=new NativeBurnObserver(r.client,'mainnet');
   const plan=await observer.preparePlan(x.plan);assert.deepEqual(validateBurnPlanBlockHints(plan),Object.fromEntries(plan.inputs.map(i=>[i.txid,r.block])));
   const state=initialBurnJournal(x.binding,{context:x.context,feePayerHex:x.f.policy.feePayerHex});
-  beginMainnetControlled(state,{destinationHex:x.binding.destination,nonce:x.binding.nonce,amountAtomic:x.f.deposit.amountAtomic});state.paused=false;
+  beginMainnetControlled(state,{destinationHex:x.binding.destination,nonce:x.binding.nonce,amountModel:'EXACT_RECEIVED'});state.paused=false;
   const op=issueBurnDeposit(state,x.binding,199);
   recordBurnDeposits(state,op.operationId,[{...x.f.deposit,blockHash:r.block,height:200,confirmations:12}]);
   retainBurnPlan(state,op.operationId,plan);

@@ -14,7 +14,7 @@ import {requireBurnSolanaAdapter} from '../solana-observer/burn-solana-adapter.m
 import {requireProtectedBurnJournal} from './protected-burn-journal.mjs';
 import {validateBurnContext} from './burn-context.mjs';
 import {nativeIdentity} from '../../shared/network-identity.mjs';
-import {beginMainnetControlled,enableMainnetNormal,requireMainnetEconomicOperation,mainnetRuntimeFlags} from './burn-mainnet-lifecycle.mjs';
+import {beginMainnetControlled,adoptMainnetExactReceived,enableMainnetNormal,requireMainnetEconomicOperation,mainnetRuntimeFlags} from './burn-mainnet-lifecycle.mjs';
 import {encodeBurnMessage} from '../../shared/protocol/burn-message.mjs';
 import {decodeCanonicalBridgeMessage,stableJson} from '../../shared/protocol/canonical-message.mjs';
 import {burnJournalRecord,issueBurnDeposit,recordBurnDeposits,retainBurnPlan,retainSignedBurn,markBurnBroadcast,
@@ -93,17 +93,26 @@ export class BurnRuntime {
   // Local operator methods only. They are not exposed by the loopback/public API.
   // Run with the service stopped; protected journal/signing leases exclude a
   // simultaneous writer. On-chain mode changes are verified before admission.
-  beginControlledMainnet({destinationHex,nonce,amountAtomic}) {
+  beginControlledMainnet(input) {
     return this.#exclusive(async()=>{
+      const {destinationHex,nonce}=input;
       await this.#readyForMainnetTransition();this.#destination(destinationHex,nonce);
       check(this.#mainnetMode()===4,'BurnMainnetControlledChainModeRequired');
       const native=await this.#observer.network();
       const id=this.#update(state=>{
-        const id=beginMainnetControlled(state,{destinationHex,nonce,amountAtomic});
+        const id=beginMainnetControlled(state,input);
         state.paused=false;state.pauseReason='MAINNET_CONTROLLED';
         issueBurnDeposit(state,{...this.#context.deployment,destination:destinationHex,nonce},native.height);return id;
       });
       this.#health={state:'HEALTHY',reconciliation:'MATCH',reason:null};return this.operation(id);
+    });
+  }
+  adoptExactReceivedMainnet(input) {
+    return this.#exclusive(async()=>{
+      await this.#readyForMainnetTransition();
+      check(this.#mainnetMode()===4,'BurnMainnetControlledChainModeRequired');
+      const id=this.#update(state=>adoptMainnetExactReceived(state,input));
+      return this.operation(id);
     });
   }
   enableNormalMainnet() {

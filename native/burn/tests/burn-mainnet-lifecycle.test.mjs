@@ -3,8 +3,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {burnFixture} from './burn-fixture.mjs';
-import {initialBurnJournal,validateBurnJournalState,retainBurnMint,completeBurnOperation} from '../../../services/bridge-validator/burn-journal-state.mjs';
-import {beginMainnetControlled,enableMainnetNormal,requireMainnetEconomicOperation,mainnetRuntimeFlags} from '../../../services/bridge-validator/burn-mainnet-lifecycle.mjs';
+import {initialBurnJournal,validateBurnJournalState,recordBurnDeposits,retainBurnMint,completeBurnOperation} from '../../../services/bridge-validator/burn-journal-state.mjs';
+import {beginMainnetControlled,adoptMainnetExactReceived,enableMainnetNormal,requireMainnetEconomicOperation,mainnetRuntimeFlags} from '../../../services/bridge-validator/burn-mainnet-lifecycle.mjs';
+import {MAX_KPEPE_SUPPLY_ATOMIC} from '../../../shared/monetary-supply.mjs';
+import {parseNativeTransactionHex} from '../../node/native-taproot-transaction.mjs';
 import {verifyBurnDeploymentSnapshot} from '../../../services/solana-observer/burn-solana-adapter.mjs';
 import {decodeBridgeAbi,encodeBridgeAbi} from '../../../shared/protocol/solana-bridge-abi.mjs';
 
@@ -16,10 +18,11 @@ test('Mainnet journal starts closed, rejects TEST relabeling and binds exactly o
   assert.throws(()=>validateBurnJournalState({...empty,paused:false}),/PreparedState/);
   const missing=structuredClone(empty);delete missing.mainnetControl;assert.throws(()=>validateBurnJournalState(missing),/FieldsRejected/);
   const loaded=validateBurnJournalState(JSON.parse(JSON.stringify(f.state)));
+  recordBurnDeposits(loaded,f.id,[f.deposit]);
   requireMainnetEconomicOperation(loaded,f.id,'100000');
   assert.throws(()=>requireMainnetEconomicOperation(loaded,'ff'.repeat(32),'100000'),/ControlledOperationOnly/);
-  assert.throws(()=>requireMainnetEconomicOperation(loaded,f.id,'100001'),/ControlledAmountChanged/);
-  assert.throws(()=>beginMainnetControlled(loaded,{destinationHex:f.binding.destination,nonce:f.binding.nonce,amountAtomic:'100000'}),/AlreadyPrepared/);
+  assert.throws(()=>requireMainnetEconomicOperation(loaded,f.id,'100001'),/ReceivedAmountChanged/);
+  assert.throws(()=>beginMainnetControlled(loaded,{destinationHex:f.binding.destination,nonce:f.binding.nonce,amountModel:'EXACT_RECEIVED'}),/AlreadyPrepared/);
   for(const key of ['nonce','destinationHex','operationId']){
     const changed=structuredClone(loaded);changed.mainnetControl.controlled[key]='ff'.repeat(32);
     assert.throws(()=>validateBurnJournalState(changed),/Controlled/);
@@ -42,6 +45,66 @@ test('normal enablement requires the existing completed exact burn/mint; ambiguo
   for(const patch of [{healthy:false},{fresh:false},{reconciliation:'FAIL'},{programState:4},{programState:0}])
     assert.equal(mainnetRuntimeFlags(loaded,{...health,...patch}).productionReady,false);
   loaded.paused=true;assert.equal(mainnetRuntimeFlags(loaded,health).mainnetActivation,'DISABLED');
+});
+
+test('controlled processing derives every amount from the received deposit, with separate fees and only the global cap',t=>{
+  for(const amountAtomic of ['330','331','100000000000000',(MAX_KPEPE_SUPPLY_ATOMIC-1_000_000n).toString()]) {
+    const f=burnFixture({mainnet:true,amountAtomic});t.after(f.destroy);
+    assert.equal(f.state.mainnetControl.controlled.amountModel,'EXACT_RECEIVED');
+    assert.equal(Object.hasOwn(f.state.mainnetControl.controlled,'amountAtomic'),false);
+    f.finalize();requireMainnetEconomicOperation(f.state,f.id,amountAtomic);
+    const burn=parseNativeTransactionHex(f.state.operations[0].signedBurnHex);
+    assert.equal(burn.outputs[0].amountAtomic,amountAtomic);
+    assert.equal(BigInt(f.plan.inputs[1].amountAtomic)-BigInt(burn.outputs[1].amountAtomic),BigInt(f.plan.feeAtomic));
+    const receipt={operationId:f.id,amountAtomic,destination:f.binding.destination,mint:f.binding.mint,signature:'2'.repeat(88),commitment:'finalized',slot:'20'};
+    assert.throws(()=>retainBurnMint(f.state,f.id,{...receipt,amountAtomic:(BigInt(amountAtomic)-1n).toString()}),/MintBindingChanged/);
+    retainBurnMint(f.state,f.id,receipt);completeBurnOperation(f.state,f.id);
+    const changed=structuredClone(f.state);changed.operations[0].burnEvidence.amountAtomic=(BigInt(amountAtomic)+1n).toString();
+    assert.throws(()=>enableMainnetNormal(changed),/CompletionRequired/);
+    enableMainnetNormal(f.state);
+    const restored=validateBurnJournalState(JSON.parse(JSON.stringify(f.state)));
+    assert.equal(restored.operations[0].mintReceipt.amountAtomic,amountAtomic);
+  }
+  const f=burnFixture({mainnet:true});t.after(f.destroy);
+  recordBurnDeposits(f.state,f.id,[{...f.deposit,amountAtomic:MAX_KPEPE_SUPPLY_ATOMIC.toString()}]);
+  requireMainnetEconomicOperation(f.state,f.id,MAX_KPEPE_SUPPLY_ATOMIC.toString());
+  for(const amount of ['0','-1',(MAX_KPEPE_SUPPLY_ATOMIC+1n).toString()])
+    assert.throws(()=>requireMainnetEconomicOperation(f.state,f.id,amount),/NativeBurn/);
+  assert.equal(mainnetRuntimeFlags(f.state,{healthy:true,fresh:true,reconciliation:'MATCH',programState:4}).productionReady,false);
+});
+
+test('exact-received migration preserves the single unfunded operation and cannot change its destination or activate deposits',t=>{
+  const f=burnFixture({mainnet:true});t.after(f.destroy);
+  const legacy=structuredClone(f.state),a=legacy.mainnetControl.controlled;
+  delete a.amountModel;a.amountAtomic='331';legacy.paused=true;
+  const prior=validateBurnJournalState(JSON.parse(JSON.stringify(legacy))),before=structuredClone(prior);
+  const requested={operationId:f.id,destinationHex:f.binding.destination,nonce:f.binding.nonce,amountModel:'EXACT_RECEIVED'};
+  assert.throws(()=>requireMainnetEconomicOperation(prior,f.id),/ExactReceivedRequired/);
+  for(const key of ['operationId','destinationHex','nonce'])
+    assert.throws(()=>adoptMainnetExactReceived(structuredClone(prior),{...requested,[key]:'ff'.repeat(32)}),/BindingRejected/);
+  for(const patch of [{paused:false},{operations:[]},{mainnetControl:{...prior.mainnetControl,mode:'NORMAL'}}])
+    assert.throws(()=>adoptMainnetExactReceived({...structuredClone(prior),...patch},requested));
+  const funded=structuredClone(prior);recordBurnDeposits(funded,f.id,[f.deposit]);
+  assert.throws(()=>adoptMainnetExactReceived(funded,requested),/UnfundedControlledOperationRequired/);
+  assert.equal(adoptMainnetExactReceived(prior,requested),f.id);
+  assert.deepEqual(prior.operations,before.operations);assert.deepEqual(prior.deployment,before.deployment);
+  assert.deepEqual(prior.deliveryPolicy,before.deliveryPolicy);assert.deepEqual(prior.nativeScan,before.nativeScan);
+  assert.equal(prior.paused,true);assert.equal(prior.pauseReason,before.pauseReason);
+  assert.deepEqual(prior.mainnetControl.controlled,requested);
+  const restored=validateBurnJournalState(JSON.parse(JSON.stringify(prior)));
+  assert.equal(adoptMainnetExactReceived(restored,requested),f.id);assert.equal(restored.operations.length,1);
+  assert.throws(()=>enableMainnetNormal(restored),/CompletionRequired/);
+  assert.equal(mainnetRuntimeFlags(restored,{healthy:true,fresh:true,reconciliation:'MATCH',programState:5}).productionReady,false);
+});
+
+test('new controlled operations reject requested amounts and unknown amount models',t=>{
+  const f=burnFixture({mainnet:true});t.after(f.destroy);
+  const empty=()=>initialBurnJournal(f.binding,f.state.deliveryPolicy);
+  const input={destinationHex:f.binding.destination,nonce:f.binding.nonce,amountModel:'EXACT_RECEIVED'};
+  for(const changed of [{...input,amountAtomic:'331'},{...input,maximumAmountAtomic:'331'},
+    {...input,amountModel:'FIXED'},{destinationHex:input.destinationHex,nonce:input.nonce,amountAtomic:'331'}])
+    assert.throws(()=>beginMainnetControlled(empty(),changed),/ExactReceivedRequired/);
+  const state=empty();beginMainnetControlled(state,input);assert.equal(state.paused,true);assert.equal(state.operations.length,0);
 });
 
 test('production runtime verification accepts only its exact reviewed on-chain mode and artifacts',t=>{
