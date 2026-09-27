@@ -1485,6 +1485,81 @@
       "notes": "Original KingPepe SOL execution funding implementation or regression code.",
       "purpose": "REQUIRED_RUNTIME",
       "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "docs/market-and-network.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original public product description."
+    },
+    {
+      "path": "integrations/explorer/market-story-release.json",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Original KingPepe market and network display integration; no market transaction capabilities."
+    },
+    {
+      "path": "integrations/explorer/src/api/market-live-schema.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe market and network display integration; no market transaction capabilities."
+    },
+    {
+      "path": "integrations/explorer/src/market-chain.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe market and network display integration; no market transaction capabilities."
+    },
+    {
+      "path": "integrations/explorer/src/market-live.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe market and network display integration; no market transaction capabilities."
+    },
+    {
+      "path": "integrations/explorer/web/bridge-market.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe market and network display integration; no market transaction capabilities."
+    },
+    {
+      "path": "integrations/explorer/web/bridge-presentation.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe market and network display integration; no market transaction capabilities."
+    },
+    {
+      "path": "integrations/explorer/web/market-display-model.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe market and network display integration; no market transaction capabilities."
+    },
+    {
+      "path": "integrations/explorer/web/market-display.css",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe market and network display integration; no market transaction capabilities."
+    },
+    {
+      "path": "integrations/explorer/web/market-display.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe market and network display integration; no market transaction capabilities."
+    },
+    {
+      "path": "integrations/explorer/web/market-identities.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe market and network display integration; no market transaction capabilities."
+    },
+    {
+      "path": "integrations/explorer/web/network-story-model.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe market and network display integration; no market transaction capabilities."
+    },
+    {
+      "path": "integrations/explorer/web/network-story.css",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe market and network display integration; no market transaction capabilities."
+    },
+    {
+      "path": "integrations/explorer/web/network-story.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe market and network display integration; no market transaction capabilities."
+    },
+    {
+      "path": "native/burn/tests/market-story-display.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe market and network display integration; no market transaction capabilities."
     }
   ]
 }

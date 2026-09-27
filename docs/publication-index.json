@@ -120,6 +120,10 @@
     {
       "path": "solana/tests/README.md",
       "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "docs/market-and-network.md",
+      "classification": "PUBLIC_SAFE"
     }
   ]
 }

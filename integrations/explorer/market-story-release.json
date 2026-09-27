@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "economicBaseSourceSha": "5876620b53c66fec38927ea0857a1b19094dd4fc",
+  "publicExplorerSourceSha": "d4c77f29c7a58bf202f6817c0ca65975b9e94719",
+  "activatesFundingPolicy": false,
+  "marketMode": "DISPLAY_ONLY",
+  "files": [
+    {
+      "path": "web/bridge.js",
+      "sha256": "508fbd7b5c11d2ab9f4778ad37ae04c82eabb3c9bf980cfe710d0a6cd63378a9"
+    },
+    {
+      "path": "web/bridge-execution.js",
+      "sha256": "b2bc5401ad07be600ab103673dae04f1307c2d4fd25d3f7237811e97333cb582"
+    },
+    {
+      "path": "web/bridge-market.js",
+      "sha256": "01f8d419cfb31038cc90454811a0a98de84b403ac701bacacb1fc8fbe6bf66b4"
+    },
+    {
+      "path": "web/bridge-presentation.js",
+      "sha256": "4ccb18647b689fe457b0e4e6a87ee1278d642fbd1586980de62e86f8829ed59f"
+    },
+    {
+      "path": "web/market-identities.js",
+      "sha256": "76d58fc51e6ebf0fc12ddc78e8706b858b629f99b91cfef00fa19c963a4e517e"
+    },
+    {
+      "path": "web/market-display-model.js",
+      "sha256": "3604eb427c46a8bdb2f04ddc850a7c034c25b782089d02b378be04891b333878"
+    },
+    {
+      "path": "web/market-display.js",
+      "sha256": "d7074fcf5b275a0f8a66c5d9243102a730b313caf48ad203cdd370c31b370db7"
+    },
+    {
+      "path": "web/market-display.css",
+      "sha256": "fb40291c4b30a1133d8faae015643c0e8c449f920f44026356bfd4bda16eb498"
+    },
+    {
+      "path": "web/network-story-model.js",
+      "sha256": "72e10ab537af0313b4e20191f10f71db2df92ab6c10727f253c67528ceda6780"
+    },
+    {
+      "path": "web/network-story.js",
+      "sha256": "d97049259990fc1ca36337674100bd5ab5142d67174bfcb7cfd57fcb9de59455"
+    },
+    {
+      "path": "web/network-story.css",
+      "sha256": "09fd6798954ece53beed7d9f169f6d2c578d04e4776a495a84dcb3f450c56306"
+    },
+    {
+      "path": "src/market-chain.js",
+      "sha256": "50dc75da1a31bb1caf23693bd2be1738f1d0991b42587f535bfb1a2d624bc7ac"
+    },
+    {
+      "path": "src/market-live.js",
+      "sha256": "3a3069f678f925654b7a1c3bde66dfc737d896bbeaf3c2549788fd736b688db4"
+    },
+    {
+      "path": "src/api/market-live-schema.js",
+      "sha256": "ff18464898c7944c214d1ac703fbbb09f9341a4faeb80fd926c2bd19b2d1fb47"
+    }
+  ],
+  "explorerComposition": [
+    {
+      "path": "web/app.js",
+      "sha256": "88a2799c27e2cc5590214b010fce52c65814572bebb5c91fad70391aad6c3312"
+    },
+    {
+      "path": "web/index.html",
+      "sha256": "6e8d3eb26f3f13b96a10eb6adab1a3a8fa17190827829244f7f19ec8de84eba5"
+    },
+    {
+      "path": "src/api/v1.js",
+      "sha256": "da3ac2cd6c694af0fc2926807c79b48779e5eefe83154ceeb537fae5e1fbecc2"
+    },
+    {
+      "path": "src/api/openapi.js",
+      "sha256": "83f266f416b9e6eab4f588257047c788ad0583c93bb353322bd5a0be47d49ba1"
+    }
+  ],
+  "publicRoutes": {
+    "market": "GET /api/v1/market/live",
+    "network": "GET /api/v1/status"
+  },
+  "publication": "Market and story are read-only. Bridge availability and execution funding follow the active authoritative runtime."
+}
