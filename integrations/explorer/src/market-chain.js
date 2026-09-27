@@ -7,6 +7,9 @@ export const PROGRAMS=Object.freeze({raydium:'CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW
 export const TICK='BSuQRtDjp6d1pMBGma1KuLzNyXME1m1UBq2eAPEEGf9H';
 export const VAULTS=Object.freeze(['59oNBEiucV8aGKTfqWxDK316eTEYRHTZnovpspo6HZFD','DEUdEqUa8QDcnqq9oBm7oD2UzBTxExUue7VV6FhWY9qD','5Nc5fRbKRLoXouCBCJHsFer6MGnX8VV2dnkRxtvYLyM4','4BgxvCYDyCYXtd89hDKFa3nyZtxWaX3m4GWTWdWiw8u5']);
 export const ACCOUNT_KEYS=Object.freeze([MARKET.mint,MARKET.raydium,MARKET.order,TICK,MARKET.orca,...VAULTS]);
+// The current dashboard reads Raydium only. The legacy decoder remains compatible
+// with earlier snapshots, but no Orca account is requested by the live reader.
+export const RAYDIUM_ACCOUNT_KEYS=Object.freeze([MARKET.mint,MARKET.raydium,MARKET.order,TICK,...VAULTS.slice(0,2)]);
 const Q=1n<<64n,INITIAL=1000n*100000000n;
 const check=(ok)=>{if(!ok)throw Error('MARKET_IDENTITY_OR_LAYOUT_UNVERIFIED');};
 export const discriminator=(type,name)=>createHash('sha256').update(type+':'+name).digest().subarray(0,8);
@@ -61,8 +64,13 @@ export function decodeAccounts(result,now){
   check(out.raydium||out.orca);return out;
 }
 export const EXCLUDED_PARTICIPANTS=Object.freeze([MARKET.orderOwner,'21ySRMngN5PJk1b9aB2xdUcHkw17LbJy8yq4zZmBDhvx','Ea1BQMJeaRtXArcBEz4Y28gzvuxhZdTfTV6XVaJnN3Pg']);
+export function decodeRaydiumAccounts(result,now){
+  check(result?.value?.length===RAYDIUM_ACCOUNT_KEYS.length);
+  const [mint,ray,order,tick,sol,kpepe]=result.value;
+  return decodeAccounts({...result,value:[mint,ray,order,tick,null,sol,kpepe,null,null]},now);
+}
 const sigValid=s=>typeof s==='string'&&/^[1-9A-HJ-NP-Za-km-z]{80,90}$/.test(s);
-export function decodeTrades(tx,signature,now){
+export function decodeTrades(tx,signature,now,raydiumOnly=false){
   check(sigValid(signature)&&tx?.transaction?.signatures?.[0]===signature&&Number.isSafeInteger(tx.slot));
   check(tx.meta&&tx.meta.err===null&&Number.isInteger(tx.blockTime)&&tx.blockTime*1000<=now+5000);
   const keys=[...tx.transaction.message.accountKeys,...(tx.meta.loadedAddresses?.writable??[]),...(tx.meta.loadedAddresses?.readonly??[])].map(k=>typeof k==='string'?k:k.pubkey);
@@ -79,7 +87,7 @@ export function decodeTrades(tx,signature,now){
       check(b.length===221&&b[168]<=1);pool=pub(b,8);if(pool!==MARKET.raydium)continue;
       check(b.readBigUInt64LE(144)===0n&&b.readBigUInt64LE(160)===0n);
       venue='RAYDIUM';sol=b.readBigUInt64LE(136);kpepe=b.readBigUInt64LE(152);buy=b[168]===1;
-    }else if(stack.at(-1)===PROGRAMS.orca&&b.subarray(0,8).equals(discriminator('event','Traded'))){
+    }else if(!raydiumOnly&&stack.at(-1)===PROGRAMS.orca&&b.subarray(0,8).equals(discriminator('event','Traded'))){
       check(b.length===121&&b[40]<=1);pool=pub(b,8);if(pool!==MARKET.orca)continue;
       check(b.readBigUInt64LE(89)===0n&&b.readBigUInt64LE(97)===0n);
       venue='ORCA';buy=b[40]===1;sol=b.readBigUInt64LE(buy?73:81);kpepe=b.readBigUInt64LE(buy?81:73);

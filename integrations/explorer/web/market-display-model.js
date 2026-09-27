@@ -4,8 +4,8 @@ export const PRICE_LABELS=Object.freeze({LAST_FINALIZED_TRADE:'Last finalized tr
 export function validateMarket(value){
   if(value?.mode!=='DISPLAY_ONLY'||value.mint!==MARKET.mint||value.network!=='MAINNET'||!Number.isFinite(value.timestamp)||!Array.isArray(value.trades)||value.trades.length>500)throw Error('INVALID_MARKET');
   if(value.raydium&&(value.raydium.pool!==MARKET.raydium||value.raydium.order?.address!==MARKET.order||value.raydium.order?.owner!==MARKET.orderOwner))throw Error('INVALID_MARKET');
-  if(value.orca&&value.orca.pool!==MARKET.orca)throw Error('INVALID_MARKET');
-  for(const t of value.trades)if(!['BUY','SELL'].includes(t.side)||!['RAYDIUM','ORCA'].includes(t.venue)||t.pool!==(t.venue==='RAYDIUM'?MARKET.raydium:MARKET.orca)||!/^[1-9A-HJ-NP-Za-km-z]{80,90}$/.test(t.signature)||!(Number(t.kpepe)>0)||!(Number(t.sol)>0)||!(t.priceSol>0)||!Number.isFinite(t.timestamp)||t.timestamp>value.timestamp+5000)throw Error('INVALID_TRADE');
+  if(value.orca!==null&&value.orca!==undefined)throw Error('UNSUPPORTED_VENUE');
+  for(const t of value.trades)if(!['BUY','SELL'].includes(t.side)||t.venue!=='RAYDIUM'||t.pool!==MARKET.raydium||!/^[1-9A-HJ-NP-Za-km-z]{80,90}$/.test(t.signature)||!(Number(t.kpepe)>0)||!(Number(t.sol)>0)||!(t.priceSol>0)||!Number.isFinite(t.timestamp)||t.timestamp>value.timestamp+5000)throw Error('INVALID_TRADE');
   return value;
 }
 export function displayHealth(data,now=Date.now()){

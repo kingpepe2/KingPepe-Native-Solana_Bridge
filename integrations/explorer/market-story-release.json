@@ -1,9 +1,13 @@
 {
   "schemaVersion": 1,
   "economicBaseSourceSha": "5876620b53c66fec38927ea0857a1b19094dd4fc",
-  "publicExplorerSourceSha": "d4c77f29c7a58bf202f6817c0ca65975b9e94719",
+  "publicExplorerSourceSha": "39f1093a3fb8727b114da3cb323ff96e87d90d4d",
   "activatesFundingPolicy": false,
   "marketMode": "DISPLAY_ONLY",
+  "marketVenues": [
+    "RAYDIUM"
+  ],
+  "originalBannerPreserved": true,
   "files": [
     {
       "path": "web/bridge.js",
@@ -15,7 +19,7 @@
     },
     {
       "path": "web/bridge-market.js",
-      "sha256": "01f8d419cfb31038cc90454811a0a98de84b403ac701bacacb1fc8fbe6bf66b4"
+      "sha256": "6cd669906886c3d121983fbe398ceec03284407365a8d0beaaf0fc2f468c0130"
     },
     {
       "path": "web/bridge-presentation.js",
@@ -27,15 +31,15 @@
     },
     {
       "path": "web/market-display-model.js",
-      "sha256": "3604eb427c46a8bdb2f04ddc850a7c034c25b782089d02b378be04891b333878"
+      "sha256": "1d44496cdd7c1fdefd0dca57f614f63c326bac7378ab80d434a1e20223a3c872"
     },
     {
       "path": "web/market-display.js",
-      "sha256": "d7074fcf5b275a0f8a66c5d9243102a730b313caf48ad203cdd370c31b370db7"
+      "sha256": "dbb9f8bb29642d26c9c8d86dec44f87589b953c5a667af920ed86f075d8eb2e4"
     },
     {
       "path": "web/market-display.css",
-      "sha256": "fb40291c4b30a1133d8faae015643c0e8c449f920f44026356bfd4bda16eb498"
+      "sha256": "5b80234694219579a69a6b05b05da85da9964a31a84a9cc5b6550961d0ba1209"
     },
     {
       "path": "web/network-story-model.js",
@@ -51,25 +55,25 @@
     },
     {
       "path": "src/market-chain.js",
-      "sha256": "50dc75da1a31bb1caf23693bd2be1738f1d0991b42587f535bfb1a2d624bc7ac"
+      "sha256": "774261d445c6ed36159de2aea72f36e37edb7d4c938753904da70f7088d844e8"
     },
     {
       "path": "src/market-live.js",
-      "sha256": "3a3069f678f925654b7a1c3bde66dfc737d896bbeaf3c2549788fd736b688db4"
+      "sha256": "7e8369d8dffae223ac03f5ed7ec6c98d96f90c94ba44e6dc3a7f33593c82bdcf"
     },
     {
       "path": "src/api/market-live-schema.js",
-      "sha256": "ff18464898c7944c214d1ac703fbbb09f9341a4faeb80fd926c2bd19b2d1fb47"
+      "sha256": "e824d3dcbf82dfc59c9299862f048e6a9fd5dd38d29b63a8d4c8804e1b06f2c2"
     }
   ],
   "explorerComposition": [
     {
       "path": "web/app.js",
-      "sha256": "88a2799c27e2cc5590214b010fce52c65814572bebb5c91fad70391aad6c3312"
+      "sha256": "2a8ceb333e08e2db76f984b1df875e053c9e2539bdae2e8f68d9b78045d1dc31"
     },
     {
       "path": "web/index.html",
-      "sha256": "6e8d3eb26f3f13b96a10eb6adab1a3a8fa17190827829244f7f19ec8de84eba5"
+      "sha256": "e22b142c46e110160fe9816a7a1ee9f58ab671911adfcea7214517af1ce2ae3e"
     },
     {
       "path": "src/api/v1.js",

@@ -1,4 +1,10 @@
 /* KingPepe market display. All rules scoped to the composite Bridge page. */
+.bridge-market-banner{display:block;width:100%;height:auto;max-width:1280px;aspect-ratio:1280/427;object-fit:contain;margin:0 auto 28px;border:1px solid #314536;border-radius:15px}
+.market-display .market-venues{grid-template-columns:minmax(0,1fr)}
+.market-display .market-venue-raydium{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;padding:24px}
+.market-venue-raydium .market-order{margin-top:0;border-left:1px solid #2a4032;padding-left:24px}
+.market-venue-raydium .market-pool-summary{min-width:0}
+@media(max-width:600px){.market-display .market-venue-raydium{grid-template-columns:minmax(0,1fr);padding:20px;gap:24px}.market-venue-raydium .market-order{border-left:0;border-top:1px solid #2a4032;padding:24px 0 0}}
 body:has(.bridge-market-layout) .kpe-strike,body:has(.bridge-market-layout) .kpe-atmos canvas,body:has(.bridge-market-layout) .kpe-fog{display:none!important}
 body:has(.bridge-market-layout) .kpe-grid,.view.market-wide>*{animation:none!important}
 .view.market-wide{max-width:1560px;padding:28px 24px 56px;box-sizing:border-box}

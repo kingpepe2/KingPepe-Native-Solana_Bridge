@@ -1,7 +1,7 @@
 // Independent public market reader. Outbound RPC methods and accounts are fixed here.
 // No environment credential loading, private runtime imports, writes or transaction submission.
 import {MARKET,FRESHNESS} from '../web/market-identities.js';
-import {ACCOUNT_KEYS,decodeAccounts,decodeTrades} from './market-chain.js';
+import {RAYDIUM_ACCOUNT_KEYS,decodeRaydiumAccounts,decodeTrades} from './market-chain.js';
 const RPCS=Object.freeze(['https://solana-rpc.publicnode.com','https://api.mainnet-beta.solana.com']);
 const GENESIS='5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d';
 const METHODS=new Set(['getGenesisHash','getMultipleAccounts','getSignaturesForAddress','getTransaction']);
@@ -20,7 +20,7 @@ async function json(fetcher,url,options={}){
 export function createLiveMarket({fetcher=globalThis.fetch,now=Date.now}={}){
   let chain=null,chainAttempt=0,chainFlight=null,historyAttempt=0,historyFlight=null,statsAttempt=0,statsFlight=null,statistics=null,usd=null;
   const verifiedRpc=new Map(),records=new Map(),retryAfter=new Map();
-  const venues=[MARKET.raydium,MARKET.orca].map(pool=>({pool,signatures:new Map(),latest:[],cursor:null,oldest:null,complete:false,headAt:0,gap:false}));
+  const venues=[MARKET.raydium].map(pool=>({pool,signatures:new Map(),latest:[],cursor:null,oldest:null,complete:false,headAt:0,gap:false}));
   async function rpc(method,params){
     if(!METHODS.has(method))throw Error('READ_ONLY_METHOD_REQUIRED');
     for(const endpoint of RPCS)try{
@@ -30,7 +30,7 @@ export function createLiveMarket({fetcher=globalThis.fetch,now=Date.now}={}){
     }catch{}
     throw Error('MARKET_RPC_UNAVAILABLE');
   }
-  async function accounts(){try{chain=decodeAccounts(await rpc('getMultipleAccounts',[ACCOUNT_KEYS,{commitment:'finalized',encoding:'base64'}]),now());}catch{}finally{chainFlight=null;}}
+  async function accounts(){try{chain=decodeRaydiumAccounts(await rpc('getMultipleAccounts',[RAYDIUM_ACCOUNT_KEYS,{commitment:'finalized',encoding:'base64'}]),now());}catch{}finally{chainFlight=null;}}
   async function history(){
     try{
       for(const v of venues){
@@ -57,7 +57,7 @@ export function createLiveMarket({fetcher=globalThis.fetch,now=Date.now}={}){
       // Two bounded readers; clients share one in-flight refresh. Failed reads are retried next refresh.
       let i=0;async function worker(){while(i<todo.length){const s=todo[i++];if(s.err){records.set(s.signature,{trades:[],time:s.blockTime*1000,decoded:true});continue;}
         try{const tx=await rpc('getTransaction',[s.signature,{commitment:'finalized',encoding:'json',maxSupportedTransactionVersion:0}]);if(!tx)throw Error('TRANSACTION_UNAVAILABLE');
-          const trades=decodeTrades(tx,s.signature,now());records.set(s.signature,{trades,time:s.blockTime*1000,decoded:true});
+          const trades=decodeTrades(tx,s.signature,now(),true);records.set(s.signature,{trades,time:s.blockTime*1000,decoded:true});
         }catch{retryAfter.set(s.signature,now()+300000); /* Unverified records never become fills; retry without starving backfill. */ }
       }}
       await Promise.all([worker(),worker()]);
@@ -71,17 +71,12 @@ export function createLiveMarket({fetcher=globalThis.fetch,now=Date.now}={}){
   async function stats(){
     const results=await Promise.allSettled([
       json(fetcher,'https://api-v3.raydium.io/pools/info/ids?ids='+MARKET.raydium),
-      json(fetcher,'https://api.orca.so/v2/solana/pools/'+MARKET.orca),
       json(fetcher,'https://api.exchange.coinbase.com/products/SOL-USD/ticker'),
     ]);
-    const [r,o,c]=results.map(x=>x.status==='fulfilled'?x.value:null),at=now();let raydium=null,orca=null;
+    const [r,c]=results.map(x=>x.status==='fulfilled'?x.value:null),at=now();let raydium=null;
     const p=r?.success&&r.data?.length===1?r.data[0]:null;
     if(p?.id===MARKET.raydium&&p.mintA?.address===MARKET.wsol&&p.mintB?.address===MARKET.mint)raydium={tvlUsd:finite(p.tvl),volume24hUsd:finite(p.day?.volume),source:'RAYDIUM_API_ESTIMATE'};
-    const q=o?.data;
-    if(q?.address===MARKET.orca&&q.tokenMintA===MARKET.wsol&&q.tokenMintB===MARKET.mint)orca={
-      // Orca reports zero TVL for this unpriced token despite nonzero vault balances: unknown, not zero liquidity.
-      tvlUsd:finite(q.tvlUsdc)>0?finite(q.tvlUsdc):null,volume24hUsd:finite(q.stats?.['24h']?.volume),hasWarning:q.hasWarning===true,source:'ORCA_API_ESTIMATE'};
-    if(raydium||orca)statistics={observedAt:at,raydium,orca};
+    if(raydium)statistics={observedAt:at,raydium,orca:null};
     const price=finite(c?.price),bid=finite(c?.bid),ask=finite(c?.ask),time=Date.parse(c?.time);
     if(price>0&&bid>0&&ask>=bid&&(ask-bid)/bid<.02&&Math.abs(at-time)<60000)usd={price,observedAt:at,tradeAt:time,source:'COINBASE_SOL_USD_LAST_TRADE'};
     statsFlight=null;
@@ -93,29 +88,29 @@ export function createLiveMarket({fetcher=globalThis.fetch,now=Date.now}={}){
   }
   function snapshot(){
     const at=now(),age=chain?at-chain.observedAt:Infinity,usable=age<=FRESHNESS.retainMs,live=age<=FRESHNESS.accountsMs;
-    const raydium=usable?chain.raydium:null,orca=usable?chain.orca:null;
+    const raydium=usable?chain.raydium:null;
     const feedFresh=venues.every(v=>v.headAt>0&&at-v.headAt<=FRESHNESS.historyMs);
     const headKnown=venues.every(v=>v.latest.every(s=>records.has(s)));
     const covered=feedFresh&&venues.every(v=>!v.gap&&(v.complete||v.oldest!==null&&v.oldest<=at-DAY)&&[...v.signatures.values()].filter(s=>s.blockTime*1000>=at-DAY).every(s=>records.has(s.signature)));
-    const trades=usable?[...records.values()].flatMap(r=>r.trades).filter(t=>(t.venue==='RAYDIUM'?raydium:orca)&&t.timestamp>=at-7*DAY).sort((a,b)=>b.timestamp-a.timestamp||b.slot-a.slot):[];
+    const trades=usable?[...records.values()].flatMap(r=>r.trades).filter(t=>t.venue==='RAYDIUM'&&raydium&&t.timestamp>=at-7*DAY).sort((a,b)=>b.timestamp-a.timestamp||b.slot-a.slot):[];
     const last=trades[0]??null,order=raydium?.order;
     const currentAsk=live&&['ACTIVE','PARTIALLY_FILLED'].includes(order?.status)&&raydium.status==='ACTIVE'?Number(order.askSol):null;
     // Preference is explicit. No executable quote is claimed without a verified executable source.
     const latest=feedFresh&&headKnown?last:null;
-    const priceSol=latest?.priceSol??currentAsk??raydium?.referencePriceSol??orca?.referencePriceSol??null;
+    const priceSol=latest?.priceSol??currentAsk??raydium?.referencePriceSol??null;
     const priceType=latest?'LAST_FINALIZED_TRADE':currentAsk!==null?'TRACKED_ORDER_ASK':priceSol!==null?'POOL_REFERENCE':'UNAVAILABLE';
     const priceAt=latest?.timestamp??(usable?chain.observedAt:null);
     const usdLive=usd&&at-usd.tradeAt<=FRESHNESS.usdMs;
     const daily=trades.filter(t=>t.timestamp>=at-DAY),ps=daily.map(t=>t.priceSol);
-    // Market-wide trade metrics sum actual swaps, not provider estimates. No volume extrapolation.
+    // Raydium pool trade metrics sum actual swaps, not provider estimates. No extrapolation.
     const stats24h={changePct:covered&&daily.length>=2?(daily[0].priceSol/daily.at(-1).priceSol-1)*100:null,
       changeBasis:'FIRST_TO_LAST_OBSERVED_TRADE_IN_24H',volumeSol:covered?daily.reduce((s,t)=>s+Number(t.sol),0):null,
       highSol:covered&&ps.length?Math.max(...ps):null,lowSol:covered&&ps.length?Math.min(...ps):null,tradeCount:covered?daily.length:null};
-    return {version:1,mode:'DISPLAY_ONLY',mint:MARKET.mint,network:'MAINNET',marketHealth:!usable?'UNAVAILABLE':!live?'STALE':raydium&&orca&&feedFresh&&['ACTIVE','PARTIALLY_FILLED','FILLED'].includes(order?.status)?'LIVE':'PARTIAL',
+    return {version:1,mode:'DISPLAY_ONLY',venues:['RAYDIUM'],mint:MARKET.mint,network:'MAINNET',marketHealth:!usable?'UNAVAILABLE':!live?'STALE':raydium&&feedFresh&&['ACTIVE','PARTIALLY_FILLED','FILLED'].includes(order?.status)?'LIVE':'PARTIAL',
       timestamp:at,observedAt:usable?chain.observedAt:null,slot:usable?chain.slot:null,freshness:FRESHNESS,priceSol,priceType,priceAt,
       priceUsd:priceSol!==null&&usdLive?priceSol*usd.price:null,usdSource:usdLive?usd:null,stats24h,
       lastTrade:last,trackedAskSol:currentAsk,bestBuyQuote:null,trades:trades.slice(0,500),history:{observedAt:Math.min(...venues.map(v=>v.headAt)),health:feedFresh?'FRESH':'UNAVAILABLE',complete24h:covered,headVerified:headKnown&&feedFresh,scope:'VERIFIED_POOL_SWAP_EVENTS',retentionDays:7},
-      raydium,orca,statistics:statistics&&at-statistics.observedAt<=FRESHNESS.statisticsMs?statistics:null};
+      raydium,orca:null,statistics:statistics&&at-statistics.observedAt<=FRESHNESS.statisticsMs?statistics:null};
   }
   return {get(){kick();return snapshot();},peek:snapshot,async settled(){await Promise.allSettled([chainFlight,historyFlight,statsFlight]);return snapshot();}};
 }

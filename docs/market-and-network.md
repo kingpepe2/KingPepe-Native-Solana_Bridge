@@ -2,7 +2,7 @@
 
 The public [KingPepe Bridge page](https://kingpepe.net/bridge) combines a market information display, the native network story and the actual Native to Solana Bridge. The market and story contain no trading, order-management or wallet-signing controls. Bridge actions remain in their own panel.
 
-Market prices are labeled by their meaning: a verified finalized trade, an available executable quote, a resting ask or a pool reference. An ask is not a last trade. Charts and trade rows use verified history; missing values appear as unavailable. Each venue's liquidity is shown separately. Data freshness is independent of Bridge readiness.
+Market prices are labeled by their meaning: a verified finalized trade, an available executable quote, a resting ask or a pool reference. An ask is not a last trade. Charts and trade rows use verified history; missing values appear as unavailable. The display covers the existing Raydium CLMM market only. Other markets are not queried or displayed. Data freshness is independent of Bridge readiness.
 
 Native KPEPE originates on the independent KingPepe SHA-256 Proof-of-Work blockchain. Solana KPEPE is the bridged representation. Mining rewards follow the native network's consensus rules. The network card identifies recent block observations and marks stale or unavailable data. It does not promise mining profitability or claim historical precedence.
 
