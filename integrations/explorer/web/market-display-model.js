@@ -14,6 +14,21 @@ export function displayHealth(data,now=Date.now()){
   return ['LIVE','PARTIAL','STALE'].includes(data.marketHealth)?data.marketHealth:'UNAVAILABLE';
 }
 export function formatMarket(value,decimals=6){if(value===null||value===undefined||value===''||!Number.isFinite(Number(value)))return '—';return Number(value).toLocaleString('en-US',{maximumFractionDigits:decimals});}
+export function overviewMetrics(data,now=Date.now()){
+  const empty={priceUsd:null,marketCapUsd:null,liquidityUsd:null};
+  if(!data||!['LIVE','PARTIAL'].includes(displayHealth(data,now)))return empty;
+  const amount=n=>Number.isFinite(n)&&n>=0?n:null;
+  const usdFresh=data.usdSource&&Number.isFinite(data.usdSource.tradeAt)&&data.usdSource.tradeAt<=now+5000&&now-data.usdSource.tradeAt<=FRESHNESS.usdMs;
+  const priceUsd=usdFresh?amount(data.priceUsd):null;
+  const supply=data.solanaSupply;
+  const supplyVerified=supply?.source==='FINALIZED_MINT_ACCOUNT'&&supply.decimals===8&&/^(0|[1-9][0-9]{0,15})$/.test(supply.atomic)&&BigInt(supply.atomic)<=2100000000000000n;
+  const expected=priceUsd!==null&&supplyVerified?Number(supply.atomic)/1e8*priceUsd:null;
+  const cap=amount(data.marketCapUsd);
+  const marketCapUsd=expected!==null&&cap!==null&&data.marketCapBasis==='OUTSTANDING_SOLANA_SUPPLY_AT_DISPLAYED_PRICE'&&Math.abs(cap-expected)<=Math.max(1e-8,expected*1e-10)?cap:null;
+  const stats=data.statistics,statsFresh=Number.isFinite(stats?.observedAt)&&stats.observedAt<=now+5000&&now-stats.observedAt<=FRESHNESS.statisticsMs;
+  const liquidityUsd=statsFresh&&stats.raydium?.source==='RAYDIUM_API_ESTIMATE'?amount(stats.raydium.tvlUsd):null;
+  return {priceUsd,marketCapUsd,liquidityUsd};
+}
 export function chartSeries(trades,frame,now=Date.now()){
   const width=TIMEFRAMES[frame]??Infinity;
   const points=trades.filter(t=>t.timestamp>=now-width&&t.timestamp<=now&&Number.isFinite(t.priceSol)&&t.priceSol>0).sort((a,b)=>a.timestamp-b.timestamp||a.slot-b.slot);

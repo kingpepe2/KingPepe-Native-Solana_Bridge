@@ -1,6 +1,6 @@
 // Compose two independent health domains. Market receives only its own DOM host.
 import {renderBridge} from './bridge.js?v=network-story-v1';
-import {renderMarketDisplay} from './market-display.js?v=raydium-only-v1';
+import {renderMarketDisplay} from './market-display.js?v=market-overview-v1';
 import {renderNetworkStory} from './network-story.js?v=network-story-v1';
 export function renderBridgeMarket(view){
   const page=document.createElement('div');page.className='bridge-market-page';

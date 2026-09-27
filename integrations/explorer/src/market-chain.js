@@ -45,7 +45,8 @@ export function decodeAccounts(result,now){
   check(Number.isSafeInteger(result?.context?.slot)&&result.value?.length===ACCOUNT_KEYS.length);
   const [mint,ray,order,tick,orca,...v]=result.value;
   const m=data(mint,PROGRAMS.token,82);check(m[44]===8&&m[45]===1&&m.readUInt32LE(46)===0);
-  const out={observedAt:now,slot:result.context.slot,mint:MARKET.mint,raydium:null,orca:null};
+  const supply=m.readBigUInt64LE(36);check(supply<=2100000000000000n);
+  const out={observedAt:now,slot:result.context.slot,mint:MARKET.mint,solanaSupply:{atomic:supply.toString(),kpepe:decimal(supply,8),decimals:8,source:'FINALIZED_MINT_ACCOUNT'},raydium:null,orca:null};
   try{
     const b=data(ray,PROGRAMS.raydium,1544,'PoolState');
     check(pub(b,73)===MARKET.wsol&&pub(b,105)===MARKET.mint&&b[233]===9&&b[234]===8&&b.readUInt16LE(235)===60);

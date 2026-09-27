@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {MARKET} from '../../../integrations/explorer/web/market-identities.js';
 import {nativeActivity} from '../../../integrations/explorer/web/network-story-model.js';
-import {chartSeries,formatMarket,displayHealth} from '../../../integrations/explorer/web/market-display-model.js';
+import {chartSeries,formatMarket,displayHealth,overviewMetrics} from '../../../integrations/explorer/web/market-display-model.js';
 import {forwardProgress} from '../../../integrations/explorer/web/bridge-presentation.js';
 const root=new URL('../../../integrations/explorer/',import.meta.url),read=p=>fs.readFileSync(new URL(p,root),'utf8');
 test('market/story identities are fixed and display dependencies cannot sign or manage orders',()=>{
@@ -22,6 +22,10 @@ test('market history remains real-only and native activity fails honestly withou
  assert.equal(nativeActivity(s,now).state,'RECENT_BLOCKS');assert.equal(nativeActivity(s,now+91000).state,'STALE');assert.equal(nativeActivity(null,now).state,'UNAVAILABLE');
  assert.equal(chartSeries([],'ALL',now).type,'EMPTY');assert.equal(formatMarket(null),'—');assert.equal(formatMarket(0),'0');assert.equal(displayHealth(null,now),'UNAVAILABLE');
  assert.equal(forwardProgress({state:'BURN_READY',executionFunding:{status:'ADDITIONAL_SOL_REQUIRED',burnCommitted:false}}).steps[2].state,'pending');
+});
+test('USD overview remains read-only and does not invent missing capitalization or liquidity',()=>{
+ assert.deepEqual(overviewMetrics(null),{priceUsd:null,marketCapUsd:null,liquidityUsd:null});
+ const ui=read('web/market-display.js');assert(ui.includes('Mkt Cap'));assert(ui.includes('Raydium reported TVL'));assert(ui.includes('Price USD'));assert(ui.includes('outstanding Solana KPEPE supply'));
 });
 test('funding UI remains runtime-gated and preserves the no-global-backstop integration',()=>{
  const ui=read('web/bridge.js');assert(ui.includes("executionPolicy==='USER_FUNDED'"));assert(ui.includes("funding.status==='ADDITIONAL_SOL_REQUIRED'"));assert(ui.includes('funds remain reserved for mint completion'));

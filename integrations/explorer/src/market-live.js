@@ -101,6 +101,10 @@ export function createLiveMarket({fetcher=globalThis.fetch,now=Date.now}={}){
     const priceType=latest?'LAST_FINALIZED_TRADE':currentAsk!==null?'TRACKED_ORDER_ASK':priceSol!==null?'POOL_REFERENCE':'UNAVAILABLE';
     const priceAt=latest?.timestamp??(usable?chain.observedAt:null);
     const usdLive=usd&&at-usd.tradeAt<=FRESHNESS.usdMs;
+    const priceUsd=priceSol!==null&&usdLive?priceSol*usd.price:null;
+    const solanaSupply=live?chain.solanaSupply:null;
+    // Indicative Solana-token valuation, not a claim about native circulation or FDV.
+    const marketCapUsd=priceUsd!==null&&solanaSupply?Number(solanaSupply.kpepe)*priceUsd:null;
     const daily=trades.filter(t=>t.timestamp>=at-DAY),ps=daily.map(t=>t.priceSol);
     // Raydium pool trade metrics sum actual swaps, not provider estimates. No extrapolation.
     const stats24h={changePct:covered&&daily.length>=2?(daily[0].priceSol/daily.at(-1).priceSol-1)*100:null,
@@ -108,7 +112,7 @@ export function createLiveMarket({fetcher=globalThis.fetch,now=Date.now}={}){
       highSol:covered&&ps.length?Math.max(...ps):null,lowSol:covered&&ps.length?Math.min(...ps):null,tradeCount:covered?daily.length:null};
     return {version:1,mode:'DISPLAY_ONLY',venues:['RAYDIUM'],mint:MARKET.mint,network:'MAINNET',marketHealth:!usable?'UNAVAILABLE':!live?'STALE':raydium&&feedFresh&&['ACTIVE','PARTIALLY_FILLED','FILLED'].includes(order?.status)?'LIVE':'PARTIAL',
       timestamp:at,observedAt:usable?chain.observedAt:null,slot:usable?chain.slot:null,freshness:FRESHNESS,priceSol,priceType,priceAt,
-      priceUsd:priceSol!==null&&usdLive?priceSol*usd.price:null,usdSource:usdLive?usd:null,stats24h,
+      priceUsd,usdSource:usdLive?usd:null,solanaSupply,marketCapUsd,marketCapBasis:'OUTSTANDING_SOLANA_SUPPLY_AT_DISPLAYED_PRICE',stats24h,
       lastTrade:last,trackedAskSol:currentAsk,bestBuyQuote:null,trades:trades.slice(0,500),history:{observedAt:Math.min(...venues.map(v=>v.headAt)),health:feedFresh?'FRESH':'UNAVAILABLE',complete24h:covered,headVerified:headKnown&&feedFresh,scope:'VERIFIED_POOL_SWAP_EVENTS',retentionDays:7},
       raydium,orca:null,statistics:statistics&&at-statistics.observedAt<=FRESHNESS.statisticsMs?statistics:null};
   }

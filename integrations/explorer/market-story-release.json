@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "economicBaseSourceSha": "5876620b53c66fec38927ea0857a1b19094dd4fc",
-  "publicExplorerSourceSha": "39f1093a3fb8727b114da3cb323ff96e87d90d4d",
+  "publicExplorerSourceSha": "7c3d534f8cadeac5fc50e291f4b1e547873e982e",
   "activatesFundingPolicy": false,
   "marketMode": "DISPLAY_ONLY",
   "marketVenues": [
@@ -19,7 +19,7 @@
     },
     {
       "path": "web/bridge-market.js",
-      "sha256": "6cd669906886c3d121983fbe398ceec03284407365a8d0beaaf0fc2f468c0130"
+      "sha256": "b6cdb1bcc5b8f6fcabe6748af54997c9bf1edfb30dd7e08ba102cd2ab74108a7"
     },
     {
       "path": "web/bridge-presentation.js",
@@ -31,15 +31,15 @@
     },
     {
       "path": "web/market-display-model.js",
-      "sha256": "1d44496cdd7c1fdefd0dca57f614f63c326bac7378ab80d434a1e20223a3c872"
+      "sha256": "979d42be71b034deb242125bc3f26dbb9cf7392b511f3f36dbe332264196c5eb"
     },
     {
       "path": "web/market-display.js",
-      "sha256": "dbb9f8bb29642d26c9c8d86dec44f87589b953c5a667af920ed86f075d8eb2e4"
+      "sha256": "b0b9142135581a1e3c6ed4dabbea0b7620b288fa9e570ee269f365f4f4f7d1f5"
     },
     {
       "path": "web/market-display.css",
-      "sha256": "5b80234694219579a69a6b05b05da85da9964a31a84a9cc5b6550961d0ba1209"
+      "sha256": "f61d78d0a47eb7413976fa462b66b6fcc636cd900de4379d5f68a73f8b53fd31"
     },
     {
       "path": "web/network-story-model.js",
@@ -55,25 +55,25 @@
     },
     {
       "path": "src/market-chain.js",
-      "sha256": "774261d445c6ed36159de2aea72f36e37edb7d4c938753904da70f7088d844e8"
+      "sha256": "b967e154db4d9a2abc20cd9c0701d26825a8031efa06dd8cb7ee1e2ab064302e"
     },
     {
       "path": "src/market-live.js",
-      "sha256": "7e8369d8dffae223ac03f5ed7ec6c98d96f90c94ba44e6dc3a7f33593c82bdcf"
+      "sha256": "b76066b6b9c42dc7cd2f96756415008a678385804bae0e1245a8c8bec6e96ae1"
     },
     {
       "path": "src/api/market-live-schema.js",
-      "sha256": "e824d3dcbf82dfc59c9299862f048e6a9fd5dd38d29b63a8d4c8804e1b06f2c2"
+      "sha256": "6593b859a6eff7d52f63dfadc0586b254dba6b058b6734466bb714f148834136"
     }
   ],
   "explorerComposition": [
     {
       "path": "web/app.js",
-      "sha256": "2a8ceb333e08e2db76f984b1df875e053c9e2539bdae2e8f68d9b78045d1dc31"
+      "sha256": "a55a2c56848ec4cbd82c0fbbd75eb4c9ec5fb0917546bd142d0c92e248618bde"
     },
     {
       "path": "web/index.html",
-      "sha256": "e22b142c46e110160fe9816a7a1ee9f58ab671911adfcea7214517af1ce2ae3e"
+      "sha256": "f3fb7f2019c2b1d54ead908bb64366cf48a686a98335d1434bab4ef95ccc7a1c"
     },
     {
       "path": "src/api/v1.js",
@@ -88,5 +88,10 @@
     "market": "GET /api/v1/market/live",
     "network": "GET /api/v1/status"
   },
-  "publication": "Market and story are read-only. Bridge availability and execution funding follow the active authoritative runtime."
+  "publication": "Market and story are read-only. Bridge availability and execution funding follow the active authoritative runtime.",
+  "marketMetrics": [
+    "INDICATIVE_SOLANA_SUPPLY_MARKET_CAP_USD",
+    "RAYDIUM_REPORTED_TVL_USD",
+    "DISPLAYED_PRICE_USD"
+  ]
 }
