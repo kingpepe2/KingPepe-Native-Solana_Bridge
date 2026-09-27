@@ -21,12 +21,14 @@ export async function listenBurnUserApi({api,accessToken,port=0}) {
         if(req.method==='GET'&&op){const value=api.getOperationStatus(op[1]);return reply(value?200:404,value??{error:'OPERATION_NOT_FOUND'});}
         const balance=/^\/balances\/(native|solana)\/([a-zA-Z0-9]{32,90})$/u.exec(req.url);
         if(req.method==='GET'&&balance)return reply(200,await api.getPublicBalance(balance[1],balance[2]));
-        if(req.method!=='POST'||req.url!=='/operations')return reply(404,{error:'ROUTE_NOT_FOUND'});
+        const funding=/^\/operations\/([0-9a-f]{64})\/(execution-quote|execution-payment)$/u.exec(req.url);
+        if(req.method!=='POST'||req.url!=='/operations'&&!funding)return reply(404,{error:'ROUTE_NOT_FOUND'});
         if(!/^application\/json(?:; charset=utf-8)?$/u.test(req.headers['content-type']??''))return reply(415,{error:'JSON_REQUIRED'});
         const now=Date.now();if(now-windowStart>=60000||now<windowStart){windowStart=now;creations=0;}if(++creations>12)return reply(429,{error:'RETRY_LATER'});
         let size=0;const chunks=[];
         for await(const bytes of req){size+=bytes.length;if(size>2048){reply(413,{error:'REQUEST_TOO_LARGE'});req.resume();return;}chunks.push(bytes);}
-        const text=new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(chunks));reply(200,await api.createOperation(JSON.parse(text)));
+        const text=new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(chunks)),input=JSON.parse(text);
+        reply(200,funding?await (funding[2]==='execution-quote'?api.refreshExecutionQuote(funding[1],input):api.verifyExecutionPayment(funding[1],input)):await api.createOperation(input));
       }finally{active--;}
     }catch{reply(400,{error:'REQUEST_REJECTED_OR_DEPENDENCY_UNAVAILABLE'});}
   });

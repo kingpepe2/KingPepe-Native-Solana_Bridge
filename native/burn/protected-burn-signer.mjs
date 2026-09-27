@@ -9,13 +9,15 @@ import {requireBurnDepositAdmission} from './burn-evidence.mjs';
 import {requireBurn as check,burnOperationId,validateNativeBurnTransaction} from './burn-protocol.mjs';
 import {signNativeBurnWithKey,verifyNativeBurnSignatures} from './burn-key.mjs';
 import {parseNativeTransactionHex} from '../node/native-taproot-transaction.mjs';
+import {requireProtectedBurnJournal} from '../../services/bridge-validator/protected-burn-journal.mjs';
+import {requireExecutionBurnCommitted} from '../../services/bridge-validator/execution-funding-state.mjs';
 
 export const BURN_SIGNER_PROTOCOL='KINGPEPE_SINGLE_KEY_BURN_SIGNER_V1';
 const instances=new WeakSet(),hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export function requireProtectedNativeBurnSigner(value){check(instances.has(value),'ProtectedNativeBurnSignerRequired');}
 export function initialBurnAuthorizations(publicKeyHex){return Buffer.from(JSON.stringify({protocol:BURN_SIGNER_PROTOCOL,publicKeyHex,authorizations:[]}));}
 export class ProtectedNativeBurnSigner {
-  #key;#authorizations;#lease;#publicKey;#busy=false;#closed=false;
+  #key;#authorizations;#lease;#publicKey;#busy=false;#closed=false;#executionJournal;
   static async open({keyStore,authorizationStore}) {
     assertWindowsProtectedStore(keyStore,'BURN_SIGNER','native-burn-key');
     assertWindowsProtectedStore(authorizationStore,'BURN_SIGNER','native-burn-authorizations');
@@ -32,6 +34,7 @@ export class ProtectedNativeBurnSigner {
     }catch(error){await instance.close();throw error;}
   }
   get publicKeyHex(){return this.#publicKey;}
+  bindExecutionJournal(journal){requireProtectedBurnJournal(journal);check(!this.#executionJournal||this.#executionJournal===journal,'BurnFundingJournalChanged');this.#executionJournal=journal;}
   #read(){
     check(!this.#closed,'BurnSignerClosed');this.#lease.assertHeld();
     const {revision,payload}=this.#authorizations.read();
@@ -58,6 +61,8 @@ export class ProtectedNativeBurnSigner {
     check(!this.#busy,'BurnSignerBusy');this.#busy=true;
     try{
       requireBurnDepositAdmission(admission,binding,plan);
+      if(this.#key.context.environment==='mainnet')check(this.#executionJournal,'BurnFundingJournalRequired');
+      if(this.#executionJournal)requireExecutionBurnCommitted(this.#executionJournal.read(),burnOperationId(binding));
       check(binding.burnPublicKey===this.#publicKey&&binding.nativeGenesis===this.#key.context.nativeGenesis&&binding.solanaDeployment===this.#key.context.solanaDeployment,'BurnSignerBindingChanged');
       let {revision,state}=this.#read();
       const operationId=burnOperationId(binding),planDigest=hash(plan);

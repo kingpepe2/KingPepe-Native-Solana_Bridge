@@ -7,6 +7,9 @@ import {encodeFinalizedBurnEvidence,burnOperationId as planOperationId,requireBu
 import {decodeCanonicalBridgeMessage} from '../../shared/protocol/canonical-message.mjs';
 import {validateBurnContext,assertBurnBindingContext,assertBurnMessageContext} from '../bridge-validator/burn-context.mjs';
 import {verifyBurnAttestationPair} from '../attesters/burn-attestation-codec.mjs';
+import {requireProtectedBurnJournal} from '../bridge-validator/protected-burn-journal.mjs';
+import {executionRecord,executionTotals} from '../bridge-validator/execution-funding-state.mjs';
+import {executionTransferMessage,executionRefundMemo,verifyExecutionSignedMessage} from '../bridge-validator/execution-funding-wire.mjs';
 import {associatedTokenDestination,base58Decode,base58Encode,shortvecEncode,
   prepareSignedLocalnetSolanaDepositClaimTransaction,prepareSignedLocalnetSolanaDepositReceiptTransaction,
   verifySignedLocalnetSolanaDepositClaimTransaction,verifySignedLocalnetSolanaDepositReceiptTransaction}
@@ -65,7 +68,7 @@ export function verifyBurnSolanaPacket(packet,context,binding,feePayerHex,attest
 const instances=new WeakSet();
 export function requireProtectedBurnSolanaSigner(v){check(instances.has(v),'ProtectedBurnSolanaSignerRequired');}
 export class ProtectedBurnSolanaSigner {
-  #store;#context;#public;#busy=false;#closed=false;
+  #store;#context;#public;#busy=false;#closed=false;#executionJournal;
   constructor({store,context,feePayerHex}) {
     assertWindowsProtectedStore(store,'FEE_PAYER','fee-payer-seed');this.#context=validateBurnContext(context);
     check(store.context.environment===context.environment&&store.context.nativeGenesis===context.deployment.nativeGenesis&&
@@ -75,12 +78,16 @@ export class ProtectedBurnSolanaSigner {
     check(this.#public===feePayerHex&&![context.deployment.burnPublicKey,...context.attesters].includes(feePayerHex),'BurnSolanaSignerRoleOverlap');instances.add(this);
   }
   get publicKeyHex(){return this.#public;}
+  bindExecutionJournal(journal){requireProtectedBurnJournal(journal);check(!this.#executionJournal||this.#executionJournal===journal,'SolanaFundingJournalChanged');this.#executionJournal=journal;}
   ready(){check(!this.#closed,'BurnSolanaSignerClosed');const {payload}=this.#store.read();try{check(payload.length===32,'BurnSolanaKeyUnavailable');}finally{payload.fill(0);}}
   async prepare({kind,binding,plan,nativeAdmission,finalizedBurn,attestation,recentBlockhash,lastValidBlockHeight}) {
     check(!this.#closed&&!this.#busy,'BurnSolanaSignerUnavailable');this.#busy=true;
     try{
       assertBurnBindingContext(binding,this.#context);check(['ATA','RECEIPT','CLAIM'].includes(kind),'BurnSolanaKindRejected');
-      if(kind==='ATA')requireBurnDepositAdmission(nativeAdmission,binding,plan);
+      if(kind==='ATA'){
+        if(finalizedBurn)requireFinalizedNativeBurn(finalizedBurn,binding,plan);
+        else requireBurnDepositAdmission(nativeAdmission,binding,plan);
+      }
       else {
         requireFinalizedNativeBurn(finalizedBurn,binding,plan);
         const m=decodeCanonicalBridgeMessage(h(attestation?.encodedMessageHex));assertBurnMessageContext(m,this.#context);
@@ -102,6 +109,22 @@ export class ProtectedBurnSolanaSigner {
       }finally{payload.fill(0);}
       const packet={kind,recentBlockhash,lastValidBlockHeight,messageDigestHex:kind==='ATA'?null:decodeCanonicalBridgeMessage(h(attestation.encodedMessageHex)).messageDigestHex,...signed};
       verifyBurnSolanaPacket(packet,this.#context,binding,this.#public,attestation);return packet;
+    }finally{this.#busy=false;}
+  }
+  prepareExecutionRefund({operationId,sequence,amountLamports,feeLamports,recentBlockhash,lastValidBlockHeight}){
+    check(!this.#closed&&!this.#busy&&this.#executionJournal,'ExecutionRefundSignerUnavailable');this.#busy=true;
+    try{
+      const state=this.#executionJournal.read(),r=executionRecord(state,operationId),op=state.operations.find(o=>o.operationId===operationId);
+      check(r?.closed&&sequence===r.refunds.length&&!r.refunds.some(x=>x.outcome==='UNRESOLVED')&&(!r.burnCommitted||op?.state==='COMPLETED'),'ExecutionRefundNotAuthorized');
+      check(BigInt(amountLamports)>0n&&BigInt(amountLamports)+BigInt(feeLamports)===executionTotals(r).available,'ExecutionRefundAmountChanged');
+      check(state.deliveryPolicy.feePayerHex===this.#public,'ExecutionRefundPayerChanged');
+      const destination=base58Encode(h(r.binding.destination)),source=base58Encode(h(this.#public));
+      const message=executionTransferMessage({source,destination,lamports:amountLamports,blockhash:recentBlockhash,memo:executionRefundMemo(operationId,sequence)});
+      const {payload}=this.#store.read();let signature;
+      try{signature=ed25519.sign(message,payload);}finally{payload.fill(0);}
+      const preparedTransactionBase64=Buffer.concat([Buffer.of(1),Buffer.from(signature),message]).toString('base64');
+      check(verifyExecutionSignedMessage(preparedTransactionBase64,message,source)===base58Encode(signature),'ExecutionRefundSignatureFailed');
+      return {operationId,sequence,amountLamports,feeLamports,destination,source,recentBlockhash,lastValidBlockHeight,signature:base58Encode(signature),preparedTransactionBase64};
     }finally{this.#busy=false;}
   }
   close(){this.#closed=true;this.#store.close();}

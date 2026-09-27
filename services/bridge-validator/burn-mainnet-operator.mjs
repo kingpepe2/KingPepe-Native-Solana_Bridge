@@ -10,13 +10,15 @@ import {burnRuntimeErrorCode} from './burn-runtime.mjs';
 import {requireBurn as check} from '../../native/burn/burn-protocol.mjs';
 
 export async function runMainnetBurnOperator(configurationFile,action,controlledFile){
-  check(['inspect','prepare-controlled','adopt-exact-received','enable-normal','pause','resume-reviewed'].includes(action),'BurnMainnetOperatorActionRejected');
+  check(['inspect','prepare-controlled','adopt-exact-received','enable-normal','pause','resume-reviewed','execution-funding-review','enable-user-funded-execution'].includes(action),'BurnMainnetOperatorActionRejected');
   const bindingRequired=['prepare-controlled','adopt-exact-received'].includes(action);
   check(bindingRequired===(controlledFile!==undefined),'BurnMainnetOperatorArgumentsRejected');
   const c=loadBurnServiceConfiguration(configurationFile,{mainnet:true}),service=await openBurnServiceRuntime(c.runtime);
   try{
     if(action==='pause'){await service.runtime.pause();return service.runtime.status();}
     await service.runtime.cycle({readOnly:true});
+    if(action==='execution-funding-review')return await service.runtime.reviewExecutionFunding();
+    if(action==='enable-user-funded-execution')return await service.runtime.activateUserFundedExecution();
     if(bindingRequired){
       const file=validateRuntimeFile(controlledFile);check(statSync(file).size<=1024,'BurnMainnetControlledFileLimit');
       let a;try{a=JSON.parse(readFileSync(file,'utf8'));}catch{throw Error('BurnMainnetControlledFileRejected');}

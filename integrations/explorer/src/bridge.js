@@ -1,0 +1,218 @@
+// Copyright (c) 2026 KingPepe Team. All Rights Reserved.
+// Forward public transport only. Economic decisions stay in the existing Bridge.
+import { applyCommonHeaders, clientIP, sendJson } from './security.js';
+import { validateSupply, createAccountingDisplay } from '../web/bridge-supply.js';
+import { assertPublicNetwork } from '../web/bridge-network.js';
+import {validateExecutionQuote} from '../web/bridge-execution.js';
+import {base58} from '../web/bridge-vendor/base.js';
+
+export const BRIDGE_PREFIX = '/api/v1/bridge';
+const ID = /^[0-9a-f]{64}$/u;
+const STATES = {
+  NativeToSolana: ['AWAITING_EXECUTION_FUNDING','DEPOSIT_ADDRESS_ISSUED', 'DEPOSIT_OBSERVED', 'DEPOSIT_FINALIZED', 'BURN_READY', 'BURN_BROADCAST', 'BURN_FINALIZED', 'ATTESTED', 'CLAIMED', 'MINTED', 'COMPLETED'],
+};
+const check = value => { if (!value) throw new Error('Rejected'); };
+const fields = (value, expected) => check(value && !Array.isArray(value) &&
+  Object.keys(value).sort().join() === expected.split(',').sort().join());
+const id = value => { check(typeof value === 'string' && ID.test(value)); return value; };
+const atomic = (value, zero = false) => {
+  check(typeof value === 'string' && /^(0|[1-9][0-9]{0,19})$/u.test(value));
+  check(BigInt(value) <= 0xffffffffffffffffn && (zero || BigInt(value) > 0n)); return value;
+};
+
+function publicStatus(value, validators) {
+  const n = validators.network;
+  check(n && value?.environment === n.environment && value.nativeNetwork === n.kingpepeNetwork && value.solanaNetwork === n.solanaNetwork &&
+    value.architecture === 'ONE_WAY_AUTOMATIC_BURN_AND_MINT' && value.walletChain === n.walletChain &&
+    value.nativeDepositConfirmations === 12 && value.nativeBurnConfirmations === 12 && value.bridgeFeeAtomic === '0' && ['ACTIVE','PAUSED','PENDING','STARTING','CONTROLLED'].includes(value.state));
+  validators.publicKey(validators.mint);
+  check(value.mint === validators.mint);
+  const result = { architecture: value.architecture, state: value.state === 'ACTIVE' ? 'ACTIVE' : 'PAUSED', kingpepeNetwork: n.kingpepeNetwork, solanaNetwork: n.solanaNetwork,
+    walletChain: n.walletChain, productionReady: value.productionReady, mainnetActivation: value.mainnetActivation,
+    decimals: value.decimals, symbol: value.symbol, mint: validators.mint, bridgeFeeAtomic: '0', nativeDepositConfirmations: 12, nativeBurnConfirmations: 12 };
+  assertPublicNetwork(result);
+  check(n.test || value.state !== 'ACTIVE' || n.activationAllowed === true);
+  // Current Core standard P2TR dust minimum: (43 + 67) bytes at 3000 atomic/kB.
+  // Informational only; the runtime determines the exact received amount.
+  const checkedSupply = validateSupply(value.supply, result);
+  // Display classification only. The runtime's state/activation/admission remain
+  // authoritative. Never publish private verification reasons or cache status.
+  const failed = [value, value.supply].some(v => v &&
+    (v.reconciliation != null && v.reconciliation !== 'MATCH' ||
+     v.burnMintConservation != null && v.burnMintConservation !== 'PASS'));
+  const verified = !failed && value.state === 'ACTIVE' && checkedSupply.state === 'READY';
+  const verifying = !failed && ['PENDING', 'CONTROLLED'].includes(value.state) &&
+    value.supply?.state === 'UNAVAILABLE' && value.supply.reason === 'ACCOUNTING_NOT_VERIFIED' && value.supply.environment === n.environment;
+  check(value.executionPolicy===undefined||['USER_FUNDED','LEGACY_OPERATOR_FUNDED'].includes(value.executionPolicy));
+  return { ...result,executionPolicy:value.executionPolicy??'LEGACY_OPERATOR_FUNDED',executionFundingReady:value.executionFundingReady===true, depositAmountModel: 'EXACT_RECEIVED', minimumDepositAtomic: '330',
+    accountingRefreshState: verified ? 'VERIFIED' : verifying ? 'VERIFYING' : 'UNAVAILABLE',
+    supply: verified ? checkedSupply : { state: 'UNAVAILABLE' } };
+}
+
+async function publicOperation(value, validators, expectedId) {
+  if (value === null) return null;
+  check(value && Object.hasOwn(STATES, value.direction) && STATES[value.direction].includes(value.state));
+  check(id(value.operationId) === expectedId); if(value.amountAtomic !== null) atomic(value.amountAtomic);
+  validators.publicKey(value.destination);
+  if(value.depositAddress===null)check(value.state==='AWAITING_EXECUTION_FUNDING'&&value.executionFunding?.policy==='USER_FUNDED'&&value.amountAtomic===null&&value.burnTxid===null&&value.solanaSignature===null);
+  else validators.nativeAddress(value.depositAddress); check(value.mint === validators.mint);
+  for(const key of ['depositTxid','burnTxid']) if(value[key] !== null) id(value[key]);
+  if(value.solanaSignature !== null) validators.signature(value.solanaSignature);
+  for(const key of ['depositConfirmations','burnConfirmations']) check(value[key] === null || Number.isSafeInteger(value[key]) && value[key] >= 0);
+  check(value.requiredDepositConfirmations === 12 && value.requiredBurnConfirmations === 12 && typeof value.retired === 'boolean');
+  if(value.burnAmountAtomic !== null) check(atomic(value.burnAmountAtomic) === value.amountAtomic);
+  const exceptions = ['LATE_DEPOSIT_TO_RETIRED_ADDRESS','MULTIPLE_DEPOSITS_REQUIRE_REVIEW','STRAY_DEPOSIT_AFTER_BURN','ACCEPTED_DEPOSIT_BASIS_CHANGED'];
+  check(value.exception === null || exceptions.includes(value.exception));
+  return { operationId: value.operationId, direction: value.direction, state: value.state,
+    amountAtomic: value.amountAtomic, destination: value.destination, depositAddress: value.depositAddress, mint: validators.mint,
+    depositTxid: value.depositTxid, burnTxid: value.burnTxid, burnAmountAtomic: value.burnAmountAtomic, solanaSignature: value.solanaSignature,
+    depositConfirmations: value.depositConfirmations, burnConfirmations: value.burnConfirmations,
+    requiredDepositConfirmations: 12, requiredBurnConfirmations: 12, exception: value.exception, retired: value.retired,
+    ...(value.executionFunding?{executionFunding:await publicFunding(value.executionFunding,value,validators)}:{}) };
+}
+async function publicFunding(f,op,validators){
+  if(f.policy==='LEGACY_OPERATOR_FUNDED'){check(f.status==='OPERATOR_FUNDED');return {policy:f.policy,status:f.status};}
+  check(f.policy==='USER_FUNDED'&&typeof f.status==='string'&&/^[A-Z_]{1,96}$/u.test(f.status)&&typeof f.burnCommitted==='boolean'&&typeof f.depositAddressIssued==='boolean');
+  check(f.depositAddressIssued===(op.depositAddress!==null));
+  const result={policy:f.policy,status:f.status,burnCommitted:f.burnCommitted,depositAddressIssued:f.depositAddressIssued};
+  for(const key of ['fundedLamports','actualCostLamports','refundedLamports','remainderLamports','operatorContributionLamports'])result[key]=atomic(f[key],true);
+  check(f.expiresAt===null||Number.isSafeInteger(f.expiresAt));result.expiresAt=f.expiresAt;
+  for(const key of ['paymentSignatures','refundSignatures']){check(Array.isArray(f[key])&&f[key].length<=32);f[key].forEach(validators.signature);result[key]=[...f[key]];}
+  if(f.quote)await validateExecutionQuote(f.quote,{base58,operationId:op.operationId,destination:op.destination,recipient:validators.executionRecipient,genesis:validators.executionGenesis});
+  result.quote=f.quote?structuredClone(f.quote):null;return result;
+}
+
+function publicBalance(value, validators, network, address) {
+  check(value?.address === address);
+  if (network === 'native') {
+    check(value.network === validators.network.kingpepeNetwork && value.decimals === 8 && value.kind === 'CONFIRMED_UTXO');
+    return { address, network: validators.network.kingpepeNetwork, decimals: 8, amountAtomic: atomic(value.amountAtomic, true), kind: 'CONFIRMED_UTXO' };
+  }
+  check(value.chain === validators.network.walletChain && value.mint === validators.mint && value.decimals === 8 && value.commitment === 'finalized');
+  check(Array.isArray(value.tokenAccounts) && value.tokenAccounts.length <= 16);
+  let total = 0n;
+  const tokenAccounts = value.tokenAccounts.map(a => {
+    validators.publicKey(a.address); atomic(a.amountAtomic, true); total += BigInt(a.amountAtomic);
+    return { address: a.address, amountAtomic: a.amountAtomic };
+  });
+  check(new Set(tokenAccounts.map(a => a.address)).size === tokenAccounts.length && total.toString() === atomic(value.kpepeAtomic, true));
+  return { address, chain: validators.network.walletChain, mint: validators.mint, decimals: 8, solLamports: atomic(value.solLamports, true),
+    kpepeAtomic: value.kpepeAtomic, tokenAccounts, commitment: 'finalized' };
+}
+
+function operationInput(value, validators) {
+  fields(value, 'clientNonce,destination,walletChain');
+  validators.publicKey(value.destination); id(value.clientNonce);
+  check(value.clientNonce !== '0'.repeat(64) && value.walletChain === validators.network.walletChain);
+  return value;
+}
+
+async function readBody(req, timeoutMs) {
+  check(/^application\/json(?:;\s*charset=utf-8)?$/iu.test(req.headers['content-type'] ?? ''));
+  check(!req.headers['content-encoding']);
+  if (req.headers['content-length']) check(/^\d{1,5}$/u.test(req.headers['content-length']) && Number(req.headers['content-length']) <= 4096);
+  const timer = setTimeout(() => req.destroy(), timeoutMs);
+  try {
+    let size = 0; const chunks = [];
+    for await (const chunk of req) { size += chunk.length; check(size <= 4096); chunks.push(chunk); }
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks)));
+  } finally { clearTimeout(timer); }
+}
+
+export function createBridgeGateway({ backend = async () => null, approvedOrigin = 'https://kingpepe.net',
+  timeoutMs = 10000, now = Date.now, mutationLimit = 8, readLimit = 90 } = {}) {
+  const origin = new URL(approvedOrigin);
+  check(origin.origin === approvedOrigin && !origin.username && !origin.password &&
+    (origin.protocol === 'https:' || origin.protocol === 'http:' && origin.hostname === '127.0.0.1'));
+  const buckets = new Map(); let active = 0;
+  // Shared, bounded display memory for a page opened during a refresh hold.
+  // Never use it for operation admission, balances, or the runtime ACTIVE state.
+  const accountingDisplay = createAccountingDisplay({now});
+  function limited(req) {
+    const time = now(), ip = clientIP(req);
+    for (const [key, bucket] of buckets) if (time - bucket.start >= 60000) buckets.delete(key);
+    const key = ip + ':' + (req.method === 'POST' ? 'write' : 'read');
+    let bucket = buckets.get(key);
+    if (!bucket) { if (buckets.size >= 4096) return true; bucket = { start: time, count: 0 }; buckets.set(key, bucket); }
+    return ++bucket.count > (req.method === 'POST' ? mutationLimit : readLimit);
+  }
+  return async (req, res, url) => {
+    applyCommonHeaders(req, res);
+    res.removeHeader('Access-Control-Allow-Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+    const reply = (code, value) => { if (!res.destroyed && !res.writableEnded) sendJson(res, code, value); };
+    const failure = (code, message) => reply(code, { error: true, message });
+    if (req.headers.origin === approvedOrigin) { res.setHeader('Access-Control-Allow-Origin', approvedOrigin); res.setHeader('Vary', 'Origin'); }
+    if (req.headers.origin && req.headers.origin !== approvedOrigin ||
+        ['POST', 'OPTIONS'].includes(req.method) && (req.headers.origin !== approvedOrigin || req.headers['sec-fetch-site'] === 'cross-site'))
+      return failure(403, 'Origin not allowed.');
+    if (limited(req)) { res.setHeader('Retry-After', '60'); return failure(429, 'Please wait before trying again.'); }
+    const route = url.pathname.slice(BRIDGE_PREFIX.length);
+    const operation = /^\/operations\/([0-9a-f]{64})$/u.exec(route);
+    const balance = /^\/balances\/(solana|native)\/([a-zA-Z0-9]{32,90})$/u.exec(route);
+    const funding=/^\/operations\/([0-9a-f]{64})\/(execution-quote|execution-payment)$/u.exec(route);
+    const mutation = route === '/operations'||!!funding;
+    if (url.search || !(route === '/status' || operation || mutation || balance)) return failure(404, 'Not found.');
+    if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+    if (req.method !== (mutation ? 'POST' : 'GET')) return failure(405, 'Method not allowed.');
+    if (active >= 4) return failure(429, 'Bridge is busy. Please wait.');
+    active++;
+    const accountingRequest = route === '/status' ? accountingDisplay.begin() : null;
+    let timer, task;
+    try {
+      const input = mutation ? await readBody(req, Math.min(timeoutMs, 5000)) : undefined;
+      const connection = await backend();
+      if (!connection) { if(accountingRequest)accountingDisplay.failure(accountingRequest);return failure(503, 'Bridge temporarily unavailable.'); }
+      if (connection.activationPending === true) {
+        if(accountingRequest)accountingDisplay.failure(accountingRequest);
+        // Block every operation/address/balance path, including old saved TEST
+        // operations. This backend has no signing or operation capability.
+        if (route !== '/status') return reply(503, { error: true, code: 'ACTIVATION_PENDING',
+          message: 'Bridge activation pending. No deposits are being accepted yet.' });
+        return reply(200, await connection.getPublicStatus());
+      }
+      const { client, validators } = connection;
+      if (balance) (balance[1] === 'solana' ? validators.publicKey : validators.nativeAddress)(balance[2]);
+      if (mutation&&!funding) operationInput(input, validators);
+      if(funding){fields(input,funding[2]==='execution-quote'?'':'signature');if(funding[2]==='execution-payment')validators.signature(input.signature);}
+      // Recheck the authenticated deployment for EVERY request, including mutations.
+      // Never infer network admission from a browser field or cached ACTIVE badge.
+      const work = async () => {
+        const status = publicStatus(await client.getBridgeStatus(), validators);
+        if (route === '/status') {
+          const display = accountingDisplay.receive(accountingRequest,status,status);
+          return status.accountingRefreshState === 'VERIFYING' && display.state === 'STALE' ?
+            {...status,lastVerifiedSupply:display.supply} : status;
+        }
+        if (operation) return publicOperation(await client.getOperationStatus(operation[1]), validators, operation[1]);
+        if (balance) {
+          const address = balance[1] === 'native' ? balance[2].toLowerCase() : balance[2];
+          return publicBalance(await client[balance[1] === 'solana' ? 'getSolanaBalance' : 'getNativeBalance'](address), validators, balance[1], address);
+        }
+        if(funding&&funding[2]==='execution-payment')return publicOperation(await client.verifyExecutionPayment(funding[1],input),validators,funding[1]);
+        if (status.state !== 'ACTIVE') { const error = new Error('Paused'); error.paused = true; throw error; }
+        if(funding)return publicOperation(await client.refreshExecutionQuote(funding[1],input),validators,funding[1]);
+        // Recover an already persisted request through the read path. A retry
+        // need not wait behind the private controller's current economic cycle.
+        // Derive the identity server-side; never accept a browser operation ID.
+        const existing = await client.getOperationStatus(validators.operationId(input));
+        const created = existing ?? await client.createOperation(input);
+        validators.operationBinding(created, input);
+        return publicOperation(created, validators, created.operationId);
+      };
+      task = work();
+      const result = await Promise.race([task, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Unavailable')), timeoutMs); })]);
+      reply(result === null ? 404 : 200, result ?? { error: true, message: 'Operation not yet observed.' });
+    } catch (error) {
+      if(accountingRequest)accountingDisplay.failure(accountingRequest);
+      failure(error.paused ? 409 : 400, error.paused ? 'Bridge paused. Operation tracking remains available.' :
+        'Request rejected or service unavailable. Check the operation before retrying.');
+    } finally {
+      clearTimeout(timer);
+      // A timed-out upstream mutation remains in flight; keep its slot occupied.
+      if (task) void task.finally(() => { active--; }).catch(() => {}); else active--;
+    }
+  };
+}

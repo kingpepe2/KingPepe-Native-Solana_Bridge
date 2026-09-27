@@ -35,6 +35,7 @@ export class BurnUserApi {
     const s=this.#runtime.status();return {architecture:s.architecture,state:s.state==='HEALTHY'?(s.environment==='mainnet'&&!s.productionReady?'CONTROLLED':'ACTIVE'):s.state,environment:s.environment,nativeNetwork:s.nativeNetwork,
       solanaNetwork:s.solanaNetwork,walletChain:`solana:${s.environment}`,mint:base58Encode(Buffer.from(s.mintHex,'hex')),
       nativeDepositConfirmations:12,nativeBurnConfirmations:12,decimals:8,symbol:'KPEPE',bridgeFeeAtomic:'0',supply:publicBurnSupply(s),
+      executionPolicy:s.executionPolicy,executionFundingReady:s.executionFundingReady,
       productionReady:s.productionReady===true,mainnetActivation:s.mainnetActivation==='ENABLED'?'ENABLED':'DISABLED'};
   }
   async createOperation(input){
@@ -45,6 +46,8 @@ export class BurnUserApi {
     const op=await this.#runtime.createOperation({destinationHex:bytes.toString('hex'),nonce:input.clientNonce});return publicOperation(op);
   }
   getOperationStatus(id){try{return publicOperation(this.#runtime.operation(id));}catch(error){if(error.message==='BurnJournalOperationUnknown')return null;throw error;}}
+  async refreshExecutionQuote(id,input){check(input&&Object.keys(input).length===0,'BurnUserFieldsRejected');return publicOperation(await this.#runtime.refreshExecutionQuote(id));}
+  async verifyExecutionPayment(id,input){check(input&&Object.keys(input).join()==='signature'&&typeof input.signature==='string'&&base58Decode(input.signature).length===64,'BurnUserPaymentRejected');return publicOperation(await this.#runtime.verifyExecutionPayment(id,input.signature));}
   getPublicBalance(network,address){check(this.#balances,'BurnPublicBalanceUnavailable');return this.#balances.read(network,address);}
 }
 function publicOperation(op){

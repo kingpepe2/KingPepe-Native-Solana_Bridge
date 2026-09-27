@@ -4,6 +4,8 @@ The official [Bridge](https://kingpepe.net/bridge) displays **MAINNET**, **ONE W
 
 Deployment and controlled activation have completed. Connect a compatible Solana wallet to receive a unique Native deposit address after the live availability checks pass. The destination is bound before the address is issued and cannot be redirected by changing wallets. The Bridge is one way, with exact 1:1 Burn → Mint accounting, zero Bridge fee and 12 Native deposit confirmations.
 
+The live status field `executionPolicy` determines whether new operations require a separate SOL execution prepayment. Under `USER_FUNDED`, the connected destination wallet approves the quoted payment before a Native deposit address is issued. This does not change the zero KPEPE Bridge fee or existing operations. The user-facing quote and refund policy are described in [User access](../user-access.md). Publication of code does not itself activate the new policy.
+
 ## Public status API
 
 [`GET /api/v1/bridge/status`](https://kingpepe.net/api/v1/bridge/status) reports the current network, official Mint, amount model, minimum deposit, confirmation requirements, fee and availability. An available production response has `state: ACTIVE`, `productionReady: true` and `mainnetActivation: ENABLED`. `EXACT_RECEIVED` means the operation uses the actual confirmed Native amount; network fees never reduce that amount. The only economic maximum is the global **21,000,000 KPEPE** invariant. Use the technical minimum reported by the live Bridge.

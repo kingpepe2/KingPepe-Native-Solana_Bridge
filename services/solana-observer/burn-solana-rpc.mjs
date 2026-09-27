@@ -7,7 +7,7 @@ import {base58Decode} from '../bridge-validator/solana-deposit-claim-transaction
 import {requireBurn as check} from '../../native/burn/burn-protocol.mjs';
 import {assertWindowsProtectedStore} from '../../shared/windows/protected-store.mjs';
 const METHODS=new Set(['getGenesisHash','getHealth','getMultipleAccounts','getAccountInfo','getLatestBlockhash','getBlockHeight',
-  'getMinimumBalanceForRentExemption','getSignatureStatuses','getTransaction','getBalance','getTokenAccountsByOwner','getFeeForMessage','getSlot','getBlockTime','sendTransaction']);
+  'getMinimumBalanceForRentExemption','getSignatureStatuses','getSignaturesForAddress','getTransaction','getBalance','getTokenAccountsByOwner','getFeeForMessage','getSlot','getBlockTime','sendTransaction']);
 export class BurnSolanaRpc {
   #endpoint;#genesis;#id=0;
   constructor({environment,endpoint,expectedGenesis}) {

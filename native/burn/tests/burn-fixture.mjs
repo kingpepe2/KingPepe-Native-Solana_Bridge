@@ -44,6 +44,6 @@ export function burnFixture({mainnet=false,amountAtomic='100000'}={}) {
     return {encodedMessageHex:hex(bytes),attestations:attesters.map((seed,i)=>({protocol:ATTESTATION_PROTOCOL,mode:ATTESTATION_MODE,role:['ATTESTER_A','ATTESTER_B'][i],keyEpoch:1,policyEpoch:1,
       attesterPublicKeyHex:pub(seed),messageDigestHex:m.messageDigestHex,operationIdHex:burnOperationId(binding),signedBytes:BURN_SIGNED_BYTES,signatureHex:hex(ed25519.sign(bytes,seed)),state:'VERIFIED_READY'}))};
   };
-  return {manifest,snapshot,policy,context,binding,state,id,plan,evidence,deposit,payer,root,attesters,finalize,authorize,
+  return {manifest,snapshot,policy,context,binding,state,id,plan,evidence,deposit,payer,wallet,root,attesters,finalize,authorize,
     destroy:()=>[root,payer,wallet,...attesters].forEach(k=>k.fill(0))};
 }

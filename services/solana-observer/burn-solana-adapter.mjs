@@ -10,6 +10,8 @@ import {verifyDepositMintExecution} from './deposit-mint-execution.mjs';
 import {burnOperationId,burnHash,burnUint,requireBurn as check} from '../../native/burn/burn-protocol.mjs';
 import {MAX_KPEPE_SUPPLY_ATOMIC} from '../../shared/monetary-supply.mjs';
 import {associatedTokenCreationMessage,verifyBurnSolanaPacket} from '../relayer/burn-solana-signer.mjs';
+import {executionBudget} from '../bridge-validator/execution-funding-state.mjs';
+import {executionFeeMessages,verifyExecutionPayment,executionTransferMessage,executionRefundMemo,verifyExecutionSignedMessage} from '../bridge-validator/execution-funding-wire.mjs';
 const h=s=>Buffer.from(s,'hex'),hex=b=>Buffer.from(b).toString('hex'),TOKEN='TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 const hash=b=>createHash('sha256').update(b).digest('hex');
 export function validateBurnSolanaPolicy(input) {
@@ -152,7 +154,7 @@ export class BurnSolanaAdapter {
     verifyBurnSolanaPacket(packet,this.#policy.context,binding,this.#policy.feePayerHex,attestation);
     const status=await this.#rpc.signatureStatus(packet.signature),observed=await this.observe(binding,plan,attestation);
     const exists=packet.kind==='ATA'?observed.ataExists:packet.kind==='RECEIPT'?observed.receiptExists:observed.claimExists;
-    if(status?.confirmationStatus==='finalized')check(status.err!==null||exists,'BURN_SOLANA_FINALIZED_ACCOUNT_MISSING');
+    if(status?.confirmationStatus==='finalized')check(status.err!==null||exists||packet.kind==='ATA','BURN_SOLANA_FINALIZED_ACCOUNT_MISSING');
     return {status,observed,exists,expired:!exists&&status===null&&await this.#rpc.finalizedHeight()>BigInt(packet.lastValidBlockHeight)};
   }
   async send(packet,binding,attestation) {
@@ -171,5 +173,82 @@ export class BurnSolanaAdapter {
       solanaDeployment:op.binding.solanaDeployment,managerProgramIdHex:op.binding.bridgeProgram,transceiverProgramIdHex:op.binding.transceiverProgram,mintHex:op.binding.mint,nativeDecimals:8});
     return {operationId:op.operationId,amountAtomic:proof.amountAtomic,destination:op.binding.destination,mint:op.binding.mint,
       signature:packet.signature,slot:String(actual.slot),commitment:'finalized'};
+  }
+  async executionEstimate(binding){
+    assertBurnBindingContext(binding,this.#policy.context);
+    const payer=base58Encode(h(this.#policy.feePayerHex)),destination=base58Encode(h(binding.destination));
+    const ata=burnSolanaAddresses(binding).destinationToken;
+    const snapshot=await this.#rpc.snapshot([payer,ata],this.#minimumSlot);this.#minimumSlot=String(snapshot.slot);
+    const payerAccount=snapshot.accounts[0];accountBytes(payerAccount,'11111111111111111111111111111111',0);
+    const token=initializedOperationAccount(snapshot.accounts[1]);
+    if(token){const data=accountBytes(token,TOKEN,165);check(hex(data.subarray(0,32))===binding.mint&&hex(data.subarray(32,64))===binding.destination&&data[108]===1&&data.readUInt32LE(109)===0,'BURN_SOLANA_DESTINATION_MISMATCH');}
+    const recent=await this.#rpc.latestBlockhash(),templates=executionFeeMessages({payer,recipient:destination,blockhash:recent.recentBlockhash});
+    const rents={},fees={};
+    const readings=await Promise.all([...[0,73,165,211,240].map(async size=>{const n=await this.#rpc.call('getMinimumBalanceForRentExemption',[size,{commitment:'finalized'}]);check(Number.isSafeInteger(n)&&n>0,'BURN_SOLANA_RENT_QUOTE_UNAVAILABLE');rents[size]=String(n);}),
+      ...Object.entries(templates).map(async([key,message])=>{const q=await this.#rpc.call('getFeeForMessage',[message.toString('base64'),{commitment:'finalized'}]);check(Number.isSafeInteger(q?.value)&&q.value>0,'BURN_SOLANA_FEE_QUOTE_UNAVAILABLE');fees[key]=String(q.value);})]);
+    void readings;fees.payment=fees.single;fees.refund=fees.single;
+    return {budget:executionBudget({rents,fees,ataExists:!!token}),recipient:payer,destination,genesis:this.#policy.manifest.solanaGenesis,createdSlot:snapshot.slot,balanceLamports:String(payerAccount.lamports),...recent};
+  }
+  async executionBalance(){
+    const r=await this.#rpc.call('getBalance',[base58Encode(h(this.#policy.feePayerHex)),{commitment:'finalized',minContextSlot:Number(this.#minimumSlot)}]);
+    check(Number.isSafeInteger(r?.value)&&r.value>=0&&Number.isSafeInteger(r.context?.slot)&&r.context.slot>=Number(this.#minimumSlot),'BURN_SOLANA_BALANCE_UNAVAILABLE');
+    this.#minimumSlot=String(r.context.slot);return String(r.value);
+  }
+  get executionSlot(){return Number(this.#minimumSlot);}
+  executionHeight(){return this.#rpc.finalizedHeight();}
+  async executionTransaction(signature){
+    check(base58Decode(signature).length===64,'ExecutionSignatureRejected');
+    return this.#rpc.call('getTransaction',[signature,{encoding:'base64',commitment:'finalized',maxSupportedTransactionVersion:0}]);
+  }
+  async executionUnknownDebit(signature){
+    check(base58Decode(signature).length===64,'ExecutionSignatureRejected');
+    const tx=await this.#rpc.call('getTransaction',[signature,{encoding:'json',commitment:'finalized',maxSupportedTransactionVersion:0}]);
+    check(tx&&tx.meta&&Array.isArray(tx.transaction?.message?.accountKeys),'EXECUTION_PAYMENT_SCAN_INCOMPLETE');
+    const keys=[...tx.transaction.message.accountKeys,...(tx.meta.loadedAddresses?.writable??[]),...(tx.meta.loadedAddresses?.readonly??[])];
+    const i=keys.indexOf(base58Encode(h(this.#policy.feePayerHex)));if(i<0)return false;
+    check(Number.isSafeInteger(tx.meta.preBalances[i])&&Number.isSafeInteger(tx.meta.postBalances[i]),'ExecutionBalanceRejected');
+    return tx.meta.preBalances[i]>tx.meta.postBalances[i];
+  }
+  async executionPayment(quote,signature){
+    check(quote.recipient===base58Encode(h(this.#policy.feePayerHex))&&quote.genesis===this.#policy.manifest.solanaGenesis,'ExecutionPaymentPolicyChanged');
+    const transaction=await this.executionTransaction(signature);if(!transaction)return null;
+    return verifyExecutionPayment({quote,signature,transaction});
+  }
+  async executionCost(op,packet){
+    verifyBurnSolanaPacket(packet,this.#policy.context,op.binding,this.#policy.feePayerHex,packet.kind==='ATA'?null:
+      [...op.priorAttestations,op.attestation].filter(Boolean).find(a=>decodeCanonicalBridgeMessage(h(a.encodedMessageHex)).messageDigestHex===packet.messageDigestHex));
+    const tx=await this.executionTransaction(packet.signature);if(!tx)return null;
+    check(Array.isArray(tx.transaction)&&tx.transaction[0]===packet.preparedTransactionBase64&&Number.isSafeInteger(tx.meta?.fee),'ExecutionCostPacketChanged');
+    const debit=tx.meta.preBalances[0]-tx.meta.postBalances[0];
+    check(Number.isSafeInteger(debit)&&debit>=tx.meta.fee&&(tx.meta.err===null||debit===tx.meta.fee),'ExecutionCostRejected');
+    return {signature:packet.signature,lamports:String(debit),networkFeeLamports:String(tx.meta.fee),slot:tx.slot};
+  }
+  async executionHistory(anchor,{latestOnly=false}={}){
+    const payer=base58Encode(h(this.#policy.feePayerHex));let before;const rows=[];
+    for(let page=0;page<10;page++){
+      const result=await this.#rpc.call('getSignaturesForAddress',[payer,{commitment:'finalized',limit:latestOnly?1:100,...(before?{before}:{})}]);
+      check(Array.isArray(result),'ExecutionHistoryRejected');
+      for(const row of result){if(row.signature===anchor)return rows;if(base58Decode(row.signature).length!==64||!Number.isSafeInteger(row.slot))throw Error('ExecutionHistoryRejected');rows.push(row);}
+      if(latestOnly||result.length<100){check(anchor===null||latestOnly,'EXECUTION_PAYMENT_SCAN_INCOMPLETE');return rows;}
+      before=result.at(-1).signature;
+    }
+    throw Error('EXECUTION_PAYMENT_SCAN_INCOMPLETE');
+  }
+  async executionRefundStatus(row){
+    const source=base58Encode(h(this.#policy.feePayerHex));check(row.source===source,'ExecutionRefundPayerChanged');
+    const message=executionTransferMessage({source,destination:row.destination,lamports:row.amountLamports,blockhash:row.recentBlockhash,memo:executionRefundMemo(row.operationId,row.sequence)});
+    check(verifyExecutionSignedMessage(row.preparedTransactionBase64,message,source)===row.signature,'ExecutionRefundPacketChanged');
+    const status=await this.#rpc.signatureStatus(row.signature);
+    if(status?.confirmationStatus==='finalized'){
+      const tx=await this.executionTransaction(row.signature);check(tx&&tx.transaction[0]===row.preparedTransactionBase64&&Number.isSafeInteger(tx.meta.fee),'ExecutionRefundProofUnavailable');
+      return {outcome:tx.meta.err===null?'FINALIZED':'FINALIZED_FAILED',actualFeeLamports:String(tx.meta.fee)};
+    }
+    if(status===null&&await this.#rpc.finalizedHeight()>BigInt(row.lastValidBlockHeight))return {outcome:'EXPIRED_UNSEEN',actualFeeLamports:null};
+    return null;
+  }
+  async sendExecutionRefund(row){
+    // Exact packet revalidation precedes every broadcast. No arbitrary transfer API.
+    const state=await this.executionRefundStatus(row);check(state===null,'ExecutionRefundAlreadyResolved');
+    const sig=await this.#rpc.send(row.preparedTransactionBase64);check(sig===row.signature,'ExecutionRefundSignatureChanged');return sig;
   }
 }

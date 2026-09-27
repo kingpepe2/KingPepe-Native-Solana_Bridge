@@ -22,14 +22,16 @@ Name: **KingPepe**. Symbol: **KPEPE**. Standard SPL Token, **8 decimals**, no fr
 ## How the Bridge works
 
 1. Connect Phantom or a compatible Solana Wallet Standard wallet.
-2. Receive a unique KingPepe Native deposit address bound to that Solana wallet.
+2. If the live Bridge requires user-funded execution, review the SOL cost and approve Pay & Continue in your connected wallet. After finalized payment verification, receive a unique KingPepe Native deposit address bound to that wallet.
 3. Send Native KPEPE to the issued address.
 4. Wait for **12 Native deposit confirmations**.
 5. The Bridge automatically burns the Native amount irreversibly.
 6. After verified Native burn finality, the exact corresponding amount is minted on Solana.
 7. The KPEPE arrives in the originally bound Solana wallet, and the operation completes after verification.
 
-There is no separate “Approve to Bridge” step. **Bridge fee: 0.** The Bridge does not reduce the user's deposited amount. Network transaction fees are separate from the bridged amount.
+**KPEPE Bridge fee: 0 KPEPE.** The Bridge does not reduce the user's deposited amount. When the live policy is `USER_FUNDED`, new operations require a separate SOL execution payment before address issuance. The quote reflects account rent, network fees, a retry allowance and the refund network cost; Phantom's payment fee is shown separately. Existing operations keep their original operator-funded treatment.
+
+Unused SOL allowance is returned to the bound wallet after completion. A payment with no Native deposit expires after 24 hours and is refunded after verification, less the refund network cost. A remainder smaller than its refund network cost remains recorded as refundable, rather than being treated as a charge. Spent account rent is not refundable through this flow. A signed Native burn remains the Bridge's completion obligation; it never requires another user payment to finish minting.
 
 **A successful Native burn is irreversible.** No Solana → Native redemption is offered. Disconnecting or changing wallets does not redirect an existing operation. Deposit addresses are single-use; do not send another transfer to a completed operation's address. The Bridge never asks for a wallet's private credentials.
 

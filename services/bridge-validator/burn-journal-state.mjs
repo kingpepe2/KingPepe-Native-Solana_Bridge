@@ -10,6 +10,7 @@ import {validateBurnContext,assertBurnMessageContext} from './burn-context.mjs';
 import {verifyBurnAttestationPair} from '../attesters/burn-attestation-codec.mjs';
 import {verifyBurnSolanaPacket} from '../relayer/burn-solana-signer.mjs';
 import {initialMainnetLifecycle,validateMainnetLifecycle} from './burn-mainnet-lifecycle.mjs';
+import {validateExecutionState,requireExecutionAddressFunding,requireExecutionBurnCommitted} from './execution-funding-state.mjs';
 
 export const BURN_JOURNAL_PROTOCOL = 'KINGPEPE_AUTOMATIC_BURN_JOURNAL_V1';
 export const BURN_STATES = Object.freeze(['DEPOSIT_ADDRESS_ISSUED','DEPOSIT_OBSERVED','DEPOSIT_FINALIZED','BURN_READY','BURN_BROADCAST','BURN_FINALIZED','ATTESTED','CLAIMED','MINTED','COMPLETED']);
@@ -33,6 +34,7 @@ export function issueBurnDeposit(state,binding,createdHeight) {
   check(!state.paused,'BurnJournalPaused');
   const operationId = burnOperationId(binding), known = state.operations.find(op=>op.operationId===operationId);
   if (known) { check(sameBinding(known.binding,binding),'BurnJournalDestinationChanged'); return structuredClone(known); }
+  requireExecutionAddressFunding(state,operationId);
   const deposit = burnDepositDestination(binding);
   check(!state.operations.some(op=>op.depositAddress===deposit.address),'BurnJournalAddressReused');
   // Storage admission only; no monetary/per-transfer limit is imposed.
@@ -101,6 +103,7 @@ export function retainBurnPlan(state,id,plan) {
 }
 export function retainSignedBurn(state,id,signed) {
   const op=burnJournalRecord(state,id);
+  requireExecutionBurnCommitted(state,id);
   check(!state.paused&&!op.exception&&op.plan,'BurnJournalAdmissionStopped');
   if(op.signedBurnHex!==null) { check(op.signedBurnHex===signed,'BurnJournalSecondBurnRejected');return; }
   check(parseNativeTransactionHex(signed).strippedHex===op.plan.unsignedTransactionHex,'BurnJournalSignedBurnChanged');
@@ -108,6 +111,7 @@ export function retainSignedBurn(state,id,signed) {
   op.signedBurnHex=signed;
 }
 export function markBurnBroadcast(state,id,accepted=false) {
+  requireExecutionBurnCommitted(state,id);
   check(typeof accepted==='boolean','BurnJournalBroadcastFlagRejected');
   const op=burnJournalRecord(state,id); check(op.signedBurnHex!==null,'BurnJournalPersistSignedBurnFirst');
   if(!op.broadcastAttempted) check(!state.paused&&!op.exception,'BurnJournalAdmissionStopped');
@@ -156,14 +160,15 @@ export function burnPacketAttestation(op,packet) {
 }
 export function retainBurnSolanaPacket(state,id,packet) {
   const op=burnJournalRecord(state,id);check(!state.paused&&state.deliveryPolicy,'BurnJournalAdmissionStopped');
-  check(packet.kind==='ATA' ? op.plan&&!op.broadcastAttempted : op.burnEvidence&&op.attestation,'BurnJournalPacketNotAuthorized');
+  check(packet.kind==='ATA' ? op.plan&&(!op.broadcastAttempted||op.burnEvidence) : op.burnEvidence&&op.attestation,'BurnJournalPacketNotAuthorized');
   verifyBurnSolanaPacket(packet,state.deliveryPolicy.context,op.binding,state.deliveryPolicy.feePayerHex,op.attestation);
   op.solanaPacket??=[];
   const known=op.solanaPacket.find(p=>p.packet.signature===packet.signature);
   if(known){check(same(known.packet,packet),'BurnJournalPacketChanged');return;}
   const history=op.solanaPacket.filter(p=>p.packet.kind===packet.kind),last=history.at(-1);
   const newReceipt=last&&packet.kind==='RECEIPT'&&last.packet.messageDigestHex!==packet.messageDigestHex&&last.outcome==='FINALIZED';
-  check(history.length<8&&(!last||newReceipt||['EXPIRED_UNSEEN','FINALIZED_FAILED'].includes(last.outcome)),'BurnJournalAmbiguousSolanaPacket');
+  const repairAta=last&&packet.kind==='ATA'&&last.outcome==='FINALIZED';
+  check(history.length<8&&(!last||newReceipt||repairAta||['EXPIRED_UNSEEN','FINALIZED_FAILED'].includes(last.outcome)),'BurnJournalAmbiguousSolanaPacket');
   if(last)check(BigInt(packet.lastValidBlockHeight)>BigInt(last.packet.lastValidBlockHeight)&&packet.recentBlockhash!==last.packet.recentBlockhash,'BurnJournalPacketExpiryNotAdvanced');
   op.solanaPacket.push({packet:structuredClone(packet),outcome:'UNRESOLVED',sendAttempts:0,observedSlot:'0'});
 }
@@ -211,7 +216,9 @@ export function reconcileBurnAccounting(state,{finalizedNativeBurnAtomic,bridgeI
 
 export function validateBurnJournalState(input) {
   const mainnet=input?.deployment?.nativeGenesis===NATIVE_MAINNET_GENESIS;
-  check(input&&Object.keys(input).sort().join()===(mainnet?'deliveryPolicy,deployment,mainnetControl,nativeScan,operations,pauseReason,paused,protocol':'deliveryPolicy,deployment,nativeScan,operations,pauseReason,paused,protocol'),'BurnJournalFieldsRejected');
+  const keys=(mainnet?'deliveryPolicy,deployment,mainnetControl,nativeScan,operations,pauseReason,paused,protocol':'deliveryPolicy,deployment,nativeScan,operations,pauseReason,paused,protocol').split(',');
+  if(Object.hasOwn(input??{},'execution'))keys.push('execution');
+  check(input&&Object.keys(input).sort().join()===keys.sort().join(),'BurnJournalFieldsRejected');
   check(input.protocol===BURN_JOURNAL_PROTOCOL&&typeof input.paused==='boolean'&&typeof input.pauseReason==='string'&&
     /^[A-Z0-9_]{1,96}$/u.test(input.pauseReason),'BurnJournalVersionRejected');
   check(Array.isArray(input.operations)&&input.operations.length<=512,'BurnJournalStorageCapacity');
@@ -277,6 +284,8 @@ export function validateBurnJournalState(input) {
   }
   reconstructed.paused=input.paused;reconstructed.pauseReason=input.pauseReason;
   if(mainnet){reconstructed.mainnetControl=structuredClone(input.mainnetControl);validateMainnetLifecycle(reconstructed);}
+  if(input.execution){reconstructed.execution=structuredClone(input.execution);validateExecutionState(reconstructed);}
+  else check(!Object.hasOwn(input,'execution'),'ExecutionJournalRequired');
   burnJournalAccounting(reconstructed);
   return structuredClone(reconstructed);
 }

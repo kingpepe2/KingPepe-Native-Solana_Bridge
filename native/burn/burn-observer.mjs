@@ -29,6 +29,12 @@ export class NativeBurnObserver {
     validateNativeBurnNetwork(c,(await this.#rpc.call('getblockhash',[0])).result,this.#identity.environment);
     return {height:c.blocks,hash:burnHash(c.bestblockhash)};
   }
+  async addressWatchCursor(cursor,createdHeight){
+    check(Number.isSafeInteger(createdHeight)&&createdHeight>0,'BurnObserverWatchHeightRejected');
+    if(!cursor||cursor.height<createdHeight)return cursor;
+    const height=createdHeight-1,hash=burnHash((await this.#rpc.call('getblockhash',[height])).result);
+    return {height,hash,recent:[{height,hash}]};
+  }
   async discover(state) {
     const tip=await this.network();if(state.operations.length===0)return {tip,cursor:state.nativeScan,observations:[],caughtUp:true};
     const observations=new Map(state.operations.map(op=>[op.operationId,new Map()]));

@@ -1,0 +1,18 @@
+[
+  {
+    "beforeSha256": "3e1d5acac0cb8a5cde5baf120a13b8b303b20b7fc64ffe0e49207079a9fa16af",
+    "path": "src/bridge.js"
+  },
+  {
+    "beforeSha256": "fa164ff4366ab4e93b9a85e867e64af154800b94e2251ca8786e5341f72f917d",
+    "path": "src/bridge-client.js"
+  },
+  {
+    "beforeSha256": "286c9b65fc2c8088d6ac973a8e68585d1c74a4b2b9a5cf2df51d906f97a7e7dc",
+    "path": "src/bridge-backend.js"
+  },
+  {
+    "beforeSha256": "3c8a2e6bf1fb3096cf6c6540f5d3b42c06989fa63a734f57d2d28825e4677cdc",
+    "path": "web/bridge.js"
+  }
+]

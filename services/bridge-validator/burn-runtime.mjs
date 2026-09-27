@@ -20,6 +20,8 @@ import {decodeCanonicalBridgeMessage,stableJson} from '../../shared/protocol/can
 import {burnJournalRecord,issueBurnDeposit,recordBurnDeposits,retainBurnPlan,retainSignedBurn,markBurnBroadcast,
   retainFinalBurn,prepareBurnAuthorization,retainBurnAttestation,retainBurnSolanaPacket,markBurnSolanaPacket,burnPacketAttestation,
   retainBurnMint,completeBurnOperation,burnJournalAccounting,reconcileBurnAccounting} from './burn-journal-state.mjs';
+import {ExecutionFundingController} from './execution-funding-controller.mjs';
+import {executionRecord,createExecutionIntent,executionWatchOperations,recordExecutionNativeObservations,publicExecutionFunding} from './execution-funding-state.mjs';
 
 const PENDING=new Set(['BURN_SOLANA_RPC_UNAVAILABLE','BURN_SOLANA_OPERATIONAL_FUNDING_REQUIRED','BURN_OPERATIONAL_FEE_FUNDING_REQUIRED',
   'BURN_SOLANA_EXECUTION_PENDING','BURN_SOLANA_CLOCK_UNAVAILABLE','BURN_SOLANA_FEE_QUOTE_UNAVAILABLE',
@@ -40,6 +42,7 @@ export class BurnRuntime {
   #health={state:'STARTING',reconciliation:null,reason:'INITIAL_VERIFICATION_REQUIRED'};
   #observed=new Map();
   #accountingVerifiedAt=0;#liveMintSupplyAtomic=null;
+  #execution;#fundingReason=null;
   constructor({journal,observer,verifier,fees,burnSigner,attesters,solana,solanaSigner,onEvent=()=>{}}) {
     requireProtectedBurnJournal(journal);requireProtectedNativeBurnSigner(burnSigner);requireBurnSolanaAdapter(solana);requireProtectedBurnSolanaSigner(solanaSigner);
     check(observer instanceof NativeBurnObserver&&verifier instanceof NativeBurnVerifier&&fees instanceof NativeBurnFeePolicy,'ConcreteBurnAdaptersRequired');
@@ -52,6 +55,8 @@ export class BurnRuntime {
       state.deliveryPolicy.feePayerHex===solana.policy.feePayerHex,'BurnRuntimeJournalBinding');
     this.#journal=journal;this.#observer=observer;this.#verifier=verifier;this.#fees=fees;this.#burnSigner=burnSigner;
     this.#attesters=attesters;this.#solana=solana;this.#solanaSigner=solanaSigner;this.#event=onEvent;
+    burnSigner.bindExecutionJournal(journal);solanaSigner.bindExecutionJournal(journal);
+    this.#execution=new ExecutionFundingController({journal,solana,signer:solanaSigner});
   }
   #exclusive(task){const next=this.#tail.then(task,task);this.#tail=next.catch(()=>{});return next;}
   #emit(event,id,extra={}){this.#event(Object.freeze({event,operationId:id,at:new Date().toISOString(),...extra}));}
@@ -70,8 +75,11 @@ export class BurnRuntime {
     return {state:this.#health.state,reason:code};
   }
   async #discover(){
-    const scan=await this.#observer.discover(this.#journal.read());
-    this.#update(state=>{for(const row of scan.observations)recordBurnDeposits(state,row.id,row.observations);state.nativeScan=scan.cursor;});
+    const state=this.#journal.read(),scan=await this.#observer.discover({...state,operations:executionWatchOperations(state)});
+    this.#update(state=>{for(const row of scan.observations){
+      if(state.operations.some(o=>o.operationId===row.id))recordBurnDeposits(state,row.id,row.observations);
+      if(executionRecord(state,row.id))recordExecutionNativeObservations(state,row.id,row.observations);
+    }state.nativeScan=scan.cursor;});
     for(const row of scan.observations)this.#observed.set(row.id,{...(this.#observed.get(row.id)??{}),deposits:row.observations});
     return scan;
   }
@@ -130,31 +138,52 @@ export class BurnRuntime {
       this.#health={state:'HEALTHY',reconciliation:'MATCH',reason:null};
     });
   }
+  reviewExecutionFunding(){return this.#exclusive(()=>this.#execution.review());}
+  activateUserFundedExecution(){return this.#exclusive(async()=>{
+    await this.#readyForMainnetTransition();check(this.#mainnetMode()===5&&this.#journal.read().mainnetControl.mode==='NORMAL','BurnMainnetPublicAdmissionClosed');
+    check(!this.#journal.read().paused,'BurnGatewayNotReady');return this.#execution.activate();
+  });}
+  refreshExecutionQuote(id){return this.#exclusive(async()=>{check(!this.#journal.read().paused&&this.#freshAccounting(),'BurnGatewayNotReady');await this.#execution.synchronize();await this.#execution.quote(burnHash(id));return this.operation(id);});}
+  verifyExecutionPayment(id,signature){return this.#exclusive(async()=>{
+    burnHash(id);await this.#execution.payment(id,signature);await this.#execution.synchronize();
+    // Payment remains credited during a service hold. Address issuance waits for ordinary admission checks.
+    if(!this.#journal.read().paused&&this.#freshAccounting()&&this.#health.state==='HEALTHY')await this.#execution.issueFundedAddresses();
+    return this.operation(id);
+  });}
   createOperation({destinationHex,nonce}) {
     return this.#exclusive(async()=>{
       this.#destination(destinationHex,nonce);
       const binding={...this.#context.deployment,destination:destinationHex,nonce},id=burnOperationId(binding),state=this.#journal.read();
-      const known=state.operations.find(op=>op.operationId===id);if(known)return this.operation(id);
+      const known=state.operations.find(op=>op.operationId===id)||executionRecord(state,id);if(known)return this.operation(id);
       if(this.#context.environment==='mainnet')check(state.mainnetControl.mode==='NORMAL'&&this.#mainnetMode()===5,'BurnMainnetPublicAdmissionClosed');
       check(this.#health.state==='HEALTHY'&&!state.paused&&Date.now()>=this.#accountingVerifiedAt&&
         Date.now()-this.#accountingVerifiedAt<=30000,'BurnGatewayNotReady');
       const native=await this.#observer.network();await this.#solana.deployment();this.#solanaSigner.ready();this.#attesters.forEach(a=>a.ready());
-      this.#update(s=>issueBurnDeposit(s,binding,native.height));this.#emit('DEPOSIT_ADDRESS_ISSUED',id);return this.operation(id);
+      if(state.execution){
+        await this.#execution.synchronize();
+        const cursor=await this.#observer.addressWatchCursor(this.#journal.read().nativeScan,native.height);
+        this.#update(s=>{createExecutionIntent(s,binding,Date.now(),native.height);s.nativeScan=cursor;});
+        await this.#execution.quote(id);this.#emit('EXECUTION_FUNDING_REQUESTED',id);
+      }else{this.#update(s=>issueBurnDeposit(s,binding,native.height));this.#emit('DEPOSIT_ADDRESS_ISSUED',id);}
+      return this.operation(id);
     });
   }
   operation(id) {
-    const op=this.#op(burnHash(id)),live=this.#observed.get(id);
+    burnHash(id);const state=this.#journal.read(),funding=executionRecord(state,id),actual=state.operations.find(o=>o.operationId===id);
+    check(actual||funding,'BurnJournalOperationUnknown');
+    const op=actual??{binding:funding.binding,state:'AWAITING_EXECUTION_FUNDING',depositAddress:null,retired:false},live=this.#observed.get(id);
     return {operationId:id,state:op.state,destinationHex:op.binding.destination,depositAddress:op.depositAddress,
       amountAtomic:op.deposit?.amountAtomic??null,depositTxid:op.deposit?.txid??null,depositConfirmations:op.deposit?.confirmations??0,
       requiredDepositConfirmations:12,burnTxid:op.broadcastAttempted?op.plan.txid:null,burnAmountAtomic:op.burnEvidence?.amountAtomic??null,
       burnConfirmations:live?.burnConfirmations??null,requiredBurnConfirmations:12,solanaSignature:op.mintReceipt?.signature??null,
-      mintHex:op.binding.mint,exception:op.exception?.reason??null,retired:op.retired};
+      mintHex:op.binding.mint,exception:op.exception?.reason??null,retired:op.retired,...(state.execution?{executionFunding:publicExecutionFunding(state,id)}:{})};
   }
   status() {
     const state=this.#journal.read(),fresh=Date.now()>=this.#accountingVerifiedAt&&Date.now()-this.#accountingVerifiedAt<=30000;
     return {architecture:'ONE_WAY_AUTOMATIC_BURN_AND_MINT',environment:this.#context.environment,
       nativeNetwork:nativeIdentity(this.#context.environment).network.toUpperCase(),solanaNetwork:this.#context.environment.toUpperCase(),mintHex:this.#context.deployment.mint,
       paused:state.paused,...structuredClone(this.#health),activationMode:state.mainnetControl?.mode??'TEST',
+      executionPolicy:state.execution?'USER_FUNDED':'LEGACY_OPERATOR_FUNDED',executionFundingReady:!state.execution||this.#execution.ready&&!state.execution.operatorHold,
       ...mainnetRuntimeFlags(state,{healthy:this.#health.state==='HEALTHY',fresh,reconciliation:this.#health.reconciliation,programState:this.#mainnetMode()}),
       accounting:this.#health.reconciliation==='MATCH'&&fresh?{...burnJournalAccounting(state),observedAt:this.#accountingVerifiedAt,liveMintSupplyAtomic:this.#liveMintSupplyAtomic}:null};
   }
@@ -215,13 +244,27 @@ export class BurnRuntime {
       this.#accountingVerifiedAt=Date.now();this.#liveMintSupplyAtomic=deployed.mintSupplyAtomic;
       const paused=this.#journal.read().paused;
       this.#health={state:paused?'PAUSED':'HEALTHY',reconciliation:'MATCH',reason:paused?this.#journal.read().pauseReason:null};
+      try{await this.#execution.synchronize();this.#fundingReason=null;}catch(error){this.#fundingReason=burnRuntimeErrorCode(error);this.#emit('EXECUTION_FUNDING_HELD',null,{reason:this.#fundingReason});}
       if(paused||readOnly)return this.status();
-      for(const op of this.#journal.read().operations){
+      // Fee failures isolate new admissions. Already-signed burns retain priority and never await user payment.
+      if(this.#execution.ready)try{await this.#execution.issueFundedAddresses();}catch(error){this.#emit('EXECUTION_FUNDING_HELD',null,{reason:burnRuntimeErrorCode(error)});}
+      const operations=this.#journal.read().operations.sort((a,b)=>Number(!!b.signedBurnHex)-Number(!!a.signedBurnHex));
+      for(const op of operations){
         if(op.retired||op.exception&&!op.broadcastAttempted)continue;
         try{await this.#advance(op.operationId);}
-        catch(error){this.#stopOn(error,op.operationId);break;}
+        catch(error){
+          const code=burnRuntimeErrorCode(error);
+          if(this.#journal.read().execution&&!op.signedBurnHex&&!op.broadcastAttempted&&(code.startsWith('EXECUTION_')||code.startsWith('BURN_SOLANA_'))){
+            this.#update(s=>{const r=executionRecord(s,op.operationId);if(r)r.hold=code.toUpperCase();});this.#emit('OPERATION_FUNDING_HELD',op.operationId,{reason:code});continue;
+          }
+          this.#stopOn(error,op.operationId);break;
+        }
         if(this.#journal.read().paused)break;
       }
+      if(this.#execution.ready&&!this.#journal.read().paused)try{
+        // Refresh both chains after processing before resolving expiry/refund races.
+        const refundScan=await this.#discover();if(refundScan.caughtUp){await this.#execution.synchronize();await this.#execution.refunds({nativeClear:true});}
+      }catch(error){this.#emit('EXECUTION_REFUND_HELD',null,{reason:burnRuntimeErrorCode(error)});}
       return this.status();
     }catch(error){this.#stopOn(error);return this.status();}
   });}
@@ -250,11 +293,13 @@ export class BurnRuntime {
         if(kind==='CLAIM')return await this.#recoverMint(op);
         this.#update(state=>markBurnSolanaPacket(state,id,row.packet.signature,{outcome:'FINALIZED',sendAttempts:row.sendAttempts,observedSlot:status.observed.slot}));return true;
       }
-      if(row.outcome==='FINALIZED')throw new Error('FINALIZED_SOLANA_ACCOUNT_DISAPPEARED');
-      if(status.status?.confirmationStatus==='finalized'&&status.status.err!==null||status.expired){
+      if(row.outcome==='FINALIZED'){
+        if(kind==='ATA')row=null;else throw new Error('FINALIZED_SOLANA_ACCOUNT_DISAPPEARED');
+      }
+      if(row&&(status.status?.confirmationStatus==='finalized'&&status.status.err!==null||status.expired)){
         const outcome=status.expired?'EXPIRED_UNSEEN':'FINALIZED_FAILED';
         this.#update(state=>markBurnSolanaPacket(state,id,row.packet.signature,{outcome,sendAttempts:row.sendAttempts,observedSlot:status.observed.slot}));row=null;
-      }else if(status.status!==null)return false;
+      }else if(row&&status.status!==null)return false;
     }
     if(!row){
       op=this.#op(id);const recent=await this.#solana.latestBlockhash();
@@ -267,6 +312,8 @@ export class BurnRuntime {
   }
   async #advance(id) {
     let op=this.#op(id);
+    if(!op.signedBurnHex&&(!op.deposit||op.deposit.confirmations<12))return;
+    await this.#execution.admission(id);
     if(this.#context.environment==='mainnet'){
       const state=this.#journal.read();requireMainnetEconomicOperation(state,id,op.deposit?.amountAtomic??null);
       check(this.#mainnetMode()===(state.mainnetControl.mode==='NORMAL'?5:4),'BurnMainnetEconomicModeMismatch');
@@ -288,7 +335,9 @@ export class BurnRuntime {
       check(!op.exception,'BURN_DEPOSIT_EXCEPTION');
       this.#solanaSigner.ready();this.#attesters.forEach(a=>a.ready());
       for(const attester of this.#attesters)await attester.reserve({binding:op.binding,plan:op.plan});
-      const gate=await this.#solana.preBurn(op.binding,op.plan,burnJournalAccounting(this.#journal.read()).mintedAtomic);
+      // The old balance admission applies only before a burn is signed. Once
+      // signed, funding comes from the reserved completion backstop, never a top-up request to the user.
+      const gate=op.signedBurnHex||executionRecord(this.#journal.read(),id)?.burnCommitted?await this.#solana.observe(op.binding,op.plan):await this.#solana.preBurn(op.binding,op.plan,burnJournalAccounting(this.#journal.read()).mintedAtomic);
       if(!gate.ataExists){const admission=await this.#verifier.verifyDepositAdmission({binding:op.binding,plan:op.plan});await this.#packet(id,'ATA',admission);return;}
       // Recheck arrivals immediately before the irreversible step. Address
       // issuance is single-use; another payment is never silently aggregated.
@@ -296,13 +345,14 @@ export class BurnRuntime {
       check(!this.#journal.read().paused&&!op.exception,'BURN_DEPOSIT_EXCEPTION');
       await this.#fees.verifyBeforeBroadcast(op.plan);
       const admission=await this.#verifier.verifyDepositAdmission({binding:op.binding,plan:op.plan});
-      if(!op.signedBurnHex){const signed=this.#burnSigner.sign({binding:op.binding,plan:op.plan,admission});this.#update(state=>retainSignedBurn(state,id,signed));op=this.#op(id);}
+      if(!op.signedBurnHex){await this.#execution.admission(id,{commit:true});const signed=this.#burnSigner.sign({binding:op.binding,plan:op.plan,admission});this.#update(state=>retainSignedBurn(state,id,signed));op=this.#op(id);}
       this.#update(state=>markBurnBroadcast(state,id));
       await this.#observer.broadcast(op.plan,op.signedBurnHex,this.#fees.maximumRateAtomicPerKvB);
       this.#update(state=>markBurnBroadcast(state,id,true));this.#emit('BURN_BROADCAST',id,{txid:op.plan.txid});return;
     }
     if(op.mintReceipt)return;
     const final=await this.#verifier.verifyFinalizedBurn({binding:op.binding,plan:op.plan,burnBlockHash:op.burnEvidence.burnBlockHash});check(sameEvidence(final.evidence,op.burnEvidence),'FINALIZED_BURN_CHANGED');
+    if(!(await this.#solana.observe(op.binding,op.plan,op.attestation)).ataExists){await this.#packet(id,'ATA',null,final);return;}
     const clock=await this.#solana.clock(),now=BigInt(Math.floor(Date.now()/1000));
     if(op.attestationDraftHex&&message(op.attestationDraftHex).validUntil<clock&&message(op.attestationDraftHex).validUntil<now){
       for(const row of op.solanaPacket??[]){

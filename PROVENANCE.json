@@ -15,7 +15,7 @@
     "historicalLicensing": "Previously distributed Apache-licensed versions retain their historical grants. The authorized source-history rewrite does not revoke those grants or third-party terms.",
     "thirdPartyBoundary": "Required upstream terms and selected BIP-341 vector attribution remain. Reference/API use does not transfer upstream ownership."
   },
-  "generatedAt": "2026-09-25T00:00:00Z",
+  "generatedAt": "2026-09-27T00:00:00Z",
   "cleanup": {
     "scope": "PUBLIC_DOCUMENTATION_POLICY",
     "filesAfter": 191,
@@ -1352,6 +1352,139 @@
       "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "integrations/explorer/baseline.json",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Original KingPepe Explorer integration source or unchanged public support fixture, retained for release and regression testing.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/src/bridge-backend.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source or unchanged public support fixture, retained for release and regression testing.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/src/bridge-client.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source or unchanged public support fixture, retained for release and regression testing.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/src/bridge.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source or unchanged public support fixture, retained for release and regression testing.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/support/src/security.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source or unchanged public support fixture, retained for release and regression testing.",
+      "purpose": "REQUIRED_TEST",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/support/web/bridge-mobile.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source or unchanged public support fixture, retained for release and regression testing.",
+      "purpose": "REQUIRED_TEST",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/support/web/bridge-network.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source or unchanged public support fixture, retained for release and regression testing.",
+      "purpose": "REQUIRED_TEST",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/support/web/bridge-pending.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source or unchanged public support fixture, retained for release and regression testing.",
+      "purpose": "REQUIRED_TEST",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/support/web/bridge-presentation.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source or unchanged public support fixture, retained for release and regression testing.",
+      "purpose": "REQUIRED_TEST",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/support/web/bridge-supply.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source or unchanged public support fixture, retained for release and regression testing.",
+      "purpose": "REQUIRED_TEST",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/support/web/bridge-wallet.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source or unchanged public support fixture, retained for release and regression testing.",
+      "purpose": "REQUIRED_TEST",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/web/bridge-execution.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source or unchanged public support fixture, retained for release and regression testing.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/web/bridge.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source or unchanged public support fixture, retained for release and regression testing.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "native/burn/tests/execution-funding.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe SOL execution funding implementation or regression code.",
+      "purpose": "REQUIRED_TEST",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "native/burn/tests/explorer-execution.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe SOL execution funding implementation or regression code.",
+      "purpose": "REQUIRED_TEST",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "services/bridge-validator/execution-funding-controller.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe SOL execution funding implementation or regression code.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "services/bridge-validator/execution-funding-state.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe SOL execution funding implementation or regression code.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "services/bridge-validator/execution-funding-wire.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe SOL execution funding implementation or regression code.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "tests/windows/execution-funding-protection.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe SOL execution funding implementation or regression code.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
     }
   ]
 }
