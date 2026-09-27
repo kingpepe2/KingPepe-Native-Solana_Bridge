@@ -128,11 +128,12 @@ export class BurnSolanaAdapter {
     else check(!accounts.deposit&&!accounts.burn,'BURN_SOLANA_PARTIAL_MINT_STATE');
     return result;
   }
-  async preBurn(binding,plan,expectedIssuedAtomic) {
+  async preBurn(binding,plan,expectedIssuedAtomic,{operationFunded=false}={}) {
     const observed=await this.observe(binding,plan);
     check(observed.managerMintedAtomic===expectedIssuedAtomic,'BURN_SOLANA_UNEXPLAINED_ISSUANCE');
     check(burnUint(observed.managerMintedAtomic)+burnUint(plan.inputs[0].amountAtomic)<=MAX_KPEPE_SUPPLY_ATOMIC,'BURN_SOLANA_CAP_UNAVAILABLE');
     check(await this.#rpc.call('getHealth')==='ok','BURN_SOLANA_UNHEALTHY');
+    if(operationFunded)return {...observed,...await this.#rpc.latestBlockhash()};
     const recent=await this.#rpc.latestBlockhash(),{message}=associatedTokenCreationMessage({binding,feePayerHex:this.#policy.feePayerHex,...recent});
     const quoted=await this.#rpc.call('getFeeForMessage',[message.toString('base64'),{commitment:'finalized'}]);
     check(Number.isSafeInteger(quoted?.value)&&quoted.value>0,'BURN_SOLANA_FEE_QUOTE_UNAVAILABLE');
@@ -174,12 +175,12 @@ export class BurnSolanaAdapter {
     return {operationId:op.operationId,amountAtomic:proof.amountAtomic,destination:op.binding.destination,mint:op.binding.mint,
       signature:packet.signature,slot:String(actual.slot),commitment:'finalized'};
   }
-  async executionEstimate(binding){
+  async executionEstimate(binding,op=null){
     assertBurnBindingContext(binding,this.#policy.context);
     const payer=base58Encode(h(this.#policy.feePayerHex)),destination=base58Encode(h(binding.destination));
     const ata=burnSolanaAddresses(binding).destinationToken;
     const snapshot=await this.#rpc.snapshot([payer,ata],this.#minimumSlot);this.#minimumSlot=String(snapshot.slot);
-    const payerAccount=snapshot.accounts[0];accountBytes(payerAccount,'11111111111111111111111111111111',0);
+    const payerAccount=snapshot.accounts[0];if(payerAccount)accountBytes(payerAccount,'11111111111111111111111111111111',0);
     const token=initializedOperationAccount(snapshot.accounts[1]);
     if(token){const data=accountBytes(token,TOKEN,165);check(hex(data.subarray(0,32))===binding.mint&&hex(data.subarray(32,64))===binding.destination&&data[108]===1&&data.readUInt32LE(109)===0,'BURN_SOLANA_DESTINATION_MISMATCH');}
     const recent=await this.#rpc.latestBlockhash(),templates=executionFeeMessages({payer,recipient:destination,blockhash:recent.recentBlockhash});
@@ -187,7 +188,26 @@ export class BurnSolanaAdapter {
     const readings=await Promise.all([...[0,73,165,211,240].map(async size=>{const n=await this.#rpc.call('getMinimumBalanceForRentExemption',[size,{commitment:'finalized'}]);check(Number.isSafeInteger(n)&&n>0,'BURN_SOLANA_RENT_QUOTE_UNAVAILABLE');rents[size]=String(n);}),
       ...Object.entries(templates).map(async([key,message])=>{const q=await this.#rpc.call('getFeeForMessage',[message.toString('base64'),{commitment:'finalized'}]);check(Number.isSafeInteger(q?.value)&&q.value>0,'BURN_SOLANA_FEE_QUOTE_UNAVAILABLE');fees[key]=String(q.value);})]);
     void readings;fees.payment=fees.single;fees.refund=fees.single;
-    return {budget:executionBudget({rents,fees,ataExists:!!token}),recipient:payer,destination,genesis:this.#policy.manifest.solanaGenesis,createdSlot:snapshot.slot,balanceLamports:String(payerAccount.lamports),...recent};
+    const observed=op?.attestation?await this.observe(binding,op.plan,op.attestation):null;
+    const packetCounts=Object.fromEntries(['ATA','RECEIPT','CLAIM'].map(k=>[k,(op?.solanaPacket??[]).filter(r=>r.packet.kind===k).length]));
+    return {budget:executionBudget({rents,fees,ataExists:!!token,receiptExists:observed?.receiptExists??false,claimExists:observed?.claimExists??false,packetCounts}),recipient:payer,destination,genesis:this.#policy.manifest.solanaGenesis,createdSlot:Number(this.#minimumSlot),balanceLamports:String(payerAccount?.lamports??0),...recent};
+  }
+  executionPacketDebit(kind,budget){
+    check(['ATA','RECEIPT','CLAIM'].includes(kind),'ExecutionPacketKindRejected');
+    const rent=kind==='ATA'?(budget.ataExists?0n:BigInt(budget.rents[165])):kind==='RECEIPT'?(budget.receiptExists?0n:BigInt(budget.rents[240])):
+      budget.claimExists?0n:BigInt(budget.rents[211])+2n*BigInt(budget.rents[73]);
+    return String(rent+BigInt(kind==='RECEIPT'?budget.fees.receipt:budget.fees.single));
+  }
+  async executionPacketFee(packet){
+    const raw=Buffer.from(packet.preparedTransactionBase64,'base64');check(raw[0]===1&&raw.length<=1232,'ExecutionPacketRejected');
+    const result=await this.#rpc.call('getFeeForMessage',[raw.subarray(65).toString('base64'),{commitment:'finalized'}]);
+    check(Number.isSafeInteger(result?.value)&&result.value>0,'EXECUTION_PACKET_FEE_UNAVAILABLE');return String(result.value);
+  }
+  async executionPacketExpired(packet){
+    // Account existence alone does not prove this packet landed. Reconcile
+    // unseen ATA packets even when the recipient created the account separately.
+    const status=await this.#rpc.signatureStatus(packet.signature);
+    return status===null&&await this.#rpc.finalizedHeight()>BigInt(packet.lastValidBlockHeight);
   }
   async executionBalance(){
     const r=await this.#rpc.call('getBalance',[base58Encode(h(this.#policy.feePayerHex)),{commitment:'finalized',minContextSlot:Number(this.#minimumSlot)}]);

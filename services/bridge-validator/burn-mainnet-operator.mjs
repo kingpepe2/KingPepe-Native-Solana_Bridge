@@ -10,8 +10,8 @@ import {burnRuntimeErrorCode} from './burn-runtime.mjs';
 import {requireBurn as check} from '../../native/burn/burn-protocol.mjs';
 
 export async function runMainnetBurnOperator(configurationFile,action,controlledFile){
-  check(['inspect','prepare-controlled','adopt-exact-received','enable-normal','pause','resume-reviewed','execution-funding-review','enable-user-funded-execution'].includes(action),'BurnMainnetOperatorActionRejected');
-  const bindingRequired=['prepare-controlled','adopt-exact-received'].includes(action);
+  check(['inspect','prepare-controlled','adopt-exact-received','enable-normal','pause','resume-reviewed','execution-funding-review','enable-user-funded-execution','adopt-operation-user-funding'].includes(action),'BurnMainnetOperatorActionRejected');
+  const bindingRequired=['prepare-controlled','adopt-exact-received','adopt-operation-user-funding'].includes(action);
   check(bindingRequired===(controlledFile!==undefined),'BurnMainnetOperatorArgumentsRejected');
   const c=loadBurnServiceConfiguration(configurationFile,{mainnet:true}),service=await openBurnServiceRuntime(c.runtime);
   try{
@@ -22,6 +22,7 @@ export async function runMainnetBurnOperator(configurationFile,action,controlled
     if(bindingRequired){
       const file=validateRuntimeFile(controlledFile);check(statSync(file).size<=1024,'BurnMainnetControlledFileLimit');
       let a;try{a=JSON.parse(readFileSync(file,'utf8'));}catch{throw Error('BurnMainnetControlledFileRejected');}
+      if(action==='adopt-operation-user-funding'){check(a&&Object.keys(a).sort().join()==='operationId,policy'&&a.policy==='USER_FUNDED','ExecutionLegacyPolicyRejected');return await service.runtime.adoptOperationExecutionFunding(a.operationId);}
       check(a&&Object.keys(a).sort().join()===(action==='prepare-controlled'?'amountModel,destinationHex,nonce':'amountModel,destinationHex,nonce,operationId')&&
         a.amountModel==='EXACT_RECEIVED','BurnMainnetControlledFileRejected');
       return action==='prepare-controlled'?await service.runtime.beginControlledMainnet(a):await service.runtime.adoptExactReceivedMainnet(a);

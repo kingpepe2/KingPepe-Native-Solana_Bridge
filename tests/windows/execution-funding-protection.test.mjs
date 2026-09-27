@@ -11,10 +11,11 @@ import {ed25519} from '@noble/curves/ed25519.js';
 import {base58} from '@scure/base';
 import {WindowsProtectedStore,windowsCurrentServiceSid} from '../../shared/windows/protected-store.mjs';
 import {ProtectedBurnJournal} from '../../services/bridge-validator/protected-burn-journal.mjs';
-import {ProtectedBurnSolanaSigner} from '../../services/relayer/burn-solana-signer.mjs';
+import {ProtectedBurnSolanaSigner,associatedTokenCreationMessage} from '../../services/relayer/burn-solana-signer.mjs';
 import {BurnSolanaAdapter} from '../../services/solana-observer/burn-solana-adapter.mjs';
 import {ExecutionFundingController} from '../../services/bridge-validator/execution-funding-controller.mjs';
-import {createExecutionIntent,executionRecord,publicExecutionFunding,executionTotals} from '../../services/bridge-validator/execution-funding-state.mjs';
+import {createExecutionIntent,executionRecord,publicExecutionFunding,executionTotals,executionSpendIntent,executionPendingSpend} from '../../services/bridge-validator/execution-funding-state.mjs';
+import {recordBurnDeposits,retainBurnPlan,retainBurnSolanaPacket} from '../../services/bridge-validator/burn-journal-state.mjs';
 import {executionPaymentMessage} from '../../services/bridge-validator/execution-funding-wire.mjs';
 import {burnOperationId} from '../../native/burn/burn-protocol.mjs';
 import {burnFixture} from '../../native/burn/tests/burn-fixture.mjs';
@@ -26,15 +27,15 @@ test('protected payment recovery, exact refund signer and restart preserve liabi
  t.after(async()=>{signer?.close();await journal?.close();f.destroy();assert.equal(path.dirname(root),path.resolve(os.tmpdir()));assert(path.basename(root).startsWith('kingpepe-execution-protection-'));rmSync(root,{recursive:true});});
  journal=await ProtectedBurnJournal.open(WindowsProtectedStore.create(jopt,Buffer.from(JSON.stringify(f.state))));
  signer=new ProtectedBurnSolanaSigner({store:WindowsProtectedStore.create(sopt,Buffer.from(f.payer)),context:f.context,feePayerHex:f.policy.feePayerHex});signer.bindExecutionJournal(journal);
- let balance=1000000000,height=100,slot=1000;const transactions=new Map(),history=[],sent=[];
+ let balance=0,height=100,slot=1000,feeScale=1;const transactions=new Map(),history=[],sent=[];
  const rpcResult=(method,params)=>{
   if(method==='getGenesisHash')return f.manifest.solanaGenesis;
-  if(method==='getMultipleAccounts')return {context:{slot},value:[{owner:'11111111111111111111111111111111',executable:false,data:['','base64'],lamports:balance},null]};
+  if(method==='getMultipleAccounts')return {context:{slot},value:[balance?{owner:'11111111111111111111111111111111',executable:false,data:['','base64'],lamports:balance}:null,null]};
   if(method==='getBalance')return {context:{slot},value:balance};
   if(method==='getMinimumBalanceForRentExemption')return 1000000+params[0]*5000;
-  if(method==='getLatestBlockhash')return {context:{slot},value:{blockhash:base58.encode(new Uint8Array(32).fill(22)),lastValidBlockHeight:300}};
+  if(method==='getLatestBlockhash')return {context:{slot},value:{blockhash:base58.encode(new Uint8Array(32).fill(height>300?23:22)),lastValidBlockHeight:height+200}};
   if(method==='getBlockHeight')return height;
-  if(method==='getFeeForMessage')return {context:{slot},value:Buffer.from(params[0],'base64').length<200?15000:5000};
+  if(method==='getFeeForMessage')return {context:{slot},value:(Buffer.from(params[0],'base64').length<200?15000:5000)*feeScale};
   if(method==='getSignaturesForAddress')return history.slice(0,params[1].limit);
   if(method==='getTransaction')return transactions.get(params[0])??null;
   if(method==='getSignatureStatuses'){const tx=transactions.get(params[0][0]);return {context:{slot},value:[tx?{slot:tx.slot,confirmationStatus:'finalized',err:tx.meta.err}:null]};}
@@ -53,6 +54,16 @@ test('protected payment recovery, exact refund signer and restart preserve liabi
  // Lost browser callback: only the finalized chain history supplies the credit.
  await controller.synchronize();await controller.issueFundedAddresses();assert.equal(journal.read().operations.length,2);assert.equal(executionRecord(journal.read(),id).payments.length,1);
  await controller.payment(id,signature);assert.equal(executionRecord(journal.read(),id).payments.length,1);
+ assert.equal(journal.read().execution.legacyCapitalLamports,'0');
+ // Repeated dynamic pre-burn checks quote only the exact shortfall, never charge it.
+ feeScale=2;await assert.rejects(controller.admission(id),/ADDITIONAL_SOL_REQUIRED/);
+ const funding=publicExecutionFunding(journal.read(),id),topup=funding.quote,quoteCount=executionRecord(journal.read(),id).quotes.length;
+ assert.equal(funding.additionalSolRequiredLamports,'205000');assert.equal(topup.amountLamports,'205000');assert.equal(funding.status,'ADDITIONAL_SOL_REQUIRED');
+ await assert.rejects(controller.admission(id),/ADDITIONAL_SOL_REQUIRED/);assert.equal(executionRecord(journal.read(),id).quotes.length,quoteCount);assert.equal(sent.length,0);
+ const topupMessage=executionPaymentMessage(topup),topupSig=ed25519.sign(topupMessage,f.wallet),topupSignature=base58.encode(topupSig);
+ transactions.set(topupSignature,{slot:++slot,meta:{err:null,fee:10000},transaction:[Buffer.concat([Buffer.of(1),Buffer.from(topupSig),topupMessage]).toString('base64'),'base64']});history.unshift({slot,signature:topupSignature});balance+=Number(topup.amountLamports);
+ await controller.payment(id,topupSignature);await controller.payment(id,topupSignature);await controller.admission(id);
+ assert.equal(executionRecord(journal.read(),id).payments.length,2);assert.equal(publicExecutionFunding(journal.read(),id).preBurnFundingVerified,true);assert.equal(sent.length,0);
  assert.throws(()=>signer.prepareExecutionRefund({operationId:id,sequence:0,amountLamports:'1',feeLamports:'5000',recentBlockhash:quote.recentBlockhash,lastValidBlockHeight:'300'}),/NotAuthorized/);
  journal.update(s=>{const r=executionRecord(s,id);r.createdAt=1;r.fundedAt=2;});
  await controller.refunds({nativeClear:false});assert.equal(sent.length,0);
@@ -63,9 +74,32 @@ test('protected payment recovery, exact refund signer and restart preserve liabi
  for(const file of files(root)){const data=readFileSync(file);assert(!data.includes(Buffer.from(f.payer)));assert(!data.includes(Buffer.from(f.payer).toString('hex')));}
  journal=await ProtectedBurnJournal.open(new WindowsProtectedStore(jopt));signer=new ProtectedBurnSolanaSigner({store:new WindowsProtectedStore(sopt),context:f.context,feePayerHex:f.policy.feePayerHex});signer.bindExecutionJournal(journal);
  controller=new ExecutionFundingController({journal,solana,signer});await controller.synchronize();await controller.refunds({nativeClear:true});assert.equal(sent.length,2);assert.equal(sent[0],sent[1]);
- const refundTx={slot:++slot,meta:{err:null,fee:5000},transaction:[pending.preparedTransactionBase64,'base64']};transactions.set(pending.signature,refundTx);history.unshift({slot,signature:pending.signature});balance-=Number(pending.amountLamports)+5000;
+ const refundTx={slot:++slot,meta:{err:null,fee:10000},transaction:[pending.preparedTransactionBase64,'base64']};transactions.set(pending.signature,refundTx);history.unshift({slot,signature:pending.signature});balance-=Number(pending.amountLamports)+10000;
  await controller.synchronize();await controller.refunds({nativeClear:true});assert.equal(sent.length,2);assert.equal(executionTotals(executionRecord(journal.read(),id)).liability,0n);
  assert.equal(journal.read().paused,false);assert.equal(journal.read().operations[1].binding.destination,binding.destination);
- // Returning below the reserve prevents every new irreversible admission.
+ // Refunded operations remain closed even if the payer receives unrelated SOL.
  balance=1;await assert.rejects(controller.quote(id),/QuoteNotAllowed/);assert.equal(sent.length,2);
+ // A legacy operation proven not to have begun burn is explicitly adopted,
+ // preserving its identity. The crash window before signed-packet persistence
+ // reserves its money until the old blockhash is finalized as expired.
+ controller.adoptLegacy(f.id);await controller.quote(f.id);const adopted=publicExecutionFunding(journal.read(),f.id).quote;
+ const adoptedMessage=executionPaymentMessage(adopted),adoptedSig=ed25519.sign(adoptedMessage,f.wallet),adoptedSignature=base58.encode(adoptedSig);
+ transactions.set(adoptedSignature,{slot:++slot,meta:{err:null,fee:10000},transaction:[Buffer.concat([Buffer.of(1),Buffer.from(adoptedSig),adoptedMessage]).toString('base64'),'base64']});history.unshift({slot,signature:adoptedSignature});balance+=Number(adopted.amountLamports);
+ await controller.payment(f.id,adoptedSignature);journal.update(s=>{recordBurnDeposits(s,f.id,[f.deposit]);retainBurnPlan(s,f.id,f.plan);});
+ const reserved=await controller.prepareSpend(f.id,'ATA');assert(executionPendingSpend(journal.read(),f.id)>0n);
+ signer.close();signer=null;await journal.close();journal=null;
+ journal=await ProtectedBurnJournal.open(new WindowsProtectedStore(jopt));signer=new ProtectedBurnSolanaSigner({store:new WindowsProtectedStore(sopt),context:f.context,feePayerHex:f.policy.feePayerHex});signer.bindExecutionJournal(journal);controller=new ExecutionFundingController({journal,solana,signer});
+ await controller.synchronize();assert.deepEqual(await controller.prepareSpend(f.id,'ATA'),reserved);
+ await controller.admission(f.id);await assert.rejects(controller.admission(f.id,{commit:true}),/SPEND_RECONCILIATION_PENDING/);
+ height=301;await controller.synchronize();assert.equal(executionPendingSpend(journal.read(),f.id),0n);assert.equal(executionSpendIntent(journal.read(),f.id,0),null);
+ const recent=await controller.prepareSpend(f.id,'ATA');assert.notEqual(recent.recentBlockhash,reserved.recentBlockhash);
+ const ataMessage=associatedTokenCreationMessage({binding:f.binding,feePayerHex:f.policy.feePayerHex,...recent}).message,ataSignature=ed25519.sign(ataMessage,f.payer);
+ const packet={kind:'ATA',...recent,messageDigestHex:null,signature:base58.encode(ataSignature),preparedTransactionBase64:Buffer.concat([Buffer.of(1),Buffer.from(ataSignature),ataMessage]).toString('base64')};
+ journal.update(s=>retainBurnSolanaPacket(s,f.id,packet));await controller.authorizeSend(f.id,packet);
+ feeScale=3;await assert.rejects(controller.authorizeSend(f.id,packet),/SIGNED_COST_CHANGED/);feeScale=2;
+ height=502;slot++;await controller.synchronize();assert.equal(journal.read().operations.find(o=>o.operationId===f.id).solanaPacket[0].outcome,'EXPIRED_UNSEEN');
+ await controller.admission(f.id,{commit:true});assert.equal(executionRecord(journal.read(),f.id).burnCommitted,true);
+ feeScale=1000000;await assert.rejects(controller.prepareSpend(f.id,'ATA'),/POST_BURN_FUNDING_INCIDENT/);
+ const incident=publicExecutionFunding(journal.read(),f.id);assert.equal(incident.quote,null);assert.equal(incident.expiresAt,null);assert.equal(incident.additionalSolRequiredLamports,'0');
+ assert.equal(incident.status,'POST_BURN_EXECUTION_FUNDING_INCIDENT');await controller.refunds({nativeClear:true});assert.equal(sent.length,2);assert.equal(journal.read().paused,false);
 });

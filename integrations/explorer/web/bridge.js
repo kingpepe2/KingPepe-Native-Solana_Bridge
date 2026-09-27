@@ -7,7 +7,7 @@ import {assertPublicNetwork,operationStorageKey} from './bridge-network.js?v=mai
 import {forwardProgress} from './bridge-presentation.js?v=mainnet-pending-v1';
 import {createAccountingDisplay,ACCOUNTING_DISPLAY_LIMIT_MS,supplyDisplay} from './bridge-supply.js?v=accounting-shared-v2';
 import {mobileBrowser,phantomBrowseLink,phantomReturnIntent,registeredPhantom} from './bridge-mobile.js?v=phantom-mobile-v1';
-import {signExecutionPayment,validateExecutionQuote} from './bridge-execution.js?v=user-funded-v1';
+import {signExecutionPayment,validateExecutionQuote} from './bridge-execution.js?v=user-funded-v2';
 
 const id=value=>typeof value==='string'&&/^[0-9a-f]{64}$/u.test(value);
 const nonce=()=>Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('');
@@ -45,7 +45,7 @@ function renderBurnBridge(view){
       <section class="bridge-wallet" aria-label="Solana destination wallet"><p class="label">1 · Connect your Solana wallet</p><div class="bridge-wallet-actions"><button id="br-connect" class="btn primary bridge-connect" type="button" aria-expanded="false" aria-controls="br-wallet-picker" disabled><span id="br-connect-label">Connect Solana Wallet</span></button><button id="br-disconnect" class="bridge-link" type="button" hidden>Disconnect</button></div><div id="br-wallet-picker" class="bridge-wallet-picker" hidden><p class="small muted">Choose your wallet</p><div id="br-wallets"></div></div><p id="br-wallet-state" class="bridge-help" role="status">Phantom and compatible Solana wallets.</p><div id="br-solana-balances" class="bridge-balances" hidden><span>SOL Balance <strong id="br-sol-balance">—</strong></span><span>KPEPE Balance <strong id="br-kpepe-balance">—</strong></span><button id="br-refresh-balances" class="bridge-link" type="button">Refresh balances</button></div><p id="br-balance-help" class="bridge-help" role="status"></p></section>
       <div class="bridge-destination"><span class="label">Solana destination</span><p id="br-destination-address">Connect your wallet to receive KPEPE.</p><p id="br-destination-help" class="bridge-help"></p></div>
       <section id="br-deposit" class="bridge-send" hidden><p class="label">SEND KPEPE NATIVE TO:</p><p id="br-deposit-address" class="bridge-address"></p><button id="br-copy-address" class="btn" type="button">Copy Address</button><p id="br-minimum" class="bridge-help"></p><p id="br-send-help">Send once from your own KingPepe Native wallet.</p><p class="bridge-help">Your deposit authorizes the transfer. After confirmation, Native KPEPE is burned irreversibly and the exact amount is minted to your bound Solana wallet.</p><p id="br-received" class="bridge-send-amount">Amount: Waiting for deposit</p><p id="br-confirmations" class="bridge-help" role="status">Confirmations: 0 / 12</p></section>
-      <section id="br-execution" class="bridge-summary" hidden aria-label="Solana execution funding"><h3>Solana Bridge execution cost</h3><p><strong id="br-execution-cost"></strong></p><p>Paid by: <span id="br-execution-payer"></span></p><p id="br-execution-breakdown" class="bridge-help"></p><p id="br-execution-status" role="status">Awaiting fee approval</p><button id="br-pay" class="btn primary" type="button">Pay &amp; Continue</button><p class="bridge-help">This SOL payment funds Solana accounts and network execution. Unused allowance is returned to the same wallet after completion, less the refund network cost. If no Native deposit arrives within 24 hours, the unused payment is refundable after verification. Account rent already spent is not refunded by this flow.</p><p id="br-execution-refund" class="bridge-help"></p></section>
+      <section id="br-execution" class="bridge-summary" hidden aria-label="Solana execution funding"><h3>Solana execution funding</h3><p><strong id="br-execution-cost"></strong></p><p>Paid by: <span id="br-execution-payer"></span></p><p id="br-execution-breakdown" class="bridge-help"></p><p id="br-execution-status" role="status">Awaiting fee approval</p><button id="br-pay" class="btn primary" type="button">Pay &amp; Continue</button><p class="bridge-help">Your SOL funds only this operation, including its disclosed retry and account-recreation allowance. Before burn, a fresh check may require an additional payment from this same wallet. After burn begins, the funds remain reserved for mint completion. Unused allowance is returned after completion, less the refund network cost. If no Native deposit arrives within 24 hours, unused funding is refundable after verification. Account rent already spent is not refunded by this flow.</p><p id="br-execution-refund" class="bridge-help"></p></section>
       <p id="br-address-help" class="bridge-help" role="status">Connect your wallet to begin. New transfers require verified Solana execution funding before a Native deposit address is issued.</p>
       <div class="bridge-summary"><span>KPEPE Bridge fee: <strong>0 KPEPE</strong></span><span id="br-service" class="pill" role="status">Checking service…</span></div><p class="bridge-help">The Bridge pays the Native burn miner fee separately. Your deposit amount is not reduced.</p>
       <label for="br-native-address">Your KingPepe Native Address <span class="muted small">· optional</span></label><input id="br-native-address" type="text" maxlength="90" spellcheck="false" placeholder="Public address only" aria-describedby="br-native-balance"><div class="bridge-inline"><p id="br-native-balance" class="bridge-help" role="status">Balance: — KPEPE</p><button id="br-native-refresh" class="bridge-link" type="button">Refresh</button></div>
@@ -98,14 +98,18 @@ function renderBurnBridge(view){
     const funding=value.executionFunding;$('execution').hidden=funding?.policy!=='USER_FUNDED';
     if(funding?.policy==='USER_FUNDED'){
       const q=funding.quote,b=q?.budget;$('execution-payer').textContent=value.destination;
-      $('execution-cost').textContent=q?formatBalance(q.amountLamports,9)+' SOL':funding.paymentSignatures.length?formatBalance(funding.fundedLamports,9)+' SOL funded':'Execution quote unavailable. Refresh to view the current cost.';
+      const short=funding.status==='ADDITIONAL_SOL_REQUIRED';
+      $('execution-cost').textContent=short?'Additional SOL required: '+formatBalance(funding.additionalSolRequiredLamports,9)+' SOL':q?formatBalance(q.amountLamports,9)+' SOL':funding.paymentSignatures.length?formatBalance(funding.fundedLamports,9)+' SOL funded':'Execution quote unavailable. Refresh to view the current cost.';
       $('execution-breakdown').textContent=b?'Account rent: '+formatBalance(b.accountRentLamports,9)+' SOL; execution fees: '+formatBalance(b.networkFeeLamports,9)+' SOL; retry allowance: '+formatBalance(b.retryAllowanceLamports,9)+' SOL; refund allowance: '+formatBalance(b.refundAllowanceLamports,9)+' SOL. Phantom payment network fee: approximately '+formatBalance(b.paymentFeeLamports,9)+' SOL, separately.':'';
-      $('execution-status').textContent=funding.status==='PAID_VERIFIED'?'Execution funding: PAID / VERIFIED':funding.status==='REFUNDED'?'Execution funding refunded':funding.burnCommitted?'Execution funding reserved for completion':funding.paymentSignatures.length?'Execution funding received; verifying this operation':'Awaiting fee approval';
-      $('pay').hidden=funding.burnCommitted||!q&&funding.paymentSignatures.length>0||funding.depositAddressIssued&&funding.status!=='EXECUTION_TOP_UP_REQUIRED'&&funding.status!=='EXECUTION_FUNDING_REQUIRED';
-      $('pay').textContent=q?'Pay & Continue':'Refresh execution cost';
+      $('execution-status').textContent=short?'Additional SOL required':funding.status==='POST_BURN_EXECUTION_FUNDING_INCIDENT'?'Execution incident under review. Completion funds remain reserved.':funding.status==='PAID_VERIFIED'?'Execution funding: PAID / VERIFIED':funding.status==='REFUNDED'?'Execution funding refunded':funding.burnCommitted?'Execution funding reserved for completion':funding.paymentSignatures.length?'Execution funding received; verifying this operation':'Awaiting fee approval';
+      $('pay').hidden=funding.burnCommitted||!q&&funding.paymentSignatures.length>0&&!short||funding.depositAddressIssued&&!short;
+      $('pay').textContent=short?'Pay Remaining SOL & Continue':q?'Pay & Continue':'Refresh execution cost';
       $('execution-refund').textContent='Actual SOL cost: '+formatBalance(funding.actualCostLamports,9)+'; refunded: '+formatBalance(funding.refundedLamports,9)+'; remaining allowance: '+formatBalance(funding.remainderLamports,9)+'.';
     }
-    progress(value);if(value.depositAddress===null)$('operation-state').textContent='Awaiting execution funding';controls();
+    progress(value);if(value.depositAddress===null)$('operation-state').textContent='Awaiting execution funding';
+    if(funding?.status==='ADDITIONAL_SOL_REQUIRED')$('operation-state').textContent='Additional SOL required';
+    else if(funding?.preBurnFundingVerified&&!funding.burnCommitted&&value.depositConfirmations>=12)$('operation-state').textContent='Ready to burn — FULLY FUNDED / VERIFIED';
+    else if(funding?.status==='LEGACY_FUNDING_REVIEW_REQUIRED')$('operation-state').textContent='Existing operation funding policy under review';controls();
   }
   async function payExecution(){
     if(paying||!operation||account?.address!==operation.destination||service!=='ACTIVE'||networkConflict)return;
@@ -120,10 +124,10 @@ function renderBurnBridge(view){
       notice('Review the operation-specific SOL payment in Phantom.');
       const signature=await signExecutionPayment({wallet:selected,account:selectedAccount,operation:fresh,base58});
       store(storageKey+'.payment',JSON.stringify({operationId:opId,signature}));
-      notice('Payment submitted. Waiting for finalized verification; do not send Native KPEPE yet.');
+      notice(fresh.depositAddress?'Additional payment submitted. Waiting for finalized verification; do not repeat your Native deposit.':'Payment submitted. Waiting for finalized verification; do not send Native KPEPE yet.');
       const verified=await bridgeRequest(`/operations/${opId}/execution-payment`,{signature});
       if(!stopped&&tracking===opId)applyOperation(validateOperation(verified,opId));
-    }catch(error){notice(rejectedByUser(error)?'Payment cancelled. No Native deposit address has been issued.':'Payment was not verified yet. Keep this operation; its finalized payment will be recovered automatically. Reconnect the same wallet to retry the same payment safely.');}
+    }catch(error){notice(rejectedByUser(error)?'Payment cancelled. This operation remains unchanged; burn requires verified funding.':'Payment was not verified yet. Keep this operation; its finalized payment will be recovered automatically. Reconnect the same wallet to retry the same payment safely.');}
     finally{paying=false;controls();}
   }
   function showSupply(){

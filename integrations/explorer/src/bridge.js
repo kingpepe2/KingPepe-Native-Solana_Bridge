@@ -71,11 +71,13 @@ async function publicOperation(value, validators, expectedId) {
     ...(value.executionFunding?{executionFunding:await publicFunding(value.executionFunding,value,validators)}:{}) };
 }
 async function publicFunding(f,op,validators){
-  if(f.policy==='LEGACY_OPERATOR_FUNDED'){check(f.status==='OPERATOR_FUNDED');return {policy:f.policy,status:f.status};}
+  if(f.policy==='LEGACY_OPERATOR_FUNDED'){check(['OPERATOR_FUNDED','LEGACY_FUNDING_REVIEW_REQUIRED'].includes(f.status));return {policy:f.policy,status:f.status};}
   check(f.policy==='USER_FUNDED'&&typeof f.status==='string'&&/^[A-Z_]{1,96}$/u.test(f.status)&&typeof f.burnCommitted==='boolean'&&typeof f.depositAddressIssued==='boolean');
   check(f.depositAddressIssued===(op.depositAddress!==null));
   const result={policy:f.policy,status:f.status,burnCommitted:f.burnCommitted,depositAddressIssued:f.depositAddressIssued};
-  for(const key of ['fundedLamports','actualCostLamports','refundedLamports','remainderLamports','operatorContributionLamports'])result[key]=atomic(f[key],true);
+  for(const key of ['fundedLamports','actualCostLamports','refundedLamports','remainderLamports','deficitLamports','additionalSolRequiredLamports'])result[key]=atomic(f[key],true);
+  result.requiredCompletionLamports=f.requiredCompletionLamports===null?null:atomic(f.requiredCompletionLamports,true);
+  check(typeof f.preBurnFundingVerified==='boolean');result.preBurnFundingVerified=f.preBurnFundingVerified;
   check(f.expiresAt===null||Number.isSafeInteger(f.expiresAt));result.expiresAt=f.expiresAt;
   for(const key of ['paymentSignatures','refundSignatures']){check(Array.isArray(f[key])&&f[key].length<=32);f[key].forEach(validators.signature);result[key]=[...f[key]];}
   if(f.quote)await validateExecutionQuote(f.quote,{base58,operationId:op.operationId,destination:op.destination,recipient:validators.executionRecipient,genesis:validators.executionGenesis});

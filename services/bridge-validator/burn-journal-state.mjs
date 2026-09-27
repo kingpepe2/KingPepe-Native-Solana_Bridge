@@ -10,7 +10,7 @@ import {validateBurnContext,assertBurnMessageContext} from './burn-context.mjs';
 import {verifyBurnAttestationPair} from '../attesters/burn-attestation-codec.mjs';
 import {verifyBurnSolanaPacket} from '../relayer/burn-solana-signer.mjs';
 import {initialMainnetLifecycle,validateMainnetLifecycle} from './burn-mainnet-lifecycle.mjs';
-import {validateExecutionState,requireExecutionAddressFunding,requireExecutionBurnCommitted} from './execution-funding-state.mjs';
+import {validateExecutionState,requireExecutionAddressFunding,requireExecutionBurnCommitted,requireExecutionSpendIntent} from './execution-funding-state.mjs';
 
 export const BURN_JOURNAL_PROTOCOL = 'KINGPEPE_AUTOMATIC_BURN_JOURNAL_V1';
 export const BURN_STATES = Object.freeze(['DEPOSIT_ADDRESS_ISSUED','DEPOSIT_OBSERVED','DEPOSIT_FINALIZED','BURN_READY','BURN_BROADCAST','BURN_FINALIZED','ATTESTED','CLAIMED','MINTED','COMPLETED']);
@@ -162,6 +162,7 @@ export function retainBurnSolanaPacket(state,id,packet) {
   const op=burnJournalRecord(state,id);check(!state.paused&&state.deliveryPolicy,'BurnJournalAdmissionStopped');
   check(packet.kind==='ATA' ? op.plan&&(!op.broadcastAttempted||op.burnEvidence) : op.burnEvidence&&op.attestation,'BurnJournalPacketNotAuthorized');
   verifyBurnSolanaPacket(packet,state.deliveryPolicy.context,op.binding,state.deliveryPolicy.feePayerHex,op.attestation);
+  requireExecutionSpendIntent(state,id,packet);
   op.solanaPacket??=[];
   const known=op.solanaPacket.find(p=>p.packet.signature===packet.signature);
   if(known){check(same(known.packet,packet),'BurnJournalPacketChanged');return;}

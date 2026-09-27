@@ -8,7 +8,7 @@ import {decodeCanonicalBridgeMessage} from '../../shared/protocol/canonical-mess
 import {validateBurnContext,assertBurnBindingContext,assertBurnMessageContext} from '../bridge-validator/burn-context.mjs';
 import {verifyBurnAttestationPair} from '../attesters/burn-attestation-codec.mjs';
 import {requireProtectedBurnJournal} from '../bridge-validator/protected-burn-journal.mjs';
-import {executionRecord,executionTotals} from '../bridge-validator/execution-funding-state.mjs';
+import {executionRecord,executionTotals,requireExecutionSpendIntent,executionPendingSpend} from '../bridge-validator/execution-funding-state.mjs';
 import {executionTransferMessage,executionRefundMemo,verifyExecutionSignedMessage} from '../bridge-validator/execution-funding-wire.mjs';
 import {associatedTokenDestination,base58Decode,base58Encode,shortvecEncode,
   prepareSignedLocalnetSolanaDepositClaimTransaction,prepareSignedLocalnetSolanaDepositReceiptTransaction,
@@ -95,6 +95,8 @@ export class ProtectedBurnSolanaSigner {
         verifyBurnAttestationPair(attestation.attestations,attestation.encodedMessageHex,this.#context.attesters);
         const now=BigInt(Math.floor(Date.now()/1000));check(m.validFrom<=now&&now<=m.validUntil,'BurnSolanaAuthorizationExpired');
       }
+      if(this.#context.environment==='mainnet')check(this.#executionJournal,'SolanaFundingJournalRequired');
+      if(this.#executionJournal)requireExecutionSpendIntent(this.#executionJournal.read(),planOperationId(binding),{kind,recentBlockhash,lastValidBlockHeight,messageDigestHex:kind==='ATA'?null:decodeCanonicalBridgeMessage(h(attestation.encodedMessageHex)).messageDigestHex});
       const {payload}=this.#store.read();let signed;
       try{
         if(kind==='ATA'){
@@ -116,6 +118,7 @@ export class ProtectedBurnSolanaSigner {
     try{
       const state=this.#executionJournal.read(),r=executionRecord(state,operationId),op=state.operations.find(o=>o.operationId===operationId);
       check(r?.closed&&sequence===r.refunds.length&&!r.refunds.some(x=>x.outcome==='UNRESOLVED')&&(!r.burnCommitted||op?.state==='COMPLETED'),'ExecutionRefundNotAuthorized');
+      check(executionPendingSpend(state,operationId)===0n,'ExecutionRefundCompletionReserved');
       check(BigInt(amountLamports)>0n&&BigInt(amountLamports)+BigInt(feeLamports)===executionTotals(r).available,'ExecutionRefundAmountChanged');
       check(state.deliveryPolicy.feePayerHex===this.#public,'ExecutionRefundPayerChanged');
       const destination=base58Encode(h(r.binding.destination)),source=base58Encode(h(this.#public));

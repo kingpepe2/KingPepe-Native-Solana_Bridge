@@ -25,13 +25,13 @@ Name: **KingPepe**. Symbol: **KPEPE**. Standard SPL Token, **8 decimals**, no fr
 2. If the live Bridge requires user-funded execution, review the SOL cost and approve Pay & Continue in your connected wallet. After finalized payment verification, receive a unique KingPepe Native deposit address bound to that wallet.
 3. Send Native KPEPE to the issued address.
 4. Wait for **12 Native deposit confirmations**.
-5. The Bridge automatically burns the Native amount irreversibly.
-6. After verified Native burn finality, the exact corresponding amount is minted on Solana.
+5. The Bridge rechecks this operation's SOL funding. If costs have risen beyond its allowance, approve the displayed additional SOL payment from the same wallet. Burn waits until funding is verified.
+6. The Bridge burns the full Native amount irreversibly. After verified burn finality, the exact corresponding amount is minted on Solana.
 7. The KPEPE arrives in the originally bound Solana wallet, and the operation completes after verification.
 
-**KPEPE Bridge fee: 0 KPEPE.** The Bridge does not reduce the user's deposited amount. When the live policy is `USER_FUNDED`, new operations require a separate SOL execution payment before address issuance. The quote reflects account rent, network fees, a retry allowance and the refund network cost; Phantom's payment fee is shown separately. Existing operations keep their original operator-funded treatment.
+**KPEPE Bridge fee: 0 KPEPE.** The Bridge does not reduce the user's deposited amount. When the live policy is `USER_FUNDED`, new operations require a separate SOL execution payment before address issuance. The dynamic quote reflects account rent, network fees, a bounded retry and account-recreation allowance, and the refund network cost; Phantom's payment fee is shown separately. Each operation funds its own execution. No Team-funded global completion reserve is required. Existing operations with a committed burn retain their prior treatment; other existing operations require a funding-policy review before proceeding.
 
-Unused SOL allowance is returned to the bound wallet after completion. A payment with no Native deposit expires after 24 hours and is refunded after verification, less the refund network cost. A remainder smaller than its refund network cost remains recorded as refundable, rather than being treated as a charge. Spent account rent is not refundable through this flow. A signed Native burn remains the Bridge's completion obligation; it never requires another user payment to finish minting.
+Unused SOL allowance is returned to the bound wallet after completion. A payment with no Native deposit expires after 24 hours and is refunded after verification, less the refund network cost. A remainder smaller than its refund network cost remains recorded as refundable. Spent account rent is not refundable through this flow. Once burn signing begins, the operation's funds cannot expire, be refunded before completion, or pay for another operation. There is no normal post-burn top-up step. An exceptional shortage beyond the reserved allowance stops execution for review without changing KPEPE accounting or using another user's funds.
 
 **A successful Native burn is irreversible.** No Solana → Native redemption is offered. Disconnecting or changing wallets does not redirect an existing operation. Deposit addresses are single-use; do not send another transfer to a completed operation's address. The Bridge never asks for a wallet's private credentials.
 

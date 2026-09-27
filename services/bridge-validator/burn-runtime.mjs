@@ -139,6 +139,7 @@ export class BurnRuntime {
     });
   }
   reviewExecutionFunding(){return this.#exclusive(()=>this.#execution.review());}
+  adoptOperationExecutionFunding(id){return this.#exclusive(async()=>{burnHash(id);await this.#readyForMainnetTransition();this.#execution.adoptLegacy(id);return this.operation(id);});}
   activateUserFundedExecution(){return this.#exclusive(async()=>{
     await this.#readyForMainnetTransition();check(this.#mainnetMode()===5&&this.#journal.read().mainnetControl.mode==='NORMAL','BurnMainnetPublicAdmissionClosed');
     check(!this.#journal.read().paused,'BurnGatewayNotReady');return this.#execution.activate();
@@ -254,8 +255,8 @@ export class BurnRuntime {
         try{await this.#advance(op.operationId);}
         catch(error){
           const code=burnRuntimeErrorCode(error);
-          if(this.#journal.read().execution&&!op.signedBurnHex&&!op.broadcastAttempted&&(code.startsWith('EXECUTION_')||code.startsWith('BURN_SOLANA_'))){
-            this.#update(s=>{const r=executionRecord(s,op.operationId);if(r)r.hold=code.toUpperCase();});this.#emit('OPERATION_FUNDING_HELD',op.operationId,{reason:code});continue;
+          if(this.#journal.read().execution&&(code.startsWith('EXECUTION_')||code.startsWith('Execution')||!op.signedBurnHex&&!op.broadcastAttempted&&code.startsWith('BURN_SOLANA_'))){
+            this.#update(s=>{const r=executionRecord(s,op.operationId);if(r)r.hold=code==='EXECUTION_ADDITIONAL_SOL_REQUIRED'?'ADDITIONAL_SOL_REQUIRED':code.startsWith('EXECUTION_POST_BURN')?'POST_BURN_EXECUTION_FUNDING_INCIDENT':/^[A-Z_]{1,64}$/u.test(code.toUpperCase())?code.toUpperCase():'EXECUTION_REVIEW_REQUIRED';});this.#emit('OPERATION_FUNDING_HELD',op.operationId,{reason:code});continue;
           }
           this.#stopOn(error,op.operationId);break;
         }
@@ -291,7 +292,7 @@ export class BurnRuntime {
       const attestation=burnPacketAttestation(op,row.packet),status=await this.#solana.packetStatus(row.packet,op.binding,op.plan,attestation);
       if(status.exists){
         if(kind==='CLAIM')return await this.#recoverMint(op);
-        this.#update(state=>markBurnSolanaPacket(state,id,row.packet.signature,{outcome:'FINALIZED',sendAttempts:row.sendAttempts,observedSlot:status.observed.slot}));return true;
+        if(status.status?.confirmationStatus==='finalized'&&status.status.err===null)this.#update(state=>markBurnSolanaPacket(state,id,row.packet.signature,{outcome:'FINALIZED',sendAttempts:row.sendAttempts,observedSlot:status.observed.slot}));return true;
       }
       if(row.outcome==='FINALIZED'){
         if(kind==='ATA')row=null;else throw new Error('FINALIZED_SOLANA_ACCOUNT_DISAPPEARED');
@@ -302,11 +303,12 @@ export class BurnRuntime {
       }else if(row&&status.status!==null)return false;
     }
     if(!row){
-      op=this.#op(id);const recent=await this.#solana.latestBlockhash();
+      op=this.#op(id);const recent=await this.#execution.prepareSpend(id,kind);
       const packet=await this.#solanaSigner.prepare({kind,binding:op.binding,plan:op.plan,nativeAdmission,finalizedBurn,attestation:op.attestation,...recent});
       this.#update(state=>retainBurnSolanaPacket(state,id,packet));row=this.#op(id).solanaPacket.at(-1);
     }
     check(row.sendAttempts<32,'SOLANA_RETRY_REVIEW_REQUIRED');
+    await this.#execution.authorizeSend(id,row.packet);
     this.#update(state=>markBurnSolanaPacket(state,id,row.packet.signature,{outcome:'UNRESOLVED',sendAttempts:row.sendAttempts+1,observedSlot:row.observedSlot}));
     await this.#solana.send(row.packet,op.binding,burnPacketAttestation(this.#op(id),row.packet));this.#emit(`${kind}_BROADCAST`,id,{signature:row.packet.signature});return false;
   }
@@ -336,8 +338,8 @@ export class BurnRuntime {
       this.#solanaSigner.ready();this.#attesters.forEach(a=>a.ready());
       for(const attester of this.#attesters)await attester.reserve({binding:op.binding,plan:op.plan});
       // The old balance admission applies only before a burn is signed. Once
-      // signed, funding comes from the reserved completion backstop, never a top-up request to the user.
-      const gate=op.signedBurnHex||executionRecord(this.#journal.read(),id)?.burnCommitted?await this.#solana.observe(op.binding,op.plan):await this.#solana.preBurn(op.binding,op.plan,burnJournalAccounting(this.#journal.read()).mintedAtomic);
+      // signed, only this operation's existing funding may complete execution.
+      const gate=op.signedBurnHex||executionRecord(this.#journal.read(),id)?.burnCommitted?await this.#solana.observe(op.binding,op.plan):await this.#solana.preBurn(op.binding,op.plan,burnJournalAccounting(this.#journal.read()).mintedAtomic,{operationFunded:!!this.#journal.read().execution});
       if(!gate.ataExists){const admission=await this.#verifier.verifyDepositAdmission({binding:op.binding,plan:op.plan});await this.#packet(id,'ATA',admission);return;}
       // Recheck arrivals immediately before the irreversible step. Address
       // issuance is single-use; another payment is never silently aggregated.

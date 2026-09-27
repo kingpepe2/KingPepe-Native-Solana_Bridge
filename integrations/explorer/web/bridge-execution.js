@@ -7,7 +7,7 @@ const amount=v=>{check(typeof v==='string'&&/^(0|[1-9][0-9]{0,19})$/u.test(v)&&B
 const concat=(...rows)=>Uint8Array.from(rows.flatMap(r=>[...r]));
 const sv=n=>n<128?Uint8Array.of(n):Uint8Array.of((n&127)|128,n>>7);
 export async function validateExecutionQuote(q,{base58,operationId,destination,recipient=EXECUTION_RECIPIENT,genesis=EXECUTION_GENESIS}){
- check(q&&q.version===1&&q.operationId===operationId&&/^[a-f0-9]{64}$/u.test(operationId)&&q.destination===destination&&q.recipient===recipient&&q.genesis===genesis);
+ check(q&&q.version===2&&q.operationId===operationId&&/^[a-f0-9]{64}$/u.test(operationId)&&q.destination===destination&&q.recipient===recipient&&q.genesis===genesis);
  check(Object.keys(q).sort().join()==='amountLamports,budget,createdAt,createdSlot,destination,genesis,lastValidBlockHeight,operationId,quoteId,recentBlockhash,recipient,unsignedTransactionBase64,version');
  const {quoteId,unsignedTransactionBase64,...original}=q;
  const digest=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(original))))].map(b=>b.toString(16).padStart(2,'0')).join('');check(digest===quoteId);
