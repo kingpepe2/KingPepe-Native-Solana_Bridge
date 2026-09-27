@@ -1,6 +1,6 @@
 # KingPepe market, network and Bridge
 
-The public [KingPepe Bridge page](https://kingpepe.net/bridge) combines a market information display, the native network story and the actual Native to Solana Bridge. The market and story contain no trading, order-management or wallet-signing controls. Bridge actions remain in their own panel.
+The public [KingPepe Bridge page](https://kingpepe.net/bridge) presents the original KingPepe banner, the full-width Native to Solana Bridge, the full-width market display and the native network story, in that order. The connected Bridge workflow has four desktop stages: wallet connection, execution funding, Native deposit and progress. These stack vertically on phones. There is no sticky Bridge sidebar. The market and story contain no trading, order-management or wallet-signing controls. Bridge actions remain in their own section.
 
 Market prices are labeled by their meaning: a verified finalized trade, an available executable quote, a resting ask or a pool reference. An ask is not a last trade. Charts and trade rows use verified history; missing values appear as unavailable. The display covers the existing Raydium CLMM market only. Other markets are not queried or displayed. Data freshness is independent of Bridge readiness.
 

@@ -1,17 +1,79 @@
-/* KingPepe market display. All rules scoped to the composite Bridge page. */
-.bridge-market-banner{display:block;width:100%;height:auto;max-width:1280px;aspect-ratio:1280/427;object-fit:contain;margin:0 auto 28px;border:1px solid #314536;border-radius:15px}
-.market-display .market-venues{grid-template-columns:minmax(0,1fr)}
-.market-display .market-venue-raydium{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;padding:24px}
-.market-venue-raydium .market-order{margin-top:0;border-left:1px solid #2a4032;padding-left:24px}
-.market-venue-raydium .market-pool-summary{min-width:0}
-.market-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.market-overview .market-stat>span{font-size:.76rem;color:#d3e1d8}.market-overview .market-stat>strong{font-size:1.12rem;color:#eaf4ed}.market-overview small{font-size:.65rem;color:var(--market-muted);line-height:1.45}.market-overview-note{margin:10px 2px 20px}
-@media(max-width:600px){.market-overview{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.market-overview .market-stat:last-child{grid-column:1/-1}.market-overview .market-stat>strong{font-size:1rem}}
-@media(max-width:600px){.market-display .market-venue-raydium{grid-template-columns:minmax(0,1fr);padding:20px;gap:24px}.market-venue-raydium .market-order{border-left:0;border-top:1px solid #2a4032;padding:24px 0 0}}
+/* Full-width Bridge first, read-only market second, network story third. */
+.view.market-wide{max-width:1560px;padding:22px 24px 56px;box-sizing:border-box}
+.bridge-market-banner{display:block;width:100%;height:160px;max-width:1280px;object-fit:contain;margin:0 auto 24px;border-radius:12px;background:#0e1813}
+.bridge-market-layout{display:flex;flex-direction:column;gap:36px}
+.bridge-section,.market-section,.story-section{min-width:0;width:100%}
 body:has(.bridge-market-layout) .kpe-strike,body:has(.bridge-market-layout) .kpe-atmos canvas,body:has(.bridge-market-layout) .kpe-fog{display:none!important}
 body:has(.bridge-market-layout) .kpe-grid,.view.market-wide>*{animation:none!important}
-.view.market-wide{max-width:1560px;padding:28px 24px 56px;box-sizing:border-box}
-.bridge-market-layout{display:grid;grid-template-columns:minmax(0,1.85fr) minmax(340px,1fr);gap:28px;align-items:start}
-.market-column,.market-display,.bridge-column{min-width:0}
+.bridge-section{position:static;border:1px solid #38513e;border-radius:16px;background:#111c16;overflow:hidden}
+.bridge-section .bridge-page{max-width:none;margin:0;padding:24px}
+.bridge-section .bridge-banner{display:none}
+.bridge-section .bridge-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin:0 0 18px}
+.bridge-section .bridge-heading .bridge-eyebrow{font-size:.7rem;letter-spacing:.13em;color:#b6d0bc;font-weight:650;margin:0 0 9px}
+.bridge-section .bridge-heading h1{font-size:clamp(1.2rem,2vw,1.75rem);letter-spacing:-.025em;margin:0 0 8px}
+.bridge-section .bridge-heading h1>span{color:#a8d69f;margin:0 6px}
+.bridge-section .bridge-heading p{font-size:.78rem;line-height:1.6;margin:0;color:#a8bcaf}
+.bridge-section .bridge-badges{gap:7px;justify-content:flex-end;flex-shrink:0}
+.bridge-section .bridge-badges .pill{font-size:.62rem}
+.bridge-section .bridge-activation{display:flex;gap:12px;align-items:baseline;padding:10px 13px;margin:0 0 12px;border-radius:8px;line-height:1.6}
+.bridge-section .bridge-activation h2{font-size:.69rem;letter-spacing:.04em;white-space:nowrap;margin:0}
+.bridge-section .bridge-activation p{font-size:.73rem;margin:0}
+.bridge-section [data-runtime=ACTIVE] .bridge-activation{background:#152a1b;border-color:#365b3f;color:#b4dcbd}
+.bridge-network-note{color:#a2b8a9;font-size:.65rem;margin:10px 0 16px;line-height:1.5}
+.bridge-workflow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid #304638;border-bottom:1px solid #304638}
+.bridge-step{min-width:0;padding:22px 20px;border-right:1px solid #304638}
+.bridge-step:first-child{padding-left:0}.bridge-step:last-child{padding-right:0;border-right:0}
+.bridge-section .bridge-step h2{display:flex;align-items:center;gap:8px;font-size:.75rem;letter-spacing:.045em;text-transform:uppercase;line-height:1.4;margin:0 0 17px}
+.bridge-step h2>span{display:inline-grid;place-items:center;width:23px;height:23px;flex:none;border-radius:50%;background:#213b29;color:#bde1b3;font-size:.68rem}
+.bridge-step-intro{font-size:.76rem;color:#aebfb3;line-height:1.65;margin:0 0 16px;overflow-wrap:anywhere}
+.bridge-step-intro strong{display:block;color:#b0dfbd;margin-top:7px;font-size:1.1rem;font-weight:550}
+.bridge-section .bridge-help{font-size:.73rem;line-height:1.65;color:#a7bbad}
+.bridge-section .bridge-wallet{margin:0 0 18px}
+.bridge-section .bridge-wallet-actions{gap:8px;flex-wrap:wrap}
+.bridge-section .bridge-page .btn{white-space:normal;font-size:.78rem;min-height:40px;padding:10px 12px;line-height:1.5}
+.bridge-section .bridge-connect{flex-basis:100%;width:100%}
+.bridge-section .bridge-link{font-size:.71rem}
+.bridge-section .bridge-balances{font-size:.71rem;gap:12px}
+.bridge-route-note{display:grid;gap:6px;color:#95ad9b;font-size:.65rem;margin:15px 0}
+.bridge-route-note b{color:#bfd1c3;font-weight:500;margin-left:5px}
+.bridge-section .bridge-advanced{padding:11px 0;border-color:#2e4134}
+.bridge-section .bridge-advanced summary{font-size:.71rem;line-height:1.6}
+.bridge-section .bridge-page input{font-size:.78rem;padding:10px}
+.bridge-section .bridge-page label{font-size:.73rem}
+.bridge-section #br-execution h3{font-size:.71rem;font-weight:500;color:#aebfb3;margin:15px 0 6px}
+.bridge-section #br-execution-cost{font-size:1.02rem;overflow-wrap:anywhere;color:#d5edcc;font-weight:550}
+.bridge-section #br-execution-status{font-size:.73rem;line-height:1.65;color:#bbd9c1;overflow-wrap:anywhere}
+.bridge-section #br-pay{width:100%;margin-bottom:8px}
+.bridge-step-funding[data-funding=ADDITIONAL_SOL_REQUIRED]{background:#302b194d;box-shadow:inset 0 3px #c9a455}
+.bridge-step-funding[data-funding=ADDITIONAL_SOL_REQUIRED] #br-execution-cost{color:#f1d484}
+.bridge-section .bridge-send{padding:0;text-align:left}
+.bridge-section .bridge-send .label{font-size:.62rem;color:#b7ccbb;letter-spacing:.06em}
+.bridge-section .bridge-address{font-size:.72rem;line-height:1.7;padding:11px;margin:9px 0;overflow-wrap:anywhere}
+.bridge-section .bridge-send-amount{font-size:.89rem;line-height:1.65;overflow-wrap:anywhere}
+.bridge-section .bridge-destination{margin-top:18px}
+.bridge-section .bridge-destination .label{font-size:.62rem;letter-spacing:.05em}
+.bridge-section .bridge-destination p{font-size:.72rem;line-height:1.7}
+.bridge-section .bridge-status{margin:0;border-radius:0}
+.bridge-section #br-operation-state{white-space:normal;font-size:.63rem;line-height:1.6}
+.bridge-section .bridge-timeline{display:grid;grid-template-columns:1fr;margin:14px 0;gap:0}
+.bridge-section .bridge-timeline li{display:grid;grid-template-columns:1fr auto;gap:8px;padding:9px 0 9px 19px;border-bottom:1px solid #24382c;min-height:0;text-align:left;font-size:.7rem}
+.bridge-section .bridge-timeline li::before{content:'';position:absolute;left:0;top:13px;width:7px;height:7px;margin:0}
+.bridge-section .bridge-timeline li::after{display:none}
+.bridge-section .bridge-timeline strong,.bridge-section .bridge-timeline small{margin:0;font-size:.68rem;line-height:1.5}
+.bridge-section .bridge-details{grid-template-columns:1fr;font-size:.7rem;gap:4px}.bridge-section .bridge-details dd{margin:0 0 8px}
+.bridge-section .bridge-track{flex-wrap:wrap}.bridge-section .bridge-track input{flex:1;min-width:80px}
+.bridge-section .bridge-notice{padding:12px 0;margin:0;font-size:.78rem}
+.bridge-public-summary{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:30px;padding:20px 0 0}
+.bridge-section .bridge-supply,.bridge-section .bridge-official{padding:0;margin:0;min-width:0}
+.bridge-section .bridge-supply h2,.bridge-section .bridge-official h2{font-size:.75rem;font-weight:550;margin:0}
+.bridge-section .bridge-supply-amount{font-size:1.25rem;margin:8px 0 4px}
+.bridge-section .bridge-supply .bridge-help{font-size:.66rem;margin:4px 0}
+.bridge-section .bridge-supply-row{gap:8px;flex-wrap:wrap}.bridge-section .bridge-supply .pill{font-size:.6rem}
+.bridge-section .bridge-supply progress{margin:9px 0;height:5px}
+.bridge-section .bridge-copy-actions{justify-content:flex-start;align-items:center;flex-wrap:wrap;gap:9px}
+.bridge-section .bridge-copy-actions .btn{font-size:.69rem;min-height:34px;padding:7px 10px}
+.bridge-section .bridge-legal{font-size:.62rem;text-align:left;margin:16px 0 0;color:#8da493}
+.bridge-section button,.bridge-section input,.bridge-section summary{scroll-margin:120px 0 40px}
 .market-display{--market-muted:#9aaea4;--market-border:#25352f;color:#eaf2ed;font-variant-numeric:tabular-nums}
 .market-header,.market-brand,.market-intro,.market-section-head,.market-data-footer{display:flex;align-items:center;justify-content:space-between;gap:14px}
 .market-header{margin:4px 0 18px}.market-brand{justify-content:flex-start;gap:14px}.market-brand img{border-radius:50%;border:1px solid #386244}
@@ -27,7 +89,7 @@ body:has(.bridge-market-layout) .kpe-grid,.view.market-wide>*{animation:none!imp
 .market-price-context{max-width:180px;display:grid;gap:8px;text-align:right;font-size:.78rem}.market-small{color:var(--market-muted);font-size:.72rem;line-height:1.6;margin:0}
 .market-section-head{flex-wrap:wrap}.market-section-head h2,.market-section-head h3{margin:0;font-size:.97rem;font-weight:600;letter-spacing:-.02em}.market-section-head h2+p{margin-top:4px}
 .market-chart-card{padding:22px 22px 16px;margin-bottom:18px}.market-timeframes{display:flex;gap:3px;padding:3px;background:#0b1410;border:1px solid #25362c;border-radius:8px}.market-timeframes button{background:transparent;color:#b6c5bb;font:inherit;font-size:.68rem;font-weight:600;border:0;border-radius:5px;padding:7px 9px;cursor:pointer;min-height:32px}.market-timeframes button[aria-pressed=true]{background:#293f30;color:#b1f0c2}.market-timeframes button:disabled{opacity:.4;cursor:default}
-.market-display button:focus-visible,.market-display a:focus-visible,.market-display summary:focus-visible,.bridge-column:focus-visible{outline:2px solid #a5edb9;outline-offset:4px}
+.market-display button:focus-visible,.market-display a:focus-visible,.market-display summary:focus-visible{outline:2px solid #a5edb9;outline-offset:4px}
 .market-chart{min-height:290px;display:grid;align-items:center;margin:16px 0 6px;background:repeating-linear-gradient(to bottom,transparent,transparent 59px,#20342866 60px)}.market-chart svg{display:block;width:100%;height:auto;overflow:visible}.market-grid-line{stroke:#2b3a31;stroke-width:1}.market-axis{fill:#9bae9f;font-size:11px;font-family:inherit}.market-line{fill:none;stroke:#8ed4a0;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}.market-candle-up{fill:#87cea0;stroke:#87cea0}.market-candle-down{fill:#e6a6a1;stroke:#e6a6a1}
 .market-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;min-height:250px;color:#c7d5cb}.market-empty strong{font-size:.95rem;font-weight:550}.market-empty p{font-size:.76rem;color:var(--market-muted);margin:0;max-width:280px}.market-empty-glyph{font-size:3rem;font-weight:300;color:#537f60}
 .market-statistics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.market-stat{padding:16px 17px;display:grid;gap:8px}.market-stat>span{font-size:.68rem;color:var(--market-muted)}.market-stat>strong{font-size:1rem;font-weight:550;overflow-wrap:anywhere}.market-coverage{margin:11px 2px 22px}
@@ -36,10 +98,72 @@ body:has(.bridge-market-layout) .kpe-grid,.view.market-wide>*{animation:none!imp
 .market-venues-title{margin:0 0 14px}.market-venues{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.market-venue{padding:20px 18px}.market-venue h3{display:flex;align-items:center;gap:8px;font-size:.88rem}.venue-mark{display:inline-grid;place-items:center;width:25px;height:25px;border-radius:7px;font-size:.7rem}.venue-mark.ray{background:#2d2b4a;color:#c4bcf6}.venue-mark.orca{background:#183c47;color:#b4e3eb}.market-address{display:block;overflow-wrap:anywhere;font-family:ui-monospace,monospace;font-size:.66rem;margin:13px 0 18px;color:#b1c7b8}
 .market-venue dl{margin:0}.market-venue dl>div{display:grid;gap:4px;border-bottom:1px solid #25352b;padding:11px 0}.market-venue dt{color:var(--market-muted);font-size:.67rem}.market-venue dd{margin:0;font-size:.83rem;line-height:1.55;overflow-wrap:anywhere}.market-order{margin-top:24px}.market-venue h4{font-size:.78rem;margin:0 0 12px;font-weight:600}.market-venue dl+.market-small{margin-top:12px}.market-explanation{background:#0c1510;padding:17px;margin-top:24px;border-radius:9px}.market-explanation p{color:var(--market-muted);font-size:.72rem;line-height:1.65;margin:0 0 12px}.market-explanation p:last-child{margin:0}
 .market-methodology{margin:18px 0;padding:18px 20px}.market-methodology summary{cursor:pointer;font-size:.8rem;color:#baccc0}.market-methodology p{color:var(--market-muted);font-size:.74rem;line-height:1.7;margin:12px 0 0}.market-data-footer{color:var(--market-muted);font-size:.66rem;align-items:flex-start;flex-wrap:wrap}.market-data-footer a{color:#b8d7c3}.market-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-.bridge-column{position:sticky;top:112px;max-height:calc(100dvh - 130px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#3d5647 #111b17;border:1px solid #314536;border-radius:15px;background:#101a14;padding:22px;box-sizing:border-box;scroll-padding:16px}
-.bridge-column .bridge-page{max-width:none;margin:0}.bridge-column .bridge-banner{display:none}.bridge-column .bridge-heading{margin:0 0 20px}.bridge-column .bridge-heading h1{font-size:1.3rem;letter-spacing:-.03em}.bridge-column .bridge-heading p{font-size:.77rem}.bridge-column .bridge-badges{margin-top:9px}.bridge-column .bridge-box,.bridge-column .bridge-status,.bridge-column .bridge-supply{padding:17px;margin:15px 0;border-color:#2b3e31;border-radius:10px}.bridge-column .bridge-official{padding:13px}.bridge-column .bridge-official h2{font-size:.78rem}.bridge-column .bridge-official .bridge-address{padding:10px;font-size:.64rem;line-height:1.7;margin:9px 0}.bridge-column .bridge-copy-actions{flex-wrap:wrap;gap:7px}.bridge-column .bridge-copy-actions .btn,.bridge-column .bridge-copy-actions a{font-size:.67rem}.bridge-column .bridge-activation{padding:13px}.bridge-column .bridge-activation h2{font-size:.75rem}.bridge-column .bridge-activation p{font-size:.72rem;line-height:1.6}.bridge-column .bridge-supply h2{font-size:.78rem}.bridge-column .bridge-supply-amount{font-size:1.35rem}.bridge-column .bridge-supply-row{gap:8px;flex-wrap:wrap}.bridge-column .bridge-supply .bridge-help{font-size:.67rem}.bridge-column .bridge-direction{gap:10px;padding-bottom:16px}.bridge-column .bridge-direction strong{font-size:.79rem}.bridge-column .bridge-direction .pill{font-size:.61rem}.bridge-column .bridge-help{font-size:.71rem;line-height:1.65}.bridge-column .bridge-wallet{margin-top:18px}.bridge-column .bridge-page .btn{white-space:normal;font-size:.78rem;min-height:38px;padding:10px 12px}.bridge-column .bridge-wallet-actions{gap:8px;flex-wrap:wrap}.bridge-column .bridge-address{font-size:.74rem}.bridge-column .bridge-send-amount{font-size:1.15rem}.bridge-column .bridge-summary{font-size:.72rem;flex-wrap:wrap;gap:8px}.bridge-column .bridge-details{grid-template-columns:1fr}.bridge-column .bridge-details dd{margin:0 0 9px}.bridge-column .bridge-timeline{display:grid;grid-template-columns:1fr;gap:0;margin:18px 0}.bridge-column .bridge-timeline li{display:grid;grid-template-columns:1fr auto;gap:10px;text-align:left;padding:10px 0 10px 24px;border-bottom:1px solid #26392b;font-size:.72rem}.bridge-column .bridge-timeline li::before{left:0;top:14px;width:8px;height:8px;margin:0}.bridge-column .bridge-timeline li::after{display:none}.bridge-column .bridge-timeline strong,.bridge-column .bridge-timeline small{display:block;margin:0}.bridge-column .bridge-timeline small{font-size:.69rem}.bridge-column button,.bridge-column input,.bridge-column summary,.bridge-column .bridge-send{scroll-margin:18px}.bridge-column #br-execution{display:block}.bridge-column #br-execution[hidden]{display:none}.bridge-column #br-execution h3{font-size:.85rem}.bridge-column #br-pay{width:100%}.bridge-column .bridge-legal{font-size:.65rem}
-@media(min-width:1081px) and (max-height:800px){.bridge-column{top:100px;max-height:calc(100dvh - 112px)}}
-@media(max-width:1200px){.bridge-market-layout{gap:18px;grid-template-columns:minmax(0,1.7fr) minmax(320px,1fr)}.view.market-wide{padding-left:18px;padding-right:18px}.bridge-column{padding:16px}.market-price-card{padding:22px 20px}.market-price-context{max-width:140px}.market-timeframes button{padding:7px}.market-venues{grid-template-columns:1fr}.market-venue dl>div{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:10px}.market-venue dd{text-align:right}}
-@media(max-width:1080px){.bridge-market-layout{grid-template-columns:minmax(0,1fr);gap:30px}.bridge-column{position:static;max-height:none;overflow:visible;padding:24px}.market-venues{grid-template-columns:repeat(2,minmax(0,1fr))}.market-venue dl>div{grid-template-columns:1fr}.market-venue dd{text-align:left}.bridge-column .bridge-box,.bridge-column .bridge-status,.bridge-column .bridge-supply{padding:21px}.bridge-column .bridge-official .bridge-address{font-size:.78rem}.bridge-column .bridge-page .btn{font-size:.88rem}.bridge-column .bridge-help{font-size:.79rem}.bridge-column .bridge-heading h1{font-size:1.5rem}.bridge-column .bridge-page{max-width:700px;margin:auto}.market-price strong{font-size:3.1rem}}
-@media(max-width:600px){.view.market-wide{padding:20px 12px 35px}.market-header{gap:8px}.market-brand{gap:10px}.market-brand img{width:38px;height:38px}.market-brand h1{font-size:1.4rem}.market-health{font-size:.59rem;padding:6px 8px}.market-intro{font-size:.65rem;gap:5px}.market-price-card{padding:22px 18px;display:block}.market-price strong{font-size:2.4rem}.market-price-context{text-align:left;max-width:none;grid-template-columns:auto 1fr;gap:5px 12px;margin-top:16px}.market-price-context>span:last-child{grid-column:1/-1}.market-chart-card{padding:18px 13px 14px}.market-section-head h2{font-size:.88rem}.market-chart{min-height:230px;margin-top:10px}.market-chart svg{min-height:230px}.market-timeframes button{padding:8px 9px;min-height:36px}.market-statistics{gap:8px;grid-template-columns:repeat(2,minmax(0,1fr))}.market-stat{padding:14px}.market-stat>strong{font-size:.95rem}.market-trades{padding:18px 11px}.market-trades table{font-size:.62rem}.market-trades th{font-size:.56rem}.market-trades th:last-child{width:22%}.market-trades td{padding:11px 3px}.market-trades .market-tag{font-size:.56rem}.market-venues{grid-template-columns:1fr}.market-venue dl>div{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr)}.market-venue dd{text-align:right}.market-venues-title{align-items:flex-start}.market-venues-title span{font-size:.64rem}.bridge-column{padding:17px 12px}.bridge-column .bridge-box,.bridge-column .bridge-status,.bridge-column .bridge-supply{padding:15px}.bridge-column .bridge-track{flex-wrap:wrap}.bridge-column .bridge-track input{flex:1;min-width:0}.bridge-column .bridge-wallet-actions{align-items:stretch}.bridge-column .bridge-wallet-actions button{min-height:44px}.market-data-footer{font-size:.65rem}}
+/* The market's internal grid never shares a column with the Bridge. */
+.market-display{padding:25px;border:1px solid #2f4336;border-radius:16px;background:#0e1712}
+.market-header{margin:0 0 16px}.market-brand h1{font-size:1.55rem}.market-brand .market-eyebrow{font-size:.75rem;color:#bfdbc7}
+.market-dashboard{display:grid;grid-template-columns:minmax(215px,.82fr) minmax(0,1.7fr) minmax(295px,1.15fr);grid-template-areas:'price chart trades' 'stats chart trades';gap:16px;align-items:start;margin-bottom:28px}
+.market-price-card{grid-area:price;display:block;padding:20px 17px;margin:0}
+.market-price strong{font-size:clamp(1.8rem,2.6vw,2.6rem)}.market-price-unit{font-size:.8rem}
+.market-price-context{max-width:none;text-align:left;grid-template-columns:auto 1fr;gap:5px 10px;font-size:.67rem;margin-top:17px}
+.market-price-context>span:last-child{grid-column:1/-1}.market-price-context time{text-align:right}
+.market-stats-group{grid-area:stats;min-width:0}
+.market-overview{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+.market-overview .market-stat{grid-template-columns:1fr auto;gap:5px;padding:12px 14px}
+.market-overview .market-stat>span{font-size:.68rem;color:#c4d9ca}.market-overview .market-stat>strong{font-size:.95rem;text-align:right}
+.market-overview small{grid-column:1/-1;font-size:.59rem;line-height:1.6;color:var(--market-muted)}
+.market-display .market-overview-note{font-size:.61rem;line-height:1.65;margin:10px 2px 16px}
+.market-statistics{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.market-stat{padding:12px}
+.market-stat>span{font-size:.6rem;line-height:1.5}.market-stat>strong{font-size:.83rem}
+.market-coverage{font-size:.61rem;margin:10px 2px 0}
+.market-chart-card{grid-area:chart;padding:19px 16px;margin:0;height:100%;box-sizing:border-box;display:flex;flex-direction:column;min-width:0}
+.market-chart-card .market-section-head{align-items:flex-start;gap:14px}.market-timeframes{flex-wrap:nowrap}.market-timeframes button{padding:6px 7px}
+.market-chart{min-height:390px;flex:1}.market-chart svg{min-height:270px}.market-chart-card .market-small{font-size:.65rem}
+.market-trades{grid-area:trades;padding:19px 14px;margin:0;min-width:0;box-sizing:border-box}
+.market-trades .market-small{font-size:.63rem}.market-trades .market-section-head{align-items:flex-start;gap:9px}
+.market-table-wrap{max-height:620px;overflow-y:auto;scrollbar-width:thin}
+.market-trades table{font-size:.64rem}.market-trades th{font-size:.57rem}.market-trades th:last-child{width:26%}.market-trades td{line-height:1.65;padding:11px 3px}
+.market-trades .market-table-empty{padding:45px 8px}
+.market-venues{grid-template-columns:minmax(0,1fr)}
+.market-venue-raydium{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px;padding:24px}
+.market-venue-raydium .market-order{margin-top:0;border-left:1px solid #2a4032;padding-left:28px}
+.market-pool-summary{min-width:0}.market-venue dl>div{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.market-venue dd{text-align:right}.market-address{font-size:.72rem}
+@media(max-width:1100px){
+ .view.market-wide{padding:20px 18px 45px}.bridge-section .bridge-page{padding:22px}
+ .bridge-workflow{grid-template-columns:repeat(2,minmax(0,1fr))}.bridge-step{padding:22px!important}
+ .bridge-step:nth-child(2){border-right:0}.bridge-step:nth-child(-n+2){border-bottom:1px solid #304638}
+ .market-dashboard{grid-template-columns:minmax(220px,.8fr) minmax(0,1.6fr);grid-template-areas:'price chart' 'stats chart' 'trades trades'}
+ .market-chart{min-height:350px}.market-trades table{font-size:.76rem}.market-table-wrap{max-height:450px}
+ .market-trades th{font-size:.64rem}.market-trades .market-small{font-size:.72rem}
+}
+@media(max-width:650px){
+ .view.market-wide{padding:14px 12px 35px}.bridge-market-banner{height:auto;max-height:140px;aspect-ratio:1280/427;margin-bottom:20px}
+ .bridge-market-layout{gap:26px}.bridge-section .bridge-page{padding:18px 16px}
+ .bridge-section .bridge-heading{display:block}.bridge-section .bridge-heading h1{font-size:1.2rem;line-height:1.5}
+ .bridge-section .bridge-badges{justify-content:flex-start;margin-top:13px}.bridge-section .bridge-heading p{font-size:.73rem}
+ .bridge-section .bridge-activation{display:block}.bridge-section .bridge-activation h2{margin-bottom:5px}
+ .bridge-workflow{grid-template-columns:minmax(0,1fr)}.bridge-section .bridge-step{padding:23px 0!important;border-right:0;border-bottom:1px solid #304638}
+ .bridge-section .bridge-step:last-child{border-bottom:0}.bridge-section .bridge-step h2{font-size:.78rem;margin-bottom:14px}
+ .bridge-section .bridge-help,.bridge-step-intro{font-size:.78rem}.bridge-section .bridge-page .btn{min-height:44px;font-size:.83rem}
+ .bridge-section .bridge-timeline li{padding:10px 0 10px 23px}.bridge-section .bridge-timeline li::before{top:14px}
+ .bridge-section .bridge-timeline strong,.bridge-section .bridge-timeline small{font-size:.74rem}
+ .bridge-section .bridge-public-summary{grid-template-columns:minmax(0,1fr);gap:24px}.bridge-section .bridge-copy-actions{gap:12px}
+ .bridge-section .bridge-address{font-size:.75rem}.bridge-section .bridge-destination p{font-size:.78rem}
+ .bridge-section .bridge-page button,.bridge-section .bridge-page input,.bridge-section .bridge-page summary{scroll-margin:30px}
+ .market-display{padding:20px 13px}.market-header{gap:8px}.market-brand{gap:9px}.market-brand img{width:34px;height:34px}
+ .market-brand .market-eyebrow{font-size:.58rem}.market-brand h1{font-size:1.3rem}.market-health{font-size:.55rem;padding:6px 7px;gap:5px}
+ .market-intro{font-size:.65rem;gap:6px;margin-bottom:16px}
+ .market-dashboard{grid-template-columns:minmax(0,1fr);grid-template-areas:'price' 'chart' 'stats' 'trades';gap:16px}
+ .market-price-card{padding:21px 18px}.market-price strong{font-size:2.4rem}.market-price-context{font-size:.72rem}
+ .market-chart-card{padding:18px 12px}.market-chart-card .market-section-head{gap:12px}.market-section-head h2{font-size:.88rem}
+ .market-chart{min-height:260px}.market-chart svg{min-height:230px}.market-timeframes button{padding:8px 9px;min-height:36px}
+ .market-overview .market-stat>strong{font-size:1rem}.market-overview .market-stat>span{font-size:.74rem}.market-overview small{font-size:.65rem}
+ .market-stat{padding:14px}.market-stat>span{font-size:.65rem}.market-stat>strong{font-size:.93rem}
+ .market-display .market-overview-note,.market-coverage{font-size:.67rem}.market-trades{padding:18px 10px}.market-trades table{font-size:.6rem}
+ .market-trades th{font-size:.55rem}.market-trades .market-small{font-size:.65rem}.market-trades .market-tag{font-size:.55rem}
+ .market-venue-raydium{grid-template-columns:minmax(0,1fr);padding:20px 15px;gap:24px}
+ .market-venue-raydium .market-order{border-left:0;border-top:1px solid #2a4032;padding:24px 0 0}
+ .market-venue dl>div{gap:10px}.market-venue dd{font-size:.77rem}.market-venues-title .market-small{font-size:.62rem}
+ .market-data-footer{font-size:.64rem}.market-methodology{padding:16px}
+}
 @media(prefers-reduced-motion:reduce){.bridge-market-layout *{animation:none!important;scroll-behavior:auto!important;transition:none!important}}
