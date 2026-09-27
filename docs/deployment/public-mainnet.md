@@ -1,10 +1,10 @@
-# Public Mainnet Bridge — ACTIVE
+# Public Mainnet Bridge
 
 The official [Bridge](https://kingpepe.net/bridge) displays **MAINNET**, **ONE WAY**, **Burn Native → Mint Solana 1:1**, and the official Mint `4QkWKqTMyPEyEb8RMKv3XrcHJ5jbS7k4uQhXVoirphZW`.
 
-Deployment and controlled activation have completed. Connect a compatible Solana wallet to receive a unique Native deposit address after the live availability checks pass. The destination is bound before the address is issued and cannot be redirected by changing wallets. The Bridge is one way, with exact 1:1 Burn → Mint accounting, zero Bridge fee and 12 Native deposit confirmations.
+On-chain deployment and the earlier controlled activation have completed. Current availability and funding-policy activation still come from the live runtime. Bind a compatible Solana wallet; under the new user-funded policy, finalized execution funding is required before a unique Native deposit address is issued. Changing wallets cannot redirect the destination. The Bridge is one way, with exact 1:1 Burn → Mint accounting, a **0 KPEPE Bridge fee**, separate user-funded Solana execution costs, and 12 Native deposit confirmations.
 
-The live status field `executionPolicy` determines whether new operations require a separate SOL execution prepayment. Under `USER_FUNDED`, the connected destination wallet approves the quoted payment before a Native deposit address is issued. This does not change the zero KPEPE Bridge fee or existing operations. The user-facing quote and refund policy are described in [User access](../user-access.md). Publication of code does not itself activate the new policy.
+The live status field `executionPolicy` determines whether new operations require separate SOL execution prepayment. Under `USER_FUNDED`, the bound Phantom wallet approves the dynamic quote; a later pre-burn shortfall requires a top-up for that same operation. Global completion backstop: disabled. Team reserve required: **0 SOL**. Funding is exclusive to each operation; eligible unused allowance is refunded. Legacy identities are preserved: committed burns retain prior treatment, while unburned legacy operations require explicit review rather than automatic conversion. See [User access](../user-access.md) and [API behavior](../api/execution-funding.md). Publication of code does not itself activate the policy.
 
 ## Public status API
 

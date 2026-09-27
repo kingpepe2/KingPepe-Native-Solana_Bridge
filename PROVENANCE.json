@@ -1560,6 +1560,13 @@
       "path": "native/burn/tests/market-story-display.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original KingPepe market and network display integration; no market transaction capabilities."
+    },
+    {
+      "path": "docs/api/execution-funding.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original KingPepe public execution funding behavior and API guidance.",
+      "purpose": "REQUIRED_DOCUMENTATION",
+      "reviewDisposition": "KEEP_DOCUMENTATION"
     }
   ]
 }

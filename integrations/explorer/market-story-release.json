@@ -101,5 +101,20 @@
     "NATIVE_DEPOSIT",
     "PROGRESS"
   ],
-  "stickyBridge": false
+  "stickyBridge": false,
+  "executionGatewayFiles": [
+    {
+      "path": "src/bridge.js",
+      "sha256": "a647dfb794319141f6586860b717c99a6567b0a1c5cbc32891135a0baefc0ebd"
+    },
+    {
+      "path": "src/bridge-client.js",
+      "sha256": "6b522f2033f9917f489828fd516f3861f6f6832053cb0c6f87c735211292401e"
+    },
+    {
+      "path": "src/bridge-backend.js",
+      "sha256": "3f2ad6dc7ee1a6e9d7d8c0e57f609685197a2a7f3479cd1316004254ed12b8da"
+    }
+  ],
+  "fundingPolicyActivation": "PROTECTED_CUTOVER_REQUIRED"
 }

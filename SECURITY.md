@@ -1,6 +1,6 @@
 # Security and responsible disclosure
 
-The public Mainnet Bridge is **ACTIVE**. Use only the official [Bridge](https://kingpepe.net/bridge), verify its current availability, and send Native KPEPE only to the unique deposit address issued for your bound operation.
+Use only the official [Bridge](https://kingpepe.net/bridge), verify its live availability, and send Native KPEPE only to the unique deposit address issued for your bound operation. Under the new user-funded policy, address issuance requires finalized SOL execution funding. The KPEPE Bridge fee is 0 KPEPE; separate Solana execution costs are displayed before wallet approval. No published document or payment signature alone establishes readiness.
 
 Custody, upgrade, and recovery controls are documented internally. Relevant security-assurance information will be published alongside the results of an independent security audit.
 

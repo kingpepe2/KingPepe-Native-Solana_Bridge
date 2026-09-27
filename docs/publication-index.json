@@ -124,6 +124,10 @@
     {
       "path": "docs/market-and-network.md",
       "classification": "PUBLIC_SAFE"
+    },
+    {
+      "path": "docs/api/execution-funding.md",
+      "classification": "PUBLIC_SAFE"
     }
   ]
 }

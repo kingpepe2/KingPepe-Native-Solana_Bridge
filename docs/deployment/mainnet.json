@@ -23,6 +23,7 @@
   "bridgePrograms": "DEPLOYED_VERIFIED",
   "controlledActivation": "PASS",
   "publicStatusUrl": "https://kingpepe.net/api/v1/bridge/status",
-  "statusScope": "Published activation status; current availability and verified totals come from the live status API.",
-  "maximumSupplyAtomic": "2100000000000000"
+  "statusScope": "Historical deployment and activation evidence, not current availability. Current policy, availability and verified totals come from the live status API.",
+  "maximumSupplyAtomic": "2100000000000000",
+  "activationRecord": "HISTORICAL_COMPLETED_ACTIVATION"
 }
