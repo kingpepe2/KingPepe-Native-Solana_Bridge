@@ -62,6 +62,32 @@ test("Mainnet observer rejects a responding wrong chain and cannot lower the app
     collectMainnetEvidence({ rpc: source.rpc, transactionIds: [h(1)], minimumConfirmations }), /FINALITY_POLICY_REQUIRED/);
 });
 
+test("historical evidence survives ordinary tip extension during verification, but rejects a replaced prefix", async () => {
+  for(const reorg of [false,true]){
+    const source=sourceModel(),read=source.rpc.getRawTransaction;
+    source.rpc.getRawTransaction=async(...args)=>{
+      if(reorg)source.replaceTip();
+      source.height(241);
+      return read(...args);
+    };
+    const result=collectMainnetEvidence({rpc:source.rpc,transactionIds:[vector.input.proofs[0].transactionIds[0]],minimumConfirmations:12});
+    if(reorg)await assert.rejects(result,/RAW_NATIVE_SOURCE_CHANGED/);
+    else {const proof=await result;assert.equal(proof.tipHeight,239);assert.equal(proof.tipHash,headerId(vector.input.headers[238]));}
+  }
+});
+
+test("a historical prefix never accepts rollback, inconsistent current tip or lost synchronization", async () => {
+  for(const failure of ['rollback','tip','sync']){
+    const source=sourceModel(),read=source.rpc.getRawTransaction,info=source.rpc.getBlockchainInfo;
+    source.rpc.getRawTransaction=async(...args)=>{
+      if(failure==='rollback')source.height(238);
+      else source.rpc.getBlockchainInfo=async()=>({...await info(),...(failure==='tip'?{bestblockhash:h(99)}:{initialblockdownload:true})});
+      return read(...args);
+    };
+    await assert.rejects(collectMainnetEvidence({rpc:source.rpc,transactionIds:[vector.input.proofs[0].transactionIds[0]],minimumConfirmations:12}),/RAW_NATIVE_SOURCE_CHANGED|RAW_NATIVE_SOURCE_SYNCHRONIZING/);
+  }
+});
+
 test("optional block locations are lookup hints and cannot substitute transaction membership", async () => {
   const { rpc } = sourceModel(), txid = vector.input.proofs[0].transactionIds[0];
   const options = { rpc, transactionIds: [txid], minimumConfirmations: 12 };

@@ -6,8 +6,9 @@ import {NativeRpcClient} from '../node/native-rpc-client.mjs';
 import {parseNativeTransactionHex} from '../node/native-taproot-transaction.mjs';
 import {burnHash,requireBurn as check,nativeAmountRpcString,validateNativeBurnTransaction} from './burn-protocol.mjs';
 import {verifyNativeBurnSignatures} from './burn-key.mjs';
-import {validateNativeBurnNetwork} from './burn-evidence.mjs';
+import {validateNativeBurnNetwork,locateFinalizedBurn} from './burn-evidence.mjs';
 import {nativeIdentity} from '../../shared/network-identity.mjs';
+import {requireNativeChainAnchor} from '../node/native-raw-evidence.mjs';
 
 const sha256d=b=>createHash('sha256').update(createHash('sha256').update(b).digest()).digest();
 function merkle(ids) {
@@ -87,7 +88,8 @@ export class NativeBurnObserver {
       let tx;try{tx=parseNativeTransactionHex(await this.#rpc.getRawTransaction(id,false));}catch(e){if(e.rpcCode===-5)throw new Error('BURN_MEMPOOL_CHANGED_RETRY');throw e;}
       check(tx.txidHex===id,'BURN_MEMPOOL_TRANSACTION_REJECTED');accept(tx,0,null);
     }
-    check((await this.network()).hash===tip.hash,'BURN_NATIVE_DISCOVERY_CHANGED');
+    try{await requireNativeChainAnchor(this.#rpc,{genesisHash:this.#identity.genesis,chain:this.#identity.rpcChain,tipHeight:tip.height,tipHash:tip.hash});}
+    catch(error){if(error.message==='RAW_NATIVE_SOURCE_CHANGED')throw Error('BURN_NATIVE_DISCOVERY_CHANGED');throw error;}
     return {tip,cursor,observations:[...observations].map(([id,rows])=>({id,observations:[...rows.values()]})),caughtUp:cursor.height===tip.height};
   }
   async operationalCoins(scriptPubKeyHex,reserved) {
@@ -123,7 +125,7 @@ export class NativeBurnObserver {
   async burnStatus(plan,burnBlockHash) {
     await this.network();let tx;
     if(this.#identity.environment==='mainnet'){
-      const found=await this.#rpc.locateMainnetTransaction({txid:plan.txid,vout:1,blockHash:burnBlockHash});
+      const found=await locateFinalizedBurn(this.#rpc,plan.txid,burnBlockHash);
       if(found.state!=='OBSERVED')return {found:false,confirmations:0,transactionAbsenceProven:false};
       tx={hex:found.rawTransactionHex,confirmations:found.confirmations};
     }else try{tx=await this.#rpc.getRawTransaction(plan.txid,true);}catch(e){if(e.rpcCode===-5)return {found:false,confirmations:0};throw e;}

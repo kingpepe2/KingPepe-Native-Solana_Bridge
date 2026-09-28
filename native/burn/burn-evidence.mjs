@@ -3,7 +3,7 @@
 import { createHash } from 'node:crypto';
 import { NativeRpcClient } from '../node/native-rpc-client.mjs';
 import { collectRegtestEvidence, encodeRegtestEvidence, verifyRegtestEvidencePacket,
-  collectMainnetEvidence, encodeMainnetEvidence, verifyMainnetEvidencePacket } from '../node/native-raw-evidence.mjs';
+  collectMainnetEvidence, encodeMainnetEvidence, verifyMainnetEvidencePacket,requireNativeChainAnchor } from '../node/native-raw-evidence.mjs';
 import { nativeIdentity } from '../../shared/network-identity.mjs';
 import { parseNativeTransactionHex } from '../node/native-taproot-transaction.mjs';
 import { burnDepositDestination, burnOperationalDestination, verifyNativeBurnSignatures } from './burn-key.mjs';
@@ -38,7 +38,7 @@ function freeze(value) {
   return Object.freeze(value);
 }
 export class NativeBurnVerifier {
-  #rpc;#executable;#identity;
+  #rpc;#executable;#identity;#finalized=new Map();
   constructor({rpc,executable,environment}) {
     check(rpc instanceof NativeRpcClient,'NativeBurnRpcRequired');
     this.#rpc=rpc;this.#executable=executable;this.#identity=nativeIdentity(environment);
@@ -89,12 +89,27 @@ export class NativeBurnVerifier {
   }
   async verifyFinalizedBurn({binding,plan,burnBlockHash}) {
     binding=structuredClone(binding);plan=structuredClone(plan);this.#checkPlan(binding,plan);
+    const key=digest({binding,plan}),cached=this.#finalized.get(key);
+    if(cached){
+      try{
+        check(!burnBlockHash||burnBlockHash===cached.result.evidence.burnBlockHash,'NativeBurnSourceChanged');
+        const location=this.#identity.environment==='mainnet'
+          ?await locateFinalizedBurn(this.#rpc,plan.txid,cached.result.evidence.burnBlockHash)
+          :await this.#rpc.getRawTransaction(plan.txid,true);
+        check(this.#identity.environment==='mainnet'?location.state==='OBSERVED'&&location.rawTransactionHex===cached.raw:
+          location.hex===cached.raw&&location.blockhash===cached.result.evidence.burnBlockHash,'NativeBurnSignedTransactionChanged');
+        check(location.confirmations>=BURN_CONFIRMATIONS,'NativeBurnNotFinal');
+        check((await this.#rpc.getUtxoObservation({txid:plan.txid,vout:0,includeMempool:true})).unspent===false,'NativeBurnUnexpectedSpendableOutput');
+        await this.#anchor(cached.result);
+        return cached.result;
+      }catch(error){this.#finalized.delete(key);throw error;}
+    }
     let hints=plan.transactionBlockHints;
     if(this.#identity.environment==='mainnet'){
       // The change output locates a newly mined burn without txindex. Once
       // finalized, the durable burn evidence provides its independently checked
       // block location even after that operational change has been spent.
-      const location=await this.#rpc.locateMainnetTransaction({txid:plan.txid,vout:1,blockHash:burnBlockHash});
+      const location=await locateFinalizedBurn(this.#rpc,plan.txid,burnBlockHash);
       check(location.state==='OBSERVED'&&location.confirmations>=BURN_CONFIRMATIONS&&location.blockHash,'NativeBurnNotFinal');
       hints={...hints,[plan.txid]:location.blockHash};
     }
@@ -111,12 +126,28 @@ export class NativeBurnVerifier {
       burn:{txid:plan.txid,vout:0},burnBlockHash:blockHash(burn.blockHeight),burnHeight:burn.blockHeight,amountAtomic,
       burnCommitment:nativeBurnCommitment({operationId:plan.operationId,deposit,amountAtomic})};
     const bytes=encodeFinalizedBurnEvidence(evidence);
-    check((await this.#rpc.call('getbestblockhash')).result===bundle.tipHash,'NativeBurnSourceChanged');
+    await this.#anchor(bundle);
     const result=freeze({evidence,evidenceHex:bytes.toString('hex'),evidenceDigest:burnEvidenceDigest(evidence),rawProofDigest:verified.digestHex,
       tipHash:bundle.tipHash,tipHeight:bundle.tipHeight,burnConfirmations:bundle.tipHeight-burn.blockHeight+1});
     FINALIZED_BURNS.set(result,{binding:burnOperationId(binding),plan:digest(plan)});
+    // Only a successful independent PoW/Merkle/signature verification creates
+    // an in-memory cache entry. Every reuse rechecks the raw burn, finality,
+    // unspendability and current membership of its entire verified prefix.
+    // No cache is loaded from journal flags or persisted across a restart.
+    if(this.#finalized.size>=512)this.#finalized.delete(this.#finalized.keys().next().value);
+    this.#finalized.set(key,{result,raw:burn.rawTransactionHex});
     return result;
   }
+  async #anchor(value){
+    try{await requireNativeChainAnchor(this.#rpc,{genesisHash:this.#identity.genesis,chain:this.#identity.rpcChain,tipHeight:value.tipHeight,tipHash:value.tipHash});}
+    catch(error){if(error.message==='RAW_NATIVE_SOURCE_CHANGED')throw Error('NativeBurnSourceChanged');throw error;}
+  }
+}
+// Retry only a raced historical lookup with an already bound block. Never
+// retry substitution, missing membership or an ambiguous unconfirmed burn.
+export async function locateFinalizedBurn(rpc,txid,blockHash){
+  for(let attempt=0;;attempt++)try{return await rpc.locateMainnetTransaction({txid,vout:1,blockHash});}
+  catch(error){if(!blockHash||attempt>=1||!['NativeTransactionLookupSourceChanged','NativeTransactionLookupConfirmationChanged'].includes(error.message))throw error;}
 }
 // Preserve the explicit REGTEST constructor used by the retained proof runner.
 export class RegtestNativeBurnVerifier extends NativeBurnVerifier {

@@ -128,10 +128,10 @@ test("collector rejects IBD, unknown IBD, wrong genesis, stale source and change
     await assert.rejects(() => collectRegtestEvidence({ rpc: rpcModel({ getBlockchainInfo: async () => ({ ...defaults, ...patch }) }),
       transactionIds: [txid], minimumConfirmations: 1 }), /RAW_NATIVE_/u);
   }
-  for (const methodToChange of ["genesis", "getbestblockhash"]) {
+  for (const methodToChange of ["genesis", "anchor"]) {
     const original = rpcModel();
     const rpc = rpcModel({ call: async (method, params) => (
-      method === methodToChange || (methodToChange === "genesis" && method === "getblockhash" && params[0] === 0)
+      method === "getblockhash" && params[0] === (methodToChange === "genesis" ? 0 : 1)
         ? { result: h("ff") } : original.call(method, params)) });
     await assert.rejects(() => collectRegtestEvidence({ rpc, transactionIds: [txid], minimumConfirmations: 1 }),
       /RAW_NATIVE_WRONG_GENESIS|RAW_NATIVE_SOURCE_CHANGED/u);

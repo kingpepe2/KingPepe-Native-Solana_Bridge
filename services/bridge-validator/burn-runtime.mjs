@@ -282,7 +282,12 @@ export class BurnRuntime {
       const status=await this.#solana.packetStatus(row.packet,op.binding,op.plan,op.attestation);
       if(status.status?.confirmationStatus==='finalized'&&status.status.err===null){
         const receipt=await this.#solana.mintReceipt(op,row.packet,status.observed);
-        this.#update(state=>{markBurnSolanaPacket(state,op.operationId,row.packet.signature,{outcome:'FINALIZED',sendAttempts:row.sendAttempts,observedSlot:status.observed.slot});retainBurnMint(state,op.operationId,receipt);});return true;
+        // Revalidate the exact finalized receipt every cycle, but do not rewrite
+        // an already identical completed operation merely to advance a read slot.
+        // Protected writes are reserved for actual recovery/state transitions.
+        if(op.mintReceipt){check(stableJson(op.mintReceipt)===stableJson(receipt),'BurnJournalSecondMintRejected');
+          check(BigInt(status.observed.slot)>=BigInt(row.observedSlot),'BurnJournalPacketSlotRegressed');}
+        if(!op.mintReceipt||row.outcome!=='FINALIZED')this.#update(state=>{markBurnSolanaPacket(state,op.operationId,row.packet.signature,{outcome:'FINALIZED',sendAttempts:row.sendAttempts,observedSlot:status.observed.slot});retainBurnMint(state,op.operationId,receipt);});return true;
       }
     }
     return false;

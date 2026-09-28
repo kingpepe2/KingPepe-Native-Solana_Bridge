@@ -14,6 +14,15 @@ import {initialBurnJournal} from '../../services/bridge-validator/burn-journal-s
 import {openBurnServiceRuntime} from '../../services/bridge-validator/burn-service-runtime.mjs';
 import {loadBurnServiceConfiguration} from '../../services/bridge-validator/burn-service.mjs';
 import {NativeBurnObserver} from '../../native/burn/burn-observer.mjs';
+import {NativeBurnVerifier} from '../../native/burn/burn-evidence.mjs';
+import {BurnSolanaAdapter} from '../../services/solana-observer/burn-solana-adapter.mjs';
+import {ed25519} from '@noble/curves/ed25519.js';
+import {setTimeout as delay} from 'node:timers/promises';
+import {performance} from 'node:perf_hooks';
+import {issueBurnDeposit,prepareBurnAuthorization,retainBurnAttestation,retainBurnSolanaPacket,markBurnSolanaPacket,retainBurnMint,completeBurnOperation} from '../../services/bridge-validator/burn-journal-state.mjs';
+import {burnSolanaPlanOptions} from '../../services/relayer/burn-solana-signer.mjs';
+import {base58Encode,prepareSignedLocalnetSolanaDepositClaimTransaction} from '../../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs';
+import {decodeCanonicalBridgeMessage} from '../../shared/protocol/canonical-message.mjs';
 if(process.platform!=='win32')throw Error('WINDOWS_MAINNET_COMPOSITION_REQUIRES_WINDOWS');
 
 test('protected production composition opens its own paused journal and cannot inherit TEST resume or plaintext RPC options',async t=>{
@@ -85,5 +94,44 @@ test('protected production composition opens its own paused journal and cannot i
         assert.deepEqual(service.journal.read().operations,before.operations);
       }
     }finally{observation.mock.restore();}
+  });
+  await t.test('serialized accounting revalidates finalized receipts without rewriting them, preserves two legacy operations and stays inside the unchanged freshness budget',async()=>{
+    f.finalize();const authorization=f.authorize();
+    prepareBurnAuthorization(f.state,f.id,authorization.encodedMessageHex);retainBurnAttestation(f.state,f.id,authorization);
+    const recentBlockhash=base58Encode(Buffer.alloc(32,1)),lastValidBlockHeight='301';
+    const signed=await prepareSignedLocalnetSolanaDepositClaimTransaction({...burnSolanaPlanOptions({context:f.context,binding:f.binding,feePayerHex:f.policy.feePayerHex,...authorization,recentBlockhash,lastValidBlockHeight}),
+      feePayerSigner:{publicKeyHex:f.policy.feePayerHex,sign:bytes=>ed25519.sign(bytes,f.payer)}});
+    const packet={kind:'CLAIM',recentBlockhash,lastValidBlockHeight,messageDigestHex:decodeCanonicalBridgeMessage(Buffer.from(authorization.encodedMessageHex,'hex')).messageDigestHex,
+      preparedTransactionBase64:signed.preparedTransactionBase64,signature:signed.signatures[0].signatureBase58};
+    retainBurnSolanaPacket(f.state,f.id,packet);markBurnSolanaPacket(f.state,f.id,packet.signature,{outcome:'FINALIZED',sendAttempts:1,observedSlot:'21'});
+    const receipt={operationId:f.id,amountAtomic:f.deposit.amountAtomic,destination:f.binding.destination,mint:f.binding.mint,signature:packet.signature,slot:'21',commitment:'finalized'};
+    retainBurnMint(f.state,f.id,receipt);completeBurnOperation(f.state,f.id);f.state.mainnetControl.mode='NORMAL';
+    for(const n of [2,3])issueBurnDeposit(f.state,{...f.binding,nonce:Buffer.alloc(32,n).toString('hex')},20);
+    f.state.paused=true;f.state.pauseReason='OPERATOR_PAUSE';service.journal.update(s=>Object.assign(s,structuredClone(f.state)));
+    const before=service.journal.read(),updates=t.mock.method(service.journal,'update');
+    let active=0,maximum=0,cycles=0,receipts=0,invalid=false;
+    const mocks=[t.mock.method(NativeBurnObserver.prototype,'discover',async state=>{
+      active++;maximum=Math.max(maximum,active);await delay(15);cycles++;
+      return {tip:{height:44+cycles,hash:'11'.repeat(32)},cursor:state.nativeScan,observations:[],caughtUp:true};
+    }),t.mock.method(NativeBurnObserver.prototype,'burnStatus',async()=>({found:true,confirmations:12+cycles})),
+    t.mock.method(NativeBurnVerifier.prototype,'verifyFinalizedBurn',async()=>({evidence:f.evidence})),
+    t.mock.method(BurnSolanaAdapter.prototype,'observe',async()=>({claimExists:true})),
+    t.mock.method(BurnSolanaAdapter.prototype,'packetStatus',async()=>({status:{confirmationStatus:'finalized',err:null},observed:{slot:'100'}})),
+    t.mock.method(BurnSolanaAdapter.prototype,'mintReceipt',async()=>{receipts++;return {...receipt,...(invalid?{signature:'3'.repeat(88)}:{})};}),
+    t.mock.method(BurnSolanaAdapter.prototype,'deployment',async()=>{active--;return {managerMintedAtomic:f.deposit.amountAtomic,mintSupplyAtomic:f.deposit.amountAtomic};})];
+    try{
+      const started=performance.now();const results=await Promise.all([service.runtime.cycle({readOnly:true}),service.runtime.cycle({readOnly:true})]);
+      assert(performance.now()-started<30000,'protected composition must finish within unchanged freshness budget');
+      assert.equal(maximum,1);assert.equal(receipts,2);assert.equal(cycles,2);
+      assert.equal(updates.mock.callCount(),2,'only discovery writes, no completed receipt rewrites');
+      for(const r of results){assert.equal(r.reconciliation,'MATCH');assert.equal(r.accounting.mintedAtomic,f.deposit.amountAtomic);assert.equal(r.productionReady,false);assert.equal(r.paused,true);}
+      assert.deepEqual(service.journal.read().operations,before.operations);
+      invalid=true;const failure=await service.runtime.cycle({readOnly:true});
+      assert.equal(failure.accounting,null);assert.equal(failure.reason,'BurnJournalSecondMintRejected');
+      assert.deepEqual(service.journal.read().operations,before.operations);
+      assert.equal(service.runtime.status().executionPolicy,'LEGACY_OPERATOR_FUNDED');
+      // Any real RPC/signing/submission path would have failed global fetch;
+      // neither verification nor simulated tip movement creates an economic packet.
+    }finally{updates.mock.restore();for(const mock of mocks)mock.mock.restore();}
   });
 });

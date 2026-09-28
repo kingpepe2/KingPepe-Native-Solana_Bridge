@@ -8,6 +8,23 @@ import { randomUUID } from "node:crypto";
 import { NATIVE_MAINNET_GENESIS, NATIVE_REGTEST_GENESIS } from "../../../shared/network-identity.mjs";
 import { createUnsignedNativeTransaction, parseNativeTransactionHex } from "../native-taproot-transaction.mjs";
 import { test } from "node:test";
+import { locateFinalizedBurn } from "../../burn/burn-evidence.mjs";
+
+test('bound historical lookup retries only one tip/confirmation race; inconsistent evidence never becomes success',async()=>{
+  const txid='11'.repeat(32),blockHash='22'.repeat(32);
+  for(const code of ['NativeTransactionLookupSourceChanged','NativeTransactionLookupConfirmationChanged']){
+    let calls=0;
+    const rpc={locateMainnetTransaction:async input=>{assert.deepEqual(input,{txid,vout:1,blockHash});if(++calls===1)throw Error(code);return {state:'OBSERVED'};}};
+    assert.deepEqual(await locateFinalizedBurn(rpc,txid,blockHash),{state:'OBSERVED'});assert.equal(calls,2);
+    calls=0;rpc.locateMainnetTransaction=async()=>{calls++;throw Error(code);};
+    await assert.rejects(locateFinalizedBurn(rpc,txid,blockHash),{message:code});assert.equal(calls,2);
+    calls=0;await assert.rejects(locateFinalizedBurn(rpc,txid),{message:code});assert.equal(calls,1);
+  }
+  for(const code of ['NativeTransactionLookupSubstituted','NativeTransactionLookupBlockNotActive','NativeTransactionLookupMembershipChanged']){
+    let calls=0;const rpc={locateMainnetTransaction:async()=>{calls++;throw Error(code);}};
+    await assert.rejects(locateFinalizedBurn(rpc,txid,blockHash),{message:code});assert.equal(calls,1);
+  }
+});
 import {
   NativeRpcClient,
   RPC_OBSERVATION,
