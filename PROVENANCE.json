@@ -1567,6 +1567,13 @@
       "notes": "Original KingPepe public execution funding behavior and API guidance.",
       "purpose": "REQUIRED_DOCUMENTATION",
       "reviewDisposition": "KEEP_DOCUMENTATION"
+    },
+    {
+      "path": "services/bridge-validator/tests/burn-service-cadence.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
+      "purpose": "REQUIRED_TEST",
+      "reviewDisposition": "KEEP_TEST"
     }
   ]
 }

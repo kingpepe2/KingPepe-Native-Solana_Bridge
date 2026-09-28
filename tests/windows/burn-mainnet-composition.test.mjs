@@ -123,9 +123,19 @@ test('protected production composition opens its own paused journal and cannot i
       const started=performance.now();const results=await Promise.all([service.runtime.cycle({readOnly:true}),service.runtime.cycle({readOnly:true})]);
       assert(performance.now()-started<30000,'protected composition must finish within unchanged freshness budget');
       assert.equal(maximum,1);assert.equal(receipts,2);assert.equal(cycles,2);
-      assert.equal(updates.mock.callCount(),2,'only discovery writes, no completed receipt rewrites');
+      assert.equal(updates.mock.callCount(),0,'unchanged discovery and completed receipts must not rewrite protected state');
       for(const r of results){assert.equal(r.reconciliation,'MATCH');assert.equal(r.accounting.mintedAtomic,f.deposit.amountAtomic);assert.equal(r.productionReady,false);assert.equal(r.paused,true);}
       assert.deepEqual(service.journal.read().operations,before.operations);
+      const reads=t.mock.method(service.journal,'read'),observedAt=results.at(-1).accounting.observedAt;
+      try{
+        for(let i=0;i<100;i++)assert.equal(service.runtime.status().accounting.observedAt,observedAt);
+        assert.equal(reads.mock.callCount(),0,'status polling must not run synchronous DPAPI reads');
+        const clock=t.mock.method(Date,'now',()=>observedAt+31259);
+        try{
+          assert.equal(service.runtime.status().accounting,null,'the captured success gap expires accounting, even with a cached public summary');
+          assert.equal(service.runtime.status().productionReady,false);
+        }finally{clock.mock.restore();}
+      }finally{reads.mock.restore();}
       invalid=true;const failure=await service.runtime.cycle({readOnly:true});
       assert.equal(failure.accounting,null);assert.equal(failure.reason,'BurnJournalSecondMintRejected');
       assert.deepEqual(service.journal.read().operations,before.operations);

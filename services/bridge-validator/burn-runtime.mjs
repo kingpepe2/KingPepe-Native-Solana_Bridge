@@ -79,10 +79,15 @@ export class BurnRuntime {
   }
   async #discover(){
     const state=this.#journal.read(),scan=await this.#observer.discover({...state,operations:executionWatchOperations(state)});
-    this.#update(state=>{for(const row of scan.observations){
+    // An unchanged scan needs no DPAPI rewrite. Apply the same reducers to a
+    // disposable snapshot first; disappearance of an accepted deposit is NOT
+    // an empty/no-op scan and must still persist its safety hold.
+    const apply=state=>{for(const row of scan.observations){
       if(state.operations.some(o=>o.operationId===row.id))recordBurnDeposits(state,row.id,row.observations);
       if(executionRecord(state,row.id))recordExecutionNativeObservations(state,row.id,row.observations);
-    }state.nativeScan=scan.cursor;});
+    }state.nativeScan=scan.cursor;};
+    const observed=structuredClone(state);apply(observed);
+    if(stableJson(observed)!==stableJson(state))this.#update(apply);
     for(const row of scan.observations)this.#observed.set(row.id,{...(this.#observed.get(row.id)??{}),deposits:row.observations});
     return scan;
   }
@@ -183,13 +188,15 @@ export class BurnRuntime {
       mintHex:op.binding.mint,exception:op.exception?.reason??null,retired:op.retired,...(state.execution?{executionFunding:publicExecutionFunding(state,id)}:{})};
   }
   status() {
-    const state=this.#journal.read(),fresh=Date.now()>=this.#accountingVerifiedAt&&Date.now()-this.#accountingVerifiedAt<=30000;
+    // Public polling cannot block reconciliation with synchronous decryption.
+    // This display snapshot never refreshes proof age or authorizes a signer.
+    const state=this.#journal.publicSummary(),fresh=Date.now()>=this.#accountingVerifiedAt&&Date.now()-this.#accountingVerifiedAt<=30000;
     return {architecture:'ONE_WAY_AUTOMATIC_BURN_AND_MINT',environment:this.#context.environment,
       nativeNetwork:nativeIdentity(this.#context.environment).network.toUpperCase(),solanaNetwork:this.#context.environment.toUpperCase(),mintHex:this.#context.deployment.mint,
       paused:state.paused,...structuredClone(this.#health),activationMode:state.mainnetControl?.mode??'TEST',
       executionPolicy:state.execution?'USER_FUNDED':'LEGACY_OPERATOR_FUNDED',executionFundingReady:!state.execution||this.#execution.ready&&!state.execution.operatorHold,
       ...mainnetRuntimeFlags(state,{healthy:this.#health.state==='HEALTHY',fresh,reconciliation:this.#health.reconciliation,programState:this.#mainnetMode()}),
-      accounting:this.#health.reconciliation==='MATCH'&&fresh?{...burnJournalAccounting(state),observedAt:this.#accountingVerifiedAt,liveMintSupplyAtomic:this.#liveMintSupplyAtomic}:null};
+      accounting:this.#health.reconciliation==='MATCH'&&fresh?{...state.accounting,observedAt:this.#accountingVerifiedAt,liveMintSupplyAtomic:this.#liveMintSupplyAtomic}:null};
   }
   // Operator-only local method. No public gateway route exposes resume/pause.
   resumeReviewedTestRuntime() {
@@ -218,7 +225,9 @@ export class BurnRuntime {
         if(op.burnEvidence)check(sameEvidence(op.burnEvidence,proof.evidence),'FINALIZED_BURN_CHANGED');
         else {this.#update(state=>retainFinalBurn(state,op.operationId,proof.evidence));this.#emit('BURN_FINALIZED',op.operationId);}
         finalized+=BigInt(proof.evidence.amountAtomic);
-        if(!await this.#recoverMint(this.#op(op.operationId))){this.#health={state:'PENDING',reconciliation:null,reason:'SOLANA_EXECUTION_RECOVERY_PENDING'};return this.status();}
+        // Cycles/mutations are serialized. Re-read only a newly retained proof;
+        // completed records were already validated in this cycle's snapshot.
+        if(!await this.#recoverMint(op.burnEvidence?op:this.#op(op.operationId))){this.#health={state:'PENDING',reconciliation:null,reason:'SOLANA_EXECUTION_RECOVERY_PENDING'};return this.status();}
       }
       let deployed=await this.#solana.deployment();
       if(burnJournalAccounting(this.#journal.read()).mintedAtomic!==deployed.managerMintedAtomic){
@@ -241,13 +250,14 @@ export class BurnRuntime {
           this.#health={state:'PENDING',reconciliation:null,reason:'SOLANA_FINALIZED_SNAPSHOT_ADVANCED'};return this.status();
         }
       }
-      reconcileBurnAccounting(this.#journal.read(),{finalizedNativeBurnAtomic:finalized.toString(),bridgeIssuedAtomic:deployed.managerMintedAtomic,mintSupplyAtomic:deployed.mintSupplyAtomic});
-      for(const op of this.#journal.read().operations)if(op.state==='MINTED'){
+      const reconciled=this.#journal.read();
+      reconcileBurnAccounting(reconciled,{finalizedNativeBurnAtomic:finalized.toString(),bridgeIssuedAtomic:deployed.managerMintedAtomic,mintSupplyAtomic:deployed.mintSupplyAtomic});
+      for(const op of reconciled.operations)if(op.state==='MINTED'){
         this.#update(state=>completeBurnOperation(state,op.operationId));this.#emit('COMPLETED',op.operationId);
       }
       this.#accountingVerifiedAt=Date.now();this.#liveMintSupplyAtomic=deployed.mintSupplyAtomic;
-      const paused=this.#journal.read().paused;
-      this.#health={state:paused?'PAUSED':'HEALTHY',reconciliation:'MATCH',reason:paused?this.#journal.read().pauseReason:null};
+      const paused=reconciled.paused;
+      this.#health={state:paused?'PAUSED':'HEALTHY',reconciliation:'MATCH',reason:paused?reconciled.pauseReason:null};
       try{await this.#execution.synchronize();this.#fundingReason=null;}catch(error){this.#fundingReason=burnRuntimeErrorCode(error);this.#emit('EXECUTION_FUNDING_HELD',null,{reason:this.#fundingReason});}
       if(paused||readOnly)return this.status();
       // Fee failures isolate new admissions. Already-signed burns retain priority and never await user payment.
