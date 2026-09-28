@@ -117,7 +117,11 @@ try{
   assert(headersRead>0);pass('NORMAL_TIP_ADVANCE_DURING_INDEPENDENT_BURN_VERIFICATION');
   const tip=await harness('getbestblockhash');await harness('invalidateblock',[tip]);
   const anchor=await harness('getbestblockhash');await harness('invalidateblock',[anchor]);
-  await mine(2); // Historical burn is unchanged, but the verified prefix was replaced.
+  // A distinct coinbase destination makes the fork different even when a fast
+  // runner mines within the same timestamp; never regenerate an invalidated block.
+  const forkMining=await harness('getnewaddress',['fork','bech32m'],'user');
+  await harness('generatetoaddress',[2,forkMining]);
+  assert.notEqual(await harness('getblockhash',[advancing.tipHeight]),advancing.tipHash);
   await assert.rejects(verifier.verifyFinalizedBurn({binding,plan}),/NativeBurnSourceChanged/);
   headersRead=0;const rebuiltProof=await verifier.verifyFinalizedBurn({binding,plan});
   assert.equal(rebuiltProof.evidenceHex,final.evidenceHex);assert(headersRead>0);pass('REORG_EVICTS_CACHE_AND_REQUIRES_NEW_INDEPENDENT_PROOF');
