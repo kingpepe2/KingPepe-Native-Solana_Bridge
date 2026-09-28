@@ -117,6 +117,17 @@ test("Mainnet lookup rejects wrong identity, substituted transactions, reorg hin
   assert.deepEqual(f.calls, []);
 });
 
+test("a changed Native lookup tip yields no observation and a later lookup must read the transaction again", async () => {
+  const f = mainnetLookupFixture(); f.control.indexed = true; f.control.changeTip = true;
+  await assert.rejects(f.rpc.locateMainnetTransaction({ txid: f.txid }), { message: "NativeTransactionLookupSourceChanged" });
+  const previousReads = f.calls.filter(c => c.method === "getrawtransaction").length;
+  f.control.changeTip = false;
+  const observed = await f.rpc.locateMainnetTransaction({ txid: f.txid });
+  assert.equal(observed.state, "OBSERVED"); assert.equal(observed.trust, RPC_OBSERVATION);
+  assert.equal(f.calls.filter(c => c.method === "getrawtransaction").length, previousReads + 1);
+  assert(!f.calls.some(c => c.method === "sendrawtransaction"));
+});
+
 for (const method of ["getblockchaininfo", "sendrawtransaction"]) test("Native RPC refuses redirected " + method + " without contacting another endpoint", async () => {
   let forwarded = 0;
   const destination = http.createServer((request, response) => {

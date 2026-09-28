@@ -13,6 +13,7 @@ import {initialBurnAttesterState} from '../../services/attesters/protected-burn-
 import {initialBurnJournal} from '../../services/bridge-validator/burn-journal-state.mjs';
 import {openBurnServiceRuntime} from '../../services/bridge-validator/burn-service-runtime.mjs';
 import {loadBurnServiceConfiguration} from '../../services/bridge-validator/burn-service.mjs';
+import {NativeBurnObserver} from '../../native/burn/burn-observer.mjs';
 if(process.platform!=='win32')throw Error('WINDOWS_MAINNET_COMPOSITION_REQUIRES_WINDOWS');
 
 test('protected production composition opens its own paused journal and cannot inherit TEST resume or plaintext RPC options',async t=>{
@@ -61,4 +62,28 @@ test('protected production composition opens its own paused journal and cannot i
   await assert.rejects(service.runtime.enableNormalMainnet(),/ReviewIncomplete/);
   assert.throws(()=>service.journal.update(s=>{s.mainnetControl.mode='NORMAL'}),/ControlledBindingRejected/);
   assert.equal(service.journal.read().mainnetControl.mode,'PREPARED');
+  await t.test('a Native lookup tip race withholds accounting and never authorizes processing or creates a persistent pause',async()=>{
+    service.journal.update(s=>{s.mainnetControl=structuredClone(f.state.mainnetControl);s.operations=structuredClone(f.state.operations);s.paused=false;s.pauseReason='SYNTHETIC_READ_ONLY_REVIEW';});
+    const before=service.journal.read();
+    let code='NativeTransactionLookupSourceChanged';
+    const observation=t.mock.method(NativeBurnObserver.prototype,'discover',async()=>{throw Error(code);});
+    try{
+      const health=await service.runtime.cycle({readOnly:true});
+      assert.equal(health.state,'PENDING');assert.equal(health.reason,code);
+      assert.equal(health.reconciliation,null);assert.equal(health.accounting,null);assert.equal(health.productionReady,false);
+      assert.deepEqual(service.journal.read(),before);
+      await assert.rejects(service.runtime.resumeReviewedMainnetRuntime(),/ReviewIncomplete/);
+      await assert.rejects(service.runtime.activateUserFundedExecution(),/ReviewIncomplete|Activation/);
+      service.journal.pause('OPERATOR_PAUSE');
+      const paused=service.journal.read();
+      await service.runtime.cycle({readOnly:true});
+      assert.deepEqual(service.journal.read(),paused);
+      for(code of ['NativeTransactionLookupSubstituted','NativeTransactionLookupBlockNotActive','BURN_MINT_RECONCILIATION_MISMATCH']){
+        const failed=await service.runtime.cycle({readOnly:true});
+        assert.equal(failed.state,'PAUSED');assert.equal(failed.accounting,null);
+        assert.equal(service.journal.read().pauseReason,code.toUpperCase());
+        assert.deepEqual(service.journal.read().operations,before.operations);
+      }
+    }finally{observation.mock.restore();}
+  });
 });

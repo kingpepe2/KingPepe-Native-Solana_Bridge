@@ -27,6 +27,9 @@ const PENDING=new Set(['BURN_SOLANA_RPC_UNAVAILABLE','BURN_SOLANA_OPERATIONAL_FU
   'BURN_SOLANA_EXECUTION_PENDING','BURN_SOLANA_CLOCK_UNAVAILABLE','BURN_SOLANA_FEE_QUOTE_UNAVAILABLE',
   'BURN_FEE_POLICY_EXCEPTION','NativeFeeOperatorReviewRequired','NativeFeeEstimateUnavailable','NativeFeeObservationRejected',
   'NativeBurnInputUnavailable','NativeBurnSourceChanged','NativeEvidenceTipChanged','BURN_NATIVE_DISCOVERY_CHANGED',
+  // Discard the raced observation. A new cycle must recheck both chains;
+  // this neither accepts a lookup result nor clears an existing journal pause.
+  'NativeTransactionLookupSourceChanged',
   'BURN_MEMPOOL_CHANGED_RETRY','BURN_FEE_DISCOVERY_UNAVAILABLE','BURN_INPUT_SPENT_OR_AMBIGUOUS',
   'BURN_NATIVE_SYNCHRONIZING','RAW_NATIVE_SOURCE_SYNCHRONIZING','RAW_NATIVE_SOURCE_CHANGED']);
 export function burnRuntimeErrorCode(error) {
