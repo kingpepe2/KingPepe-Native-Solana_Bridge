@@ -99,17 +99,20 @@ try{
   pass('RAW_HEADERS_MERKLE_EXACT_BURN_AND_FINALITY');
   // Exercise real historical proof caching against the owned chain, never a
   // serialized journal flag. Only the test harness mines/reorganizes this node.
-  const originalCall=rpc.call.bind(rpc),originalRaw=rpc.getRawTransaction.bind(rpc);
-  let headersRead=0,economicCalls=0,advanceOnBurnRead=false;
+  const originalCall=rpc.call.bind(rpc),originalUtxo=rpc.getUtxoObservation.bind(rpc);
+  let headersRead=0,economicCalls=0,advanceAfterProof=false;
   rpc.call=async(method,...args)=>{if(method==='getblockheader')headersRead++;
     if(['sendrawtransaction','sendtoaddress'].includes(method))economicCalls++;return originalCall(method,...args);};
-  rpc.getRawTransaction=async(id,...args)=>{if(advanceOnBurnRead&&id===plan.txid){advanceOnBurnRead=false;await mine(1);}return originalRaw(id,...args);};
+  rpc.getUtxoObservation=async input=>{const result=await originalUtxo(input);
+    // This read follows completed Rust/Merkle/signature verification. Advancing
+    // here reproduces the exact former NativeBurnSourceChanged final-check race.
+    if(advanceAfterProof&&input.txid===plan.txid){advanceAfterProof=false;await mine(1);}return result;};
   await mine(1);const warm=await verifier.verifyFinalizedBurn({binding,plan});
   assert.equal(warm,final);assert.equal(headersRead,0);assert.equal(economicCalls,0);pass('VERIFIED_HISTORICAL_BURN_REUSED_WITH_FRESH_MEMBERSHIP');
   // A fresh independent proof must survive extension between its snapshot and
   // final anchor check, retaining the original, actually verified prefix.
   verifier=new RegtestNativeBurnVerifier({rpc,executable:process.env.KINGPEPE_TEST_NATIVE_VERIFIER});
-  advanceOnBurnRead=true;const advancing=await verifier.verifyFinalizedBurn({binding,plan});
+  advanceAfterProof=true;const advancing=await verifier.verifyFinalizedBurn({binding,plan});
   assert.equal(advancing.evidenceHex,final.evidenceHex);assert.equal((await rpc.getBlockchainInfo()).blocks,advancing.tipHeight+1);
   assert(headersRead>0);pass('NORMAL_TIP_ADVANCE_DURING_INDEPENDENT_BURN_VERIFICATION');
   const tip=await harness('getbestblockhash');await harness('invalidateblock',[tip]);
