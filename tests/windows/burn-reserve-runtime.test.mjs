@@ -15,7 +15,7 @@ import {burnDepositDestination,burnOperationalDestination,signNativeBurnWithKey}
 import {initialBurnAuthorizations,ProtectedNativeBurnSigner} from '../../native/burn/protected-burn-signer.mjs';
 import {initialBurnAttesterState,ProtectedBurnAttester} from '../../services/attesters/protected-burn-attester.mjs';
 import {initialBurnJournal,issueBurnDeposit,recordBurnDeposits,prepareBurnAuthorization,retainBurnAttestation,retainBurnSolanaPacket,
-  markBurnSolanaPacket,retainBurnMint,completeBurnOperation,burnReserveCommitments,burnExecutionOwner} from '../../services/bridge-validator/burn-journal-state.mjs';
+  markBurnSolanaPacket,retainBurnMint,completeBurnOperation,burnReserveCommitments,burnExecutionOwner,burnAdmissionBusy,ADMISSION_WINDOW_BLOCKS} from '../../services/bridge-validator/burn-journal-state.mjs';
 import {openBurnServiceRuntime} from '../../services/bridge-validator/burn-service-runtime.mjs';
 import {NativeBurnObserver} from '../../native/burn/burn-observer.mjs';
 import {NativeBurnVerifier} from '../../native/burn/burn-evidence.mjs';
@@ -34,7 +34,7 @@ const ENVELOPE=burnReserveEnvelope(quote);
 async function composition(t) {
   const f=burnFixture({mainnet:true}),root=mkdtempSync(path.join(os.tmpdir(),'kingpepe-reserve-runtime-')),sid=windowsCurrentServiceSid();
   const repoRoot=path.resolve(import.meta.dirname,'../..'),events=[],world={balance:0n,slot:1000,minted:f.deposit.amountAtomic,tokenAccounts:new Set(),broadcasts:[],sent:[],burned:new Set(),
-    plans:new Map(),blocks:new Map(),evidence:new Map(),final:new Set(),clock:0,feeValue:5000,discoverFailure:null,onDiscover:null,onPlan:null,staleBalance:false};
+    plans:new Map(),blocks:new Map(),evidence:new Map(),final:new Set(),height:50,clock:0,feeValue:5000,discoverFailure:null,onDiscover:null,onPlan:null,staleBalance:false};
   // Normal public operation requires the active on-chain program state.
   Object.assign(f.policy.manifest.config,{mainnetProgramState:5,mainnetActivationEnabled:true});
   const prior=process.env.SOLANA_MAINNET_RPC_URL;delete process.env.SOLANA_MAINNET_RPC_URL;
@@ -78,6 +78,8 @@ async function composition(t) {
   retainBurnSolanaPacket(f.state,f.id,claim);markBurnSolanaPacket(f.state,f.id,claim.signature,{outcome:'FINALIZED',sendAttempts:1,observedSlot:'21'});
   const receipt={operationId:f.id,amountAtomic:f.deposit.amountAtomic,destination:f.binding.destination,mint:f.binding.mint,signature:claim.signature,slot:'21',commitment:'finalized'};
   retainBurnMint(f.state,f.id,receipt);completeBurnOperation(f.state,f.id);f.state.mainnetControl.mode='NORMAL';
+  // The Native height the journal has scanned to, as production always holds.
+  f.state.nativeScan={height:50,hash:'11'.repeat(32),recent:[{height:50,hash:'11'.repeat(32)}]};
   const base=structuredClone(f.state);
   // A further operation with its finalized deposit. Its plan is what the
   // mocked fee policy will select when the runtime reaches it.
@@ -97,11 +99,13 @@ async function composition(t) {
   };
   t.mock.method(NativeBurnObserver.prototype,'discover',async state=>{
     if(world.discoverFailure)throw Error(world.discoverFailure);world.onDiscover?.();
-    return {tip:{height:50,hash:'11'.repeat(32)},cursor:state.nativeScan,observations:[],caughtUp:true};
+    return {tip:{height:world.height,hash:'11'.repeat(32)},cursor:state.nativeScan,observations:[],caughtUp:true};
   });
   t.mock.method(NativeBurnObserver.prototype,'burnStatus',async plan=>plan.txid===f.plan.txid||world.final.has(plan.txid)?{found:true,confirmations:40}:
     world.burned.has(plan.txid)?{found:true,confirmations:1}:{found:false,confirmations:0});
   t.mock.method(NativeBurnObserver.prototype,'operationalCoins',async()=>[]);
+  t.mock.method(NativeBurnObserver.prototype,'network',async()=>({height:world.height}));
+  t.mock.method(NativeBurnObserver.prototype,'addressWatchCursor',async cursor=>cursor);
   t.mock.method(NativeBurnObserver.prototype,'preparePlan',async plan=>({...plan,transactionBlockHints:Object.fromEntries(plan.inputs.map(i=>[i.txid,world.blocks.get(plan.operationId)]))}));
   t.mock.method(NativeBurnObserver.prototype,'broadcast',async plan=>{world.broadcasts.push(plan.operationId);world.burned.add(plan.txid);});
   t.mock.method(NativeBurnVerifier.prototype,'verifyFinalizedBurn',async({plan})=>({evidence:world.evidence.get(plan.operationId)??f.evidence}));
@@ -115,12 +119,12 @@ async function composition(t) {
     return {kind,recentBlockhash,lastValidBlockHeight,messageDigestHex:null,signature:base58Encode(signature),preparedTransactionBase64:Buffer.concat([Buffer.of(1),Buffer.from(signature),message]).toString('base64')};
   });
   t.mock.method(BurnSolanaAdapter.prototype,'observe',async(binding,_plan,attestation)=>attestation?{claimExists:true}:
-    {managerMintedAtomic:world.minted,ataExists:world.tokenAccounts.has(binding.destination),claimExists:false,receiptExists:false,slot:String(world.slot)});
+    {managerMintedAtomic:world.minted,ataExists:world.tokenAccounts.has(binding.destination),claimExists:!!world.claims,receiptExists:false,slot:String(world.slot)});
   t.mock.method(BurnSolanaAdapter.prototype,'packetStatus',async(packet,binding)=>packet.kind==='ATA'?
     {status:null,observed:{slot:String(world.slot)},exists:world.tokenAccounts.has(binding.destination),expired:false}:
     {status:{confirmationStatus:'finalized',err:null},observed:{slot:'100'}});
   t.mock.method(BurnSolanaAdapter.prototype,'mintReceipt',async()=>receipt);
-  t.mock.method(BurnSolanaAdapter.prototype,'deployment',async()=>({managerMintedAtomic:world.minted,mintSupplyAtomic:world.minted}));
+  t.mock.method(BurnSolanaAdapter.prototype,'deployment',async()=>({managerMintedAtomic:world.minted,mintSupplyAtomic:world.minted,slot:String(world.slot)}));
   t.mock.method(BurnSolanaAdapter.prototype,'send',async packet=>{world.sent.push(packet.kind);events.push({event:'TEST_SOLANA_SEND',kind:packet.kind});});
   let service=await openBurnServiceRuntime(options,event=>events.push(event));
   t.after(async()=>{await service?.close();f.destroy();assert.equal(path.dirname(root),path.resolve(os.tmpdir()));
@@ -144,7 +148,7 @@ test('one operation executes at a time; the others wait unburned across restarts
   const c=await composition(t),{world,events}=c,state=structuredClone(c.base);state.paused=false;state.pauseReason='MAINNET_REVIEWED_RESUME';
   const small=c.add(state,1,kpepe(999)),a=c.add(state,2,kpepe(1000)),b=c.add(state,3,kpepe(1001)),d=c.add(state,4,kpepe(1500));
   c.load(state);world.balance=ENVELOPE*50n; // SOL is not what limits it
-  assert.equal(c.service.runtime.status().executionSlot,'IDLE');assert.equal(c.service.api.getBridgeStatus().executionSlot,'AVAILABLE');
+  assert.equal(c.service.runtime.status().executionSlot,'IDLE');
 
   let status=await c.service.runtime.cycle();
   assert.deepEqual(world.broadcasts,[a.id]);assert.equal(burnExecutionOwner(c.service.journal.read()),a.id);
@@ -330,4 +334,105 @@ test('a paused runtime commits nothing and leaves the journal readable by the pr
   assert.deepEqual(c.service.journal.read(),before);assert.deepEqual(world.broadcasts,[]);assert.deepEqual(world.sent,[]);
   assert.equal(c.op(a.id).plan,null);
   assert(!JSON.stringify(c.service.journal.read()).includes('"reserve"'));
+});
+
+const wallet=()=>({destinationHex:hex(ed25519.getPublicKey(ed25519.utils.randomSecretKey())),nonce:hash('request'+Math.random())});
+
+test('of two users asking at the same moment exactly one is given a deposit address',async t=>{
+  const c=await composition(t),{world,events}=c,state=structuredClone(c.base);state.paused=false;state.pauseReason='MAINNET_REVIEWED_RESUME';
+  c.load(state);world.balance=ENVELOPE*50n;world.height=200;
+  let status=await c.service.runtime.cycle();assert.equal(status.state,'HEALTHY');assert.equal(status.admission,'AVAILABLE');
+  assert.equal(c.service.api.getBridgeStatus().executionSlot,'AVAILABLE');
+  const first=wallet(),second=wallet();
+  const results=await Promise.allSettled([c.service.runtime.createOperation(first),c.service.runtime.createOperation(second)]);
+  assert.deepEqual(results.map(r=>r.status).sort(),['fulfilled','rejected']);
+  const issued=results.find(r=>r.status==='fulfilled').value,refused=results.find(r=>r.status==='rejected').reason;
+  assert.equal(refused.message,'BRIDGE_BUSY');assert.equal(issued.state,'DEPOSIT_ADDRESS_ISSUED');assert(issued.depositAddress.startsWith('kpepe1p'));
+  assert.equal(issued.destinationHex,first.destinationHex,'requests are answered in the order they arrive');
+  assert.equal(c.service.journal.read().operations.filter(o=>!o.retired).length,1);
+  assert.equal(events.filter(e=>e.event==='DEPOSIT_ADDRESS_ISSUED').length,1);
+  // The refusal says nothing about the other user.
+  for(const text of [refused.message,JSON.stringify(c.service.api.getBridgeStatus())])
+    for(const secret of [issued.operationId,issued.depositAddress,first.destinationHex])assert(!text.includes(secret));
+  assert.equal(c.service.api.getBridgeStatus().executionSlot,'BRIDGE_BUSY');assert.equal(c.service.runtime.status().executionSlot,'IDLE');
+  // The same user asking again is shown their own operation, not refused.
+  assert.deepEqual(await c.service.runtime.createOperation(first),issued);
+  for(let n=0;n<3;n++)await assert.rejects(c.service.runtime.createOperation(wallet()),{message:'BRIDGE_BUSY'});
+  await c.restart();await c.service.runtime.cycle();
+  await assert.rejects(c.service.runtime.createOperation(second),{message:'BRIDGE_BUSY'});
+  assert.equal(c.service.journal.read().operations.filter(o=>!o.retired).length,1);
+
+  // An address never paid stops holding the Bridge after the admission window.
+  world.height=200+ADMISSION_WINDOW_BLOCKS-1;await assert.rejects(c.service.runtime.createOperation(second),{message:'BRIDGE_BUSY'});
+  world.height=200+ADMISSION_WINDOW_BLOCKS;
+  const next=await c.service.runtime.createOperation(second);assert.equal(next.destinationHex,second.destinationHex);
+  await assert.rejects(c.service.runtime.createOperation(wallet()),{message:'BRIDGE_BUSY'});
+});
+
+test('nobody is given a deposit address while a transfer is executing or waiting, and one is again after completion',async t=>{
+  const c=await composition(t),{world}=c,state=structuredClone(c.base);state.paused=false;state.pauseReason='MAINNET_REVIEWED_RESUME';
+  const a=c.add(state,1,kpepe(1000)),small=c.add(state,2,kpepe(999));
+  c.load(state);world.balance=ENVELOPE*50n;world.height=200;
+  // A confirmed eligible deposit is already enough: its owner is about to execute.
+  assert.equal(burnAdmissionBusy(c.service.journal.read(),world.height),'DEPOSIT_RECEIVED');
+  await c.service.runtime.cycle();assert.deepEqual(world.broadcasts,[a.id]);
+  assert.equal(burnAdmissionBusy(c.service.journal.read(),world.height),'EXECUTING');
+  for(const step of [()=>{},()=>c.finalizeBurn(a)]){
+    step();await c.service.runtime.cycle();
+    assert.equal(c.service.api.getBridgeStatus().executionSlot,'BRIDGE_BUSY');
+    // Refused as busy, or as not ready while the owner's mint is being recovered.
+    await assert.rejects(c.service.runtime.createOperation(wallet()),/^Error: (BRIDGE_BUSY|BurnGatewayNotReady)$/);
+    await c.restart();await c.service.runtime.cycle();
+    await assert.rejects(c.service.runtime.createOperation(wallet()),/^Error: (BRIDGE_BUSY|BurnGatewayNotReady)$/);
+    assert.equal(c.service.journal.read().operations.filter(o=>!o.retired).length,2);
+  }
+  const count=c.service.journal.read().operations.length;
+  c.finalizeMint(a);const status=await c.service.runtime.cycle();
+  assert.equal(c.op(a.id).state,'COMPLETED');assert.equal(status.executionSlot,'IDLE');
+  // The held deposit below the minimum never executes, so it holds nothing.
+  assert.equal(c.op(small.id).plan,null);assert.equal(status.admission,'AVAILABLE');assert.equal(c.service.api.getBridgeStatus().executionSlot,'AVAILABLE');
+  const created=await c.service.runtime.createOperation(wallet());
+  assert.equal(created.state,'DEPOSIT_ADDRESS_ISSUED');assert.equal(created.minimumDepositAtomic,kpepe(1000));
+  assert.equal(c.service.journal.read().operations.length,count+1);
+});
+
+test('a low reserve gives nobody a deposit address and is visible to operators only',async t=>{
+  const c=await composition(t),{world,events}=c,state=structuredClone(c.base);state.paused=false;state.pauseReason='MAINNET_REVIEWED_RESUME';
+  c.load(state);world.balance=ENVELOPE-1n;world.height=200;
+  await c.service.runtime.cycle();assert.equal(c.service.runtime.status().reserveState,'UNKNOWN');
+  const before=c.service.journal.read();
+  await assert.rejects(c.service.runtime.createOperation(wallet()),{message:'BRIDGE_RESERVE_UNAVAILABLE'});
+  assert.deepEqual(c.service.journal.read(),before);
+  assert.equal(c.service.runtime.status().reserveState,'LOW');assert.equal(c.service.api.getBridgeStatus().reserveState,'LOW');
+  assert.equal(events.filter(e=>e.event==='BRIDGE_RESERVE_LOW').length,1);
+  await assert.rejects(c.service.runtime.createOperation(wallet()),{message:'BRIDGE_RESERVE_UNAVAILABLE'});
+  assert.equal(events.filter(e=>e.event==='BRIDGE_RESERVE_LOW').length,1,'reported once, not on every request');
+  // A failed quote or a stale balance refuses too; neither is called low.
+  world.balance=ENVELOPE*2n;world.feeValue=0;await assert.rejects(c.service.runtime.createOperation(wallet()),{message:'BURN_SOLANA_FEE_QUOTE_UNAVAILABLE'});world.feeValue=5000;
+  world.staleBalance=true;await assert.rejects(c.service.runtime.createOperation(wallet()),{message:'BURN_SOLANA_BALANCE_UNAVAILABLE'});world.staleBalance=false;
+  assert.deepEqual(c.service.journal.read(),before);
+  const created=await c.service.runtime.createOperation(wallet());assert.equal(created.state,'DEPOSIT_ADDRESS_ISSUED');
+  assert.equal(c.service.runtime.status().reserveState,'SUFFICIENT');assert(events.some(e=>e.event==='BRIDGE_RESERVE_SUFFICIENT'));
+  // What the reserve holds is never part of an operation or of a refusal.
+  assert(!JSON.stringify(created).includes(world.balance.toString()));
+});
+
+test('operator recovery requires current chain evidence that nothing was burned',async t=>{
+  const c=await composition(t),{world}=c,state=structuredClone(c.base);state.paused=false;state.pauseReason='MAINNET_REVIEWED_RESUME';
+  const a=c.add(state,1,kpepe(1000));
+  c.load(state);world.balance=ENVELOPE*50n;
+  let discoveries=0;world.onDiscover=()=>{if(++discoveries===2)world.clock+=30001;};
+  await c.service.runtime.cycle();world.onDiscover=null;
+  assert.equal(burnExecutionOwner(c.service.journal.read()),a.id);assert.deepEqual(world.broadcasts,[]);
+  c.service.journal.pause('OPERATOR_PAUSE');
+  // The journal records no burn, but the chain shows one: the journal is not believed.
+  world.burned.add(world.plans.get(a.id).txid);
+  await assert.rejects(c.service.runtime.releaseUnburnedExecutionSlot(a.id),{message:'BURN_EXECUTION_SLOT_HELD_BY_BURN'});
+  world.burned.clear();
+  // Solana already holds a record for this operation.
+  world.claims=true;await assert.rejects(c.service.runtime.releaseUnburnedExecutionSlot(a.id),{message:'BURN_EXECUTION_SLOT_HELD_BY_BURN'});world.claims=false;
+  // The Native view is unavailable or not caught up.
+  world.discoverFailure='NativeRpcUnavailable:getblockhash';await assert.rejects(c.service.runtime.releaseUnburnedExecutionSlot(a.id),/NativeRpcUnavailable/);world.discoverFailure=null;
+  assert.equal(burnExecutionOwner(c.service.journal.read()),a.id);assert.equal(c.service.journal.read().paused,true);
+  await c.service.runtime.releaseUnburnedExecutionSlot(a.id);assert.equal(burnExecutionOwner(c.service.journal.read()),null);
 });

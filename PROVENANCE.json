@@ -1361,6 +1361,13 @@
       "reviewDisposition": "KEEP_FUNCTIONAL"
     },
     {
+      "path": "integrations/explorer/reserve-gateway/src/bridge.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source or unchanged public support fixture, retained for release and regression testing.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
       "path": "integrations/explorer/src/bridge-backend.js",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original KingPepe Explorer integration source or unchanged public support fixture, retained for release and regression testing.",

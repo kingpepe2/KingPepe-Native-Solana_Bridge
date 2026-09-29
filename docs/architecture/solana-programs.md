@@ -6,4 +6,4 @@ The Solana implementation validates finalized-burn evidence and the originally b
 
 Source and reproducible artifacts must correspond to the deployed programs before activation. Pending build identities are not advertised as deployed programs.
 
-User-funded Solana execution is an off-chain runtime/API/UI policy. It does not change the Bridge Program, Transceiver, official Mint, decimals or KPEPE conservation rules. The KPEPE Bridge fee remains 0 KPEPE; new-policy users fund their own Solana execution costs separately.
+Solana execution costs are paid from the Bridge operational reserve. Before an irreversible Native burn, the runtime checks current completion costs and available reserve; if the reserve is insufficient or cannot be verified, that operation remains held before burn. The KPEPE Bridge fee remains 0 KPEPE. These off-chain checks do not change the Bridge Program, Transceiver, official Mint, decimals or KPEPE conservation rules.

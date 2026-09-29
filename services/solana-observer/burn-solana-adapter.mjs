@@ -185,6 +185,26 @@ export class BurnSolanaAdapter {
     return {...observed,...recent,requiredLamports:required.toString(),reserveEnvelopeLamports:envelope.toString(),
       balanceLamports:String(balance.value),balanceSlot:String(balance.context.slot)};
   }
+  // The same envelope and finalized balance as pre-burn admission, before any
+  // operation exists. It admits nothing by itself.
+  async reserveAvailable(committedLamports='0') {
+    const verified=await this.deployment();
+    const recent=await this.#rpc.latestBlockhash(),{message}=associatedTokenCreationMessage({binding:{...this.#policy.context.deployment,destination:this.#policy.feePayerHex,nonce:'00'.repeat(32)},feePayerHex:this.#policy.feePayerHex,...recent});
+    const quoted=await this.#rpc.call('getFeeForMessage',[message.toString('base64'),{commitment:'finalized'}]);
+    check(Number.isSafeInteger(quoted?.value)&&quoted.value>0,'BURN_SOLANA_FEE_QUOTE_UNAVAILABLE');
+    const rents={};
+    for(const size of [0,240,211,73,165]){
+      const rent=await this.#rpc.call('getMinimumBalanceForRentExemption',[size,{commitment:'finalized'}]);
+      check(Number.isSafeInteger(rent)&&rent>=0,'BURN_SOLANA_RENT_QUOTE_UNAVAILABLE');rents[size]=String(rent);
+    }
+    const envelope=burnReserveEnvelope({feeLamports:String(quoted.value),rents});
+    const balance=await this.#rpc.call('getBalance',[base58Encode(h(this.#policy.feePayerHex)),{commitment:'finalized',minContextSlot:Number(verified.slot)}]);
+    check(Number.isSafeInteger(balance?.value)&&balance.value>=0&&Number.isSafeInteger(balance.context?.slot)&&
+      balance.context.slot>=Number(verified.slot),'BURN_SOLANA_BALANCE_UNAVAILABLE');
+    this.#minimumSlot=String(balance.context.slot);
+    requireBurnReserveAvailable({balanceLamports:String(balance.value),committedElsewhereLamports:committedLamports,requiredLamports:envelope.toString()});
+    return {reserveEnvelopeLamports:envelope.toString(),balanceLamports:String(balance.value),balanceSlot:String(balance.context.slot)};
+  }
   latestBlockhash(){return this.#rpc.latestBlockhash();}
   clock(){return this.#rpc.clock();}
   async packetStatus(packet,binding,plan,attestation) {

@@ -39,6 +39,21 @@ export function burnReserveCommitments(state,exceptId=null) {
   for(const op of state.operations) if(holds(op)&&op.operationId!==exceptId){committed+=lamports(op.reserve.lamports);active++;}
   return Object.freeze({committedLamports:committed.toString(),activeCommitments:active});
 }
+// A deposit address that has just been issued keeps the Bridge to that one
+// user for this many Native blocks. An address never paid does not hold the
+// Bridge for ever, and a late payment simply waits for the slot.
+export const ADMISSION_WINDOW_BLOCKS = 30;
+const admissionFacts = state => ({executing:state.operations.some(holds),
+  funded:state.operations.some(op=>!op.retired&&!op.exception&&!holds(op)&&op.deposit!==null&&burnAmount(op.deposit.amountAtomic)>=minimumBurnDepositAtomic(state)),
+  issuedHeights:state.operations.filter(op=>!op.retired&&!op.exception&&op.deposit===null).map(op=>op.createdHeight)});
+export function burnAdmissionSummary(state) { return admissionFacts(state); }
+export function summaryAdmissionBusy(facts,nativeHeight) {
+  check(Number.isSafeInteger(nativeHeight)&&nativeHeight>=0,'BurnJournalIntegerRejected');
+  return facts.executing?'EXECUTING':facts.funded?'DEPOSIT_RECEIVED':
+    facts.issuedHeights.some(height=>nativeHeight<height+ADMISSION_WINDOW_BLOCKS)?'ADDRESS_ISSUED':null;
+}
+// Why nobody else may start a transfer now, or null when one may.
+export function burnAdmissionBusy(state,nativeHeight) { return summaryAdmissionBusy(admissionFacts(state),nativeHeight); }
 export function burnExecutionOwner(state) {
   const owners=state.operations.filter(holds);
   check(owners.length<=MAX_CONCURRENT_EXECUTING_OPERATIONS,'BurnExecutionSlotConflict');

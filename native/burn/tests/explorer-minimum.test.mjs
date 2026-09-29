@@ -69,3 +69,66 @@ test('the gateway publishes the runtime minimum and a held deposit exactly as th
  delete status.minimumDepositAtomic;published=await get('/status');assert.equal(published.body.minimumDepositAtomic,'330');
  for(const minimumDepositAtomic of ['0','-1',330,'1.5',null]){status.minimumDepositAtomic=minimumDepositAtomic;assert.notEqual((await get('/status')).status,200);}
 });
+
+// The gateway that production deploys: the existing public gateway with only
+// the minimum, the busy state and the busy refusal added. No funding routes.
+test('the production gateway publishes the minimum and refuses a new transfer while the Bridge is busy',async t=>{
+ const root=stage(t),f=burnFixture();t.after(f.destroy);
+ cpSync(path.resolve(import.meta.dirname,'../../../integrations/explorer/reserve-gateway/src/bridge.js'),path.join(root,'src/bridge.js'));
+ const {createBridgeGateway}=await import(pathToFileURL(path.join(root,'src/bridge.js')).href+'?production');
+ const destination=base58.encode(Buffer.from(f.binding.destination,'hex')),depositAddress=bech32m.encode('kpepe',[1,...bech32m.toWords(new Uint8Array(32).fill(9))]);
+ const status={architecture:'ONE_WAY_AUTOMATIC_BURN_AND_MINT',state:'ACTIVE',environment:'mainnet',nativeNetwork:'MAINNET',solanaNetwork:'MAINNET',walletChain:'solana:mainnet',
+  productionReady:true,mainnetActivation:'ENABLED',decimals:8,symbol:'KPEPE',mint,bridgeFeeAtomic:'0',nativeDepositConfirmations:12,nativeBurnConfirmations:12,
+  executionPolicy:'LEGACY_OPERATOR_FUNDED',executionFundingReady:true,depositAmountModel:'EXACT_RECEIVED',minimumDepositAtomic:MINIMUM,reserveCommittedLamports:'0',reserveActiveCommitments:0,
+  maxConcurrentExecutingOperations:1,executionSlot:'AVAILABLE',reserveState:'SUFFICIENT',
+  supply:{state:'READY',source:'CANONICAL_COMPLETED_FINALIZED_NATIVE_BURN_MINT_ACCOUNTING',environment:'mainnet',nativeNetwork:'MAINNET',solanaNetwork:'MAINNET',mint,decimals:8,
+   maxSupplyAtomic:'2100000000000000',bridgedSupplyAtomic:'0',remainingSupplyAtomic:'2100000000000000',liveMintSupplyAtomic:'0',observedAt:Date.now()}};
+ const op={operationId:f.id,direction:'NativeToSolana',state:'DEPOSIT_ADDRESS_ISSUED',destination,depositAddress,amountAtomic:null,depositTxid:null,depositConfirmations:0,
+  requiredDepositConfirmations:12,burnTxid:null,burnAmountAtomic:null,burnConfirmations:null,requiredBurnConfirmations:12,solanaSignature:null,mint,exception:null,retired:false,
+  minimumDepositAtomic:MINIMUM,depositBelowMinimum:false,remainingDepositAtomic:'0',reserveCommitted:false,executionSlot:'NOT_REQUESTED'};
+ const network={environment:'mainnet',kingpepeNetwork:'MAINNET',solanaNetwork:'MAINNET',walletChain:'solana:mainnet',test:false,activationAllowed:true};
+ const validators={network,mint,publicKey:v=>assert.equal(base58.decode(v).length,32),signature:v=>assert.equal(base58.decode(v).length,64),
+  nativeAddress:v=>assert.equal(bech32m.decode(v).prefix,'kpepe'),operationId:()=>f.id,operationBinding:(value,input)=>assert.equal(value.destination,input.destination)};
+ let known=null,creates=0,create=async()=>{creates++;known=op;return op;};
+ const client={getBridgeStatus:async()=>status,getOperationStatus:async()=>known,createOperation:input=>create(input)};
+ const gateway=createBridgeGateway({backend:async()=>({client,validators}),mutationLimit:100}),server=createServer((req,res)=>void gateway(req,res,new URL(req.url,'http://127.0.0.1')));
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>{server.closeAllConnections();server.close();});
+ const endpoint=`http://127.0.0.1:${server.address().port}/api/v1/bridge`,input={clientNonce:f.binding.nonce,destination,walletChain:'solana:mainnet'};
+ const get=async route=>{const response=await fetch(endpoint+route);return {status:response.status,body:await response.json().catch(()=>null)};};
+ const post=async(route,body=input)=>{const response=await fetch(endpoint+route,{method:'POST',headers:{origin:'https://kingpepe.net','content-type':'application/json'},body:JSON.stringify(body)});
+  return {status:response.status,body:await response.json().catch(()=>null)};};
+ let published=await get('/status');assert.equal(published.status,200);
+ assert.equal(published.body.minimumDepositAtomic,MINIMUM);assert.equal(published.body.bridgeFeeAtomic,'0');assert.equal(published.body.executionSlot,'AVAILABLE');
+ assert.equal(published.body.maxConcurrentExecutingOperations,1);
+ // Nothing about funding models, the reserve or another user is published.
+ for(const key of ['executionPolicy','executionFundingReady','reserveCommittedLamports','reserveActiveCommitments','reserveState'])assert.equal(Object.hasOwn(published.body,key),false,key);
+ // Busy: refused before the runtime is asked, with the reason and nothing else.
+ status.executionSlot='BRIDGE_BUSY';
+ let refused=await post('/operations');assert.equal(refused.status,409);assert.equal(refused.body.code,'BRIDGE_BUSY');assert.equal(creates,0);
+ assert.deepEqual(Object.keys(refused.body).sort(),['code','error','message']);assert.match(refused.body.message,/Another bridge transfer is currently being processed/u);
+ assert.equal((await get('/status')).body.executionSlot,'BRIDGE_BUSY');
+ // Two requests pass the check together; the runtime admits one and the other learns why.
+ status.executionSlot='AVAILABLE';create=async()=>{creates++;status.executionSlot='BRIDGE_BUSY';throw new Error('BRIDGE_BUSY');};
+ refused=await post('/operations');assert.equal(refused.status,409);assert.equal(refused.body.code,'BRIDGE_BUSY');assert.equal(creates,1);
+ // Refused for another reason: never reported as busy.
+ status.executionSlot='AVAILABLE';create=async()=>{creates++;throw new Error('BRIDGE_RESERVE_UNAVAILABLE');};
+ refused=await post('/operations');assert.equal(refused.status,400);assert.equal(refused.body.code,undefined);assert(!JSON.stringify(refused.body).includes('RESERVE'));
+ // Available: the address is issued. Busy afterwards, its own user still sees it.
+ create=async()=>{creates++;known=op;return op;};
+ const created=await post('/operations');assert.equal(created.status,200);assert.equal(created.body.depositAddress,depositAddress);assert.equal(created.body.minimumDepositAtomic,MINIMUM);
+ status.executionSlot='BRIDGE_BUSY';const again=await post('/operations');assert.equal(again.status,200);assert.equal(again.body.operationId,f.id);assert.equal(creates,3);
+ assert.equal((await get('/operations/'+f.id)).status,200);
+ // A held deposit below the minimum, and a waiting one, are shown as the runtime reports them.
+ Object.assign(op,{state:'DEPOSIT_FINALIZED',amountAtomic:'99900000000',depositTxid:'ab'.repeat(32),depositConfirmations:12,depositBelowMinimum:true,remainingDepositAtomic:'100000000'});
+ let shown=await get('/operations/'+f.id);assert.equal(shown.body.depositBelowMinimum,true);assert.equal(shown.body.remainingDepositAtomic,'100000000');
+ Object.assign(op,{burnTxid:'cd'.repeat(32)});assert.notEqual((await get('/operations/'+f.id)).status,200);Object.assign(op,{burnTxid:null});
+ Object.assign(op,{amountAtomic:MINIMUM,depositBelowMinimum:false,remainingDepositAtomic:'0',executionSlot:'WAITING_FOR_EXECUTION_SLOT'});
+ shown=await get('/operations/'+f.id);assert.equal(shown.body.executionSlot,'WAITING_FOR_EXECUTION_SLOT');
+ // No user-funding surface exists here, and a runtime claiming one is not served.
+ for(const route of ['/execution-quote','/execution-payment'])assert.equal((await post(`/operations/${f.id}${route}`,{})).status,404);
+ Object.assign(op,{executionFunding:{policy:'USER_FUNDED',status:'PAID_VERIFIED'}});assert.notEqual((await get('/operations/'+f.id)).status,200);delete op.executionFunding;
+ status.executionPolicy='USER_FUNDED';assert.notEqual((await get('/status')).status,200);assert.notEqual((await post('/operations')).status,200);
+ status.executionPolicy='LEGACY_OPERATOR_FUNDED';
+ for(const change of [{executionSlot:'BUSY'},{maxConcurrentExecutingOperations:2},{minimumDepositAtomic:'0'},{bridgeFeeAtomic:'1'}]){
+  const before={...status};Object.assign(status,change);assert.notEqual((await get('/status')).status,200,JSON.stringify(change));Object.assign(status,before);}
+});

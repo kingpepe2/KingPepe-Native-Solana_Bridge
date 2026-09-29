@@ -9,7 +9,7 @@ import {burnFixture,FIXTURE_RESERVE} from './burn-fixture.mjs';
 import {burnOperationId,planNativeBurn,nativeBurnCommitment} from '../burn-protocol.mjs';
 import {burnDepositDestination,burnOperationalDestination,signNativeBurnWithKey} from '../burn-key.mjs';
 import {issueBurnDeposit,recordBurnDeposits,retainBurnPlan,retainBurnReserve,retainSignedBurn,markBurnBroadcast,retainFinalBurn,
-  retainBurnMint,completeBurnOperation,burnReserveCommitments,burnExecutionOwner,releaseUnburnedBurnReserve,MAX_CONCURRENT_EXECUTING_OPERATIONS,minimumBurnDepositAtomic,validateBurnJournalState} from '../../../services/bridge-validator/burn-journal-state.mjs';
+  retainBurnMint,completeBurnOperation,burnReserveCommitments,burnExecutionOwner,burnAdmissionBusy,ADMISSION_WINDOW_BLOCKS,releaseUnburnedBurnReserve,MAX_CONCURRENT_EXECUTING_OPERATIONS,minimumBurnDepositAtomic,validateBurnJournalState} from '../../../services/bridge-validator/burn-journal-state.mjs';
 import {BurnSolanaAdapter,burnReserveEnvelope,burnReserveRemaining,requireBurnReserveAvailable} from '../../../services/solana-observer/burn-solana-adapter.mjs';
 import {MIN_BRIDGE_DEPOSIT_ATOMIC,MIN_BRIDGE_DEPOSIT_KPEPE} from '../../../shared/monetary-supply.mjs';
 
@@ -322,4 +322,25 @@ test('payments to one address are never added together',t=>{
     // The same observation again changes nothing.
     recordBurnDeposits(f.state,f.id,deposits);assert.deepEqual(reload(f.state).operations[0],op);
   }
+});
+
+test('a new transfer may start only when nothing is executing, funded or freshly issued',t=>{
+  const f=burnFixture();t.after(f.destroy);const height=f.state.operations[0].createdHeight;
+  // Address issued at height 20 and not yet paid.
+  assert.equal(burnAdmissionBusy(f.state,height),'ADDRESS_ISSUED');
+  assert.equal(burnAdmissionBusy(f.state,height+ADMISSION_WINDOW_BLOCKS-1),'ADDRESS_ISSUED');
+  assert.equal(burnAdmissionBusy(f.state,height+ADMISSION_WINDOW_BLOCKS),null);
+  for(const bad of [-1,1.5,'20',null,undefined])assert.throws(()=>burnAdmissionBusy(f.state,bad));
+  // Paid, even unconfirmed, and long after the window.
+  recordBurnDeposits(f.state,f.id,[{...f.deposit,confirmations:0,blockHash:null,height:0}]);
+  assert.equal(burnAdmissionBusy(f.state,height+1000),'DEPOSIT_RECEIVED');
+  recordBurnDeposits(f.state,f.id,[f.deposit]);retainBurnPlan(f.state,f.id,f.plan);assert.equal(burnAdmissionBusy(f.state,height+1000),'DEPOSIT_RECEIVED');
+  retainBurnReserve(f.state,f.id,{...FIXTURE_RESERVE});assert.equal(burnAdmissionBusy(f.state,height+1000),'EXECUTING');
+  assert.equal(burnAdmissionBusy(reload(f.state),height+1000),'EXECUTING');
+  // An operation held for review does not keep everyone else out.
+  const g=burnFixture();t.after(g.destroy);recordBurnDeposits(g.state,g.id,[g.deposit,{...g.deposit,txid:hash('second')}]);
+  assert.equal(g.state.operations[0].exception.reason,'MULTIPLE_DEPOSITS_REQUIRE_REVIEW');assert.equal(burnAdmissionBusy(g.state,1000),null);
+  // Nor does a Mainnet deposit below the minimum, which can never execute.
+  const m=burnFixture({mainnet:true,amountAtomic:kpepe(999)});t.after(m.destroy);recordBurnDeposits(m.state,m.id,[m.deposit]);
+  assert.equal(burnAdmissionBusy(m.state,1000),null);
 });

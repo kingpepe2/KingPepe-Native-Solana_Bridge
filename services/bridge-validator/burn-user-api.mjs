@@ -38,7 +38,7 @@ export class BurnUserApi {
       executionPolicy:s.executionPolicy,executionFundingReady:s.executionFundingReady,
       depositAmountModel:'EXACT_RECEIVED',minimumDepositAtomic:s.minimumDepositAtomic,
       reserveCommittedLamports:s.reserve.committedLamports,reserveActiveCommitments:s.reserve.activeCommitments,
-      maxConcurrentExecutingOperations:s.maxConcurrentExecutingOperations,executionSlot:s.executionSlot==='BUSY'?'BRIDGE_BUSY':'AVAILABLE',
+      maxConcurrentExecutingOperations:s.maxConcurrentExecutingOperations,executionSlot:s.admission,reserveState:s.reserveState,
       productionReady:s.productionReady===true,mainnetActivation:s.mainnetActivation==='ENABLED'?'ENABLED':'DISABLED'};
   }
   async createOperation(input){

@@ -15,7 +15,7 @@ function publicFixture(t) {
   const runtime=Object.create(BurnRuntime.prototype);
   runtime.publicContext=()=>f.context;
   runtime.status=()=>({architecture:'ONE_WAY_AUTOMATIC_BURN_AND_MINT',state:'HEALTHY',environment:'localnet',nativeNetwork:'REGTEST',solanaNetwork:'LOCALNET',
-    mintHex:f.binding.mint,reconciliation:'MATCH',accounting:{completedAtomic:'0',mintedAtomic:'0',finalizedNativeBurnAtomic:'0',liveMintSupplyAtomic:'0',observedAt:Date.now()},minimumDepositAtomic:'330',reserve:{committedLamports:'0',activeCommitments:0},maxConcurrentExecutingOperations:1,executionSlot:'IDLE',privateConfig:'PRIVATE_TEST_SENTINEL'});
+    mintHex:f.binding.mint,reconciliation:'MATCH',accounting:{completedAtomic:'0',mintedAtomic:'0',finalizedNativeBurnAtomic:'0',liveMintSupplyAtomic:'0',observedAt:Date.now()},minimumDepositAtomic:'330',reserve:{committedLamports:'0',activeCommitments:0},maxConcurrentExecutingOperations:1,executionSlot:'IDLE',admission:'AVAILABLE',reserveState:'UNKNOWN',privateConfig:'PRIVATE_TEST_SENTINEL'});
   const op={operationId:f.id,state:'DEPOSIT_ADDRESS_ISSUED',destinationHex:f.binding.destination,mintHex:f.binding.mint,depositAddress:f.state.operations[0].depositAddress,
     amountAtomic:null,depositTxid:null,depositConfirmations:0,requiredDepositConfirmations:12,burnTxid:null,burnAmountAtomic:null,burnConfirmations:null,
     requiredBurnConfirmations:12,solanaSignature:null,exception:null,retired:false};

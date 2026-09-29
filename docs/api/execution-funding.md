@@ -1,5 +1,7 @@
 # Public execution funding API
 
+> **Not the production policy.** Production funds Solana execution from the Bridge operational reserve and does not accept user execution payments. The user-funded model described here is disabled on Mainnet. See [User access](../user-access.md).
+
 The official interface is [kingpepe.net/bridge](https://kingpepe.net/bridge). These routes describe the public gateway, not a signing or administrative API. Clients cannot choose another Mint or execution-payment recipient. No wallet signing authority is sent to the Bridge. The KPEPE Bridge fee is **0 KPEPE**; Solana execution costs are separate and user-funded for new operations after cutover.
 
 ## Availability and operation binding

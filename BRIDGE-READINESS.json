@@ -18,15 +18,17 @@
   "independentSecurityAuditCompleted": false,
   "securityInformation": "Custody, upgrade, and recovery controls are documented internally. Relevant security-assurance information will be published alongside the results of an independent security audit.",
   "sourceAuditStatus": "INTERNAL_SOURCE_REVIEW_COMPLETED",
+  "minimumDepositAtomic": "100000000000",
+  "minimumDepositKpepe": "1000",
+  "cumulativeDeposits": "NOT_SUPPORTED",
+  "maxConcurrentExecutingOperations": 1,
   "executionPolicy": {
-    "approved": "USER_FUNDED",
+    "approved": "BRIDGE_OPERATIONAL_RESERVE",
+    "runtimePolicy": "LEGACY_OPERATOR_FUNDED",
+    "userFunded": "DISABLED",
     "activation": "CHECK_LIVE_API",
-    "globalCompletionBackstop": false,
-    "teamReserveRequiredLamports": "0",
-    "newOperationsOnly": true,
-    "preBurnRequote": true,
-    "userTopUpBeforeBurn": true,
-    "crossOperationFunding": "PROHIBITED",
-    "unusedSolRefund": true
+    "preBurnReserveCheck": true,
+    "durableReserveCommitment": true,
+    "userPaymentRequired": false
   }
 }

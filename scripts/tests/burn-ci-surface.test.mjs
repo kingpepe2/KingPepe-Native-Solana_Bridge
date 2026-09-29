@@ -37,9 +37,11 @@ test('required CI keeps real burn/reindex/mint/replay and protected Windows cove
   assert.equal(readiness.publicBridgeActivation,'LIVE_API_REQUIRED');assert.equal(readiness.publicNetwork,'MAINNET');
   assert.equal(readiness.productionReady,null);assert.equal(readiness.publicDepositsAccepted,null);
   assert.equal(readiness.mainnetActivation,'LIVE_API_REQUIRED');
-  assert.equal(readiness.executionPolicy.globalCompletionBackstop,false);
-  assert.equal(readiness.executionPolicy.teamReserveRequiredLamports,'0');
-  assert.equal(readiness.executionPolicy.newOperationsOnly,true);
+  // Production runs on the Bridge reserve, one transfer at a time.
+  assert.deepEqual(readiness.executionPolicy,{approved:'BRIDGE_OPERATIONAL_RESERVE',runtimePolicy:'LEGACY_OPERATOR_FUNDED',userFunded:'DISABLED',
+    activation:'CHECK_LIVE_API',preBurnReserveCheck:true,durableReserveCommitment:true,userPaymentRequired:false});
+  assert.equal(readiness.maxConcurrentExecutingOperations,1);assert.equal(readiness.minimumDepositAtomic,'100000000000');
+  assert.equal(readiness.minimumDepositKpepe,'1000');assert.equal(readiness.cumulativeDeposits,'NOT_SUPPORTED');assert.equal(readiness.bridgeFeeAtomic,'0');
   assert.equal(readiness.publicStatusUrl,'https://kingpepe.net/api/v1/bridge/status');
   // Static documentation cannot assert live readiness or promote CI to Mainnet.
   assert.equal(JSON.parse(read('scripts/local-e2e-toolchain.json')).environment,'LOCALNET_REGTEST_ONLY');
