@@ -104,9 +104,10 @@ test('requests waiting for an address never take the slots that status and track
   const third=await g.call('/operations',g.request(11,6));assert.equal(third.status,429);
   for(let n=0;n<6;n++){const s=await g.call('/status');assert.equal(s.status,200);}
   assert.equal((await g.call('/operations/'+hex(1))).status,404);
-  assert.deepEqual((await Promise.all(waiting)).map(r=>r.status).sort(),[200,409]);
-  // Released afterwards.
-  assert.equal((await g.call('/operations',g.request(9))).status,200);assert.equal(g.upstream.state.created,1);
+  const answers=await Promise.all(waiting);assert.deepEqual(answers.map(r=>r.status).sort(),[200,409]);
+  // Released afterwards. Which of the two was admitted depends on arrival; its own request is repeated.
+  const admitted=answers[0].status===200?g.request(9):g.request(10,8);
+  assert.equal((await g.call('/operations',admitted)).status,200);assert.equal(g.upstream.state.created,1);
 });
 test('reads keep their limit of 10 seconds at the gateway',{concurrency:true},async t=>{
   const g=await gateway(t),slow=http.createServer(()=>{});await new Promise(r=>slow.listen(0,'127.0.0.1',r));t.after(()=>{slow.closeAllConnections();slow.close();});
