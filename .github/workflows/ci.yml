@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - 'feature/user-funded-execution-*'
+      - 'fix/reserve-commitment-*'
   pull_request:
 
 jobs:
