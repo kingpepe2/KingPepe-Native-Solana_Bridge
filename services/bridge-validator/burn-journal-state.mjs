@@ -21,39 +21,71 @@ const lamports = v => { check(typeof v==='string'&&/^(0|[1-9][0-9]{0,19})$/u.tes
 // Records completed before reserve commitments existed carry no commitment.
 // Only the validator's replay of such a completed record may skip the rules
 // below; every live transition is held to them.
-let completedLegacyReplay = null;
+let completedLegacyReplay = null, journalReplay = false;
 const legacyReplay = id => completedLegacyReplay === id;
 // Mainnet production threshold. Test networks keep the Native dust floor.
 export function minimumBurnDepositAtomic(state) {
   return state.deployment.nativeGenesis===NATIVE_MAINNET_GENESIS ? MIN_BRIDGE_DEPOSIT_ATOMIC : 330n;
 }
-// SOL held for operations that may still spend it. A commitment is released
-// only by completion, which itself requires the finalized mint receipt.
+// One operation executes at a time. The operation holding the unreleased
+// reserve commitment owns the execution slot, from before its token account
+// is paid for until completion after its finalized mint. Ownership is this
+// journal record: there is no separate flag to lose, repeat or disagree.
+export const MAX_CONCURRENT_EXECUTING_OPERATIONS = 1;
+const UNBURNED_RELEASE = 'UNBURNED_OPERATOR_RELEASE';
+const holds = op => !!op.reserve&&!op.retired&&op.reserve.released===undefined;
 export function burnReserveCommitments(state,exceptId=null) {
   let committed=0n,active=0;
-  for(const op of state.operations) if(op.reserve&&!op.retired&&op.operationId!==exceptId){committed+=lamports(op.reserve.lamports);active++;}
+  for(const op of state.operations) if(holds(op)&&op.operationId!==exceptId){committed+=lamports(op.reserve.lamports);active++;}
   return Object.freeze({committedLamports:committed.toString(),activeCommitments:active});
 }
+export function burnExecutionOwner(state) {
+  const owners=state.operations.filter(holds);
+  check(owners.length<=MAX_CONCURRENT_EXECUTING_OPERATIONS,'BurnExecutionSlotConflict');
+  return owners[0]?.operationId??null;
+}
 function reserveRecord(value) {
-  check(value&&Object.keys(value).sort().join()==='balanceLamports,lamports,slot','BurnReserveFieldsRejected');
+  const released=Object.hasOwn(value??{},'released');
+  check(value&&Object.keys(value).sort().join()===(released?'balanceLamports,lamports,released,slot':'balanceLamports,lamports,slot'),'BurnReserveFieldsRejected');
   check(lamports(value.lamports)>0n&&lamports(value.balanceLamports)>=lamports(value.lamports),'BurnReserveAmountRejected');burnUint(value.slot);
+  check(!released||value.released===UNBURNED_RELEASE,'BurnReserveFieldsRejected');
   return {lamports:value.lamports,balanceLamports:value.balanceLamports,slot:value.slot};
 }
-function commitBurnReserve(state,id,value,verifyAvailable) {
+function commitBurnReserve(state,id,value,admit) {
   const op=burnJournalRecord(state,id),record=reserveRecord(value);
+  check(!Object.hasOwn(value,'released')||!admit,'BurnReserveFieldsRejected');
   // One commitment per operation. A repeated observation keeps the first.
-  if(op.reserve)return structuredClone(op.reserve);
+  if(holds(op)||op.reserve&&op.retired)return structuredClone(op.reserve);
   check(!state.execution,'BurnReservePolicyConflict');
   check(!state.paused&&!op.exception&&!op.retired&&op.plan,'BurnJournalAdmissionStopped');
-  check(op.signedBurnHex===null&&!op.broadcastAttempted&&op.solanaPacket===null,'BurnReserveCommitmentTooLate');
-  if(verifyAvailable)check(lamports(record.balanceLamports)>=BigInt(burnReserveCommitments(state,id).committedLamports)+lamports(record.lamports),
+  check(op.signedBurnHex===null&&!op.broadcastAttempted&&(admit?(op.solanaPacket??[]).every(row=>row.outcome!=='UNRESOLVED'):op.solanaPacket===null),'BurnReserveCommitmentTooLate');
+  // Checking for an owner, claiming the slot and recording the commitment
+  // are this one journal mutation. It is written whole or not at all.
+  if(admit)check(burnExecutionOwner(state)===null,'BURN_EXECUTION_SLOT_BUSY');
+  if(admit)check(lamports(record.balanceLamports)>=BigInt(burnReserveCommitments(state,id).committedLamports)+lamports(record.lamports),
     'BURN_SOLANA_OPERATIONAL_FUNDING_REQUIRED');
   op.reserve=record;return structuredClone(record);
 }
 export function retainBurnReserve(state,id,value) { return commitBurnReserve(state,id,value,true); }
+// Operator recovery for an owner that can no longer proceed and has not
+// burned. Once a burn is signed the slot is released by completion only.
+export function releaseUnburnedBurnReserve(state,id) {
+  const op=burnJournalRecord(state,id);
+  check(!state.execution&&holds(op),'BurnExecutionSlotNotHeld');
+  check(op.signedBurnHex===null&&!op.broadcastAttempted&&!op.broadcastAccepted&&op.burnEvidence===null&&op.attestationDraftHex===null&&
+    op.attestation===null&&op.mintReceipt===null,'BURN_EXECUTION_SLOT_HELD_BY_BURN');
+  check((op.solanaPacket??[]).every(row=>row.packet.kind==='ATA'&&row.outcome!=='UNRESOLVED'),'BURN_EXECUTION_SLOT_PACKET_UNRESOLVED');
+  op.reserve={...op.reserve,released:UNBURNED_RELEASE};
+}
 function requireBurnReserve(state,op) {
   if(state.execution||legacyReplay(op.operationId))return;
   check(op.reserve,'BURN_RESERVE_COMMITMENT_REQUIRED');
+  // A reload replays records one at a time; ownership is judged on the whole
+  // journal once every record has been rebuilt.
+  if(journalReplay)return;
+  // A released commitment authorizes nothing, and neither does any
+  // commitment while another operation owns the slot.
+  check(op.retired||holds(op)&&burnExecutionOwner(state)===op.operationId,'BURN_EXECUTION_SLOT_REQUIRED');
 }
 export function initialBurnJournal(binding,deliveryPolicy=null) {
   const {nonce:_nonce,destination:_destination,...deployment} = validateBurnBinding(binding);
@@ -282,7 +314,7 @@ export function validateBurnJournalState(input) {
     // Only a completed record with its finalized mint may predate commitments.
     // A journal under the separate execution-funding model holds none at all.
     const legacy=!committed&&(Object.hasOwn(input,'execution')||op.retired===true&&op.state==='COMPLETED'&&op.mintReceipt!==null);
-    completedLegacyReplay=legacy?op.operationId:null;
+    completedLegacyReplay=legacy?op.operationId:null;journalReplay=true;
     try{
     const issued=issueBurnDeposit(reconstructed,op.binding,op.createdHeight);
     check(issued.operationId===op.operationId&&issued.depositAddress===op.depositAddress&&issued.depositScriptHex===op.depositScriptHex,'BurnJournalDestinationChanged');
@@ -330,12 +362,13 @@ export function validateBurnJournalState(input) {
         Array.isArray(op.exception.deposits)&&op.exception.deposits.length<=64,'BurnJournalExceptionRejected');
       built.exception=structuredClone(op.exception);
     }
-    }finally{completedLegacyReplay=null;}
+    if(committed&&Object.hasOwn(op.reserve,'released')){journalReplay=false;releaseUnburnedBurnReserve(reconstructed,op.operationId);}
+    }finally{completedLegacyReplay=null;journalReplay=false;}
   }
   reconstructed.paused=input.paused;reconstructed.pauseReason=input.pauseReason;
   if(mainnet){reconstructed.mainnetControl=structuredClone(input.mainnetControl);validateMainnetLifecycle(reconstructed);}
   if(input.execution){reconstructed.execution=structuredClone(input.execution);validateExecutionState(reconstructed);}
   else check(!Object.hasOwn(input,'execution'),'ExecutionJournalRequired');
-  burnJournalAccounting(reconstructed);
+  burnJournalAccounting(reconstructed);burnExecutionOwner(reconstructed);
   return structuredClone(reconstructed);
 }

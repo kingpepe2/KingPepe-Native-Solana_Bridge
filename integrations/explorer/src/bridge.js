@@ -47,7 +47,14 @@ function publicStatus(value, validators) {
   // The runtime enforces the minimum and is its only source. The dust floor
   // is shown solely for a runtime that predates a published minimum.
   const minimumDepositAtomic = value.minimumDepositAtomic === undefined ? '330' : atomic(value.minimumDepositAtomic);
-  return { ...result,executionPolicy:value.executionPolicy??'LEGACY_OPERATOR_FUNDED',executionFundingReady:value.executionFundingReady===true, depositAmountModel: 'EXACT_RECEIVED', minimumDepositAtomic,
+  // One operation executes at a time. Only whether the Bridge is busy is
+  // public, never which operation or whose.
+  const slot = {};
+  if(value.executionSlot !== undefined) {
+    check(['BRIDGE_BUSY','AVAILABLE'].includes(value.executionSlot) && value.maxConcurrentExecutingOperations === 1);
+    Object.assign(slot, { executionSlot: value.executionSlot, maxConcurrentExecutingOperations: 1 });
+  }
+  return { ...result,executionPolicy:value.executionPolicy??'LEGACY_OPERATOR_FUNDED',executionFundingReady:value.executionFundingReady===true, depositAmountModel: 'EXACT_RECEIVED', minimumDepositAtomic, ...slot,
     accountingRefreshState: verified ? 'VERIFIED' : verifying ? 'VERIFYING' : 'UNAVAILABLE',
     supply: verified ? checkedSupply : { state: 'UNAVAILABLE' } };
 }
@@ -75,6 +82,12 @@ async function publicOperation(value, validators, expectedId) {
       value.solanaSignature === null && remaining > 0n && BigInt(value.amountAtomic) + remaining === floor);
     else check(remaining === 0n);
     Object.assign(minimum, { minimumDepositAtomic: value.minimumDepositAtomic, depositBelowMinimum: value.depositBelowMinimum, remainingDepositAtomic: value.remainingDepositAtomic });
+  }
+  if(value.executionSlot !== undefined) {
+    check(['OWNED','WAITING_FOR_EXECUTION_SLOT','NOT_REQUESTED'].includes(value.executionSlot));
+    // Waiting means exactly that: nothing of this operation has been burned.
+    if(value.executionSlot === 'WAITING_FOR_EXECUTION_SLOT') check(value.burnTxid === null && value.solanaSignature === null && value.depositBelowMinimum !== true);
+    minimum.executionSlot = value.executionSlot;
   }
   return { operationId: value.operationId, direction: value.direction, state: value.state, ...minimum,
     amountAtomic: value.amountAtomic, destination: value.destination, depositAddress: value.depositAddress, mint: validators.mint,

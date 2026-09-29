@@ -9,7 +9,7 @@ import {burnFixture,FIXTURE_RESERVE} from './burn-fixture.mjs';
 import {burnOperationId,planNativeBurn,nativeBurnCommitment} from '../burn-protocol.mjs';
 import {burnDepositDestination,burnOperationalDestination,signNativeBurnWithKey} from '../burn-key.mjs';
 import {issueBurnDeposit,recordBurnDeposits,retainBurnPlan,retainBurnReserve,retainSignedBurn,markBurnBroadcast,retainFinalBurn,
-  retainBurnMint,completeBurnOperation,burnReserveCommitments,minimumBurnDepositAtomic,validateBurnJournalState} from '../../../services/bridge-validator/burn-journal-state.mjs';
+  retainBurnMint,completeBurnOperation,burnReserveCommitments,burnExecutionOwner,releaseUnburnedBurnReserve,MAX_CONCURRENT_EXECUTING_OPERATIONS,minimumBurnDepositAtomic,validateBurnJournalState} from '../../../services/bridge-validator/burn-journal-state.mjs';
 import {BurnSolanaAdapter,burnReserveEnvelope,burnReserveRemaining,requireBurnReserveAvailable} from '../../../services/solana-observer/burn-solana-adapter.mjs';
 import {MIN_BRIDGE_DEPOSIT_ATOMIC,MIN_BRIDGE_DEPOSIT_KPEPE} from '../../../shared/monetary-supply.mjs';
 
@@ -48,86 +48,116 @@ test('the former whole-balance rule admitted every operation against the same re
     {message:'BURN_SOLANA_OPERATIONAL_FUNDING_REQUIRED'});
 });
 
-test('one operation is admitted only by a sufficient reserve',t=>{
+test('one eligible operation obtains the execution slot, and only with a sufficient reserve',t=>{
   const {f,ops:[a]}=competing(t,1);
+  assert.equal(MAX_CONCURRENT_EXECUTING_OPERATIONS,1);assert.equal(burnExecutionOwner(f.state),null);
   assert.throws(()=>retainBurnReserve(f.state,a.id,held(ENVELOPE-1n)),/BurnReserveAmountRejected/);
-  assert.equal(f.state.operations.find(o=>o.operationId===a.id).reserve,undefined);
+  assert.equal(f.state.operations.find(o=>o.operationId===a.id).reserve,undefined);assert.equal(burnExecutionOwner(f.state),null);
   assert.throws(()=>a.burn(f.state),{message:'BURN_RESERVE_COMMITMENT_REQUIRED'});
   assert.equal(f.state.operations.find(o=>o.operationId===a.id).signedBurnHex,null);
-  retainBurnReserve(f.state,a.id,held(ENVELOPE));a.burn(f.state);
+  retainBurnReserve(f.state,a.id,held(ENVELOPE));assert.equal(burnExecutionOwner(f.state),a.id);a.burn(f.state);
   assert.deepEqual(burnReserveCommitments(f.state),{committedLamports:ENVELOPE.toString(),activeCommitments:1});
 });
 
-test('two operations both burn only when the reserve covers both',t=>{
-  const {f,ops:[a,b]}=competing(t,2),balance=ENVELOPE*2n;
-  retainBurnReserve(f.state,a.id,held(balance));retainBurnReserve(f.state,b.id,held(balance));
-  a.burn(f.state);b.burn(f.state);
-  assert.deepEqual(burnReserveCommitments(reload(f.state)),{committedLamports:(ENVELOPE*2n).toString(),activeCommitments:2});
-});
-
-test('two operations competing for a reserve that covers one: exactly one burns',t=>{
-  const {f,ops:[a,b]}=competing(t,2),balance=ENVELOPE*2n-1n;
+test('a second eligible operation waits however large the reserve is',t=>{
+  const {f,ops:[a,b]}=competing(t,2),balance=ENVELOPE*100n;
   retainBurnReserve(f.state,a.id,held(balance));
-  assert.throws(()=>retainBurnReserve(f.state,b.id,held(balance)),{message:'BURN_SOLANA_OPERATIONAL_FUNDING_REQUIRED'});
+  assert.throws(()=>retainBurnReserve(f.state,b.id,held(balance)),{message:'BURN_EXECUTION_SLOT_BUSY'});
   a.burn(f.state);
+  assert.throws(()=>retainBurnReserve(f.state,b.id,held(balance)),{message:'BURN_EXECUTION_SLOT_BUSY'});
   assert.throws(()=>b.burn(f.state),{message:'BURN_RESERVE_COMMITMENT_REQUIRED'});
   const state=reload(f.state),second=state.operations.find(o=>o.operationId===b.id);
-  assert.equal(second.signedBurnHex,null);assert.equal(second.broadcastAttempted,false);assert.equal(second.state,'BURN_READY');
-  assert.equal(burnReserveCommitments(state).activeCommitments,1);
-  // Order does not matter: whichever is measured second is refused.
-  const other=competing(t,2),[c,d]=other.ops;
-  retainBurnReserve(other.f.state,d.id,held(balance));
-  assert.throws(()=>retainBurnReserve(other.f.state,c.id,held(balance)),{message:'BURN_SOLANA_OPERATIONAL_FUNDING_REQUIRED'});
+  assert.equal(second.signedBurnHex,null);assert.equal(second.broadcastAttempted,false);assert.equal(second.solanaPacket,null);assert.equal(Object.hasOwn(second,'reserve'),false);
+  assert.equal(burnExecutionOwner(state),a.id);
+  assert.deepEqual(burnReserveCommitments(state),{committedLamports:ENVELOPE.toString(),activeCommitments:1});
 });
 
-test('three operations competing for a limited reserve never hold more than the balance',t=>{
-  const {f,ops}=competing(t,3),balance=ENVELOPE*2n+ENVELOPE/2n;let admitted=0;
-  for(const op of ops){try{retainBurnReserve(f.state,op.id,held(balance));op.burn(f.state);admitted++;}catch(error){assert.match(error.message,/^BURN_SOLANA_OPERATIONAL_FUNDING_REQUIRED$/);}}
-  assert.equal(admitted,2);
-  const {committedLamports,activeCommitments}=burnReserveCommitments(reload(f.state));
-  assert.equal(activeCommitments,2);assert(BigInt(committedLamports)<=balance);
-  // A later, larger balance admits the third without disturbing the others.
-  const third=ops.find(op=>!f.state.operations.find(o=>o.operationId===op.id).reserve);
-  retainBurnReserve(f.state,third.id,held(ENVELOPE*3n));third.burn(f.state);
-  assert.equal(burnReserveCommitments(reload(f.state)).committedLamports,(ENVELOPE*3n).toString());
+test('operations observed together can never both obtain the slot, in either order',t=>{
+  for(const order of [[0,1,2],[2,1,0],[1,2,0]]){
+    const {f,ops}=competing(t,3),admitted=[];
+    for(const n of order){try{retainBurnReserve(f.state,ops[n].id,held(ENVELOPE*100n));ops[n].burn(f.state);admitted.push(n);}
+      catch(error){assert.equal(error.message,'BURN_EXECUTION_SLOT_BUSY');}}
+    // Deterministic: the first one measured owns it, every later one waits.
+    assert.deepEqual(admitted,[order[0]]);assert.equal(burnExecutionOwner(reload(f.state)),ops[order[0]].id);
+    assert.equal(reload(f.state).operations.filter(o=>o.signedBurnHex).length,1);
+  }
+  // A journal that records two owners is refused outright.
+  const {f,ops:[a,b]}=competing(t,2);retainBurnReserve(f.state,a.id,held(ENVELOPE*100n));
+  const forged=JSON.parse(JSON.stringify(f.state));forged.operations.find(o=>o.operationId===b.id).reserve=held(ENVELOPE*100n);
+  assert.throws(()=>validateBurnJournalState(forged),{message:'BurnExecutionSlotConflict'});
+  assert.throws(()=>burnExecutionOwner(forged),{message:'BurnExecutionSlotConflict'});
+  assert.throws(()=>retainSignedBurn(forged,b.id,signNativeBurnWithKey({rootSecret:f.root,binding:b.binding,plan:b.plan})),{message:'BurnExecutionSlotConflict'});
 });
 
-test('a commitment survives restart before burn, after burn and while burned but unminted',t=>{
-  const {f,ops:[a,b]}=competing(t,2),balance=ENVELOPE*2n-1n;
+test('the slot survives restart before burn, after burn and while burned but unminted',t=>{
+  const {f,ops:[a,b]}=competing(t,2),balance=ENVELOPE*100n;
   retainBurnReserve(f.state,a.id,held(balance));
   // Restart or crash before the burn is signed.
-  let state=reload(f.state);assert.deepEqual(state.operations.find(o=>o.operationId===a.id).reserve,held(balance));
-  assert.throws(()=>retainBurnReserve(state,b.id,held(balance)),{message:'BURN_SOLANA_OPERATIONAL_FUNDING_REQUIRED'});
+  let state=reload(f.state);assert.deepEqual(state.operations.find(o=>o.operationId===a.id).reserve,held(balance));assert.equal(burnExecutionOwner(state),a.id);
+  assert.throws(()=>retainBurnReserve(state,b.id,held(balance)),{message:'BURN_EXECUTION_SLOT_BUSY'});
   // Crash after the Native burn was signed and broadcast.
-  a.burn(state);state=reload(state);assert.equal(burnReserveCommitments(state).committedLamports,ENVELOPE.toString());
+  a.burn(state);state=reload(state);assert.equal(burnExecutionOwner(state),a.id);
   // Burned and finalized, mint still outstanding, across further restarts.
   retainFinalBurn(state,a.id,a.evidence);
   for(let n=0;n<3;n++){state=reload(state);assert.equal(state.operations.find(o=>o.operationId===a.id).state,'BURN_FINALIZED');
-    assert.equal(burnReserveCommitments(state).committedLamports,ENVELOPE.toString());
-    assert.throws(()=>retainBurnReserve(state,b.id,held(balance)),{message:'BURN_SOLANA_OPERATIONAL_FUNDING_REQUIRED'});}
+    assert.equal(burnExecutionOwner(state),a.id);assert.equal(burnReserveCommitments(state).committedLamports,ENVELOPE.toString());
+    assert.throws(()=>retainBurnReserve(state,b.id,held(balance)),{message:'BURN_EXECUTION_SLOT_BUSY'});
+    // Recovery repeats the owner's own transitions without a second owner.
+    retainBurnReserve(state,a.id,held(balance));markBurnBroadcast(state,a.id,true);retainFinalBurn(state,a.id,a.evidence);}
   assert.deepEqual(reload(state),state);
 });
 
-test('only completion after the finalized mint releases a commitment, exactly once',t=>{
-  const {f,ops:[a,b]}=competing(t,2),balance=ENVELOPE*2n-1n;
+test('only completion after the finalized mint releases the slot, exactly once, and the next operation then obtains it',t=>{
+  const {f,ops:[a,b,c]}=competing(t,3),balance=ENVELOPE*100n;
   retainBurnReserve(f.state,a.id,held(balance));a.burn(f.state);retainFinalBurn(f.state,a.id,a.evidence);
-  assert.throws(()=>completeBurnOperation(f.state,a.id),/CompletionEvidenceMissing/);
-  assert.equal(burnReserveCommitments(f.state).activeCommitments,1);
+  assert.throws(()=>completeBurnOperation(f.state,a.id),/CompletionEvidenceMissing/);assert.equal(burnExecutionOwner(f.state),a.id);
   retainBurnMint(f.state,a.id,a.mint);
   // The receipt alone does not release it; reconciliation completes first.
-  assert.equal(burnReserveCommitments(f.state).activeCommitments,1);
+  assert.equal(burnExecutionOwner(f.state),a.id);
+  assert.throws(()=>retainBurnReserve(f.state,b.id,held(balance)),{message:'BURN_EXECUTION_SLOT_BUSY'});
   completeBurnOperation(f.state,a.id);
-  assert.deepEqual(burnReserveCommitments(f.state),{committedLamports:'0',activeCommitments:0});
+  assert.equal(burnExecutionOwner(f.state),null);assert.deepEqual(burnReserveCommitments(f.state),{committedLamports:'0',activeCommitments:0});
   completeBurnOperation(f.state,a.id);completeBurnOperation(reload(f.state),a.id);
-  assert.deepEqual(burnReserveCommitments(reload(f.state)),{committedLamports:'0',activeCommitments:0});
+  assert.equal(burnExecutionOwner(reload(f.state)),null);
   // The record of what was held is retained; it simply no longer counts.
   assert.deepEqual(reload(f.state).operations.find(o=>o.operationId===a.id).reserve,held(balance));
-  // Asking again for a completed operation returns that record and holds nothing.
-  assert.deepEqual(retainBurnReserve(f.state,a.id,held(balance*2n)),held(balance));
-  assert.deepEqual(burnReserveCommitments(f.state),{committedLamports:'0',activeCommitments:0});
-  // Its release makes room for the operation that had been refused.
-  retainBurnReserve(f.state,b.id,held(balance));b.burn(f.state);
-  assert.deepEqual(burnReserveCommitments(reload(f.state)),{committedLamports:ENVELOPE.toString(),activeCommitments:1});
+  // Asking again for the completed operation returns that record and holds nothing.
+  assert.deepEqual(retainBurnReserve(f.state,a.id,held(balance*2n)),held(balance));assert.equal(burnExecutionOwner(f.state),null);
+  // The next waiting operation is admitted, and again only one.
+  retainBurnReserve(f.state,b.id,held(balance));
+  assert.throws(()=>retainBurnReserve(f.state,c.id,held(balance)),{message:'BURN_EXECUTION_SLOT_BUSY'});b.burn(f.state);
+  const state=reload(f.state);assert.equal(burnExecutionOwner(state),b.id);
+  assert.deepEqual(burnReserveCommitments(state),{committedLamports:ENVELOPE.toString(),activeCommitments:1});
+});
+
+test('operator recovery frees only an owner that has not burned',t=>{
+  const {f,ops:[a,b]}=competing(t,2),balance=ENVELOPE*100n;
+  assert.throws(()=>releaseUnburnedBurnReserve(f.state,a.id),{message:'BurnExecutionSlotNotHeld'});
+  retainBurnReserve(f.state,a.id,held(balance));
+  // Before any burn: released, recorded, and the operation cannot burn on it.
+  releaseUnburnedBurnReserve(f.state,a.id);
+  assert.equal(burnExecutionOwner(f.state),null);assert.equal(f.state.operations.find(o=>o.operationId===a.id).reserve.released,'UNBURNED_OPERATOR_RELEASE');
+  assert.throws(()=>releaseUnburnedBurnReserve(f.state,a.id),{message:'BurnExecutionSlotNotHeld'});
+  assert.throws(()=>a.burn(f.state),{message:'BURN_EXECUTION_SLOT_REQUIRED'});
+  assert.deepEqual(reload(f.state),f.state);assert.equal(burnExecutionOwner(reload(f.state)),null);
+  // The freed slot goes to the other operation; the released one must wait.
+  retainBurnReserve(f.state,b.id,held(balance));
+  assert.throws(()=>retainBurnReserve(f.state,a.id,held(balance)),{message:'BURN_EXECUTION_SLOT_BUSY'});
+  b.burn(f.state);
+  // Signed, broadcast, finalized or minted: never releasable by an operator.
+  for(const advance of [()=>{},()=>retainFinalBurn(f.state,b.id,b.evidence),()=>retainBurnMint(f.state,b.id,b.mint)]){
+    advance();
+    for(const state of [f.state,reload(f.state)])assert.throws(()=>releaseUnburnedBurnReserve(state,b.id),{message:'BURN_EXECUTION_SLOT_HELD_BY_BURN'});
+    assert.equal(burnExecutionOwner(reload(f.state)),b.id);
+  }
+  // A journal claiming a burned operation was released is refused.
+  const forged=JSON.parse(JSON.stringify(f.state));forged.operations.find(o=>o.operationId===b.id).reserve.released='UNBURNED_OPERATOR_RELEASE';
+  assert.throws(()=>validateBurnJournalState(forged),{message:'BURN_EXECUTION_SLOT_HELD_BY_BURN'});
+  completeBurnOperation(f.state,b.id);assert.equal(burnExecutionOwner(f.state),null);
+  assert.throws(()=>releaseUnburnedBurnReserve(f.state,b.id),{message:'BurnExecutionSlotNotHeld'});
+  // After its release the first operation is admitted afresh and burns once.
+  retainBurnReserve(f.state,a.id,held(balance));a.burn(f.state);
+  assert.equal(burnExecutionOwner(reload(f.state)),a.id);assert.equal(Object.hasOwn(reload(f.state).operations.find(o=>o.operationId===a.id).reserve,'released'),false);
 });
 
 test('a repeated observation of one operation never obtains or counts a second commitment',t=>{
@@ -213,7 +243,7 @@ async function transport(t,f) {
 
 test('pre-burn admission measures the finalized balance left after other commitments',async t=>{
   const {f,ops:[a,b]}=competing(t,2),{rpc,adapter}=await transport(t,f);
-  rpc.balance=ENVELOPE*2n-1n;
+  rpc.balance=ENVELOPE*2n-1n;const admit=(state,id,gate)=>retainBurnReserve(state,id,{lamports:gate.reserveEnvelopeLamports,balanceLamports:gate.balanceLamports,slot:gate.balanceSlot});
   const first=await adapter.preBurn(a.binding,a.plan,'0',{committedElsewhereLamports:burnReserveCommitments(f.state,a.id).committedLamports});
   assert.equal(first.reserveEnvelopeLamports,ENVELOPE.toString());assert.equal(first.requiredLamports,ENVELOPE.toString());
   assert.equal(first.balanceLamports,rpc.balance.toString());assert.equal(first.balanceSlot,String(rpc.slot));assert(BigInt(first.balanceSlot)>BigInt(rpc.snapshot));assert.equal(first.ataExists,false);
@@ -224,8 +254,9 @@ test('pre-burn admission measures the finalized balance left after other commitm
   await adapter.preBurn(a.binding,a.plan,'0',{committedElsewhereLamports:burnReserveCommitments(f.state,a.id).committedLamports,committed:true});
   rpc.balance=ENVELOPE*2n;
   const second=await adapter.preBurn(b.binding,b.plan,'0',{committedElsewhereLamports:burnReserveCommitments(f.state,b.id).committedLamports});
-  retainBurnReserve(f.state,b.id,{lamports:second.reserveEnvelopeLamports,balanceLamports:second.balanceLamports,slot:second.balanceSlot});
-  assert.equal(burnReserveCommitments(f.state).activeCommitments,2);
+  // Enough SOL for both is still one execution slot.
+  assert.throws(()=>admit(f.state,b.id,second),{message:'BURN_EXECUTION_SLOT_BUSY'});
+  assert.equal(burnReserveCommitments(f.state).activeCommitments,1);
 });
 
 test('a stale balance, a fallen balance or a failed quote cannot admit a burn',async t=>{
