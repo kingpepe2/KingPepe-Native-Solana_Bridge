@@ -4,7 +4,7 @@ The official [Bridge](https://kingpepe.net/bridge) displays **MAINNET**, **ONE W
 
 On-chain deployment and the earlier controlled activation have completed. Current availability comes from the live runtime. Bind a compatible Solana wallet; the Bridge issues a unique Native deposit address bound to that destination. Changing wallets cannot redirect the destination. The Bridge is one way, with exact 1:1 Burn → Mint accounting, a **0 KPEPE Bridge fee**, Bridge-reserve-funded Solana execution costs, and 12 Native deposit confirmations.
 
-The protected Bridge operational SOL reserve pays the Solana-side fees and required account rent. Before the irreversible Native burn, the runtime refreshes the required completion allowance and blocks the burn if the reserve is inadequate or cannot be verified. Users do not make separate SOL prepayments. The public status API remains authoritative for availability; publication of code does not clear a verification hold. See [User access](../user-access.md).
+The protected Bridge operational SOL reserve pays the Solana-side fees and required account rent. Before the irreversible Native burn, the runtime refreshes the required completion allowance and blocks the burn if the reserve is inadequate or cannot be verified. Users do not make separate SOL prepayments. The public status API remains authoritative for availability; publication of code does not clear a verification hold. See [User access](../user-access.md) and the [Bridge API](../api/bridge-api.md).
 
 ## Public status API
 

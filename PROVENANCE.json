@@ -1354,13 +1354,6 @@
       "reviewDisposition": "KEEP_TEST"
     },
     {
-      "path": "integrations/explorer/baseline.json",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Original KingPepe Explorer integration source or unchanged public support fixture, retained for release and regression testing.",
-      "purpose": "REQUIRED_RUNTIME",
-      "reviewDisposition": "KEEP_FUNCTIONAL"
-    },
-    {
       "path": "integrations/explorer/reserve-gateway/src/bridge.js",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original KingPepe Explorer integration source or unchanged public support fixture, retained for release and regression testing.",
@@ -1499,11 +1492,6 @@
       "notes": "Original public product description."
     },
     {
-      "path": "integrations/explorer/market-story-release.json",
-      "classification": "BUILD_OR_CONFIGURATION_METADATA",
-      "notes": "Original KingPepe market and network display integration; no market transaction capabilities."
-    },
-    {
       "path": "integrations/explorer/src/api/market-live-schema.js",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original KingPepe market and network display integration; no market transaction capabilities."
@@ -1525,21 +1513,6 @@
     },
     {
       "path": "integrations/explorer/web/bridge-presentation.js",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original KingPepe market and network display integration; no market transaction capabilities."
-    },
-    {
-      "path": "integrations/explorer/web/market-display-model.js",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original KingPepe market and network display integration; no market transaction capabilities."
-    },
-    {
-      "path": "integrations/explorer/web/market-display.css",
-      "classification": "ORIGINAL_KINGPEPE_CODE",
-      "notes": "Original KingPepe market and network display integration; no market transaction capabilities."
-    },
-    {
-      "path": "integrations/explorer/web/market-display.js",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original KingPepe market and network display integration; no market transaction capabilities."
     },
@@ -1601,6 +1574,175 @@
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "REQUIRED_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "docs/api/bridge-api.md",
+      "classification": "ORIGINAL_KINGPEPE_DOCUMENTATION",
+      "notes": "Original public product description."
+    },
+    {
+      "path": "integrations/explorer/reserve-gateway/release.json",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Release manifest or public test fixture of the KingPepe Explorer integration."
+    },
+    {
+      "path": "integrations/explorer/reserve-gateway/src/bridge-backend.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source as production serves it, retained for release and regression testing.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/reserve-gateway/src/bridge-client.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source as production serves it, retained for release and regression testing.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/reserve-gateway/web/bridge-presentation.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source as production serves it, retained for release and regression testing.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/reserve-gateway/web/bridge.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source as production serves it, retained for release and regression testing.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/src/api/market-schema.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source as production serves it, retained for release and regression testing.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/src/api/snapshot-schema.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source as production serves it, retained for release and regression testing.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/src/bridge-connection.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source as production serves it, retained for release and regression testing.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/src/bridge-pending.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source as production serves it, retained for release and regression testing.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/src/bridge-profile.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source as production serves it, retained for release and regression testing.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/src/market.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source as production serves it, retained for release and regression testing.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/src/snapshot.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source as production serves it, retained for release and regression testing.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/web/bridge-layout.css",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source as production serves it, retained for release and regression testing.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/web/bridge-mainnet.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source as production serves it, retained for release and regression testing.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/web/bridge-ux.css",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source as production serves it, retained for release and regression testing.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/web/bridge.css",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source as production serves it, retained for release and regression testing.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/web/market-summary.css",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source as production serves it, retained for release and regression testing.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/web/market-summary.js",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe Explorer integration source as production serves it, retained for release and regression testing.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "native/burn/tests/explorer-bridge-connection.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "native/burn/tests/explorer-gateway-timeout.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "native/burn/tests/explorer-market-fixture-20260929.json",
+      "classification": "BUILD_OR_CONFIGURATION_METADATA",
+      "notes": "Release manifest or public test fixture of the KingPepe Explorer integration."
+    },
+    {
+      "path": "native/burn/tests/explorer-market-policy.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "native/burn/tests/explorer-production-stage.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "native/burn/tests/explorer-production.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
+      "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
     }
   ]

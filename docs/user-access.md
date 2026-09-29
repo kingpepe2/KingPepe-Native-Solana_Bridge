@@ -23,6 +23,6 @@ The supply counter includes completed Mainnet bridging only, up to **21,000,000 
 - **What if I send less than 1,000 KPEPE?** It is not burned and nothing is minted. It stays recorded against your operation. Do not send a second transfer to make up the difference: transfers to one address are never added together.
 - **Why does the Bridge say it is busy?** It processes one transfer at a time. While another transfer is being processed no new deposit address is issued. Wait until the Bridge is available, then start your transfer.
 - **Can I change the destination?** No. Reconnecting another wallet does not redirect an operation.
-- **Does market data availability control the Bridge?** No. The read-only Raydium display and Bridge readiness are independent.
+- **Does market data availability control the Bridge?** No. The Bridge page shows no market information. The price summary on the main page and Bridge readiness are independent.
 
 Public API responses expose availability, the minimum amount and operation progress. Users make no SOL payment to the Bridge.

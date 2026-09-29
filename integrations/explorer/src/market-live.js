@@ -2,6 +2,7 @@
 // No environment credential loading, private runtime imports, writes or transaction submission.
 import {MARKET,FRESHNESS} from '../web/market-identities.js';
 import {RAYDIUM_ACCOUNT_KEYS,decodeRaydiumAccounts,decodeTrades} from './market-chain.js';
+import {marketResponse} from './market.js';
 const RPCS=Object.freeze(['https://solana-rpc.publicnode.com','https://api.mainnet-beta.solana.com']);
 const GENESIS='5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d';
 const METHODS=new Set(['getGenesisHash','getMultipleAccounts','getSignaturesForAddress','getTransaction']);
@@ -116,7 +117,25 @@ export function createLiveMarket({fetcher=globalThis.fetch,now=Date.now}={}){
       lastTrade:last,trackedAskSol:currentAsk,bestBuyQuote:null,trades:trades.slice(0,500),history:{observedAt:Math.min(...venues.map(v=>v.headAt)),health:feedFresh?'FRESH':'UNAVAILABLE',complete24h:covered,headVerified:headKnown&&feedFresh,scope:'VERIFIED_POOL_SWAP_EVENTS',retentionDays:7},
       raydium,orca:null,statistics:statistics&&at-statistics.observedAt<=FRESHNESS.statisticsMs?statistics:null};
   }
-  return {get(){kick();return snapshot();},peek:snapshot,async settled(){await Promise.allSettled([chainFlight,historyFlight,statsFlight]);return snapshot();}};
+  return {get(){kick();return snapshot();},async solanaSupply(){kick();await chainFlight;return snapshot().solanaSupply?.atomic??null;},peek:snapshot,async settled(){await Promise.allSettled([chainFlight,historyFlight,statsFlight]);return snapshot();}};
+}
+// The displayed price is the one selected DEX observation that /api/v1/market and
+// snapshot.market publish. The tracked pool below remains the source of trade
+// history and of the order card; its last trade, however recent or old, never
+// sets the displayed price.
+export function withSelectedMarket(live,selected){
+  const priced=Boolean(selected)&&['ACTIVE','LOW_LIQUIDITY_MARKET','STALE'].includes(selected.state)&&selected.mint===MARKET.mint&&typeof selected.priceUsd==='string'&&Number(selected.priceUsd)>0;
+  const priceUsd=priced?Number(selected.priceUsd):null,priceSol=priced&&selected.priceSol!==null?Number(selected.priceSol):null;
+  const cap=priced&&typeof selected.marketCapUsd==='string'?Number(selected.marketCapUsd):null;
+  return {...live,selectedMarket:selected??null,priceSol,priceUsd,priceType:priced?'SELECTED_DEX_POOL':'UNAVAILABLE',priceAt:priced?Date.parse(selected.updatedAt):null,
+    priceReliable:priced&&selected.priceReliable===true,usdSource:null,
+    // The valuation of the selected observation: its price times the supply it states.
+    marketCapUsd:cap,marketCapBasis:'SELECTED_PRICE_TIMES_CIRCULATING_SUPPLY'};
 }
 const market=createLiveMarket();
-export function liveMarketResponse(query={}){if(Object.keys(query).length)throw Object.assign(Error('This market display has no parameters.'),{kind:'input'});return {value:market.get(),ttlSec:5};}
+export const liveSolanaSupply=()=>market.solanaSupply();
+export async function liveMarketResponse(query={},readSelected=marketResponse,readLive=()=>market.get()){
+  if(Object.keys(query).length)throw Object.assign(Error('This market display has no parameters.'),{kind:'input'});
+  const live=readLive();let selected=null;try{selected=(await readSelected()).value;}catch{}
+  return {value:withSelectedMarket(live,selected),ttlSec:5};
+}

@@ -133,11 +133,15 @@ async function readBody(req, timeoutMs) {
 }
 
 export function createBridgeGateway({ backend = async () => null, approvedOrigin = 'https://kingpepe.net',
-  timeoutMs = 10000, now = Date.now, mutationLimit = 8, readLimit = 90 } = {}) {
+  timeoutMs = 10000, mutationTimeoutMs = 32000, now = Date.now, mutationLimit = 8, readLimit = 90 } = {}) {
+  // A new deposit address waits for the runtime, which creates it between two
+  // accounting cycles. Bounded, a little above the client's own 30 seconds so
+  // that the client's answer, not this limit, is what the caller receives.
+  check(Number.isSafeInteger(mutationTimeoutMs) && mutationTimeoutMs >= timeoutMs && mutationTimeoutMs <= 60000);
   const origin = new URL(approvedOrigin);
   check(origin.origin === approvedOrigin && !origin.username && !origin.password &&
     (origin.protocol === 'https:' || origin.protocol === 'http:' && origin.hostname === '127.0.0.1'));
-  const buckets = new Map(); let active = 0;
+  const buckets = new Map(); let active = 0, creating = 0;
   // Shared, bounded display memory for a page opened during a refresh hold.
   // Never use it for operation admission, balances, or the runtime ACTIVE state.
   const accountingDisplay = createAccountingDisplay({now});
@@ -170,7 +174,10 @@ export function createBridgeGateway({ backend = async () => null, approvedOrigin
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
     if (req.method !== (mutation ? 'POST' : 'GET')) return failure(405, 'Method not allowed.');
     if (active >= 4) return failure(429, 'Bridge is busy. Please wait.');
-    active++;
+    // The Bridge admits one transfer at a time. Requests waiting for an address
+    // never take the slots that status and tracking need.
+    if (mutation && creating >= 2) { res.setHeader('Retry-After', '10'); return failure(429, 'Bridge is busy. Please wait.'); }
+    active++; if (mutation) creating++;
     const accountingRequest = route === '/status' ? accountingDisplay.begin() : null;
     let timer, task;
     try {
@@ -221,7 +228,7 @@ export function createBridgeGateway({ backend = async () => null, approvedOrigin
         return publicOperation(created, validators, created.operationId);
       };
       task = work();
-      const result = await Promise.race([task, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Unavailable')), timeoutMs); })]);
+      const result = await Promise.race([task, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Unavailable')), mutation ? mutationTimeoutMs : timeoutMs); })]);
       reply(result === null ? 404 : 200, result ?? { error: true, message: 'Operation not yet observed.' });
     } catch (error) {
       if(accountingRequest)accountingDisplay.failure(accountingRequest);
@@ -232,7 +239,8 @@ export function createBridgeGateway({ backend = async () => null, approvedOrigin
     } finally {
       clearTimeout(timer);
       // A timed-out upstream mutation remains in flight; keep its slot occupied.
-      if (task) void task.finally(() => { active--; }).catch(() => {}); else active--;
+      const release = () => { active--; if (mutation) creating--; };
+      if (task) void task.finally(release).catch(() => {}); else release();
     }
   };
 }
