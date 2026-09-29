@@ -19,11 +19,13 @@ import {encodeBurnMessage} from '../../shared/protocol/burn-message.mjs';
 import {decodeCanonicalBridgeMessage,stableJson} from '../../shared/protocol/canonical-message.mjs';
 import {burnJournalRecord,issueBurnDeposit,recordBurnDeposits,retainBurnPlan,retainSignedBurn,markBurnBroadcast,
   retainFinalBurn,prepareBurnAuthorization,retainBurnAttestation,retainBurnSolanaPacket,markBurnSolanaPacket,burnPacketAttestation,
-  retainBurnMint,completeBurnOperation,burnJournalAccounting,reconcileBurnAccounting} from './burn-journal-state.mjs';
+  retainBurnMint,completeBurnOperation,burnJournalAccounting,reconcileBurnAccounting,
+  retainBurnReserve,burnReserveCommitments,minimumBurnDepositAtomic} from './burn-journal-state.mjs';
 import {ExecutionFundingController} from './execution-funding-controller.mjs';
 import {executionRecord,createExecutionIntent,executionWatchOperations,recordExecutionNativeObservations,publicExecutionFunding} from './execution-funding-state.mjs';
 
 const PENDING=new Set(['BURN_SOLANA_RPC_UNAVAILABLE','BURN_SOLANA_OPERATIONAL_FUNDING_REQUIRED','BURN_OPERATIONAL_FEE_FUNDING_REQUIRED',
+  'BURN_ACCOUNTING_NOT_FRESH',
   'BURN_SOLANA_EXECUTION_PENDING','BURN_SOLANA_CLOCK_UNAVAILABLE','BURN_SOLANA_FEE_QUOTE_UNAVAILABLE',
   'BURN_FEE_POLICY_EXCEPTION','NativeFeeOperatorReviewRequired','NativeFeeEstimateUnavailable','NativeFeeObservationRejected',
   'NativeBurnInputUnavailable','NativeBurnSourceChanged','NativeEvidenceTipChanged','BURN_NATIVE_DISCOVERY_CHANGED',
@@ -149,6 +151,9 @@ export class BurnRuntime {
   reviewExecutionFunding(){return this.#exclusive(()=>this.#execution.review());}
   adoptOperationExecutionFunding(id){return this.#exclusive(async()=>{burnHash(id);await this.#readyForMainnetTransition();this.#execution.adoptLegacy(id);return this.operation(id);});}
   activateUserFundedExecution(){return this.#exclusive(async()=>{
+    // Production runs on the Bridge reserve. One journal never mixes the two
+    // funding models, and Mainnet does not change model through this runtime.
+    check(this.#context.environment!=='mainnet'&&burnReserveCommitments(this.#journal.read()).activeCommitments===0,'ExecutionUserFundedDisabled');
     await this.#readyForMainnetTransition();check(this.#mainnetMode()===5&&this.#journal.read().mainnetControl.mode==='NORMAL','BurnMainnetPublicAdmissionClosed');
     check(!this.#journal.read().paused,'BurnGatewayNotReady');return this.#execution.activate();
   });}
@@ -181,7 +186,12 @@ export class BurnRuntime {
     burnHash(id);const state=this.#journal.read(),funding=executionRecord(state,id),actual=state.operations.find(o=>o.operationId===id);
     check(actual||funding,'BurnJournalOperationUnknown');
     const op=actual??{binding:funding.binding,state:'AWAITING_EXECUTION_FUNDING',depositAddress:null,retired:false},live=this.#observed.get(id);
+    // Derived display facts. A deposit below the minimum is held, never burned.
+    const minimum=minimumBurnDepositAtomic(state),received=op.deposit?BigInt(op.deposit.amountAtomic):null,
+      below=received!==null&&!op.plan&&received<minimum;
     return {operationId:id,state:op.state,destinationHex:op.binding.destination,depositAddress:op.depositAddress,
+      minimumDepositAtomic:minimum.toString(),depositBelowMinimum:below,remainingDepositAtomic:below?(minimum-received).toString():'0',
+      reserveCommitted:!!op.reserve,
       amountAtomic:op.deposit?.amountAtomic??null,depositTxid:op.deposit?.txid??null,depositConfirmations:op.deposit?.confirmations??0,
       requiredDepositConfirmations:12,burnTxid:op.broadcastAttempted?op.plan.txid:null,burnAmountAtomic:op.burnEvidence?.amountAtomic??null,
       burnConfirmations:live?.burnConfirmations??null,requiredBurnConfirmations:12,solanaSignature:op.mintReceipt?.signature??null,
@@ -196,7 +206,8 @@ export class BurnRuntime {
       paused:state.paused,...structuredClone(this.#health),activationMode:state.mainnetControl?.mode??'TEST',
       executionPolicy:state.execution?'USER_FUNDED':'LEGACY_OPERATOR_FUNDED',executionFundingReady:!state.execution||this.#execution.ready&&!state.execution.operatorHold,
       ...mainnetRuntimeFlags(state,{healthy:this.#health.state==='HEALTHY',fresh,reconciliation:this.#health.reconciliation,programState:this.#mainnetMode()}),
-      accounting:this.#health.reconciliation==='MATCH'&&fresh?{...state.accounting,observedAt:this.#accountingVerifiedAt,liveMintSupplyAtomic:this.#liveMintSupplyAtomic}:null};
+      accounting:this.#health.reconciliation==='MATCH'&&fresh?{...state.accounting,observedAt:this.#accountingVerifiedAt,liveMintSupplyAtomic:this.#liveMintSupplyAtomic}:null,
+      minimumDepositAtomic:state.minimumDepositAtomic,reserve:state.reserve};
   }
   // Operator-only local method. No public gateway route exposes resume/pause.
   resumeReviewedTestRuntime() {
@@ -340,6 +351,12 @@ export class BurnRuntime {
     }
     if(!op.plan){
       if(!op.deposit||op.deposit.confirmations<12)return;
+      // Below the minimum nothing is planned, signed, burned or paid for.
+      // Arrivals are never added together: a second payment is an exception.
+      if(BigInt(op.deposit.amountAtomic)<minimumBurnDepositAtomic(this.#journal.read())){
+        if(!this.#observed.get(id)?.belowMinimum){this.#observed.set(id,{...(this.#observed.get(id)??{}),belowMinimum:true});this.#emit('DEPOSIT_BELOW_MINIMUM',id);}
+        return;
+      }
       this.#emit('DEPOSIT_FINALITY_REACHED',id);
       const operational=burnOperationalDestination(op.binding),reserved=new Set(this.#journal.read().operations.flatMap(o=>o.plan?.inputs.map(i=>`${i.txid}:${i.vout}`)??[]));
       const feeCoins=await this.#observer.operationalCoins(operational.scriptPubKeyHex,reserved);
@@ -357,7 +374,19 @@ export class BurnRuntime {
       for(const attester of this.#attesters)await attester.reserve({binding:op.binding,plan:op.plan});
       // The old balance admission applies only before a burn is signed. Once
       // signed, only this operation's existing funding may complete execution.
-      const gate=op.signedBurnHex||executionRecord(this.#journal.read(),id)?.burnCommitted?await this.#solana.observe(op.binding,op.plan):await this.#solana.preBurn(op.binding,op.plan,burnJournalAccounting(this.#journal.read()).mintedAtomic,{operationFunded:!!this.#journal.read().execution});
+      // An unsigned burn is admitted only on this cycle's own verified
+      // accounting. A slow pass waits for the next cycle; it never pauses.
+      if(!op.signedBurnHex)check(this.#health.reconciliation==='MATCH'&&this.#freshAccounting(),'BURN_ACCOUNTING_NOT_FRESH');
+      const admitted=this.#journal.read(),userFunded=!!admitted.execution;
+      const gate=op.signedBurnHex||executionRecord(admitted,id)?.burnCommitted?await this.#solana.observe(op.binding,op.plan):await this.#solana.preBurn(op.binding,op.plan,burnJournalAccounting(admitted).mintedAtomic,
+        {operationFunded:userFunded,committedElsewhereLamports:burnReserveCommitments(admitted,id).committedLamports,committed:!!op.reserve});
+      // Hold this operation's SOL durably before anything is paid or signed.
+      // Operations are advanced one at a time, so the next one is measured
+      // against a balance from which this commitment is already subtracted.
+      if(!userFunded&&!op.signedBurnHex&&!op.reserve){
+        this.#update(state=>retainBurnReserve(state,id,{lamports:gate.reserveEnvelopeLamports,balanceLamports:gate.balanceLamports,slot:gate.balanceSlot}));
+        op=this.#op(id);this.#emit('RESERVE_COMMITTED',id,{lamports:op.reserve.lamports});
+      }
       if(!gate.ataExists){const admission=await this.#verifier.verifyDepositAdmission({binding:op.binding,plan:op.plan});await this.#packet(id,'ATA',admission);return;}
       // Recheck arrivals immediately before the irreversible step. Address
       // issuance is single-use; another payment is never silently aggregated.
@@ -365,7 +394,9 @@ export class BurnRuntime {
       check(!this.#journal.read().paused&&!op.exception,'BURN_DEPOSIT_EXCEPTION');
       await this.#fees.verifyBeforeBroadcast(op.plan);
       const admission=await this.#verifier.verifyDepositAdmission({binding:op.binding,plan:op.plan});
-      if(!op.signedBurnHex){await this.#execution.admission(id,{commit:true});const signed=this.#burnSigner.sign({binding:op.binding,plan:op.plan,admission});this.#update(state=>retainSignedBurn(state,id,signed));op=this.#op(id);}
+      if(!op.signedBurnHex){
+        check(this.#health.reconciliation==='MATCH'&&this.#freshAccounting(),'BURN_ACCOUNTING_NOT_FRESH');
+        await this.#execution.admission(id,{commit:true});const signed=this.#burnSigner.sign({binding:op.binding,plan:op.plan,admission});this.#update(state=>retainSignedBurn(state,id,signed));op=this.#op(id);}
       this.#update(state=>markBurnBroadcast(state,id));
       await this.#observer.broadcast(op.plan,op.signedBurnHex,this.#fees.maximumRateAtomicPerKvB);
       this.#update(state=>markBurnBroadcast(state,id,true));this.#emit('BURN_BROADCAST',id,{txid:op.plan.txid});return;

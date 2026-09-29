@@ -1557,6 +1557,27 @@
       "notes": "Original KingPepe market and network display integration; no market transaction capabilities."
     },
     {
+      "path": "native/burn/tests/burn-reserve.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "tests/windows/burn-reserve-runtime.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
+      "purpose": "REQUIRED_RUNTIME_OR_TEST",
+      "reviewDisposition": "KEEP_CURRENT_FORWARD"
+    },
+    {
+      "path": "native/burn/tests/explorer-minimum.test.mjs",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
+      "purpose": "CORE_TEST",
+      "reviewDisposition": "KEEP_TEST"
+    },
+    {
       "path": "native/burn/tests/market-story-display.test.mjs",
       "classification": "ORIGINAL_KINGPEPE_CODE",
       "notes": "Original KingPepe market and network display integration; no market transaction capabilities."

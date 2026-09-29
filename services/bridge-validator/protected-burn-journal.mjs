@@ -2,7 +2,7 @@
 // Existing DPAPI/revision/process-exclusion storage, dedicated burn state format.
 import {assertWindowsProtectedStore} from '../../shared/windows/protected-store.mjs';
 import {nativeIdentity} from '../../shared/network-identity.mjs';
-import {validateBurnJournalState,burnJournalAccounting} from './burn-journal-state.mjs';
+import {validateBurnJournalState,burnJournalAccounting,burnReserveCommitments,minimumBurnDepositAtomic} from './burn-journal-state.mjs';
 
 const instances=new WeakSet();
 export function requireProtectedBurnJournal(value) {
@@ -40,7 +40,8 @@ export class ProtectedBurnJournal {
     // Display only. No records, signing material or authorization inputs are
     // cached. Economic paths continue to read/validate the protected store.
     this.#summary={paused:state.paused,mainnetControl:{mode:state.mainnetControl?.mode??'TEST'},
-      execution:state.execution?{operatorHold:!!state.execution.operatorHold}:null,accounting:burnJournalAccounting(state)};
+      execution:state.execution?{operatorHold:!!state.execution.operatorHold}:null,accounting:burnJournalAccounting(state),
+      reserve:{...burnReserveCommitments(state)},minimumDepositAtomic:minimumBurnDepositAtomic(state).toString()};
   }
   publicSummary(){
     if(this.#closed)throw new Error('BurnJournalClosed');this.#lease.assertHeld();

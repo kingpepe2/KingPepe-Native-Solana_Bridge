@@ -29,7 +29,7 @@ import {associatedTokenCreationMessage,burnSolanaPlanOptions,verifyBurnSolanaPac
 import {base58Encode,base58Decode,findProgramAddress,prepareSignedLocalnetSolanaDepositClaimTransaction,prepareSignedLocalnetSolanaDepositReceiptTransaction} from '../../services/bridge-validator/solana-deposit-claim-transaction-plan.mjs';
 import {prepareSignedLocalnetSolanaSetupTransaction,LOCALNET_MANAGER_PROGRAM_ID_BASE58 as MANAGER,LOCALNET_TRANSCEIVER_PROGRAM_ID_BASE58 as TRANSCEIVER,SPL_TOKEN_PROGRAM_ID_BASE58 as TOKEN} from '../../services/bridge-validator/localnet-solana-setup-plan.mjs';
 import {DEPLOYMENT_MONITOR_PROTOCOL,UPGRADEABLE_LOADER} from '../../services/solana-observer/deployment-integrity.mjs';
-import {initialBurnJournal,issueBurnDeposit,recordBurnDeposits,retainBurnPlan,retainSignedBurn,markBurnBroadcast,retainFinalBurn,
+import {initialBurnJournal,issueBurnDeposit,recordBurnDeposits,retainBurnPlan,retainBurnReserve,retainSignedBurn,markBurnBroadcast,retainFinalBurn,
   prepareBurnAuthorization,retainBurnAttestation,retainBurnMint,completeBurnOperation,validateBurnJournalState,reconcileBurnAccounting} from '../../services/bridge-validator/burn-journal-state.mjs';
 
 const repoRoot=path.resolve(import.meta.dirname,'../..'),root=validateRuntimeStateRoot(process.env.KINGPEPE_BURN_TEST_ROOT,repoRoot);
@@ -134,7 +134,7 @@ try{
   assert.equal((await rpc.getUtxoObservation({txid:plan.txid,vout:0,includeMempool:true})).unspent,false);
   await assert.rejects(verifier.verifyDepositAdmission({binding,plan}));pass('FINALIZED_EXACT_BURN_UNSPENDABLE_NO_SECOND_BURN');
   recordBurnDeposits(state,id,[{...final.evidence.deposit,amountAtomic:deposit.amountAtomic,blockHash:final.evidence.depositBlockHash,height:final.evidence.depositHeight,confirmations:24}]);
-  retainBurnPlan(state,id,plan);retainSignedBurn(state,id,signed);markBurnBroadcast(state,id,true);retainFinalBurn(state,id,final.evidence);
+  retainBurnPlan(state,id,plan);retainBurnReserve(state,id,{lamports:'10000000',balanceLamports:'50000000',slot:'1'});retainSignedBurn(state,id,signed);markBurnBroadcast(state,id,true);retainFinalBurn(state,id,final.evidence);
   state=validateBurnJournalState(JSON.parse(JSON.stringify(state)));
   assert.equal(reconcileBurnAccounting(state,{finalizedNativeBurnAtomic:deposit.amountAtomic,bridgeIssuedAtomic:'0',mintSupplyAtomic:'0'}).pendingFinalizedBurnAtomic,deposit.amountAtomic);
   pass('FINALIZED_BURN_RELOAD_RETAINS_PENDING_MINT_OBLIGATION');

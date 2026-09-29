@@ -11,10 +11,11 @@ import {encodeBurnMessage} from '../../../shared/protocol/burn-message.mjs';
 import {decodeCanonicalBridgeMessage} from '../../../shared/protocol/canonical-message.mjs';
 import {burnOperationId,planNativeBurn,nativeBurnCommitment} from '../burn-protocol.mjs';
 import {burnDepositDestination,burnOperationalDestination,signNativeBurnWithKey} from '../burn-key.mjs';
-import {initialBurnJournal,issueBurnDeposit,recordBurnDeposits,retainBurnPlan,retainSignedBurn,markBurnBroadcast,retainFinalBurn} from '../../../services/bridge-validator/burn-journal-state.mjs';
+import {initialBurnJournal,issueBurnDeposit,recordBurnDeposits,retainBurnPlan,retainBurnReserve,retainSignedBurn,markBurnBroadcast,retainFinalBurn} from '../../../services/bridge-validator/burn-journal-state.mjs';
 import {ATTESTATION_PROTOCOL,ATTESTATION_MODE,BURN_SIGNED_BYTES} from '../../../services/attesters/burn-attestation-codec.mjs';
 const hex=bytes=>Buffer.from(bytes).toString('hex'),hash=s=>createHash('sha256').update(s).digest('hex');
-export function burnFixture({mainnet=false,amountAtomic='100000'}={}) {
+export const FIXTURE_RESERVE=Object.freeze({lamports:'10000000',balanceLamports:'50000000',slot:'1'});
+export function burnFixture({mainnet=false,amountAtomic=mainnet?'100000000000':'100000'}={}) {
   const {manifest,snapshot}=mainnet?mainnetDeploymentFixture(4):deploymentFixture(),root=schnorr.utils.randomSecretKey(),payer=ed25519.utils.randomSecretKey(),wallet=ed25519.utils.randomSecretKey(),attesters=[ed25519.utils.randomSecretKey(),ed25519.utils.randomSecretKey()];
   const pub=key=>hex(ed25519.getPublicKey(key));
   Object.assign(manifest.config,{protocolId:1,nativeNetwork:mainnet?manifest.config.nativeNetwork:8000111,attesters:attesters.map(a=>base58Encode(ed25519.getPublicKey(a)))});
@@ -38,7 +39,7 @@ export function burnFixture({mainnet=false,amountAtomic='100000'}={}) {
   const evidence={binding,operationId:id,deposit:{txid:deposit.txid,vout:0},depositHeight:21,depositBlockHash:deposit.blockHash,burn:{txid:plan.txid,vout:0},
     burnHeight:33,burnBlockHash:hash('burn-block'),amountAtomic:deposit.amountAtomic,burnCommitment:nativeBurnCommitment({operationId:id,deposit:{txid:deposit.txid,vout:0},amountAtomic:deposit.amountAtomic})};
   if(mainnet)plan={...plan,transactionBlockHints:Object.fromEntries(plan.inputs.map(input=>[input.txid,deposit.blockHash]))};
-  const finalize=()=>{recordBurnDeposits(state,id,[deposit]);retainBurnPlan(state,id,plan);retainSignedBurn(state,id,signNativeBurnWithKey({rootSecret:root,binding,plan}));markBurnBroadcast(state,id);retainFinalBurn(state,id,evidence);};
+  const finalize=()=>{recordBurnDeposits(state,id,[deposit]);retainBurnPlan(state,id,plan);if(!state.execution)retainBurnReserve(state,id,{...FIXTURE_RESERVE});retainSignedBurn(state,id,signNativeBurnWithKey({rootSecret:root,binding,plan}));markBurnBroadcast(state,id);retainFinalBurn(state,id,evidence);};
   const authorize=(validFrom='100',validUntil='3700')=>{
     const bytes=encodeBurnMessage({evidence,keyEpoch:1,policyEpoch:1,validFrom,validUntil}),m=decodeCanonicalBridgeMessage(bytes);
     return {encodedMessageHex:hex(bytes),attestations:attesters.map((seed,i)=>({protocol:ATTESTATION_PROTOCOL,mode:ATTESTATION_MODE,role:['ATTESTER_A','ATTESTER_B'][i],keyEpoch:1,policyEpoch:1,

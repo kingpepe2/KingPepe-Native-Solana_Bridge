@@ -44,7 +44,10 @@ function publicStatus(value, validators) {
   const verifying = !failed && ['PENDING', 'CONTROLLED'].includes(value.state) &&
     value.supply?.state === 'UNAVAILABLE' && value.supply.reason === 'ACCOUNTING_NOT_VERIFIED' && value.supply.environment === n.environment;
   check(value.executionPolicy===undefined||['USER_FUNDED','LEGACY_OPERATOR_FUNDED'].includes(value.executionPolicy));
-  return { ...result,executionPolicy:value.executionPolicy??'LEGACY_OPERATOR_FUNDED',executionFundingReady:value.executionFundingReady===true, depositAmountModel: 'EXACT_RECEIVED', minimumDepositAtomic: '330',
+  // The runtime enforces the minimum and is its only source. The dust floor
+  // is shown solely for a runtime that predates a published minimum.
+  const minimumDepositAtomic = value.minimumDepositAtomic === undefined ? '330' : atomic(value.minimumDepositAtomic);
+  return { ...result,executionPolicy:value.executionPolicy??'LEGACY_OPERATOR_FUNDED',executionFundingReady:value.executionFundingReady===true, depositAmountModel: 'EXACT_RECEIVED', minimumDepositAtomic,
     accountingRefreshState: verified ? 'VERIFIED' : verifying ? 'VERIFYING' : 'UNAVAILABLE',
     supply: verified ? checkedSupply : { state: 'UNAVAILABLE' } };
 }
@@ -63,7 +66,17 @@ async function publicOperation(value, validators, expectedId) {
   if(value.burnAmountAtomic !== null) check(atomic(value.burnAmountAtomic) === value.amountAtomic);
   const exceptions = ['LATE_DEPOSIT_TO_RETIRED_ADDRESS','MULTIPLE_DEPOSITS_REQUIRE_REVIEW','STRAY_DEPOSIT_AFTER_BURN','ACCEPTED_DEPOSIT_BASIS_CHANGED'];
   check(value.exception === null || exceptions.includes(value.exception));
-  return { operationId: value.operationId, direction: value.direction, state: value.state,
+  // Published by the runtime: a deposit below the minimum is held unburned.
+  const minimum = {};
+  if(value.minimumDepositAtomic !== undefined) {
+    const floor = BigInt(atomic(value.minimumDepositAtomic)), remaining = BigInt(atomic(value.remainingDepositAtomic, true));
+    check(typeof value.depositBelowMinimum === 'boolean');
+    if(value.depositBelowMinimum) check(value.amountAtomic !== null && value.burnTxid === null && value.burnAmountAtomic === null &&
+      value.solanaSignature === null && remaining > 0n && BigInt(value.amountAtomic) + remaining === floor);
+    else check(remaining === 0n);
+    Object.assign(minimum, { minimumDepositAtomic: value.minimumDepositAtomic, depositBelowMinimum: value.depositBelowMinimum, remainingDepositAtomic: value.remainingDepositAtomic });
+  }
+  return { operationId: value.operationId, direction: value.direction, state: value.state, ...minimum,
     amountAtomic: value.amountAtomic, destination: value.destination, depositAddress: value.depositAddress, mint: validators.mint,
     depositTxid: value.depositTxid, burnTxid: value.burnTxid, burnAmountAtomic: value.burnAmountAtomic, solanaSignature: value.solanaSignature,
     depositConfirmations: value.depositConfirmations, burnConfirmations: value.burnConfirmations,

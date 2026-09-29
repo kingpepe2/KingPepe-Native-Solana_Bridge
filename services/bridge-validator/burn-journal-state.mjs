@@ -3,7 +3,7 @@
 import { burnOperationId, burnHash, burnUint, burnAmount, validateBurnBinding, validateBurnPlanBlockHints, validateNativeBurnTransaction, encodeFinalizedBurnEvidence, requireBurn as check } from '../../native/burn/burn-protocol.mjs';
 import { NATIVE_MAINNET_GENESIS } from '../../shared/network-identity.mjs';
 import { burnDepositDestination, verifyNativeBurnSignatures } from '../../native/burn/burn-key.mjs';
-import { MAX_KPEPE_SUPPLY_ATOMIC } from '../../shared/monetary-supply.mjs';
+import { MAX_KPEPE_SUPPLY_ATOMIC, MIN_BRIDGE_DEPOSIT_ATOMIC } from '../../shared/monetary-supply.mjs';
 import { parseNativeTransactionHex } from '../../native/node/native-taproot-transaction.mjs';
 import {decodeCanonicalBridgeMessage} from '../../shared/protocol/canonical-message.mjs';
 import {validateBurnContext,assertBurnMessageContext} from './burn-context.mjs';
@@ -17,6 +17,44 @@ export const BURN_STATES = Object.freeze(['DEPOSIT_ADDRESS_ISSUED','DEPOSIT_OBSE
 const same = (a,b) => JSON.stringify(a) === JSON.stringify(b);
 const integer = n => check(Number.isSafeInteger(n) && n >= 0,'BurnJournalIntegerRejected');
 function sameBinding(a,b) { return burnOperationId(a) === burnOperationId(b); }
+const lamports = v => { check(typeof v==='string'&&/^(0|[1-9][0-9]{0,19})$/u.test(v),'BurnReserveAmountRejected'); return BigInt(v); };
+// Records completed before reserve commitments existed carry no commitment.
+// Only the validator's replay of such a completed record may skip the rules
+// below; every live transition is held to them.
+let completedLegacyReplay = null;
+const legacyReplay = id => completedLegacyReplay === id;
+// Mainnet production threshold. Test networks keep the Native dust floor.
+export function minimumBurnDepositAtomic(state) {
+  return state.deployment.nativeGenesis===NATIVE_MAINNET_GENESIS ? MIN_BRIDGE_DEPOSIT_ATOMIC : 330n;
+}
+// SOL held for operations that may still spend it. A commitment is released
+// only by completion, which itself requires the finalized mint receipt.
+export function burnReserveCommitments(state,exceptId=null) {
+  let committed=0n,active=0;
+  for(const op of state.operations) if(op.reserve&&!op.retired&&op.operationId!==exceptId){committed+=lamports(op.reserve.lamports);active++;}
+  return Object.freeze({committedLamports:committed.toString(),activeCommitments:active});
+}
+function reserveRecord(value) {
+  check(value&&Object.keys(value).sort().join()==='balanceLamports,lamports,slot','BurnReserveFieldsRejected');
+  check(lamports(value.lamports)>0n&&lamports(value.balanceLamports)>=lamports(value.lamports),'BurnReserveAmountRejected');burnUint(value.slot);
+  return {lamports:value.lamports,balanceLamports:value.balanceLamports,slot:value.slot};
+}
+function commitBurnReserve(state,id,value,verifyAvailable) {
+  const op=burnJournalRecord(state,id),record=reserveRecord(value);
+  // One commitment per operation. A repeated observation keeps the first.
+  if(op.reserve)return structuredClone(op.reserve);
+  check(!state.execution,'BurnReservePolicyConflict');
+  check(!state.paused&&!op.exception&&!op.retired&&op.plan,'BurnJournalAdmissionStopped');
+  check(op.signedBurnHex===null&&!op.broadcastAttempted&&op.solanaPacket===null,'BurnReserveCommitmentTooLate');
+  if(verifyAvailable)check(lamports(record.balanceLamports)>=BigInt(burnReserveCommitments(state,id).committedLamports)+lamports(record.lamports),
+    'BURN_SOLANA_OPERATIONAL_FUNDING_REQUIRED');
+  op.reserve=record;return structuredClone(record);
+}
+export function retainBurnReserve(state,id,value) { return commitBurnReserve(state,id,value,true); }
+function requireBurnReserve(state,op) {
+  if(state.execution||legacyReplay(op.operationId))return;
+  check(op.reserve,'BURN_RESERVE_COMMITMENT_REQUIRED');
+}
 export function initialBurnJournal(binding,deliveryPolicy=null) {
   const {nonce:_nonce,destination:_destination,...deployment} = validateBurnBinding(binding);
   return {protocol:BURN_JOURNAL_PROTOCOL,deployment,deliveryPolicy,nativeScan:null,paused:true,pauseReason:'INITIAL_REVIEW_REQUIRED',operations:[],
@@ -87,6 +125,7 @@ export function retainBurnPlan(state,id,plan) {
   check(!state.paused&&!op.exception&&!op.retired,'BurnJournalAdmissionStopped');
   check(op.deposit && op.deposit.confirmations>=12,'BurnJournalDepositNotFinal');
   if(op.plan) { check(same(op.plan,plan),'BurnJournalPlanChanged'); return; }
+  if(!legacyReplay(id))check(burnAmount(op.deposit.amountAtomic)>=minimumBurnDepositAtomic(state),'BURN_DEPOSIT_BELOW_MINIMUM');
   check(plan.operationId===id && plan.inputs[0].txid===op.deposit.txid && plan.inputs[0].vout===op.deposit.vout &&
     plan.inputs[0].amountAtomic===op.deposit.amountAtomic && plan.inputs[0].scriptPubKeyHex===op.depositScriptHex,'BurnJournalDepositBindingChanged');
   if(op.binding.nativeGenesis===NATIVE_MAINNET_GENESIS){
@@ -103,7 +142,7 @@ export function retainBurnPlan(state,id,plan) {
 }
 export function retainSignedBurn(state,id,signed) {
   const op=burnJournalRecord(state,id);
-  requireExecutionBurnCommitted(state,id);
+  requireExecutionBurnCommitted(state,id);requireBurnReserve(state,op);
   check(!state.paused&&!op.exception&&op.plan,'BurnJournalAdmissionStopped');
   if(op.signedBurnHex!==null) { check(op.signedBurnHex===signed,'BurnJournalSecondBurnRejected');return; }
   check(parseNativeTransactionHex(signed).strippedHex===op.plan.unsignedTransactionHex,'BurnJournalSignedBurnChanged');
@@ -113,7 +152,7 @@ export function retainSignedBurn(state,id,signed) {
 export function markBurnBroadcast(state,id,accepted=false) {
   requireExecutionBurnCommitted(state,id);
   check(typeof accepted==='boolean','BurnJournalBroadcastFlagRejected');
-  const op=burnJournalRecord(state,id); check(op.signedBurnHex!==null,'BurnJournalPersistSignedBurnFirst');
+  const op=burnJournalRecord(state,id); check(op.signedBurnHex!==null,'BurnJournalPersistSignedBurnFirst');requireBurnReserve(state,op);
   if(!op.broadcastAttempted) check(!state.paused&&!op.exception,'BurnJournalAdmissionStopped');
   op.broadcastAttempted=true;op.broadcastAccepted ||= accepted;
   if(!op.burnEvidence) op.state='BURN_BROADCAST';
@@ -162,7 +201,7 @@ export function retainBurnSolanaPacket(state,id,packet) {
   const op=burnJournalRecord(state,id);check(!state.paused&&state.deliveryPolicy,'BurnJournalAdmissionStopped');
   check(packet.kind==='ATA' ? op.plan&&(!op.broadcastAttempted||op.burnEvidence) : op.burnEvidence&&op.attestation,'BurnJournalPacketNotAuthorized');
   verifyBurnSolanaPacket(packet,state.deliveryPolicy.context,op.binding,state.deliveryPolicy.feePayerHex,op.attestation);
-  requireExecutionSpendIntent(state,id,packet);
+  requireExecutionSpendIntent(state,id,packet);requireBurnReserve(state,op);
   op.solanaPacket??=[];
   const known=op.solanaPacket.find(p=>p.packet.signature===packet.signature);
   if(known){check(same(known.packet,packet),'BurnJournalPacketChanged');return;}
@@ -238,11 +277,20 @@ export function validateBurnJournalState(input) {
     check(scan.recent.at(-1).hash===scan.hash,'BurnJournalCursorRejected');
   }
   for(const op of input.operations) {
-    check(op&&Object.keys(op).sort().join()==='attestation,attestationDraftHex,binding,broadcastAccepted,broadcastAttempted,burnEvidence,createdHeight,deposit,depositAddress,depositScriptHex,exception,mintReceipt,operationId,plan,priorAttestations,retired,signedBurnHex,solanaPacket,state','BurnJournalRecordFieldsRejected');
+    const committed=Object.hasOwn(op??{},'reserve');
+    check(op&&Object.keys(op).filter(k=>k!=='reserve').sort().join()==='attestation,attestationDraftHex,binding,broadcastAccepted,broadcastAttempted,burnEvidence,createdHeight,deposit,depositAddress,depositScriptHex,exception,mintReceipt,operationId,plan,priorAttestations,retired,signedBurnHex,solanaPacket,state','BurnJournalRecordFieldsRejected');
+    // Only a completed record with its finalized mint may predate commitments.
+    // A journal under the separate execution-funding model holds none at all.
+    const legacy=!committed&&(Object.hasOwn(input,'execution')||op.retired===true&&op.state==='COMPLETED'&&op.mintReceipt!==null);
+    completedLegacyReplay=legacy?op.operationId:null;
+    try{
     const issued=issueBurnDeposit(reconstructed,op.binding,op.createdHeight);
     check(issued.operationId===op.operationId&&issued.depositAddress===op.depositAddress&&issued.depositScriptHex===op.depositScriptHex,'BurnJournalDestinationChanged');
     if(op.deposit) recordBurnDeposits(reconstructed,op.operationId,[op.deposit]);
     if(op.plan) retainBurnPlan(reconstructed,op.operationId,op.plan);
+    // Availability was decided against the balance and commitments of that
+    // moment; a reload re-establishes the record, never a new admission.
+    if(committed)commitBurnReserve(reconstructed,op.operationId,op.reserve,false);
     if(op.signedBurnHex) retainSignedBurn(reconstructed,op.operationId,op.signedBurnHex);
     check(typeof op.broadcastAttempted==='boolean'&&typeof op.broadcastAccepted==='boolean'&&(!op.broadcastAccepted||op.broadcastAttempted),'BurnJournalBroadcastFlagRejected');
     if(op.broadcastAttempted) markBurnBroadcast(reconstructed,op.operationId,op.broadcastAccepted);
@@ -282,6 +330,7 @@ export function validateBurnJournalState(input) {
         Array.isArray(op.exception.deposits)&&op.exception.deposits.length<=64,'BurnJournalExceptionRejected');
       built.exception=structuredClone(op.exception);
     }
+    }finally{completedLegacyReplay=null;}
   }
   reconstructed.paused=input.paused;reconstructed.pauseReason=input.pauseReason;
   if(mainnet){reconstructed.mainnetControl=structuredClone(input.mainnetControl);validateMainnetLifecycle(reconstructed);}

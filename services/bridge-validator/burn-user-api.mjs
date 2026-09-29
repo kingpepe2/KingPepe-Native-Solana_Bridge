@@ -36,6 +36,8 @@ export class BurnUserApi {
       solanaNetwork:s.solanaNetwork,walletChain:`solana:${s.environment}`,mint:base58Encode(Buffer.from(s.mintHex,'hex')),
       nativeDepositConfirmations:12,nativeBurnConfirmations:12,decimals:8,symbol:'KPEPE',bridgeFeeAtomic:'0',supply:publicBurnSupply(s),
       executionPolicy:s.executionPolicy,executionFundingReady:s.executionFundingReady,
+      depositAmountModel:'EXACT_RECEIVED',minimumDepositAtomic:s.minimumDepositAtomic,
+      reserveCommittedLamports:s.reserve.committedLamports,reserveActiveCommitments:s.reserve.activeCommitments,
       productionReady:s.productionReady===true,mainnetActivation:s.mainnetActivation==='ENABLED'?'ENABLED':'DISABLED'};
   }
   async createOperation(input){

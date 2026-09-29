@@ -82,7 +82,7 @@ test('protected production composition opens its own paused journal and cannot i
       assert.equal(health.reconciliation,null);assert.equal(health.accounting,null);assert.equal(health.productionReady,false);
       assert.deepEqual(service.journal.read(),before);
       await assert.rejects(service.runtime.resumeReviewedMainnetRuntime(),/ReviewIncomplete/);
-      await assert.rejects(service.runtime.activateUserFundedExecution(),/ReviewIncomplete|Activation/);
+      await assert.rejects(service.runtime.activateUserFundedExecution(),/^Error: ExecutionUserFundedDisabled$/);
       service.journal.pause('OPERATOR_PAUSE');
       const paused=service.journal.read();
       await service.runtime.cycle({readOnly:true});
