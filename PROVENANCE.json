@@ -1744,6 +1744,41 @@
       "notes": "Original KingPepe implementation or regression code; dependency APIs are used without copying upstream implementations.",
       "purpose": "CORE_TEST",
       "reviewDisposition": "KEEP_TEST"
+    },
+    {
+      "path": "integrations/explorer/web/story/frog-card.webp",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe artwork, derived from the project’s own official images for the Bridge page story.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/web/story/frog-portrait-small.webp",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe artwork, derived from the project’s own official images for the Bridge page story.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/web/story/frog-portrait.webp",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe artwork, derived from the project’s own official images for the Bridge page story.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/web/story/king-portrait.webp",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe artwork, derived from the project’s own official images for the Bridge page story.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
+    },
+    {
+      "path": "integrations/explorer/web/story/king-wordmark.webp",
+      "classification": "ORIGINAL_KINGPEPE_CODE",
+      "notes": "Original KingPepe artwork, derived from the project’s own official images for the Bridge page story.",
+      "purpose": "REQUIRED_RUNTIME",
+      "reviewDisposition": "KEEP_FUNCTIONAL"
     }
   ]
 }

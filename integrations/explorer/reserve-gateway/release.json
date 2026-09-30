@@ -92,7 +92,7 @@
     {
       "deployed": "web/bridge-market.js",
       "repository": "integrations/explorer/web/bridge-market.js",
-      "sha256": "8dc95c41a80fd3822118f87a3e3165d6d79717e26e4bad168c7144bca22806d1"
+      "sha256": "d5d1fda1706c2fb6bd755b2bf4048f18ef12901ae546f5cf67b2af373f029895"
     },
     {
       "deployed": "web/bridge-mainnet.js",
@@ -132,17 +132,42 @@
     {
       "deployed": "web/network-story.js",
       "repository": "integrations/explorer/web/network-story.js",
-      "sha256": "d97049259990fc1ca36337674100bd5ab5142d67174bfcb7cfd57fcb9de59455"
+      "sha256": "8408e9ddf92ac37d0c2d7befc562f337d546c9c6c4135ed1694ab5a0d62422d0"
     },
     {
       "deployed": "web/network-story-model.js",
       "repository": "integrations/explorer/web/network-story-model.js",
-      "sha256": "72e10ab537af0313b4e20191f10f71db2df92ab6c10727f253c67528ceda6780"
+      "sha256": "e80a6be9ba2e38198221df1fbb5fa49c9f7939a16a91e5496200af025ebc8e41"
     },
     {
       "deployed": "web/network-story.css",
       "repository": "integrations/explorer/web/network-story.css",
-      "sha256": "a09a3883b38b92687dc59a07c305b14c32147cb196e8d388b32e64b2ccd52029"
+      "sha256": "8c8830dff2e68ba681136ba5f18d4157a36fcd1b7655b2012b9a99d02225f615"
+    },
+    {
+      "deployed": "web/story/frog-portrait.webp",
+      "repository": "integrations/explorer/web/story/frog-portrait.webp",
+      "sha256": "ff7d63d3285349503e3704a07333047ade460350ebf58db00d0e63400646a902"
+    },
+    {
+      "deployed": "web/story/frog-portrait-small.webp",
+      "repository": "integrations/explorer/web/story/frog-portrait-small.webp",
+      "sha256": "6d3108f372983f3854f7a85cc18b9e291384d424a66fa2adf6927782c6110ff8"
+    },
+    {
+      "deployed": "web/story/frog-card.webp",
+      "repository": "integrations/explorer/web/story/frog-card.webp",
+      "sha256": "cc78413b28009adc5f5168bad929c14ea56598ae6f46129e25b4dc228caf4d03"
+    },
+    {
+      "deployed": "web/story/king-portrait.webp",
+      "repository": "integrations/explorer/web/story/king-portrait.webp",
+      "sha256": "cc0ea806fa850a9ae0d8959e4a9776fb30354c20d70ec606ea5facae8512e932"
+    },
+    {
+      "deployed": "web/story/king-wordmark.webp",
+      "repository": "integrations/explorer/web/story/king-wordmark.webp",
+      "sha256": "71f0cd7a22a2b3fed6bf511448cc2941e73362e3424fcccbe5d82c15e1b8c88e"
     },
     {
       "deployed": "src/security.js",
@@ -203,7 +228,7 @@
   "explorerComposition": [
     {
       "deployed": "src/index.js",
-      "sha256": "3d7505d3620fc103abde0c779dee16859056248b722934a409359170ed713239"
+      "sha256": "7e3c274b01d980da0a3deddd77bca257033763c30a4e6630528bc6dadc691dc5"
     },
     {
       "deployed": "src/api/v1.js",
@@ -215,11 +240,11 @@
     },
     {
       "deployed": "web/app.js",
-      "sha256": "a9e5f0f2bb497ca2fd83e82ccbf1d1acb4ab51b9254078f0dc7af65ca0557a42"
+      "sha256": "46e1ee4dbdf4aaa068b459abd68cd437f3c5be23255a9a1844bfca956d38996f"
     },
     {
       "deployed": "web/index.html",
-      "sha256": "563b9653c3e06445be2a7946953e66c7d8e90241e96b22ffe47a5acaa6eea09d"
+      "sha256": "24a155339d2a156dffef2ae58d6dc7c74ee79d9cb3016ab2bb61c0298a4fea69"
     },
     {
       "deployed": "web/bridge-vendor/base.js",

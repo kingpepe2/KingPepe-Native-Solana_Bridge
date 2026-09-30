@@ -1,6 +1,6 @@
 # KingPepe market, network and Bridge
 
-The public [KingPepe Bridge page](https://kingpepe.net/bridge) presents the original KingPepe banner, the full-width Native to Solana Bridge and the native network story, in that order. It shows no market information and requests none. The connected Bridge workflow stacks vertically on phones. There is no sticky Bridge sidebar. The story contains no trading, order-management or wallet-signing controls.
+The public [KingPepe Bridge page](https://kingpepe.net/bridge) presents the original KingPepe banner, the full-width Native to Solana Bridge and the native network story, in that order. It shows no market information and requests none. Below the Bridge, the story shows the native network's current block height, difficulty, hashrate and latest block, the Bridge's published minimum, fee and one-at-a-time policy, and the verified bridged supply, all read from the public API and shown as unavailable when a read fails. The connected Bridge workflow stacks vertically on phones. There is no sticky Bridge sidebar. The story contains no trading, order-management or wallet-signing controls.
 
 ## Market summary
 
