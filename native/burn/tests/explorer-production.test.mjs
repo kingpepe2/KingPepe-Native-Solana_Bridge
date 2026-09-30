@@ -9,7 +9,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {stageProduction,overlay} from './explorer-production-stage.mjs';
-const repository=path.resolve(overlay,'../..'),read=p=>fs.readFileSync(p,'utf8').replaceAll('\r\n','\n');
+const repository=path.resolve(overlay,'../..'),binary=p=>/\.(?:webp|png|jpg)$/u.test(p),read=p=>binary(p)?fs.readFileSync(p):fs.readFileSync(p,'utf8').replaceAll('\r\n','\n');
 const release=JSON.parse(read(path.join(overlay,'reserve-gateway/release.json'))),stage=stageProduction();
 const walk=(dir,base=dir)=>fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?walk(path.join(dir,e.name),base):[path.relative(base,path.join(dir,e.name)).replaceAll('\\','/')]);
 test('every recorded file is present, unchanged, and is the file production composes',()=>{
