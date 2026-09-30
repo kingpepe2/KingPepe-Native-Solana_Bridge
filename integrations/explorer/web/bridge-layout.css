@@ -1,0 +1,107 @@
+/* Bridge page layout: the full-width Bridge, then the network story. */
+.view.market-wide{max-width:1560px;padding:22px 24px 56px;box-sizing:border-box}
+.bridge-market-banner{display:block;width:100%;height:160px;max-width:1280px;object-fit:contain;margin:0 auto 24px;border-radius:12px;background:#0e1813}
+.bridge-market-layout{display:flex;flex-direction:column;gap:36px}
+.bridge-section,.story-section{min-width:0;width:100%}
+body:has(.bridge-market-layout) .kpe-strike,body:has(.bridge-market-layout) .kpe-atmos canvas,body:has(.bridge-market-layout) .kpe-fog{display:none!important}
+body:has(.bridge-market-layout) .kpe-grid,.view.market-wide>*{animation:none!important}
+.bridge-section{position:static;border:1px solid #38513e;border-radius:16px;background:#111c16;overflow:hidden}
+.bridge-section .bridge-page{max-width:none;margin:0;padding:24px}
+.bridge-section .bridge-banner{display:none}
+.bridge-section .bridge-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin:0 0 18px}
+.bridge-section .bridge-heading .bridge-eyebrow{font-size:.7rem;letter-spacing:.13em;color:#b6d0bc;font-weight:650;margin:0 0 9px}
+.bridge-section .bridge-heading h1{font-size:clamp(1.2rem,2vw,1.75rem);letter-spacing:-.025em;margin:0 0 8px}
+.bridge-section .bridge-heading h1>span{color:#a8d69f;margin:0 6px}
+.bridge-section .bridge-heading p{font-size:.78rem;line-height:1.6;margin:0;color:#a8bcaf}
+.bridge-section .bridge-badges{gap:7px;justify-content:flex-end;flex-shrink:0}
+.bridge-section .bridge-badges .pill{font-size:.62rem}
+.bridge-section .bridge-activation{display:flex;gap:12px;align-items:baseline;padding:10px 13px;margin:0 0 12px;border-radius:8px;line-height:1.6}
+.bridge-section .bridge-activation h2{font-size:.69rem;letter-spacing:.04em;white-space:nowrap;margin:0}
+.bridge-section .bridge-activation p{font-size:.73rem;margin:0}
+.bridge-section [data-runtime=ACTIVE] .bridge-activation{background:#152a1b;border-color:#365b3f;color:#b4dcbd}
+.bridge-network-note{color:#a2b8a9;font-size:.65rem;margin:10px 0 16px;line-height:1.5}
+.bridge-workflow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid #304638;border-bottom:1px solid #304638}
+.bridge-step{min-width:0;padding:22px 20px;border-right:1px solid #304638}
+.bridge-step:first-child{padding-left:0}.bridge-step:last-child{padding-right:0;border-right:0}
+.bridge-section .bridge-step h2{display:flex;align-items:center;gap:8px;font-size:.75rem;letter-spacing:.045em;text-transform:uppercase;line-height:1.4;margin:0 0 17px}
+.bridge-step h2>span{display:inline-grid;place-items:center;width:23px;height:23px;flex:none;border-radius:50%;background:#213b29;color:#bde1b3;font-size:.68rem}
+.bridge-step-intro{font-size:.76rem;color:#aebfb3;line-height:1.65;margin:0 0 16px;overflow-wrap:anywhere}
+.bridge-step-intro strong{display:block;color:#b0dfbd;margin-top:7px;font-size:1.1rem;font-weight:550}
+.bridge-section .bridge-help{font-size:.73rem;line-height:1.65;color:#a7bbad}
+.bridge-section .bridge-wallet{margin:0 0 18px}
+.bridge-section .bridge-wallet-actions{gap:8px;flex-wrap:wrap}
+.bridge-section .bridge-page .btn{white-space:normal;font-size:.78rem;min-height:40px;padding:10px 12px;line-height:1.5}
+.bridge-section .bridge-connect{flex-basis:100%;width:100%}
+.bridge-section .bridge-link{font-size:.71rem}
+.bridge-section .bridge-balances{font-size:.71rem;gap:12px}
+.bridge-route-note{display:grid;gap:6px;color:#95ad9b;font-size:.65rem;margin:15px 0}
+.bridge-route-note b{color:#bfd1c3;font-weight:500;margin-left:5px}
+.bridge-section .bridge-advanced{padding:11px 0;border-color:#2e4134}
+.bridge-section .bridge-advanced summary{font-size:.71rem;line-height:1.6}
+.bridge-section .bridge-page input{font-size:.78rem;padding:10px}
+.bridge-section .bridge-page label{font-size:.73rem}
+.bridge-section #br-execution h3{font-size:.71rem;font-weight:500;color:#aebfb3;margin:15px 0 6px}
+.bridge-section #br-execution-cost{font-size:1.02rem;overflow-wrap:anywhere;color:#d5edcc;font-weight:550}
+.bridge-section #br-execution-status{font-size:.73rem;line-height:1.65;color:#bbd9c1;overflow-wrap:anywhere}
+.bridge-section #br-pay{width:100%;margin-bottom:8px}
+.bridge-step-funding[data-funding=ADDITIONAL_SOL_REQUIRED]{background:#302b194d;box-shadow:inset 0 3px #c9a455}
+.bridge-step-funding[data-funding=ADDITIONAL_SOL_REQUIRED] #br-execution-cost{color:#f1d484}
+.bridge-section .bridge-send{padding:0;text-align:left}
+.bridge-section .bridge-send .label{font-size:.62rem;color:#b7ccbb;letter-spacing:.06em}
+.bridge-section .bridge-address{font-size:.72rem;line-height:1.7;padding:11px;margin:9px 0;overflow-wrap:anywhere}
+.bridge-section .bridge-send-amount{font-size:.89rem;line-height:1.65;overflow-wrap:anywhere}
+.bridge-section .bridge-destination{margin-top:18px}
+.bridge-section .bridge-destination .label{font-size:.62rem;letter-spacing:.05em}
+.bridge-section .bridge-destination p{font-size:.72rem;line-height:1.7}
+.bridge-section .bridge-status{margin:0;border-radius:0}
+.bridge-section #br-operation-state{white-space:normal;font-size:.63rem;line-height:1.6}
+.bridge-section .bridge-timeline{display:grid;grid-template-columns:1fr;margin:14px 0;gap:0}
+.bridge-section .bridge-timeline li{display:grid;grid-template-columns:1fr auto;gap:8px;padding:9px 0 9px 19px;border-bottom:1px solid #24382c;min-height:0;text-align:left;font-size:.7rem}
+.bridge-section .bridge-timeline li::before{content:'';position:absolute;left:0;top:13px;width:7px;height:7px;margin:0}
+.bridge-section .bridge-timeline li::after{display:none}
+.bridge-section .bridge-timeline strong,.bridge-section .bridge-timeline small{margin:0;font-size:.68rem;line-height:1.5}
+.bridge-section .bridge-details{grid-template-columns:1fr;font-size:.7rem;gap:4px}.bridge-section .bridge-details dd{margin:0 0 8px}
+.bridge-section .bridge-track{flex-wrap:wrap}.bridge-section .bridge-track input{flex:1;min-width:80px}
+.bridge-section .bridge-notice{padding:12px 0;margin:0;font-size:.78rem}
+.bridge-public-summary{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:30px;padding:20px 0 0}
+.bridge-section .bridge-supply,.bridge-section .bridge-official{padding:0;margin:0;min-width:0}
+.bridge-section .bridge-supply h2,.bridge-section .bridge-official h2{font-size:.75rem;font-weight:550;margin:0}
+.bridge-section .bridge-supply-amount{font-size:1.25rem;margin:8px 0 4px}
+.bridge-section .bridge-supply .bridge-help{font-size:.66rem;margin:4px 0}
+.bridge-section .bridge-supply-row{gap:8px;flex-wrap:wrap}.bridge-section .bridge-supply .pill{font-size:.6rem}
+.bridge-section .bridge-supply progress{margin:9px 0;height:5px}
+.bridge-section .bridge-copy-actions{justify-content:flex-start;align-items:center;flex-wrap:wrap;gap:9px}
+.bridge-section .bridge-copy-actions .btn{font-size:.69rem;min-height:34px;padding:7px 10px}
+.bridge-section .bridge-legal{font-size:.62rem;text-align:left;margin:16px 0 0;color:#8da493}
+.bridge-section button,.bridge-section input,.bridge-section summary{scroll-margin:120px 0 40px}
+/* The market's internal grid never shares a column with the Bridge. */
+@media(max-width:1100px){
+ .view.market-wide{padding:20px 18px 45px}.bridge-section .bridge-page{padding:22px}
+ .bridge-workflow{grid-template-columns:repeat(2,minmax(0,1fr))}.bridge-step{padding:22px!important}
+ .bridge-step:nth-child(2){border-right:0}.bridge-step:nth-child(-n+2){border-bottom:1px solid #304638}
+ 
+}
+@media(max-width:650px){
+ .view.market-wide{padding:14px 12px 35px}.bridge-market-banner{height:auto;max-height:140px;aspect-ratio:1280/427;margin-bottom:20px}
+ .bridge-market-layout{gap:26px}.bridge-section .bridge-page{padding:18px 16px}
+ .bridge-section .bridge-heading{display:block}.bridge-section .bridge-heading h1{font-size:1.2rem;line-height:1.5}
+ .bridge-section .bridge-badges{justify-content:flex-start;margin-top:13px}.bridge-section .bridge-heading p{font-size:.73rem}
+ .bridge-section .bridge-activation{display:block}.bridge-section .bridge-activation h2{margin-bottom:5px}
+ .bridge-workflow{grid-template-columns:minmax(0,1fr)}.bridge-section .bridge-step{padding:23px 0!important;border-right:0;border-bottom:1px solid #304638}
+ .bridge-section .bridge-step:last-child{border-bottom:0}.bridge-section .bridge-step h2{font-size:.78rem;margin-bottom:14px}
+ .bridge-section .bridge-help,.bridge-step-intro{font-size:.78rem}.bridge-section .bridge-page .btn{min-height:44px;font-size:.83rem}
+ .bridge-section .bridge-timeline li{padding:10px 0 10px 23px}.bridge-section .bridge-timeline li::before{top:14px}
+ .bridge-section .bridge-timeline strong,.bridge-section .bridge-timeline small{font-size:.74rem}
+ .bridge-section .bridge-public-summary{grid-template-columns:minmax(0,1fr);gap:24px}.bridge-section .bridge-copy-actions{gap:12px}
+ .bridge-section .bridge-address{font-size:.75rem}.bridge-section .bridge-destination p{font-size:.78rem}
+ .bridge-section .bridge-page button,.bridge-section .bridge-page input,.bridge-section .bridge-page summary{scroll-margin:30px}
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+}
+@media(prefers-reduced-motion:reduce){.bridge-market-layout *{animation:none!important;scroll-behavior:auto!important;transition:none!important}}
+/* An indicative price is shown, and said to be indicative. */

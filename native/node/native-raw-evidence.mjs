@@ -182,9 +182,24 @@ async function collectNativeEvidence({ rpc, transactionIds, minimumConfirmations
     if (transactionIndex < 0) throw new Error("RAW_NATIVE_MERKLE_MEMBERSHIP_MISSING");
     proofs.push({ rawTransactionHex: raw, blockHeight, transactionIndex, transactionIds: ids });
   }
-  if ((await rpc.call("getbestblockhash", [])).result !== tipHash) throw new Error("RAW_NATIVE_SOURCE_CHANGED");
+  await requireNativeChainAnchor(rpc,{genesisHash,chain:profile.chain,tipHeight,tipHash});
   return { genesisHash, tipHash, tipHeight, chainworkHex: hex(info.chainwork, 32).toString("hex"),
     minimumConfirmations, headers, proofs };
+}
+
+// A historical proof commits to a chain prefix, not to an unchanging tip.
+// Normal extension preserves that prefix. A rollback, replaced prefix, wrong
+// network, unsynchronized source or contradictory current tip still rejects it.
+// This is a fresh node observation, never a substitute for the Rust proof.
+export async function requireNativeChainAnchor(rpc,{genesisHash,chain,tipHeight,tipHash}) {
+  hex(genesisHash,32);hex(tipHash,32);integer(tipHeight,MAINNET_PROFILE.maximumHeaders);
+  const current=await rpc.getBlockchainInfo();
+  if(current?.chain!==chain||(await rpc.call('getblockhash',[0])).result!==genesisHash)throw Error('RAW_NATIVE_WRONG_NETWORK');
+  if(current.initialblockdownload!==false||!Number.isSafeInteger(current.blocks)||current.blocks<0||
+    current.headers!==current.blocks)throw Error('RAW_NATIVE_SOURCE_SYNCHRONIZING');
+  if(current.blocks<tipHeight||(await rpc.call('getblockhash',[current.blocks])).result!==current.bestblockhash||
+    (await rpc.call('getblockhash',[tipHeight])).result!==tipHash)throw Error('RAW_NATIVE_SOURCE_CHANGED');
+  return {height:current.blocks,hash:current.bestblockhash};
 }
 
 export function verifyRegtestEvidencePacket({ executable, packet }) {

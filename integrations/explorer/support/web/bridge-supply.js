@@ -36,7 +36,7 @@ export function supplyDisplay(supply) {
 }
 
 // Display-only memory. Nothing here grants transfer admission or changes the
-// 30-second validation rule for accepting a newly verified accounting response.
+// runtime's 30-second economic gate. Display age includes network transit time.
 export function createAccountingDisplay({ now = Date.now } = {}) {
   let snapshot = null, identity = null, verifying = false, issued = 0, applied = 0;
   let newestVerifiedAt = -1, invalidatedThrough = -1;
@@ -45,6 +45,14 @@ export function createAccountingDisplay({ now = Date.now } = {}) {
     if (!Number.isSafeInteger(request) || request <= applied || request > issued) return false;
     applied = request; return true;
   };
+  function displaySupply(value, expected) {
+    const age = now() - value?.observedAt;
+    if (!Number.isSafeInteger(value?.observedAt) || age < -5000 || age > ACCOUNTING_DISPLAY_LIMIT_MS)
+      throw new Error('SUPPLY_UNAVAILABLE');
+    // A response can cross 30 seconds in transit. Its original verification is
+    // still usable only as a bounded, visibly stale display, never as admission.
+    return validateSupply(value, expected, value.observedAt);
+  }
   function retain(value) {
     if (value.observedAt <= invalidatedThrough || value.observedAt < newestVerifiedAt) return false;
     if (snapshot && value.observedAt === snapshot.observedAt && JSON.stringify(value) !== JSON.stringify(snapshot)) {
@@ -74,20 +82,17 @@ export function createAccountingDisplay({ now = Date.now } = {}) {
         if (failed || status?.accountingRefreshState === 'UNAVAILABLE') { clear(); return current(); }
         if (status?.accountingRefreshState === 'VERIFYING' && status.state === 'PAUSED' && status.supply?.state === 'UNAVAILABLE') {
           if (status.lastVerifiedSupply !== undefined) {
-            const retained = status.lastVerifiedSupply, age = now() - retained?.observedAt;
-            if (!Number.isSafeInteger(retained?.observedAt) || age < -5000 || age > ACCOUNTING_DISPLAY_LIMIT_MS)
-              throw new Error('SUPPLY_UNAVAILABLE');
             // Explicitly stale gateway memory, never a fresh accounting source.
             // Validate the unchanged schema at its original verification time;
             // the separate bound above never permits extending that timestamp.
-            const value = validateSupply(retained, expected, retained.observedAt);
+            const value = displaySupply(status.lastVerifiedSupply, expected);
             if (value.state !== 'READY') throw new Error('SUPPLY_UNAVAILABLE');
             retain(value);
           }
           verifying = true; return current();
         }
         if (status?.accountingRefreshState !== 'VERIFIED' || status.state !== 'ACTIVE') { clear(); return current(); }
-        const value = validateSupply(status.supply, expected, now());
+        const value = displaySupply(status.supply, expected);
         if (value.state !== 'READY') { clear(); return current(); }
         if (!retain(value)) return current();
         verifying = false;

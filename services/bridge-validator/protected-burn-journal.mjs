@@ -2,14 +2,14 @@
 // Existing DPAPI/revision/process-exclusion storage, dedicated burn state format.
 import {assertWindowsProtectedStore} from '../../shared/windows/protected-store.mjs';
 import {nativeIdentity} from '../../shared/network-identity.mjs';
-import {validateBurnJournalState} from './burn-journal-state.mjs';
+import {validateBurnJournalState,burnJournalAccounting,burnReserveCommitments,burnAdmissionSummary,minimumBurnDepositAtomic} from './burn-journal-state.mjs';
 
 const instances=new WeakSet();
 export function requireProtectedBurnJournal(value) {
   if(!instances.has(value))throw new Error('ProtectedBurnJournalRequired');
 }
 export class ProtectedBurnJournal {
-  #store;#lease;#closed=false;#busy=false;
+  #store;#lease;#closed=false;#busy=false;#summary=null;
   static async open(store) {
     assertWindowsProtectedStore(store,'BRIDGE_VALIDATOR','burn-operations');
     if(store.context.nativeGenesis!==nativeIdentity(store.context.environment).genesis)
@@ -20,6 +20,8 @@ export class ProtectedBurnJournal {
   }
   #load() {
     if(this.#closed)throw new Error('BurnJournalClosed');this.#lease.assertHeld();
+    // A failed authoritative read must invalidate the last display snapshot.
+    this.#summary=null;
     const {revision,payload}=this.#store.read();
     try {
       const text=payload.toString('utf8'),raw=JSON.parse(text);
@@ -30,23 +32,35 @@ export class ProtectedBurnJournal {
         throw new Error('BurnJournalDeploymentChanged');
       if(state.deliveryPolicy&&(state.deliveryPolicy.context.environment!==context.environment||
         state.deliveryPolicy.context.keyEpoch!==context.keyEpoch))throw new Error('BurnJournalProtectedContextChanged');
-      return {revision,state};
+      this.#publishSummary(state);return {revision,state};
     }finally{payload.fill(0);}
   }
   read(){return this.#load().state;}
+  #publishSummary(state){
+    // Display only. No records, signing material or authorization inputs are
+    // cached. Economic paths continue to read/validate the protected store.
+    this.#summary={paused:state.paused,mainnetControl:{mode:state.mainnetControl?.mode??'TEST'},
+      execution:state.execution?{operatorHold:!!state.execution.operatorHold}:null,accounting:burnJournalAccounting(state),
+      reserve:{...burnReserveCommitments(state)},admission:burnAdmissionSummary(state),minimumDepositAtomic:minimumBurnDepositAtomic(state).toString()};
+  }
+  publicSummary(){
+    if(this.#closed)throw new Error('BurnJournalClosed');this.#lease.assertHeld();
+    if(!this.#summary)throw new Error('BurnJournalPublicSummaryUnavailable');
+    return structuredClone(this.#summary);
+  }
   update(change) {
     if(this.#busy)throw new Error('BurnJournalConcurrentMutation');this.#busy=true;
     try{
       const {revision,state}=this.#load(),result=change(state);
       if(result&&typeof result.then==='function')throw new Error('BurnJournalMutationMustBeSynchronous');
       const validated=validateBurnJournalState(state),payload=Buffer.from(JSON.stringify(validated));
-      try{this.#lease.assertHeld();this.#store.write(payload,revision);}finally{payload.fill(0);}
+      try{this.#lease.assertHeld();this.#store.write(payload,revision);this.#publishSummary(validated);}finally{payload.fill(0);}
       return result;
-    }finally{this.#busy=false;}
+    }catch(error){this.#summary=null;throw error;}finally{this.#busy=false;}
   }
   pause(reason) {
     if(!/^[A-Z0-9_]{1,96}$/u.test(reason))throw new Error('BurnPauseReasonRejected');
     this.update(state=>{state.paused=true;state.pauseReason=reason;});
   }
-  async close(){this.#closed=true;await this.#lease?.close();this.#store?.close();}
+  async close(){this.#closed=true;this.#summary=null;await this.#lease?.close();this.#store?.close();}
 }

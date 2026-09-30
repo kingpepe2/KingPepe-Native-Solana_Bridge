@@ -19,9 +19,9 @@ test('Mainnet journal starts closed, rejects TEST relabeling and binds exactly o
   const missing=structuredClone(empty);delete missing.mainnetControl;assert.throws(()=>validateBurnJournalState(missing),/FieldsRejected/);
   const loaded=validateBurnJournalState(JSON.parse(JSON.stringify(f.state)));
   recordBurnDeposits(loaded,f.id,[f.deposit]);
-  requireMainnetEconomicOperation(loaded,f.id,'100000');
-  assert.throws(()=>requireMainnetEconomicOperation(loaded,'ff'.repeat(32),'100000'),/ControlledOperationOnly/);
-  assert.throws(()=>requireMainnetEconomicOperation(loaded,f.id,'100001'),/ReceivedAmountChanged/);
+  requireMainnetEconomicOperation(loaded,f.id,f.deposit.amountAtomic);
+  assert.throws(()=>requireMainnetEconomicOperation(loaded,'ff'.repeat(32),f.deposit.amountAtomic),/ControlledOperationOnly/);
+  assert.throws(()=>requireMainnetEconomicOperation(loaded,f.id,'100000000001'),/ReceivedAmountChanged/);
   assert.throws(()=>beginMainnetControlled(loaded,{destinationHex:f.binding.destination,nonce:f.binding.nonce,amountModel:'EXACT_RECEIVED'}),/AlreadyPrepared/);
   for(const key of ['nonce','destinationHex','operationId']){
     const changed=structuredClone(loaded);changed.mainnetControl.controlled[key]='ff'.repeat(32);
@@ -34,7 +34,7 @@ test('normal enablement requires the existing completed exact burn/mint; ambiguo
   assert.throws(()=>enableMainnetNormal(f.state),/CompletionRequired/);
   f.finalize();assert.equal(f.state.operations[0].broadcastAccepted,false);
   assert.throws(()=>enableMainnetNormal(f.state),/CompletionRequired/);
-  retainBurnMint(f.state,f.id,{operationId:f.id,amountAtomic:'100000',destination:f.binding.destination,mint:f.binding.mint,
+  retainBurnMint(f.state,f.id,{operationId:f.id,amountAtomic:f.deposit.amountAtomic,destination:f.binding.destination,mint:f.binding.mint,
     signature:'2'.repeat(88),commitment:'finalized',slot:'20'});
   assert.throws(()=>enableMainnetNormal(f.state),/CompletionRequired/);
   completeBurnOperation(f.state,f.id);enableMainnetNormal(f.state);
@@ -48,7 +48,7 @@ test('normal enablement requires the existing completed exact burn/mint; ambiguo
 });
 
 test('controlled processing derives every amount from the received deposit, with separate fees and only the global cap',t=>{
-  for(const amountAtomic of ['330','331','100000000000000',(MAX_KPEPE_SUPPLY_ATOMIC-1_000_000n).toString()]) {
+  for(const amountAtomic of ['100000000000','100000000001','100000000000000',(MAX_KPEPE_SUPPLY_ATOMIC-1_000_000n).toString()]) {
     const f=burnFixture({mainnet:true,amountAtomic});t.after(f.destroy);
     assert.equal(f.state.mainnetControl.controlled.amountModel,'EXACT_RECEIVED');
     assert.equal(Object.hasOwn(f.state.mainnetControl.controlled,'amountAtomic'),false);
@@ -127,7 +127,7 @@ test('verifying initialized disabled production cannot open deposits or bypass c
   assert.equal(verifyBurnDeploymentSnapshot(policy,snapshot).managerMintedAtomic,'0');
   for(const programState of [0,1,4,5,255])assert.deepEqual(mainnetRuntimeFlags(journal,
     {healthy:true,fresh:true,reconciliation:'MATCH',programState}),{productionReady:false,mainnetActivation:'DISABLED'});
-  assert.throws(()=>requireMainnetEconomicOperation(journal,f.id,'100000'),/NotActivated/);
+  assert.throws(()=>requireMainnetEconomicOperation(journal,f.id,f.deposit.amountAtomic),/NotActivated/);
   assert.throws(()=>enableMainnetNormal(journal),/ControlledCompletionRequired/);
   assert.equal(journal.paused,true);assert.equal(journal.mainnetControl.mode,'PREPARED');
   assert.equal(journal.operations.length,0);assert.equal(JSON.stringify(journal),before);

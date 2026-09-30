@@ -71,7 +71,7 @@ try{
   const depositTxid=await harness('sendtoaddress',[deposit.address,'0.00100000'],'user');
   const feeTxid=await harness('sendtoaddress',[fees.address,'0.01000000'],'user');await mine(1);
   const rpc=new NativeRpcClient({endpoint,authCookieFile:cookie,repoRoot});
-  const verifier=new RegtestNativeBurnVerifier({rpc,executable:process.env.KINGPEPE_TEST_NATIVE_VERIFIER});
+  let verifier=new RegtestNativeBurnVerifier({rpc,executable:process.env.KINGPEPE_TEST_NATIVE_VERIFIER});
   const coin=async(txid,scriptPubKeyHex)=>{
     const tx=parseNativeTransactionHex(await rpc.getRawTransaction(txid,false)),vout=tx.outputs.findIndex(o=>o.scriptPubKeyHex===scriptPubKeyHex);
     assert(vout>=0);return {txid,vout,amountAtomic:tx.outputs[vout].amountAtomic,scriptPubKeyHex};
@@ -97,6 +97,37 @@ try{
   assert.throws(()=>requireFinalizedNativeBurn(structuredClone(final),binding,plan));
   assert.equal(final.burnConfirmations,12);assert.equal(final.evidence.amountAtomic,inputs[0].amountAtomic);
   pass('RAW_HEADERS_MERKLE_EXACT_BURN_AND_FINALITY');
+  // Exercise real historical proof caching against the owned chain, never a
+  // serialized journal flag. Only the test harness mines/reorganizes this node.
+  const originalCall=rpc.call.bind(rpc),originalUtxo=rpc.getUtxoObservation.bind(rpc);
+  let headersRead=0,economicCalls=0,advanceAfterProof=false;
+  rpc.call=async(method,...args)=>{if(method==='getblockheader')headersRead++;
+    if(['sendrawtransaction','sendtoaddress'].includes(method))economicCalls++;return originalCall(method,...args);};
+  rpc.getUtxoObservation=async input=>{const result=await originalUtxo(input);
+    // This read follows completed Rust/Merkle/signature verification. Advancing
+    // here reproduces the exact former NativeBurnSourceChanged final-check race.
+    if(advanceAfterProof&&input.txid===plan.txid){advanceAfterProof=false;await mine(1);}return result;};
+  await mine(1);const warm=await verifier.verifyFinalizedBurn({binding,plan});
+  assert.equal(warm,final);assert.equal(headersRead,0);assert.equal(economicCalls,0);pass('VERIFIED_HISTORICAL_BURN_REUSED_WITH_FRESH_MEMBERSHIP');
+  // A fresh independent proof must survive extension between its snapshot and
+  // final anchor check, retaining the original, actually verified prefix.
+  verifier=new RegtestNativeBurnVerifier({rpc,executable:process.env.KINGPEPE_TEST_NATIVE_VERIFIER});
+  advanceAfterProof=true;const advancing=await verifier.verifyFinalizedBurn({binding,plan});
+  assert.equal(advancing.evidenceHex,final.evidenceHex);assert.equal((await rpc.getBlockchainInfo()).blocks,advancing.tipHeight+1);
+  assert(headersRead>0);pass('NORMAL_TIP_ADVANCE_DURING_INDEPENDENT_BURN_VERIFICATION');
+  const tip=await harness('getbestblockhash');await harness('invalidateblock',[tip]);
+  const anchor=await harness('getbestblockhash');await harness('invalidateblock',[anchor]);
+  // A distinct coinbase destination makes the fork different even when a fast
+  // runner mines within the same timestamp; never regenerate an invalidated block.
+  const forkMining=await harness('getnewaddress',['fork','bech32m'],'user');
+  await harness('generatetoaddress',[2,forkMining]);
+  assert.notEqual(await harness('getblockhash',[advancing.tipHeight]),advancing.tipHash);
+  await assert.rejects(verifier.verifyFinalizedBurn({binding,plan}),/NativeBurnSourceChanged/);
+  headersRead=0;const rebuiltProof=await verifier.verifyFinalizedBurn({binding,plan});
+  assert.equal(rebuiltProof.evidenceHex,final.evidenceHex);assert(headersRead>0);pass('REORG_EVICTS_CACHE_AND_REQUIRES_NEW_INDEPENDENT_PROOF');
+  await harness('invalidateblock',[firstBlock]);await assert.rejects(verifier.verifyFinalizedBurn({binding,plan}));
+  await harness('reconsiderblock',[firstBlock]);await mine(12);
+  await verifier.verifyFinalizedBurn({binding,plan});assert.equal(economicCalls,0);pass('CACHED_BURN_DISAPPEARANCE_FAILS_CLOSED_WITHOUT_ECONOMIC_RPC');
   const message=encodeBurnMessage({evidence:final.evidence,policyEpoch:1,keyEpoch:1,validFrom:'1',validUntil:'999999999999'});
   report.operation={operationId:plan.operationId,depositTxid,depositVout:inputs[0].vout,depositAtomic:inputs[0].amountAtomic,
     burnTxid:txid,burnVout:0,burnAtomic:final.evidence.amountAtomic,minerFeeAtomic:plan.feeAtomic,feeFundingTxid:feeTxid,
@@ -105,12 +136,14 @@ try{
   const spend=await rpc.getUtxoObservation({txid,vout:0,includeMempool:true});assert.equal(spend.unspent,false);pass('BURN_UTXO_EXCLUDED');
   const priorCookieDigest=createHash('sha256').update(readFileSync(cookie)).digest('hex');
   await stop();await start();
+  verifier=new RegtestNativeBurnVerifier({rpc,executable:process.env.KINGPEPE_TEST_NATIVE_VERIFIER});
   assert.notEqual(createHash('sha256').update(readFileSync(cookie)).digest('hex'),priorCookieDigest);
   const afterRestart=await verifier.verifyFinalizedBurn({binding,plan});assert.equal(afterRestart.evidenceHex,final.evidenceHex);pass('RESTART_REVERIFIES_IDENTICAL_FINAL_BURN');
   pass('RETAINED_RPC_CLIENT_RECOVERS_ROTATED_NATIVE_COOKIE');
   await assert.rejects(verifier.verifyDepositAdmission({binding,plan}));pass('SPENT_DEPOSIT_CANNOT_BURN_AGAIN');
   const retained=await rpc.getRawTransaction(txid,false);assert.equal(retained,signed);pass('BROADCAST_RECOVERY_FINDS_SAME_BURN_WITHOUT_RESUBMISSION');
   await stop();await start(['-reindex=1']);
+  verifier=new RegtestNativeBurnVerifier({rpc,executable:process.env.KINGPEPE_TEST_NATIVE_VERIFIER});
   for(let n=0;n<240;n++) {
     try {
       const rebuilt=await verifier.verifyFinalizedBurn({binding,plan});assert.equal(rebuilt.evidenceHex,final.evidenceHex);

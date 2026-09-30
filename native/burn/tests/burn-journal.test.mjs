@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { schnorr } from '@noble/curves/secp256k1.js';
 import { burnOperationId,nativeBurnCommitment,planNativeBurn } from '../burn-protocol.mjs';
 import { burnDepositDestination,burnOperationalDestination,signNativeBurnWithKey } from '../burn-key.mjs';
-import { initialBurnJournal,issueBurnDeposit,recordBurnDeposits,retainBurnPlan,retainSignedBurn,markBurnBroadcast,
+import { initialBurnJournal,issueBurnDeposit,recordBurnDeposits,retainBurnPlan,retainBurnReserve,retainSignedBurn,markBurnBroadcast,
   retainFinalBurn,retainBurnMint,completeBurnOperation,burnJournalAccounting,reconcileBurnAccounting,validateBurnJournalState } from '../../../services/bridge-validator/burn-journal-state.mjs';
 
 const h=n=>n.toString(16).padStart(2,'0').repeat(32);
@@ -22,9 +22,10 @@ function fixture() {
     burn:{txid:plan.txid,vout:0},burnBlockHash:h(13),burnHeight:33,amountAtomic:deposit.amountAtomic,
     burnCommitment:nativeBurnCommitment({operationId:id,deposit:{txid:deposit.txid,vout:0},amountAtomic:deposit.amountAtomic})};
   const mint={operationId:id,amountAtomic:'100000',destination:binding.destination,mint:binding.mint,signature:'2'.repeat(88),commitment:'finalized',slot:'123'};
-  const advance=()=>{recordBurnDeposits(state,id,[deposit]);retainBurnPlan(state,id,plan);
+  const reserve={lamports:'10000000',balanceLamports:'50000000',slot:'1'};
+  const advance=()=>{recordBurnDeposits(state,id,[deposit]);retainBurnPlan(state,id,plan);retainBurnReserve(state,id,{...reserve});
     retainSignedBurn(state,id,signNativeBurnWithKey({rootSecret,binding,plan}));markBurnBroadcast(state,id);retainFinalBurn(state,id,evidence);};
-  return {rootSecret,binding,state,id,op,deposit,plan,evidence,mint,advance};
+  return {rootSecret,binding,state,id,op,deposit,plan,evidence,mint,advance,reserve};
 }
 const reload=state=>validateBurnJournalState(JSON.parse(JSON.stringify(state)));
 test('issued operation survives reload and another wallet cannot change its deposit address or destination',()=>{
@@ -43,6 +44,7 @@ test('below finality and orphaned observations cannot retain burn or mint',()=>{
   recordBurnDeposits(f.state,f.id,[]);assert.equal(reload(f.state).operations[0].state,'DEPOSIT_ADDRESS_ISSUED');
   recordBurnDeposits(f.state,f.id,[f.deposit]);retainBurnPlan(f.state,f.id,f.plan);
   assert.throws(()=>retainBurnMint(f.state,f.id,f.mint),/NoFinalizedBurn/);
+  retainBurnReserve(f.state,f.id,{...f.reserve});
   retainSignedBurn(f.state,f.id,signNativeBurnWithKey({rootSecret:f.rootSecret,binding:f.binding,plan:f.plan}));markBurnBroadcast(f.state,f.id);
   assert.throws(()=>retainBurnMint(f.state,f.id,f.mint),/NoFinalizedBurn/);
 });

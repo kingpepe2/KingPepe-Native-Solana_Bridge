@@ -4,6 +4,7 @@
 import {readFileSync,statSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {setTimeout as delay} from 'node:timers/promises';
+import {performance} from 'node:perf_hooks';
 import {validateRuntimeFile} from '../../shared/runtime-path-boundary.mjs';
 import {WindowsProtectedStore} from '../../shared/windows/protected-store.mjs';
 import {openBurnServiceRuntime} from './burn-service-runtime.mjs';
@@ -24,6 +25,20 @@ export function loadBurnServiceConfiguration(file,{mainnet=false}={}) {
   return c;
 }
 
+export async function runBurnReconciliationLoop({runtime,intervalMs,signal,log=()=>{},clock=()=>performance.now(),wait=delay}) {
+  let health='';
+  while(!signal?.aborted) {
+    const started=clock(),result=await runtime.cycle(),next=JSON.stringify([result.state,result.reconciliation,result.reason]);
+    if(next!==health){health=next;log({event:'HEALTH',state:result.state,reconciliation:result.reconciliation,reason:result.reason});}
+    // The interval is a start cadence, not an extra sleep after expensive proof
+    // work. Await each complete cycle; never overlap or mark old proof fresh.
+    // Unverified/failed cycles retain the configured retry backoff.
+    const waitMs=result.reconciliation==='MATCH'&&result.accounting?
+      Math.max(1,intervalMs-Math.max(0,clock()-started)):intervalMs;
+    try{await wait(waitMs,undefined,{signal});}catch(error){if(error.name!=='AbortError')throw error;}
+  }
+}
+
 export async function runBurnService(file,{mainnet=false,resumeReviewedTest=false,signal,log=()=>{}}={}) {
   check(typeof mainnet==='boolean'&&typeof resumeReviewedTest==='boolean'&&!(mainnet&&resumeReviewedTest)&&typeof log==='function','BurnServiceOptionsRejected');
   const configuration=loadBurnServiceConfiguration(file,{mainnet});
@@ -40,12 +55,7 @@ export async function runBurnService(file,{mainnet=false,resumeReviewedTest=fals
     const status=service.runtime.status();
     log({event:mainnet?'MAINNET_SERVICE_LISTENING':'TEST_SERVICE_LISTENING',environment:configuration.runtime.policy.context.environment,
       productionReady:status.productionReady,mainnetActivation:status.mainnetActivation});
-    let health='';
-    while(!signal?.aborted) {
-      const result=await service.runtime.cycle(),next=JSON.stringify([result.state,result.reconciliation,result.reason]);
-      if(next!==health){health=next;log({event:'HEALTH',state:result.state,reconciliation:result.reconciliation,reason:result.reason});}
-      try{await delay(configuration.intervalMs,undefined,{signal});}catch(error){if(error.name!=='AbortError')throw error;}
-    }
+    await runBurnReconciliationLoop({runtime:service.runtime,intervalMs:configuration.intervalMs,signal,log});
   }finally {
     secret?.fill(0);tokenStore?.close();
     // Drain authenticated in-flight requests before releasing journal/signers.

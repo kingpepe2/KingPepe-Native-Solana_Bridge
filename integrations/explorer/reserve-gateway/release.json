@@ -1,0 +1,248 @@
+{
+  "schemaVersion": 1,
+  "release": "RESERVE_FUNDED_PRODUCTION",
+  "runtimeSourceSha": "965ef1039b429f47121c63f204443b092d86514e",
+  "executionPolicy": "LEGACY_OPERATOR_FUNDED",
+  "userFunded": "DISABLED",
+  "maxConcurrentExecutingOperations": 1,
+  "minimumDepositAtomic": "100000000000",
+  "bridgeFeeAtomic": "0",
+  "bridgePage": {
+    "route": "/bridge",
+    "sections": [
+      "BRIDGE",
+      "NETWORK_STORY"
+    ],
+    "marketInformation": "NONE"
+  },
+  "market": {
+    "shownOn": "MAIN_PAGE",
+    "primaryDex": "raydium",
+    "primaryPool": "J3QJDVzWrrPZmSABXicoftFewFFinZuuAhC9vqBRrXbi",
+    "fallback": "OTHER_VERIFIED_POOL_OF_THE_OFFICIAL_MINT",
+    "routes": [
+      "GET /api/v1/market",
+      "GET /api/v1/market/live"
+    ]
+  },
+  "publicRoutes": [
+    "GET /api/v1/bridge/status",
+    "POST /api/v1/bridge/operations",
+    "GET /api/v1/bridge/operations/{operationId}",
+    "GET /api/v1/bridge/balances/{solana|native}/{address}"
+  ],
+  "overlayOrder": [
+    "support",
+    "src",
+    "web",
+    "reserve-gateway"
+  ],
+  "hashing": "SHA-256 of the file with LF line endings",
+  "files": [
+    {
+      "deployed": "src/market-live.js",
+      "repository": "integrations/explorer/src/market-live.js",
+      "sha256": "a16a9ba643fa78a25cec727457c48d740fb7722ad8c34515de3a0938f4985320"
+    },
+    {
+      "deployed": "src/market-chain.js",
+      "repository": "integrations/explorer/src/market-chain.js",
+      "sha256": "b967e154db4d9a2abc20cd9c0701d26825a8031efa06dd8cb7ee1e2ab064302e"
+    },
+    {
+      "deployed": "src/market.js",
+      "repository": "integrations/explorer/src/market.js",
+      "sha256": "e183ff620ff538842b4a879ba0b9a84758c21a8814bc7e6fa258d587d9e4f92c"
+    },
+    {
+      "deployed": "src/snapshot.js",
+      "repository": "integrations/explorer/src/snapshot.js",
+      "sha256": "c15b9752d734f7f3d5c15ef75f3939903927183c13d7d5916c89a8aaa9670e6c"
+    },
+    {
+      "deployed": "src/bridge-connection.js",
+      "repository": "integrations/explorer/src/bridge-connection.js",
+      "sha256": "e821f0eb0beb3c8a4ecefe12e8bda93e9f633c077c9b965284e5f5d1fcf203f5"
+    },
+    {
+      "deployed": "src/bridge-pending.js",
+      "repository": "integrations/explorer/src/bridge-pending.js",
+      "sha256": "d2695ff3bc8d510563457d80d635bca4e09d02c1350236598f20707faf8bcd03"
+    },
+    {
+      "deployed": "src/bridge-profile.js",
+      "repository": "integrations/explorer/src/bridge-profile.js",
+      "sha256": "ee497502fc96b3187dde5eae57e8875ee279901904d204403fc60180a3abe73f"
+    },
+    {
+      "deployed": "src/api/market-live-schema.js",
+      "repository": "integrations/explorer/src/api/market-live-schema.js",
+      "sha256": "9f596af017f4ee49306500fc1759d80f8eb07f7e7aab1cefbd588e6379d44ef3"
+    },
+    {
+      "deployed": "src/api/market-schema.js",
+      "repository": "integrations/explorer/src/api/market-schema.js",
+      "sha256": "f03b7facf641665b77d90664d93ac99f2c651ab22e7f0d7e4332c700da2d6b1f"
+    },
+    {
+      "deployed": "src/api/snapshot-schema.js",
+      "repository": "integrations/explorer/src/api/snapshot-schema.js",
+      "sha256": "87785f42560dd6265c71857a3023fd44e35ab59127c2f567a1113c0e59e86dee"
+    },
+    {
+      "deployed": "web/bridge-market.js",
+      "repository": "integrations/explorer/web/bridge-market.js",
+      "sha256": "8dc95c41a80fd3822118f87a3e3165d6d79717e26e4bad168c7144bca22806d1"
+    },
+    {
+      "deployed": "web/bridge-mainnet.js",
+      "repository": "integrations/explorer/web/bridge-mainnet.js",
+      "sha256": "b1eb5e8e17237171fb8d1ed67bdf427976c003b6452f3d798488138b796c1101"
+    },
+    {
+      "deployed": "web/bridge.css",
+      "repository": "integrations/explorer/web/bridge.css",
+      "sha256": "5b155ad733f2869a35dce8c6ee759e2e7a813554488c8b789c7c77aa5346456e"
+    },
+    {
+      "deployed": "web/bridge-ux.css",
+      "repository": "integrations/explorer/web/bridge-ux.css",
+      "sha256": "9e61e234da23b03c6c388232874a67a448d6e33e3573916bf5d7d898d972cf84"
+    },
+    {
+      "deployed": "web/bridge-layout.css",
+      "repository": "integrations/explorer/web/bridge-layout.css",
+      "sha256": "76b8014a53bcd4a1b7f3174040a9b248a408ecffc0477d35798dae4c6b89b348"
+    },
+    {
+      "deployed": "web/market-identities.js",
+      "repository": "integrations/explorer/web/market-identities.js",
+      "sha256": "76d58fc51e6ebf0fc12ddc78e8706b858b629f99b91cfef00fa19c963a4e517e"
+    },
+    {
+      "deployed": "web/market-summary.js",
+      "repository": "integrations/explorer/web/market-summary.js",
+      "sha256": "00cd8ec3fc6cdbf10aab5325b3e8d671bc858c874450be32348b16c104817d97"
+    },
+    {
+      "deployed": "web/market-summary.css",
+      "repository": "integrations/explorer/web/market-summary.css",
+      "sha256": "b9c3f144016f5999d300113f4dc1105b4d6ce46079b20884072a766d0f874854"
+    },
+    {
+      "deployed": "web/network-story.js",
+      "repository": "integrations/explorer/web/network-story.js",
+      "sha256": "d97049259990fc1ca36337674100bd5ab5142d67174bfcb7cfd57fcb9de59455"
+    },
+    {
+      "deployed": "web/network-story-model.js",
+      "repository": "integrations/explorer/web/network-story-model.js",
+      "sha256": "72e10ab537af0313b4e20191f10f71db2df92ab6c10727f253c67528ceda6780"
+    },
+    {
+      "deployed": "web/network-story.css",
+      "repository": "integrations/explorer/web/network-story.css",
+      "sha256": "a09a3883b38b92687dc59a07c305b14c32147cb196e8d388b32e64b2ccd52029"
+    },
+    {
+      "deployed": "src/security.js",
+      "repository": "integrations/explorer/support/src/security.js",
+      "sha256": "3a48f898544642a659683f73272a8b52b4d460abcb9fe1a03528b58a8b3c9598"
+    },
+    {
+      "deployed": "web/bridge-mobile.js",
+      "repository": "integrations/explorer/support/web/bridge-mobile.js",
+      "sha256": "f292b35db5bdfafd545c6bc169f088006e1a2ee6e16ea976eb2601fd6d8e169f"
+    },
+    {
+      "deployed": "web/bridge-network.js",
+      "repository": "integrations/explorer/support/web/bridge-network.js",
+      "sha256": "19181482d6764ce586880561bd728d87d988034f959d423aa0aa57bd31958b7a"
+    },
+    {
+      "deployed": "web/bridge-pending.js",
+      "repository": "integrations/explorer/support/web/bridge-pending.js",
+      "sha256": "da1c7674e6dba4a8c092116ccb634ecbbcd79797ce92a0f55ad746a6932f098f"
+    },
+    {
+      "deployed": "web/bridge-supply.js",
+      "repository": "integrations/explorer/support/web/bridge-supply.js",
+      "sha256": "f1de737dc3e3f5055a22210943e0430bc0a23578ab9d1c9d033ece7956239bdc"
+    },
+    {
+      "deployed": "web/bridge-wallet.js",
+      "repository": "integrations/explorer/support/web/bridge-wallet.js",
+      "sha256": "7a36730b5fe253c680cffce8b8d470316c5ee2ce0525c2e5c20fc9020bf34be2"
+    },
+    {
+      "deployed": "src/bridge.js",
+      "repository": "integrations/explorer/reserve-gateway/src/bridge.js",
+      "sha256": "d90a118ec9d451b352fa1d0cbd2b8e82e145e6bdc38be8bfd616754911e747b9"
+    },
+    {
+      "deployed": "src/bridge-client.js",
+      "repository": "integrations/explorer/reserve-gateway/src/bridge-client.js",
+      "sha256": "0bf76531e7d86849c2e8c0ca544ae6cccae61dea6c151e41c419ff8db3d37eb9"
+    },
+    {
+      "deployed": "src/bridge-backend.js",
+      "repository": "integrations/explorer/reserve-gateway/src/bridge-backend.js",
+      "sha256": "996d2babb5913531a72bce25556e86e205cdd1ebebe2c985768b0b0bae650ed2"
+    },
+    {
+      "deployed": "web/bridge.js",
+      "repository": "integrations/explorer/reserve-gateway/web/bridge.js",
+      "sha256": "c12170d66b599410f53c3e46863e0f819e1a0cb7239325c328962e7e92f1bdbd"
+    },
+    {
+      "deployed": "web/bridge-presentation.js",
+      "repository": "integrations/explorer/reserve-gateway/web/bridge-presentation.js",
+      "sha256": "0bb3947f4ee652adb9cf460ff5f47cc2171a3c74eb796b1e2b11944a05b90faf"
+    }
+  ],
+  "explorerComposition": [
+    {
+      "deployed": "src/index.js",
+      "sha256": "3d7505d3620fc103abde0c779dee16859056248b722934a409359170ed713239"
+    },
+    {
+      "deployed": "src/api/v1.js",
+      "sha256": "e818c9d29c2b7e70e12da388e44f28b39f0b5a4cda06fa8f18b0e69e3154fd10"
+    },
+    {
+      "deployed": "src/api/openapi.js",
+      "sha256": "83f266f416b9e6eab4f588257047c788ad0583c93bb353322bd5a0be47d49ba1"
+    },
+    {
+      "deployed": "web/app.js",
+      "sha256": "a9e5f0f2bb497ca2fd83e82ccbf1d1acb4ab51b9254078f0dc7af65ca0557a42"
+    },
+    {
+      "deployed": "web/index.html",
+      "sha256": "563b9653c3e06445be2a7946953e66c7d8e90241e96b22ffe47a5acaa6eea09d"
+    },
+    {
+      "deployed": "web/bridge-vendor/base.js",
+      "sha256": "4bd334e6606db7216143c7bffbc5c00716d2c137744a0c48b51495fa6d05444a"
+    },
+    {
+      "deployed": "web/bridge-vendor/wallets.js",
+      "sha256": "36155c770206ac029d5a86348281b721fb7aa7b0a572a8491ff74c095d17ed97"
+    }
+  ],
+  "removedFromProduction": [
+    "web/market-display.js",
+    "web/market-display-model.js",
+    "web/market-display.css",
+    "web/bridge-execution.js"
+  ],
+  "notDeployed": [
+    "integrations/explorer/src/bridge.js",
+    "integrations/explorer/src/bridge-client.js",
+    "integrations/explorer/src/bridge-backend.js",
+    "integrations/explorer/web/bridge.js",
+    "integrations/explorer/web/bridge-presentation.js",
+    "integrations/explorer/web/bridge-execution.js",
+    "integrations/explorer/support/web/bridge-presentation.js"
+  ]
+}

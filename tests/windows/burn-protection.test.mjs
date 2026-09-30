@@ -35,9 +35,24 @@ test('DPAPI burn key and forward journal remain encrypted, role-bound and recove
   assert.throws(()=>signer.sign({binding,plan:{},admission:{}}),/VerifiedBurnDepositAdmissionRequired/);
   const operation=journal.update(state=>issueBurnDeposit(state,binding,21));
   assert.equal(journal.read().operations[0].operationId,operation.operationId);
+  await t.test('public summary is isolated, invalidates on protected failures and cannot replace an authoritative read',()=>{
+    const summary=journal.publicSummary();assert.equal(summary.paused,false);
+    assert.equal(summary.operations,undefined);assert.equal(summary.deployment,undefined);
+    summary.paused=true;summary.accounting.mintedAtomic='999';
+    assert.equal(journal.publicSummary().paused,false);assert.notEqual(journal.publicSummary().accounting.mintedAtomic,'999');
+    const read=t.mock.method(store,'read',()=>{throw Error('ProtectedReadFailure');});
+    try{assert.throws(()=>journal.read(),/ProtectedReadFailure/);assert.throws(()=>journal.publicSummary(),/SummaryUnavailable/);}
+    finally{read.mock.restore();}
+    journal.read();assert.equal(journal.publicSummary().paused,false);
+    const write=t.mock.method(store,'write',()=>{throw Error('ProtectedWriteFailure');});
+    try{assert.throws(()=>journal.pause('TEST_REJECTED_WRITE'),/ProtectedWriteFailure/);assert.throws(()=>journal.publicSummary(),/SummaryUnavailable/);}
+    finally{write.mock.restore();}
+    assert.equal(journal.read().paused,false);assert.equal(journal.publicSummary().paused,false);
+    journal.pause('TEST_COMMITTED_PAUSE');assert.equal(journal.publicSummary().paused,true);
+  });
   // The exclusive lease deliberately prevents file reads while held. Close the
   // stores before inspecting their encrypted at-rest files, then reopen below.
-  await signer.close();await journal.close();signer=null;journal=null;
+  await signer.close();await journal.close();assert.throws(()=>journal.publicSummary(),/BurnJournalClosed/);signer=null;journal=null;
   const allFiles=directory=>readdirSync(directory).flatMap(name=>{const file=path.join(directory,name);return statSync(file).isDirectory()?allFiles(file):[file];});
   for(const file of allFiles(root)){
     const contents=readFileSync(file);assert.equal(contents.includes(Buffer.from(seed)),false);assert.equal(contents.includes(Buffer.from(seed).toString('hex')),false);

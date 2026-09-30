@@ -18,7 +18,7 @@ import {NATIVE_MAINNET_GENESIS,NATIVE_MAINNET_DOMAIN,SOLANA_MAINNET_GENESIS,SOLA
 const h=s=>createHash('sha256').update('PublicMainnetFixture:'+s).digest('hex');
 const nativeValue=atomic=>{const n=BigInt(atomic);return `${n/100000000n}.${(n%100000000n).toString().padStart(8,'0')}`;};
 function fixture(){
- const f=burnFixture(),binding={...f.binding,nativeGenesis:NATIVE_MAINNET_GENESIS,nativeNetwork:NATIVE_MAINNET_DOMAIN,
+ const f=burnFixture({amountAtomic:'100000000000'}),binding={...f.binding,nativeGenesis:NATIVE_MAINNET_GENESIS,nativeNetwork:NATIVE_MAINNET_DOMAIN,
   solanaGenesis:Buffer.from(base58Decode(SOLANA_MAINNET_GENESIS)).toString('hex')};
  binding.solanaDeployment=mainnetDeploymentIdentity({manager:base58Encode(Buffer.from(binding.bridgeProgram,'hex')),
   transceiver:base58Encode(Buffer.from(binding.transceiverProgram,'hex')),mint:base58Encode(Buffer.from(binding.mint,'hex'))});

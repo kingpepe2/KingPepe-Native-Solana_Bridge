@@ -14,6 +14,34 @@ import {executionBudget} from '../bridge-validator/execution-funding-state.mjs';
 import {executionFeeMessages,verifyExecutionPayment,executionTransferMessage,executionRefundMemo,verifyExecutionSignedMessage} from '../bridge-validator/execution-funding-wire.mjs';
 const h=s=>Buffer.from(s,'hex'),hex=b=>Buffer.from(b).toString('hex'),TOKEN='TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 const hash=b=>createHash('sha256').update(b).digest('hex');
+const quotedLamports=(value,code,positive=false)=>{check(typeof value==='string'&&/^(0|[1-9][0-9]{0,19})$/u.test(value)&&(!positive||value!=='0'),code);return BigInt(value);};
+function reserveQuote({feeLamports,rents}={}) {
+  check(rents&&typeof rents==='object','BURN_SOLANA_RESERVE_QUOTE_REJECTED');
+  const fee=quotedLamports(feeLamports,'BURN_SOLANA_RESERVE_QUOTE_REJECTED',true);
+  const rent=Object.fromEntries([0,240,211,73,165].map(size=>[size,quotedLamports(rents[size],'BURN_SOLANA_RENT_QUOTE_UNAVAILABLE')]));
+  return {fee,rent};
+}
+// One complete execution signs five times: token account 1, receipt 3 (payer
+// and two Ed25519 verifications), claim 1. Rejected or replaced packets still
+// pay their signature fee, so eight further signatures are held for retries.
+export const BURN_RESERVE_SIGNATURES = 5n, BURN_RESERVE_RETRY_SIGNATURES = 8n;
+// What one operation may cost from before its token account exists until its
+// mint is finalized. The token account rent is always held, because the owner
+// can close that account at any time before the mint.
+export function burnReserveEnvelope(quote) {
+  const {fee,rent}=reserveQuote(quote);
+  return fee*(BURN_RESERVE_SIGNATURES+BURN_RESERVE_RETRY_SIGNATURES)+rent[0]+rent[240]+rent[211]+2n*rent[73]+rent[165];
+}
+export function burnReserveRemaining(quote,ataExists) {
+  check(typeof ataExists==='boolean','BURN_SOLANA_RESERVE_QUOTE_REJECTED');
+  return burnReserveEnvelope(quote)-(ataExists?reserveQuote(quote).rent[165]:0n);
+}
+export function requireBurnReserveAvailable({balanceLamports,committedElsewhereLamports,requiredLamports}={}) {
+  const balance=quotedLamports(balanceLamports,'BURN_SOLANA_BALANCE_UNAVAILABLE'),held=quotedLamports(committedElsewhereLamports,'BURN_SOLANA_RESERVE_QUOTE_REJECTED'),
+    required=quotedLamports(requiredLamports,'BURN_SOLANA_RESERVE_QUOTE_REJECTED',true);
+  check(balance>=held+required,'BURN_SOLANA_OPERATIONAL_FUNDING_REQUIRED');
+  return (balance-held).toString();
+}
 export function validateBurnSolanaPolicy(input) {
   check(input&&Object.keys(input).sort().join()==='artifacts,context,feePayerHex,manifest','BurnSolanaPolicyFields');
   const p=structuredClone(input);p.context=validateBurnContext(p.context);p.manifest=validateDeploymentManifest(p.manifest);burnHash(p.feePayerHex);
@@ -128,26 +156,54 @@ export class BurnSolanaAdapter {
     else check(!accounts.deposit&&!accounts.burn,'BURN_SOLANA_PARTIAL_MINT_STATE');
     return result;
   }
-  async preBurn(binding,plan,expectedIssuedAtomic,{operationFunded=false}={}) {
+  // committedElsewhereLamports is SOL the journal already holds for other
+  // operations. Only the remainder of the finalized balance may admit this one.
+  async preBurn(binding,plan,expectedIssuedAtomic,{operationFunded=false,committedElsewhereLamports='0',committed=false}={}) {
     const observed=await this.observe(binding,plan);
     check(observed.managerMintedAtomic===expectedIssuedAtomic,'BURN_SOLANA_UNEXPLAINED_ISSUANCE');
     check(burnUint(observed.managerMintedAtomic)+burnUint(plan.inputs[0].amountAtomic)<=MAX_KPEPE_SUPPLY_ATOMIC,'BURN_SOLANA_CAP_UNAVAILABLE');
     check(await this.#rpc.call('getHealth')==='ok','BURN_SOLANA_UNHEALTHY');
     if(operationFunded)return {...observed,...await this.#rpc.latestBlockhash()};
+    check(typeof committed==='boolean','BURN_SOLANA_RESERVE_QUOTE_REJECTED');
     const recent=await this.#rpc.latestBlockhash(),{message}=associatedTokenCreationMessage({binding,feePayerHex:this.#policy.feePayerHex,...recent});
     const quoted=await this.#rpc.call('getFeeForMessage',[message.toString('base64'),{commitment:'finalized'}]);
     check(Number.isSafeInteger(quoted?.value)&&quoted.value>0,'BURN_SOLANA_FEE_QUOTE_UNAVAILABLE');
-    // ATA: one signature, receipt: payer + two Ed25519 verifications, claim:
-    // one signature. No ComputeUnitPrice instruction is included in these plans.
-    let required=BigInt(quoted.value)*5n;
-    for(const size of [0,240,211,73,73,...(observed.ataExists?[]:[165])]){
+    const rents={};
+    for(const size of [0,240,211,73,165]){
       const rent=await this.#rpc.call('getMinimumBalanceForRentExemption',[size,{commitment:'finalized'}]);
-      check(Number.isSafeInteger(rent)&&rent>=0,'BURN_SOLANA_RENT_QUOTE_UNAVAILABLE');required+=BigInt(rent);
+      check(Number.isSafeInteger(rent)&&rent>=0,'BURN_SOLANA_RENT_QUOTE_UNAVAILABLE');rents[size]=String(rent);
     }
-    const balance=await this.#rpc.call('getBalance',[base58Encode(h(this.#policy.feePayerHex)),{commitment:'finalized'}]);
-    check(Number.isSafeInteger(balance?.value)&&balance.value>=0,'BURN_SOLANA_BALANCE_UNAVAILABLE');
-    check(BigInt(balance.value)>=required,'BURN_SOLANA_OPERATIONAL_FUNDING_REQUIRED');
-    return {...observed,...recent,requiredLamports:required.toString()};
+    const quote={feeLamports:String(quoted.value),rents},envelope=burnReserveEnvelope(quote);
+    // Not older than the account snapshot verified above for this operation.
+    const balance=await this.#rpc.call('getBalance',[base58Encode(h(this.#policy.feePayerHex)),{commitment:'finalized',minContextSlot:Number(this.#minimumSlot)}]);
+    check(Number.isSafeInteger(balance?.value)&&balance.value>=0&&Number.isSafeInteger(balance.context?.slot)&&
+      balance.context.slot>=Number(this.#minimumSlot),'BURN_SOLANA_BALANCE_UNAVAILABLE');
+    this.#minimumSlot=String(balance.context.slot);
+    // A committed operation may already have paid for its token account.
+    const required=committed?burnReserveRemaining(quote,observed.ataExists):envelope;
+    requireBurnReserveAvailable({balanceLamports:String(balance.value),committedElsewhereLamports,requiredLamports:required.toString()});
+    return {...observed,...recent,requiredLamports:required.toString(),reserveEnvelopeLamports:envelope.toString(),
+      balanceLamports:String(balance.value),balanceSlot:String(balance.context.slot)};
+  }
+  // The same envelope and finalized balance as pre-burn admission, before any
+  // operation exists. It admits nothing by itself.
+  async reserveAvailable(committedLamports='0') {
+    const verified=await this.deployment();
+    const recent=await this.#rpc.latestBlockhash(),{message}=associatedTokenCreationMessage({binding:{...this.#policy.context.deployment,destination:this.#policy.feePayerHex,nonce:'00'.repeat(32)},feePayerHex:this.#policy.feePayerHex,...recent});
+    const quoted=await this.#rpc.call('getFeeForMessage',[message.toString('base64'),{commitment:'finalized'}]);
+    check(Number.isSafeInteger(quoted?.value)&&quoted.value>0,'BURN_SOLANA_FEE_QUOTE_UNAVAILABLE');
+    const rents={};
+    for(const size of [0,240,211,73,165]){
+      const rent=await this.#rpc.call('getMinimumBalanceForRentExemption',[size,{commitment:'finalized'}]);
+      check(Number.isSafeInteger(rent)&&rent>=0,'BURN_SOLANA_RENT_QUOTE_UNAVAILABLE');rents[size]=String(rent);
+    }
+    const envelope=burnReserveEnvelope({feeLamports:String(quoted.value),rents});
+    const balance=await this.#rpc.call('getBalance',[base58Encode(h(this.#policy.feePayerHex)),{commitment:'finalized',minContextSlot:Number(verified.slot)}]);
+    check(Number.isSafeInteger(balance?.value)&&balance.value>=0&&Number.isSafeInteger(balance.context?.slot)&&
+      balance.context.slot>=Number(verified.slot),'BURN_SOLANA_BALANCE_UNAVAILABLE');
+    this.#minimumSlot=String(balance.context.slot);
+    requireBurnReserveAvailable({balanceLamports:String(balance.value),committedElsewhereLamports:committedLamports,requiredLamports:envelope.toString()});
+    return {reserveEnvelopeLamports:envelope.toString(),balanceLamports:String(balance.value),balanceSlot:String(balance.context.slot)};
   }
   latestBlockhash(){return this.#rpc.latestBlockhash();}
   clock(){return this.#rpc.clock();}
